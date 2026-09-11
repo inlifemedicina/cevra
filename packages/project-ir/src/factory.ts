@@ -18,7 +18,7 @@ export function createEmptyProject(options: CreateProjectOptions = {}): ProjectI
     schemaVersion: CURRENT_SCHEMA_VERSION,
     project: {
       id: options.id ?? randomId(),
-      name: options.name ?? "Untitled Project",
+      name: options.name ?? "CEVRA",
       createdAt: now,
       updatedAt: now,
       defaultLocale: options.locale ?? "pt-BR"
