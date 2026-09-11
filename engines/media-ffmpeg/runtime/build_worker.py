@@ -7,77 +7,78 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ENGINE = HERE.parent
-WORKER_DIR = ENGINE / "worker"
-WORKER_ENTRY = WORKER_DIR / "cevra_media_worker.py"
+WORKER_SOURCE = ENGINE / "worker"
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 
+WORKER_FILES = ("cevra_media_worker.py", "cevra_native_tools.py", "runtime_profile.py")
 
-def run(argv: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
-    proc = subprocess.run(argv, cwd=cwd, env=env)
+
+def run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    proc = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     if proc.returncode != 0:
-        raise SystemExit(proc.returncode)
+        raise SystemExit(f"command failed ({proc.returncode}): {' '.join(argv)}\n{proc.stderr}")
+    return proc
 
 
-def build(output_dir: Path, work_dir: Path | None = None) -> Path:
+def build(output_dir: Path, python_executable: Path) -> Path:
+    """Stage the persistent worker for CEVRA's private managed CPython runtime.
+
+    The worker is intentionally not frozen with PyInstaller. Desktop CEVRA already owns a
+    private CPython runtime (ADR 0007), which is also shared by faster-whisper/WhisperX.
+    Keeping one managed interpreter avoids duplicate runtimes and lets ffmpeg-skill tools run
+    in-process instead of spawning a Python child process for every media operation.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
-    own_temp = work_dir is None
-    temp_context = tempfile.TemporaryDirectory(prefix="cevra-media-build-") if own_temp else None
-    root = Path(temp_context.name) if temp_context else work_dir.resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    vendor = root / "vendor" / "ffmpeg-skill"
-    run([sys.executable, str(HERE / "prepare_vendor.py"), str(vendor)])
+    worker_dir = output_dir / "worker"
+    vendor_dir = output_dir / "vendor" / "ffmpeg-skill"
+    if worker_dir.exists():
+        shutil.rmtree(worker_dir)
+    worker_dir.mkdir(parents=True)
 
-    dist = root / "dist"
-    build_work = root / "pyinstaller"
-    spec = root / "spec"
-    data_arg = f"{vendor}{os.pathsep}vendor/ffmpeg-skill"
+    for name in WORKER_FILES:
+        source = WORKER_SOURCE / name
+        if not source.is_file():
+            raise SystemExit(f"worker source missing: {source}")
+        shutil.copy2(source, worker_dir / name)
+
+    run([sys.executable, str(HERE / "prepare_vendor.py"), str(vendor_dir)])
+
+    entry = worker_dir / "cevra_media_worker.py"
     env = os.environ.copy()
-    env["PYTHONHASHSEED"] = "0"
-    run([
-        sys.executable, "-m", "PyInstaller",
-        "--noconfirm", "--clean", "--onefile", "--console",
-        "--name", "cevra-media-worker",
-        "--paths", str(WORKER_DIR),
-        "--add-data", data_arg,
-        "--distpath", str(dist),
-        "--workpath", str(build_work),
-        "--specpath", str(spec),
-        str(WORKER_ENTRY),
-    ], cwd=ENGINE, env=env)
-
-    executable_name = "cevra-media-worker.exe" if os.name == "nt" else "cevra-media-worker"
-    built = dist / executable_name
-    if not built.is_file():
-        raise SystemExit(f"PyInstaller did not produce {built}")
-    target = output_dir / executable_name
-    shutil.copy2(built, target)
-
-    info = subprocess.run([str(target), "--info"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if info.returncode != 0:
-        raise SystemExit(f"built worker self-check failed:\n{info.stderr}")
+    env.update({
+        "CEVRA_MEDIA_RUNTIME_ROOT": str(output_dir.resolve()),
+        "CEVRA_FFMPEG_SKILL_ROOT": str(vendor_dir.resolve()),
+        "CEVRA_RELEASE_MODE": "0",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    })
+    info = run([str(python_executable), "-I", str(entry), "--info"], env=env)
     parsed = json.loads(info.stdout)
     if parsed.get("version") != VERSIONS["mediaRuntime"]:
-        raise SystemExit("built worker version does not match versions.json")
+        raise SystemExit("staged worker version does not match versions.json")
     upstream = parsed.get("upstream") or {}
     if upstream.get("commit") != VERSIONS["ffmpegSkill"]["commit"]:
-        raise SystemExit("built worker upstream provenance mismatch")
-
-    if temp_context:
-        temp_context.cleanup()
-    return target
+        raise SystemExit("staged worker upstream provenance mismatch")
+    expected_python = VERSIONS["python"]["version"]
+    actual_python = str((parsed.get("python") or {}).get("version") or "")
+    if actual_python and actual_python != expected_python:
+        raise SystemExit(f"managed Python version {actual_python} does not match pin {expected_python}")
+    return entry
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("output", type=Path)
-    ap.add_argument("--work-dir", type=Path)
+    ap.add_argument("--python", type=Path, default=Path(sys.executable), help="CEVRA-managed CPython executable; current interpreter is allowed for development staging")
     args = ap.parse_args()
-    result = build(args.output.resolve(), args.work_dir.resolve() if args.work_dir else None)
+    python_executable = args.python.resolve()
+    if not python_executable.is_file():
+        raise SystemExit(f"Python executable missing: {python_executable}")
+    result = build(args.output.resolve(), python_executable)
     print(result)
     return 0
 
