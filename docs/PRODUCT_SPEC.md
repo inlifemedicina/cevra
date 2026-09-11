@@ -8,6 +8,8 @@ A user can import media, request an edit in natural language, review the determi
 
 The editor remains fully usable without Content OS, external social integrations or a paid AI provider.
 
+A second primary path is one-click recurring production: a user imports media, selects a versioned Workflow / Production Preset and receives a completed edit using approved typed operations, with review remaining available rather than mandatory.
+
 ## Content OS vision
 Content OS extends CEVRA from editing into the full content lifecycle:
 
@@ -35,11 +37,29 @@ The Content OS is optional and must not become a prerequisite for audiovisual ed
 - Headlines, overlays, split-screen and layout presets
 - Typed media operations
 - Style presets separated from content decisions
+- Versioned Workflow / Production Presets for reusable one-click editing flows
+- User-created presets using the same constrained schema as built-in presets
 - Autosave, crash recovery, history/journal and snapshots
 - Technical QA before export
 - PT-BR and EN-US parity
 - Signed in-app updates
 - Codex and Claude-compatible agent bridge
+
+## Workflow / Production Presets
+Workflow Presets are application-level declarative orchestration, not Project IR state and not executable scripts.
+
+They may combine typed steps such as transcription, cleanup, reframing, audio normalization, captions, overlays, composition choices, QA and export profiles. They may reference reusable style/caption/composition presets and expose validated user parameters.
+
+Preset execution must:
+- resolve only to approved typed application commands and provider/engine operations;
+- preserve Project IR as the audiovisual source of truth;
+- journal the preset ID/version and resolved parameters/provenance;
+- remain inspectable, cancelable and recoverable;
+- support PT-BR and EN-US metadata;
+- work without Content OS;
+- never expose arbitrary shell, raw FFmpeg/filtergraph execution or arbitrary executable code.
+
+The canonical boundary is documented in `docs/WORKFLOW_PRESETS.md` and ADR 0010.
 
 ## Content OS architecture reserved from this phase
 - Content-source provider adapters for manual input, URLs, text/documents, transcripts, comments, feeds/APIs and future platform integrations
@@ -64,6 +84,7 @@ The Content OS is optional and must not become a prerequisite for audiovisual ed
 - Content analytics providers
 - Content publishing providers
 - Specialized content intelligence profiles
+- Preset sharing/synchronization and future team/marketplace distribution
 
 ## Out of scope for current Content OS foundation
 - Social-network scrapers
@@ -80,4 +101,5 @@ The Content OS is optional and must not become a prerequisite for audiovisual ed
 - No required terminal use for normal end users
 - Manual control always remains available
 - AI edits must be inspectable and reversible
+- One-click preset workflows must not remove the ability to inspect or manually refine the resulting edit
 - Content OS must be discoverable but optional; users who only want the editor should not be forced through research/ideation workflows
