@@ -18,11 +18,18 @@ from _cevra_runtime import sdr_encoder_args as _cevra_sdr_encoder_args
 from _cevra_runtime import with_decode_acceleration as _cevra_with_decode_acceleration
 
 
+def _cevra_allow_gpl_dev_encoder() -> bool:
+    return os.environ.get("CEVRA_ALLOW_GPL_DEV_ENCODERS", "0") not in ("", "0", "false", "False")
+
+
 def x264_args(crf: int = 18, preset: str = "medium", keep_bt709: bool = True) -> List[str]:
     encoder = os.environ.get("CEVRA_VIDEO_ENCODER_H264", "").strip()
     if encoder:
         return _cevra_sdr_encoder_args(encoder, crf, preset, keep_bt709)
-    return _upstream_x264_args(crf, preset, keep_bt709)
+    if _cevra_allow_gpl_dev_encoder():
+        return _upstream_x264_args(crf, preset, keep_bt709)
+    die("no approved CEVRA H.264 encoder is configured; GPL libx264 fallback is disabled", kind="missing_tool")
+    return []
 
 
 def video_args(meta: Optional[Dict[str, Any]], crf: int = 18, preset: str = "medium") -> List[str]:
@@ -31,11 +38,17 @@ def video_args(meta: Optional[Dict[str, Any]], crf: int = 18, preset: str = "med
         encoder = os.environ.get("CEVRA_VIDEO_ENCODER_HEVC", "").strip()
         if encoder:
             return _cevra_hdr_encoder_args(encoder, meta, crf, preset)
-    else:
-        encoder = os.environ.get("CEVRA_VIDEO_ENCODER_H264", "").strip()
-        if encoder:
-            return _cevra_sdr_encoder_args(encoder, crf, preset, True, meta)
-    return _upstream_video_args(meta, crf, preset)
+        if _cevra_allow_gpl_dev_encoder():
+            return _upstream_video_args(meta, crf, preset)
+        die("no approved CEVRA HEVC encoder is configured for HDR preservation; GPL libx265 fallback is disabled", kind="missing_tool")
+        return []
+    encoder = os.environ.get("CEVRA_VIDEO_ENCODER_H264", "").strip()
+    if encoder:
+        return _cevra_sdr_encoder_args(encoder, crf, preset, True, meta)
+    if _cevra_allow_gpl_dev_encoder():
+        return _upstream_video_args(meta, crf, preset)
+    die("no approved CEVRA H.264 encoder is configured; GPL libx264 fallback is disabled", kind="missing_tool")
+    return []
 
 
 def run(cmd: Sequence[str], *, quiet: bool = False, check: bool = True) -> subprocess.CompletedProcess:
