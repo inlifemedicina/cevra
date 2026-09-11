@@ -138,8 +138,14 @@ test("close cancels and reaps an active subprocess without leaving the worker al
 test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async () => {
   const runtime = createRuntime();
   const tools = await runtime.client.listTools();
-  assert.deepEqual(tools.map((tool) => tool.name), ["cut", "cevra-overlay-media", "cevra-scale", "cevra-speed", "cevra-transcode"]);
+  assert.deepEqual(tools.map((tool) => tool.name), ["cut", "cevra-mux-audio", "cevra-overlay-media", "cevra-scale", "cevra-speed", "cevra-transcode"]);
   assert.equal(JSON.stringify(tools).includes('"argv"'), false);
+  for (const tool of tools.filter((item) => item.name.startsWith("cevra-"))) {
+    assert.equal(tool.inputSchema.additionalProperties, false);
+  }
+  const transcode = tools.find((tool) => tool.name === "cevra-transcode");
+  assert.equal(transcode.inputSchema.properties.video_codec.type, "string");
+  assert.equal(transcode.inputSchema.properties.width.type, "integer");
   await assert.rejects(runtime.client.callTool("redact", {}, "blocked-tool"), /not allowed by CEVRA/);
   await assert.rejects(runtime.client.callTool("cut", { argv: ["--help"] }, "blocked-argv"), /raw argv execution is not allowed/);
   await assert.rejects(runtime.client.callTool("cut", { nested: { argv: ["--help"] } }, "blocked-nested-argv"), /raw argv execution is not allowed/);

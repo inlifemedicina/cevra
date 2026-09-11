@@ -5,6 +5,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import math
 import os
 import platform
 import re
@@ -16,7 +17,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from cevra_native_tools import CUSTOM_TOOLS, call_custom_tool
+from cevra_native_tools import AUDIO_CODECS as DELIVERY_AUDIO_CODECS
+from cevra_native_tools import CUSTOM_TOOLS, DELIVERY_MATRIX, VIDEO_CODECS as DELIVERY_VIDEO_CODECS, call_custom_tool
 import cevra_job_control as job_control
 from runtime_profile import adapt_required_capabilities, configured_profile, ensure_functional_profile
 
@@ -58,6 +60,7 @@ ALLOWED_UPSTREAM_TOOLS = frozenset({
     "audio", "crop", "cut", "fit", "join", "look", "loudness", "probe", "silence",
 })
 ALLOWED_TOOLS = ALLOWED_UPSTREAM_TOOLS | CUSTOM_TOOLS
+DELIVERY_CONTAINERS = frozenset(DELIVERY_MATRIX)
 
 
 def _binary_candidates(name: str) -> List[Path]:
@@ -247,7 +250,8 @@ def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ff
             if not hevc:
                 detail += "; HDR output requires an approved HEVC encoder"
             tools[name] = {"usable": "yes", "detail": detail}
-    tools["cevra-transcode"] = {"usable": "yes" if ffmpeg_present else "no", **({} if ffmpeg_present else {"missing": ["ffmpeg"]})}
+    for name in ("cevra-transcode", "cevra-mux-audio"):
+        tools[name] = {"usable": "yes" if ffmpeg_present else "no", **({} if ffmpeg_present else {"missing": ["ffmpeg"]})}
 
 
 def health() -> Dict[str, Any]:
@@ -387,6 +391,8 @@ def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any
         return {"isError": True, "content": [{"type": "text", "text": f"tool {name} is not allowed by CEVRA"}]}
     if _contains_raw_argv(arguments):
         return {"isError": True, "content": [{"type": "text", "text": "raw argv execution is not allowed by CEVRA"}]}
+    if _contains_non_finite_number(arguments):
+        return {"isError": True, "content": [{"type": "text", "text": "tool arguments must contain only finite numbers"}]}
     _ensure_profile()
     custom = call_custom_tool(name, arguments or {}, VENDOR_ROOT)
     if custom is not None:
@@ -451,8 +457,37 @@ def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any
 
 
 def _custom_tool_specs() -> List[Dict[str, Any]]:
-    object_schema = {"type": "object", "additionalProperties": True}
-    return [{"name": name, "description": f"CEVRA typed media operation: {name}", "inputSchema": object_schema} for name in sorted(CUSTOM_TOOLS)]
+    path = {"type": "string", "minLength": 1}
+    positive = {"type": "number", "exclusiveMinimum": 0}
+    non_negative = {"type": "number", "minimum": 0}
+    positive_integer = {"type": "integer", "minimum": 1}
+    non_negative_integer = {"type": "integer", "minimum": 0}
+    schemas = {
+        "cevra-scale": {
+            "properties": {"input": path, "output": path, "width": positive_integer, "height": positive_integer},
+            "required": ["input", "output", "width", "height"],
+        },
+        "cevra-overlay-media": {
+            "properties": {"base": path, "overlay": path, "output": path, "start": non_negative, "end": positive, "x": non_negative_integer, "y": non_negative_integer, "width": positive_integer, "height": positive_integer, "opacity": {"type": "number", "minimum": 0, "maximum": 1}},
+            "required": ["base", "overlay", "output", "start", "end", "x", "y", "width", "height"],
+        },
+        "cevra-speed": {
+            "properties": {"input": path, "output": path, "factor": {"type": "number", "minimum": 0.0625, "maximum": 16}},
+            "required": ["input", "output", "factor"],
+        },
+        "cevra-transcode": {
+            "properties": {"input": path, "output": path, "container": {"type": "string", "enum": sorted(DELIVERY_CONTAINERS)}, "video_codec": {"type": "string", "enum": sorted(DELIVERY_VIDEO_CODECS)}, "audio_codec": {"type": "string", "enum": sorted(DELIVERY_AUDIO_CODECS)}, "width": positive_integer, "height": positive_integer, "fps": positive, "drop_video": {"type": "boolean"}},
+            "required": ["input", "output"],
+        },
+        "cevra-mux-audio": {
+            "properties": {"video": path, "audio": path, "output": path, "container": {"type": "string", "enum": sorted(DELIVERY_CONTAINERS)}, "audio_codec": {"type": "string", "enum": sorted(DELIVERY_AUDIO_CODECS)}, "replace_existing": {"type": "boolean"}},
+            "required": ["video", "audio", "output"],
+        },
+    }
+    return [
+        {"name": name, "description": f"CEVRA typed media operation: {name}", "inputSchema": {"type": "object", "additionalProperties": False, **schemas[name]}}
+        for name in sorted(CUSTOM_TOOLS)
+    ]
 
 
 def _contains_raw_argv(value: Any) -> bool:
@@ -461,6 +496,18 @@ def _contains_raw_argv(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
     return "argv" in value or any(_contains_raw_argv(child) for child in value.values())
+
+
+def _contains_non_finite_number(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, float):
+        return not math.isfinite(value)
+    if isinstance(value, list):
+        return any(_contains_non_finite_number(item) for item in value)
+    if isinstance(value, dict):
+        return any(_contains_non_finite_number(child) for child in value.values())
+    return False
 
 
 def _remove_raw_argv(value: Any) -> Any:
@@ -513,7 +560,12 @@ def handle(method: str, params: Dict[str, Any]) -> Any:
         encoders = params.get("encoders") or []
         if not isinstance(encoders, list):
             raise ValueError("encoders must be an array")
-        return benchmark(str(params.get("codec") or ""), encoders)
+        codec = params.get("codec")
+        if not isinstance(codec, str) or codec not in {"h264", "h265", "av1"}:
+            raise ValueError("codec must be h264, h265 or av1")
+        if any(not isinstance(encoder, str) or not encoder for encoder in encoders):
+            raise ValueError("encoders must contain non-empty strings")
+        return benchmark(codec, encoders)
     if method == "tools/list":
         upstream = _load_upstream()
         return {"tools": _allowed_tool_specs(upstream) + _custom_tool_specs()}
@@ -561,6 +613,8 @@ def _start_job(request_id: Any, params: Dict[str, Any]) -> Optional[Dict[str, An
         raise PermissionError(f"tool {name} is not allowed by CEVRA")
     if _contains_raw_argv(arguments):
         raise PermissionError("raw argv execution is not allowed by CEVRA")
+    if _contains_non_finite_number(arguments):
+        raise ValueError("tool arguments must contain only finite numbers")
     if _JOB_THREAD is not None or job_control.active_job_id() is not None:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32001, "message": "media worker is busy"}}
     job_control.begin_job(job_id)

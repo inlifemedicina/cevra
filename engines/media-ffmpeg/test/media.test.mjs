@@ -4,6 +4,8 @@ import { FfmpegMediaEngine } from "../dist/index.js";
 
 class FakeWorker {
   calls = [];
+  probeVideoCodec = "h264";
+  probeAudioCodec = "aac";
   async info() {
     return { name: "cevra-media-worker", version: "0.1.0", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
   }
@@ -13,7 +15,7 @@ class FakeWorker {
   async listTools() { return []; }
   async callTool(name, arguments_, jobId, signal) {
     this.calls.push({ name, arguments_, jobId, signal });
-    if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: "h264" }, audio: { codec: "aac", sample_rate: 48000, channels: 2 } } };
+    if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: this.probeVideoCodec }, audio: { codec: this.probeAudioCodec, sample_rate: 48000, channels: 2 } } };
     if (name === "silence") return { structuredContent: { silences: [[1.2, 2.4], [5.0, null]] } };
     return { structuredContent: { status: "completed", output: arguments_.output, probe: { file: arguments_.output, duration: 1.0 } } };
   }
@@ -122,11 +124,78 @@ test("incompatible delivery codec/container pairs are rejected before worker exe
   const engine = new FfmpegMediaEngine(worker);
   await assert.rejects(
     () => engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.webm", container: "webm", videoCodec: "h264", audioCodec: "opus" }, context),
-    /WebM supports VP9\/AV1/
+    /incompatible with WEBM/
   );
   await assert.rejects(
     () => engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.mp4", container: "mp4", audioCodec: "mp3" }, context),
-    /MP4 audio must be AAC/
+    /incompatible with MP4/
   );
   assert.equal(worker.calls.length, 0);
+});
+
+test("inferred containers dispatch compatible defaults instead of H.264/AAC everywhere", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  await engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.webm" }, context);
+  assert.equal(worker.calls[0].name, "cevra-transcode");
+  assert.deepEqual(worker.calls[0].arguments_, {
+    input: "in.mp4", output: "out.webm", container: "webm", video_codec: "vp9", audio_codec: "opus"
+  });
+});
+
+test("audio-only transcode drops video explicitly and rejects video transforms", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  await engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.wav" }, context);
+  assert.deepEqual(worker.calls[0].arguments_, {
+    input: "in.mp4", output: "out.wav", container: "wav", audio_codec: "pcm", drop_video: true
+  });
+
+  worker.calls.length = 0;
+  await assert.rejects(
+    () => engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.wav", width: 100 }, context),
+    /audio-only/
+  );
+  assert.equal(worker.calls.length, 0);
+});
+
+test("stream copy probes real input codecs before dispatch", async () => {
+  const worker = new FakeWorker();
+  worker.probeVideoCodec = "vp9";
+  worker.probeAudioCodec = "opus";
+  const engine = new FfmpegMediaEngine(worker);
+  await engine.execute({ type: "transcode", inputUri: "in.webm", outputUri: "out.webm", videoCodec: "copy", audioCodec: "copy" }, context);
+  assert.deepEqual(worker.calls.map((call) => call.name), ["probe", "cevra-transcode"]);
+  assert.equal(worker.calls[1].arguments_.video_codec, "copy");
+  assert.equal(worker.calls[1].arguments_.audio_codec, "copy");
+
+  const incompatible = new FakeWorker();
+  const incompatibleEngine = new FfmpegMediaEngine(incompatible);
+  await assert.rejects(
+    () => incompatibleEngine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.webm", videoCodec: "copy" }, context),
+    /video codec cannot be copied/
+  );
+  assert.deepEqual(incompatible.calls.map((call) => call.name), ["probe"]);
+});
+
+test("extract-audio forwards its resolved codec through the typed transcode tool", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  await engine.execute({ type: "extract-audio", inputUri: "in.mp4", outputUri: "out.webm", audioCodec: "opus" }, context);
+  assert.equal(worker.calls[0].name, "cevra-transcode");
+  assert.deepEqual(worker.calls[0].arguments_, {
+    input: "in.mp4", output: "out.webm", container: "webm", audio_codec: "opus", drop_video: true
+  });
+});
+
+test("mux-audio preserves or replaces existing audio according to replaceExisting", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  await engine.execute({ type: "mux-audio", videoUri: "video.mp4", audioUri: "new.wav", outputUri: "added.mp4", replaceExisting: false }, context);
+  assert.deepEqual(worker.calls.map((call) => call.name), ["probe", "cevra-mux-audio"]);
+  assert.equal(worker.calls[1].arguments_.replace_existing, false);
+
+  worker.calls.length = 0;
+  await engine.execute({ type: "mux-audio", videoUri: "video.mp4", audioUri: "new.wav", outputUri: "replaced.mp4" }, context);
+  assert.equal(worker.calls[1].arguments_.replace_existing, true);
 });

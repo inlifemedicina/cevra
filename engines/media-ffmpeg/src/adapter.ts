@@ -1,5 +1,10 @@
 import {
   CEVRA_ENGINE_API_VERSION,
+  MEDIA_DELIVERY_MATRIX,
+  resolveAudioDelivery,
+  resolveMediaContainer,
+  resolveTranscodeDelivery,
+  validateCopyCompatibility,
   validateMediaOperation,
   type CapabilityDescriptor,
   type EngineHealth,
@@ -68,8 +73,17 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
         return fileResult(await call("loudness", { input: operation.inputUri, output: operation.outputUri, lufs: operation.targetLufs, ...(operation.truePeakDb !== undefined ? { tp: operation.truePeakDb } : {}) }), operation.outputUri);
       case "audio-fade":
         return fileResult(await call("audio", { input: operation.inputUri, output: operation.outputUri, ...(operation.fadeInMs !== undefined ? { fade_in: seconds(operation.fadeInMs) } : {}), ...(operation.fadeOutMs !== undefined ? { fade_out: seconds(operation.fadeOutMs) } : {}) }), operation.outputUri);
-      case "extract-audio":
-        return fileResult(await call("audio", { input: operation.inputUri, output: operation.outputUri }), operation.outputUri);
+      case "extract-audio": {
+        const delivery = resolveAudioDelivery(operation.outputUri, operation.audioCodec);
+        if (delivery.audioCodec === "copy") validateCopyCompatibility(delivery, await this.probeForDelivery(call, operation.inputUri));
+        return fileResult(await call("cevra-transcode", {
+          input: operation.inputUri,
+          output: operation.outputUri,
+          container: delivery.container,
+          audio_codec: delivery.audioCodec,
+          drop_video: true
+        }), operation.outputUri);
+      }
       case "extract-frame":
         return fileResult(await call("look", { input: operation.inputUri, output: operation.outputUri, at: seconds(operation.atMs), tiles: 1, no_timecode: true }), operation.outputUri);
       case "detect-silence": {
@@ -83,23 +97,53 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
       }
       case "overlay-media":
         return fileResult(await call("cevra-overlay-media", { base: operation.baseUri, overlay: operation.overlayUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), x: operation.x, y: operation.y, width: operation.width, height: operation.height, ...(operation.opacity !== undefined ? { opacity: operation.opacity } : {}) }), operation.outputUri);
-      case "mux-audio":
-        return fileResult(await call("audio", { input: operation.videoUri, replace: operation.audioUri, output: operation.outputUri }), operation.outputUri);
+      case "mux-audio": {
+        const container = resolveMediaContainer(operation.outputUri);
+        const rule = MEDIA_DELIVERY_MATRIX[container];
+        const delivery = { container, audioOnly: false, videoCodec: "copy" as const, audioCodec: rule.defaultAudioCodec };
+        validateCopyCompatibility(delivery, await this.probeForDelivery(call, operation.videoUri));
+        return fileResult(await call("cevra-mux-audio", {
+          video: operation.videoUri,
+          audio: operation.audioUri,
+          output: operation.outputUri,
+          container,
+          audio_codec: rule.defaultAudioCodec,
+          replace_existing: operation.replaceExisting ?? true
+        }), operation.outputUri);
+      }
       case "speed":
         return fileResult(await call("cevra-speed", { input: operation.inputUri, output: operation.outputUri, factor: operation.factor }), operation.outputUri);
-      case "transcode":
-        validateTranscodeCompatibility(operation);
+      case "transcode": {
+        const delivery = resolveTranscodeDelivery({
+          outputUri: operation.outputUri,
+          ...(operation.container ? { container: operation.container } : {}),
+          ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}),
+          ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}),
+          transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined
+        });
+        if (delivery.videoCodec === "copy" || delivery.audioCodec === "copy") {
+          validateCopyCompatibility(delivery, await this.probeForDelivery(call, operation.inputUri));
+        }
         return fileResult(await call("cevra-transcode", {
           input: operation.inputUri,
           output: operation.outputUri,
-          ...(operation.container ? { container: operation.container } : {}),
-          ...(operation.videoCodec ? { video_codec: operation.videoCodec } : {}),
-          ...(operation.audioCodec ? { audio_codec: operation.audioCodec } : {}),
+          container: delivery.container,
+          ...(delivery.videoCodec ? { video_codec: delivery.videoCodec } : {}),
+          audio_codec: delivery.audioCodec,
           ...(operation.width ? { width: operation.width } : {}),
           ...(operation.height ? { height: operation.height } : {}),
-          ...(operation.fps ? { fps: operation.fps } : {})
+          ...(operation.fps ? { fps: operation.fps } : {}),
+          ...(delivery.audioOnly ? { drop_video: true } : {})
         }), operation.outputUri);
+      }
     }
+  }
+
+  private async probeForDelivery(
+    call: (name: string, args: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    inputUri: string
+  ): Promise<MediaProbeResult> {
+    return parseProbe(await call("probe", { inputs: [inputUri] }), inputUri);
   }
 
   private async call(name: string, args: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
@@ -111,33 +155,6 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
       throw new Error(`Media worker tool ${name} returned an invalid result.`);
     }
     return payload;
-  }
-}
-
-function validateTranscodeCompatibility(operation: Extract<MediaOperation, { type: "transcode" }>): void {
-  const container = operation.container;
-  const video = operation.videoCodec;
-  const audio = operation.audioCodec;
-  if (!container) return;
-
-  if (container === "webm") {
-    if (video && !["vp9", "av1", "copy"].includes(video)) throw new Error("WebM supports VP9/AV1 in the CEVRA delivery profile; H.264/H.265 are rejected.");
-    if (audio && !["opus", "copy"].includes(audio)) throw new Error("WebM audio must be Opus or stream copy in the CEVRA delivery profile.");
-  }
-  if (container === "mp4") {
-    if (video === "vp9") throw new Error("VP9 in MP4 is not supported by the CEVRA compatibility profile; use AV1/H.264/H.265 or WebM.");
-    if (audio && !["aac", "copy"].includes(audio)) throw new Error("MP4 audio must be AAC or stream copy in the CEVRA compatibility profile.");
-  }
-  if (container === "mov") {
-    if (video === "vp9") throw new Error("VP9 in MOV is not supported by the CEVRA compatibility profile.");
-    if (audio && !["aac", "pcm", "copy"].includes(audio)) throw new Error("MOV audio must be AAC, PCM or stream copy in the CEVRA compatibility profile.");
-  }
-  if (["wav", "mp3", "m4a"].includes(container)) {
-    if (video || operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined) {
-      throw new Error(`${container.toUpperCase()} is an audio-only delivery container; use extract-audio instead of a video transcode.`);
-    }
-    const allowed = container === "wav" ? ["pcm", "copy"] : container === "mp3" ? ["mp3", "copy"] : ["aac", "copy"];
-    if (audio && !allowed.includes(audio)) throw new Error(`${container.toUpperCase()} audio codec is incompatible with the CEVRA delivery profile.`);
   }
 }
 
