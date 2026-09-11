@@ -5,6 +5,11 @@
   "license": "UNLICENSED",
   "workspaces": ["apps/*", "packages/*", "engines/*"],
   "scripts": {
+    "build": "npm run build -w @cevra/project-ir",
+    "test": "npm run test -w @cevra/project-ir",
     "doctor": "python3 scripts/doctor.py"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
   }
 }
