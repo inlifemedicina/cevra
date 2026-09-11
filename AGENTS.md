@@ -25,3 +25,5 @@ These rules are authoritative for Codex, Claude Code, and any other coding agent
 21. The editor must remain functional when Content OS is disabled or unconfigured.
 22. Specialized content profiles (for example health/medical, business or creator) belong in versioned configuration/skill/policy packs, not in generic Content OS core logic.
 23. Code from external content-intelligence products may be reused only after exact license/provenance audit confirms compatibility with CEVRA's proprietary commercial distribution. Otherwise use independent/clean-room implementation.
+24. Workflow / Production Presets are declarative application-level orchestration. They may resolve only to typed, validated CEVRA commands/providers and must never embed arbitrary code, shell commands, raw FFmpeg arguments/filtergraphs or credentials.
+25. Built-in and user-created presets use the same versioned schema, capability checks and privilege boundary. Presets never replace Project IR or bypass journal/history.
