@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional
+import os
+from typing import Any, Dict, List, Optional, Sequence
 
 
 def _quality_scale(crf: int) -> float:
@@ -15,7 +16,7 @@ def _target_bitrate(meta: Optional[Dict[str, Any]], crf: int, codec: str) -> int
     width = int(video.get("width") or 1920)
     height = int(video.get("height") or 1080)
     fps = float(video.get("fps") or 30.0)
-    bits_per_pixel = 0.080 if codec == "h264" else 0.052
+    bits_per_pixel = {"h264": 0.080, "h265": 0.052, "av1": 0.044}.get(codec, 0.060)
     estimate = width * height * fps * bits_per_pixel * _quality_scale(crf)
     floor = 1_500_000 if codec == "h264" else 1_000_000
     ceiling = 100_000_000 if codec == "h264" else 80_000_000
@@ -40,7 +41,7 @@ def sdr_encoder_args(
     keep_bt709: bool = True,
     meta: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
-    del keep_bt709  # Tagging is handled separately after CEVRA colour-pipeline validation.
+    del keep_bt709  # Colour tags are handled only after the CEVRA colour pipeline validates them.
     bitrate = _target_bitrate(meta, crf, "h264")
     return [
         "-c:v", encoder,
@@ -51,12 +52,32 @@ def sdr_encoder_args(
     ]
 
 
+def hevc_encoder_args(
+    encoder: str,
+    meta: Optional[Dict[str, Any]],
+    crf: int = 20,
+    preset: str = "medium",
+) -> List[str]:
+    video = (meta or {}).get("video") or {}
+    hdr = bool(video.get("hdr"))
+    bitrate = _target_bitrate(meta, crf, "h265")
+    return [
+        "-c:v", encoder,
+        *_preset_args(encoder, preset),
+        "-b:v", str(bitrate),
+        "-pix_fmt", "p010le" if hdr else "yuv420p",
+        "-tag:v", "hvc1",
+        "-movflags", "+faststart",
+    ]
+
+
 def hdr_encoder_args(
     encoder: str,
     meta: Optional[Dict[str, Any]],
     crf: int = 18,
     preset: str = "medium",
 ) -> List[str]:
+    # ffmpeg-skill calls this path only for HDR preservation.
     bitrate = _target_bitrate(meta, crf + 2, "h265")
     return [
         "-c:v", encoder,
@@ -66,3 +87,50 @@ def hdr_encoder_args(
         "-tag:v", "hvc1",
         "-movflags", "+faststart",
     ]
+
+
+def av1_encoder_args(
+    encoder: str,
+    meta: Optional[Dict[str, Any]],
+    crf: int = 24,
+    preset: str = "medium",
+) -> List[str]:
+    video = (meta or {}).get("video") or {}
+    bitrate = _target_bitrate(meta, crf, "av1")
+    return [
+        "-c:v", encoder,
+        *_preset_args(encoder, preset),
+        "-b:v", str(bitrate),
+        "-pix_fmt", "p010le" if video.get("hdr") else "yuv420p",
+    ]
+
+
+def with_decode_acceleration(command: Sequence[str]) -> List[str]:
+    """Inject CEVRA's selected hardware decoder before the first real media input.
+
+    This remains opt-in because hardware decoding can lose to software decoding when a
+    filter-heavy pipeline immediately transfers frames back to system memory. The app may
+    set CEVRA_DECODE_ACCELERATION after a capability/benchmark decision.
+    """
+    acceleration = os.environ.get("CEVRA_DECODE_ACCELERATION", "").strip()
+    cmd = list(command)
+    if not acceleration or "-hwaccel" in cmd:
+        return cmd
+    try:
+        input_index = cmd.index("-i")
+    except ValueError:
+        return cmd
+    if input_index + 1 >= len(cmd):
+        return cmd
+    prefix = cmd[:input_index]
+    source = cmd[input_index + 1]
+    if "-f" in prefix:
+        try:
+            fmt = prefix[prefix.index("-f") + 1]
+            if fmt in ("lavfi", "image2", "rawvideo"):
+                return cmd
+        except (ValueError, IndexError):
+            pass
+    if source == "-" or source.startswith("pipe:"):
+        return cmd
+    return cmd[:input_index] + ["-hwaccel", acceleration] + cmd[input_index:]
