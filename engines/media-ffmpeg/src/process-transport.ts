@@ -1,4 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import type { PersistentWorkerTransport } from "./persistent-worker.js";
 
 export interface MediaWorkerProcessOptions {
@@ -58,9 +60,22 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   }
 
   private async spawnWorker(): Promise<void> {
-    const child = spawn(this.options.pythonExecutable, ["-s", "-B", this.options.workerScript], {
+    const runtimeRoot = resolve(dirname(this.options.workerScript), "..");
+    const sourceEnv = this.options.env ?? process.env;
+    const releaseMode = existsSync(join(runtimeRoot, "manifest.json")) || isEnabled(sourceEnv.CEVRA_RELEASE_MODE);
+    const env = { ...sourceEnv };
+    env.PYTHONNOUSERSITE = "1";
+    env.PYTHONDONTWRITEBYTECODE = "1";
+    if (releaseMode) {
+      for (const name of PYTHON_PROCESS_OVERRIDES) delete env[name];
+      for (const name of CEVRA_RELEASE_OVERRIDES) delete env[name];
+      env.CEVRA_MEDIA_RUNTIME_ROOT = runtimeRoot;
+      env.CEVRA_RELEASE_MODE = "1";
+      env.PATH = join(runtimeRoot, "bin");
+    }
+    const child = spawn(this.options.pythonExecutable, ["-I", "-B", this.options.workerScript], {
       ...(this.options.cwd ? { cwd: this.options.cwd } : {}),
-      ...(this.options.env ? { env: this.options.env } : {}),
+      env,
       shell: false,
       windowsHide: true
     });
@@ -155,6 +170,21 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
     }
     this.pending.clear();
   }
+}
+
+const PYTHON_PROCESS_OVERRIDES = [
+  "CONDA_PREFIX", "DYLD_FALLBACK_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH",
+  "LD_LIBRARY_PATH", "LD_PRELOAD", "PYTHONBREAKPOINT", "PYTHONCASEOK", "PYTHONEXECUTABLE",
+  "PYTHONHOME", "PYTHONINSPECT", "PYTHONPATH", "PYTHONPLATLIBDIR", "PYTHONSTARTUP",
+  "PYTHONUSERBASE", "PYTHONWARNINGS", "VIRTUAL_ENV"
+] as const;
+
+const CEVRA_RELEASE_OVERRIDES = [
+  "CEVRA_ALLOW_GPL_DEV_ENCODERS", "CEVRA_FFMPEG_SKILL_ROOT", "CEVRA_MEDIA_BIN_DIR", "CEVRA_MEDIA_RUNTIME_ROOT"
+] as const;
+
+function isEnabled(value: string | undefined): boolean {
+  return value !== undefined && !["", "0", "false", "False"].includes(value);
 }
 
 function abortError(): Error {

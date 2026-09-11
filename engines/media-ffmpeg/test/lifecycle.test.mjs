@@ -13,7 +13,9 @@ const workerScript = path.join(engine, "worker", "cevra_media_worker.py");
 const patchScript = path.join(engine, "runtime", "patch_ffmpeg_skill.py");
 const runtimeModule = path.join(engine, "runtime", "_cevra_runtime.py");
 const vendor = path.join(here, "fixtures", "vendor");
-const python = process.env.CEVRA_TEST_PYTHON || "python3";
+const requestedPython = process.env.CEVRA_TEST_PYTHON || "python3";
+const resolvedPython = spawnSync(requestedPython, ["-c", "import sys; print(sys.executable)"], { encoding: "utf8" });
+const python = resolvedPython.status === 0 ? resolvedPython.stdout.trim() : requestedPython;
 
 function createRuntime(options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-media-lifecycle-"));
@@ -152,7 +154,7 @@ test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async (
   await runtime.client.close();
 });
 
-test("release worker resolves ffmpeg and ffprobe only from its runtime bin directory", async () => {
+test("release worker ignores PATH/bin overrides and fails closed without its bundle manifest", async () => {
   const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-release-runtime-"));
   const systemBin = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-system-bin-"));
   const runtimeBin = path.join(runtimeRoot, "bin");
@@ -186,12 +188,7 @@ test("release worker resolves ffmpeg and ffprobe only from its runtime bin direc
   assert.equal(direct.stdout.trim(), "none");
   const runtime = createRuntime({ releaseMode: true, runtimeRoot, pathValue: `${systemBin}${path.delimiter}${process.env.PATH || ""}` });
   try {
-    const result = await runtime.client.callTool("cut", { resolveTools: true }, "release-tools");
-    const canonicalBin = path.join(fs.realpathSync(runtimeRoot), "bin");
-    assert.equal(result.structuredContent.ffmpeg, path.join(canonicalBin, `ffmpeg${suffix}`));
-    assert.equal(result.structuredContent.ffprobe, path.join(canonicalBin, `ffprobe${suffix}`));
-    assert.equal(fs.realpathSync(result.structuredContent.executed_ffmpeg), path.join(canonicalBin, `ffmpeg${suffix}`));
-    assert.equal(fs.realpathSync(result.structuredContent.executed_ffprobe), path.join(canonicalBin, `ffprobe${suffix}`));
+    await assert.rejects(runtime.client.info(), /manifest|runtime component/i);
   } finally {
     await runtime.client.close();
   }

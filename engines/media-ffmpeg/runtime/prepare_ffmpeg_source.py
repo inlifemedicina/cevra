@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -14,6 +15,14 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 PIN = VERSIONS["ffmpeg"]
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def download(url: str, destination: Path) -> None:
@@ -66,10 +75,14 @@ def prepare(destination: Path) -> Path:
             shutil.rmtree(target)
         shutil.copytree(source, target, symlinks=True)
         provenance = {
+            "id": "ffmpeg-source",
             "version": PIN["version"],
             "source": PIN["source"],
             "signature": PIN["signature"],
             "signingFingerprint": PIN["signingFingerprint"],
+            "archiveSha256": sha256(archive),
+            "signatureSha256": sha256(signature),
+            "signingKeySha256": sha256(key),
             "verified": True,
         }
         (target / "CEVRA_SOURCE_PROVENANCE.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")

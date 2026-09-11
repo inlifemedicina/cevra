@@ -14,7 +14,7 @@ ENGINE = HERE.parent
 WORKER_SOURCE = ENGINE / "worker"
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 
-WORKER_FILES = ("cevra_media_worker.py", "cevra_native_tools.py", "cevra_job_control.py", "runtime_profile.py")
+WORKER_FILES = ("cevra_media_worker.py", "cevra_native_tools.py", "cevra_job_control.py", "runtime_integrity.py", "runtime_profile.py")
 
 
 def run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -55,7 +55,25 @@ def build(output_dir: Path, python_executable: Path) -> Path:
             raise SystemExit(f"worker source missing: {source}")
         shutil.copy2(source, worker_dir / name)
 
-    run([sys.executable, str(HERE / "prepare_vendor.py"), str(vendor_dir)])
+    run([str(python_executable), "-I", "-B", str(HERE / "prepare_vendor.py"), str(vendor_dir)])
+
+    repository_root = ENGINE.parents[1]
+    for name in ("NOTICE", "THIRD_PARTY_LICENSES.md"):
+        source = repository_root / name
+        if not source.is_file():
+            raise SystemExit(f"required release notice missing: {source}")
+        shutil.copy2(source, output_dir / name)
+    python_root = python_executable.parent.parent
+    python_license = next((candidate for candidate in (
+        python_root / "LICENSE.txt",
+        python_root / "LICENSE",
+        python_root / "lib" / f"python{VERSIONS['python']['series']}" / "LICENSE.txt",
+    ) if candidate.is_file()), None)
+    if python_license is None:
+        raise SystemExit("managed Python license text is missing")
+    license_dir = output_dir / "licenses" / "python"
+    license_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(python_license, license_dir / "LICENSE.txt")
 
     entry = worker_dir / "cevra_media_worker.py"
     env = os.environ.copy()
@@ -66,7 +84,7 @@ def build(output_dir: Path, python_executable: Path) -> Path:
         "PYTHONNOUSERSITE": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
     })
-    info = run([str(python_executable), "-s", str(entry), "--info"], env=env)
+    info = run([str(python_executable), "-I", "-B", str(entry), "--info"], env=env)
     parsed = json.loads(info.stdout)
     if parsed.get("version") != VERSIONS["mediaRuntime"]:
         raise SystemExit("staged worker version does not match versions.json")

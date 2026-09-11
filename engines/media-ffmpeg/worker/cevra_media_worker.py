@@ -17,10 +17,12 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from cevra_native_tools import AUDIO_CODECS as DELIVERY_AUDIO_CODECS
-from cevra_native_tools import CUSTOM_TOOLS, DELIVERY_MATRIX, VIDEO_CODECS as DELIVERY_VIDEO_CODECS, call_custom_tool
-import cevra_job_control as job_control
-from runtime_profile import adapt_required_capabilities, configured_profile, ensure_functional_profile
+WORKER_FILE = Path(__file__).absolute()
+WORKER_DIRECTORY = WORKER_FILE.parent
+if str(WORKER_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(WORKER_DIRECTORY))
+
+from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
 WORKER_VERSION = "0.1.0"
 PROTOCOL_VERSION = 1
@@ -28,30 +30,50 @@ UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
 UPSTREAM_CONTRACT = "1.0"
 EXPECTED_FFMPEG_VERSION = "9.0.1"
+EXPECTED_FFMPEG_SOURCE = "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz"
+EXPECTED_FFMPEG_SIGNATURE = "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz.asc"
+EXPECTED_FFMPEG_FINGERPRINT = "FCF986EA15E6E293A5644F10B4322F04D67658D8"
+EXPECTED_PYTHON_VERSION = "3.12.14"
 
 
 def _external_runtime_root() -> Path:
     configured = os.environ.get("CEVRA_MEDIA_RUNTIME_ROOT")
     if configured:
         return Path(configured).resolve()
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent.parent
+    return WORKER_DIRECTORY.parent.resolve()
 
 
-def _bundle_root() -> Path:
-    frozen = getattr(sys, "_MEIPASS", None)
-    if frozen:
-        return Path(str(frozen)).resolve()
-    return _external_runtime_root()
-
-
-RUNTIME_ROOT = _external_runtime_root()
-os.environ["CEVRA_MEDIA_RUNTIME_ROOT"] = str(RUNTIME_ROOT)
-BUNDLE_ROOT = _bundle_root()
-VENDOR_ROOT = Path(os.environ.get("CEVRA_FFMPEG_SKILL_ROOT", str(BUNDLE_ROOT / "vendor" / "ffmpeg-skill"))).resolve()
-RELEASE_MODE = os.environ.get("CEVRA_RELEASE_MODE", "0") not in ("", "0", "false", "False")
+RELEASE_MODE = release_mode_for(WORKER_FILE)
+RUNTIME_ROOT = WORKER_DIRECTORY.parent.absolute() if RELEASE_MODE else _external_runtime_root()
+if RELEASE_MODE:
+    if not sys.flags.isolated:
+        raise RuntimeError("release media worker requires CPython isolated mode (-I)")
+    sanitize_release_environment(RUNTIME_ROOT)
+else:
+    os.environ["CEVRA_MEDIA_RUNTIME_ROOT"] = str(RUNTIME_ROOT)
+VENDOR_ROOT = (RUNTIME_ROOT / "vendor" / "ffmpeg-skill") if RELEASE_MODE else Path(os.environ.get("CEVRA_FFMPEG_SKILL_ROOT", str(RUNTIME_ROOT / "vendor" / "ffmpeg-skill"))).resolve()
 BIN_DIR = (RUNTIME_ROOT / "bin").resolve() if RELEASE_MODE else Path(os.environ.get("CEVRA_MEDIA_BIN_DIR", str(RUNTIME_ROOT / "bin"))).resolve()
+
+if RELEASE_MODE:
+    verify_release_bundle(
+        RUNTIME_ROOT,
+        Path(sys.executable),
+        expected_python=EXPECTED_PYTHON_VERSION,
+        expected_ffmpeg=EXPECTED_FFMPEG_VERSION,
+        expected_ffmpeg_source=EXPECTED_FFMPEG_SOURCE,
+        expected_ffmpeg_signature=EXPECTED_FFMPEG_SIGNATURE,
+        expected_ffmpeg_fingerprint=EXPECTED_FFMPEG_FINGERPRINT,
+        expected_worker=WORKER_VERSION,
+        expected_upstream_version=UPSTREAM_VERSION,
+        expected_upstream_commit=UPSTREAM_COMMIT,
+        expected_upstream_contract=UPSTREAM_CONTRACT,
+    )
+
+from cevra_native_tools import AUDIO_CODECS as DELIVERY_AUDIO_CODECS
+from cevra_native_tools import CUSTOM_TOOLS, DELIVERY_MATRIX, VIDEO_CODECS as DELIVERY_VIDEO_CODECS, call_custom_tool
+import cevra_job_control as job_control
+from runtime_profile import adapt_required_capabilities, configured_profile, ensure_functional_profile
+
 _UPSTREAM: Any = None
 _CONTROL_STDOUT = sys.stdout
 _CONTROL_WRITE_LOCK = threading.Lock()
@@ -80,7 +102,9 @@ def _prepare_path() -> None:
 def _tool(name: str) -> Optional[str]:
     for candidate in _binary_candidates(name):
         if candidate.is_file():
-            return str(candidate.resolve())
+            resolved = candidate.resolve()
+            if not RELEASE_MODE or _is_within(str(resolved), BIN_DIR):
+                return str(resolved)
     if RELEASE_MODE:
         return None
     _prepare_path()
@@ -189,7 +213,12 @@ def _read_vendor_provenance() -> Dict[str, Any]:
     if not provenance_path.is_file():
         raise RuntimeError("vendored ffmpeg-skill CEVRA_PROVENANCE.json is missing; build patch was not applied")
     provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
-    if provenance.get("version") != UPSTREAM_VERSION or provenance.get("commit") != UPSTREAM_COMMIT:
+    if (
+        provenance.get("upstream") != "kajisho5/ffmpeg-skill"
+        or provenance.get("version") != UPSTREAM_VERSION
+        or provenance.get("commit") != UPSTREAM_COMMIT
+        or provenance.get("patch") != "CEVRA_MEDIA_RUNTIME_PATCH_V1"
+    ):
         raise RuntimeError("vendored ffmpeg-skill provenance does not match CEVRA pin")
     return provenance
 

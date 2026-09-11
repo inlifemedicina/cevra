@@ -24,3 +24,17 @@ declare module "node:child_process" {
   }
   export function spawn(command: string, args: readonly string[], options: SpawnOptionsWithoutStdio): ChildProcessWithoutNullStreams;
 }
+
+declare module "node:fs" {
+  export function existsSync(path: string): boolean;
+}
+
+declare module "node:path" {
+  export function dirname(path: string): string;
+  export function join(...paths: string[]): string;
+  export function resolve(...paths: string[]): string;
+}
+
+declare const process: {
+  env: Record<string, string | undefined>;
+};

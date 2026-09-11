@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -42,6 +44,14 @@ PLATFORM_FLAGS = {
 }
 
 
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def run(argv: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
     proc = subprocess.run(argv, cwd=cwd, env=env)
     if proc.returncode != 0:
@@ -68,8 +78,19 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
     if not provenance.is_file():
         raise SystemExit("refusing unverified FFmpeg source: CEVRA_SOURCE_PROVENANCE.json missing")
     source_info = json.loads(provenance.read_text(encoding="utf-8"))
-    if source_info.get("version") != PIN["version"] or source_info.get("verified") is not True:
+    required_source = {
+        "id": "ffmpeg-source",
+        "version": PIN["version"],
+        "source": PIN["source"],
+        "signature": PIN["signature"],
+        "signingFingerprint": PIN["signingFingerprint"],
+        "verified": True,
+    }
+    if any(source_info.get(key) != value for key, value in required_source.items()):
         raise SystemExit("FFmpeg source provenance does not match the pinned verified release")
+    for field in ("archiveSha256", "signatureSha256", "signingKeySha256"):
+        if re.fullmatch(r"[0-9a-f]{64}", str(source_info.get(field) or "")) is None:
+            raise SystemExit(f"FFmpeg source provenance is missing {field}")
 
     prefix.mkdir(parents=True, exist_ok=True)
     flags = [*COMMON_FLAGS, *PLATFORM_FLAGS[system], f"--prefix={prefix}"]
@@ -99,11 +120,55 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
     first = version.splitlines()[0] if version else ""
     if PIN["version"] not in first:
         raise SystemExit(f"built FFmpeg version mismatch: {first}")
+    version_match = re.search(r"ffmpeg version\s+([^\s]+)", first)
+    if version_match is None:
+        raise SystemExit(f"could not identify built FFmpeg: {first}")
+    actual_version = version_match.group(1)
     buildconf = subprocess.run([str(binary), "-buildconf"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True).stdout
     if "--enable-gpl" in buildconf or "--enable-nonfree" in buildconf or "--enable-libx264" in buildconf or "--enable-libx265" in buildconf:
         raise SystemExit("release FFmpeg contains forbidden GPL/nonfree configuration")
     if "--disable-autodetect" not in buildconf:
         raise SystemExit("release FFmpeg provenance is missing --disable-autodetect")
+
+    probe_version_output = subprocess.run([str(probe), "-version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True).stdout
+    probe_first = probe_version_output.splitlines()[0] if probe_version_output else ""
+    if PIN["version"] not in probe_first:
+        raise SystemExit(f"built ffprobe version mismatch: {probe_first}")
+    probe_match = re.search(r"ffprobe version\s+([^\s]+)", probe_first)
+    if probe_match is None:
+        raise SystemExit(f"could not identify built ffprobe: {probe_first}")
+    actual_probe_version = probe_match.group(1)
+    configure_flags = sorted(set(part for part in buildconf.split() if part.startswith("--")))
+    configure_hash = hashlib.sha256("\n".join(configure_flags).encode("utf-8")).hexdigest()
+    license_name = "LGPL-3.0-or-later" if "--enable-version3" in configure_flags else "LGPL-2.1-or-later"
+
+    license_source = source / "COPYING.LGPLv2.1"
+    if not license_source.is_file():
+        raise SystemExit("verified FFmpeg source is missing COPYING.LGPLv2.1")
+    license_directory = prefix / "licenses" / "ffmpeg"
+    license_directory.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(license_source, license_directory / "COPYING.LGPLv2.1")
+
+    provenance_directory = prefix / "provenance"
+    provenance_directory.mkdir(parents=True, exist_ok=True)
+    build_provenance = {
+        "id": "ffmpeg",
+        "version": actual_version,
+        "probeVersion": actual_probe_version,
+        "license": license_name,
+        "source": source_info["source"],
+        "sourceSignature": source_info["signature"],
+        "signingFingerprint": source_info["signingFingerprint"],
+        "sourceArchiveSha256": source_info["archiveSha256"],
+        "sourceSignatureSha256": source_info["signatureSha256"],
+        "signingKeySha256": source_info["signingKeySha256"],
+        "verified": True,
+        "configureFlags": configure_flags,
+        "configureFlagsSha256": configure_hash,
+        "ffmpegSha256": sha256(binary),
+        "ffprobeSha256": sha256(probe),
+    }
+    (provenance_directory / "ffmpeg.json").write_text(json.dumps(build_provenance, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> int:

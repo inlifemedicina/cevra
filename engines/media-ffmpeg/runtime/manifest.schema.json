@@ -4,75 +4,71 @@
   "title": "CEVRA Media Runtime Manifest v1",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "format",
-    "formatVersion",
-    "runtimeVersion",
-    "workerVersion",
-    "platform",
-    "arch",
-    "workerSha256",
-    "executionBundleSha256",
-    "python",
-    "upstream",
-    "ffmpeg"
-  ],
+  "required": ["format", "formatVersion", "runtimeVersion", "workerVersion", "platform", "arch", "python", "worker", "upstream", "ffmpeg", "notices"],
   "properties": {
     "format": { "const": "cevra-media-runtime" },
     "formatVersion": { "const": 1 },
-    "runtimeVersion": { "type": "string", "minLength": 1 },
-    "workerVersion": { "type": "string", "minLength": 1 },
+    "runtimeVersion": { "$ref": "#/$defs/text" },
+    "workerVersion": { "$ref": "#/$defs/text" },
     "platform": { "enum": ["darwin", "win32", "linux", "unknown"] },
-    "arch": { "type": "string", "minLength": 1 },
-    "workerSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "executionBundleSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "arch": { "$ref": "#/$defs/text" },
     "python": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["version", "executableSha256"],
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "root", "executable", "executableSha256", "treeSha256"],
       "properties": {
-        "version": { "type": "string", "minLength": 1 },
-        "executableSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        "version": { "$ref": "#/$defs/text" }, "root": { "const": "python" },
+        "executable": { "$ref": "#/$defs/path" }, "executableSha256": { "$ref": "#/$defs/hash" },
+        "treeSha256": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "worker": {
+      "type": "object", "additionalProperties": false,
+      "required": ["root", "entrypoint", "treeSha256", "files"],
+      "properties": {
+        "root": { "const": "worker" }, "entrypoint": { "const": "worker/cevra_media_worker.py" },
+        "treeSha256": { "$ref": "#/$defs/hash" },
+        "files": { "type": "array", "minItems": 5, "items": { "$ref": "#/$defs/file" } }
       }
     },
     "upstream": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "version", "contractVersion", "commit"],
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "contractVersion", "commit", "root", "treeSha256", "package", "packageSha256", "provenance", "provenanceSha256"],
       "properties": {
-        "id": { "const": "ffmpeg-skill" },
-        "version": { "type": "string", "minLength": 1 },
-        "contractVersion": { "type": "string", "minLength": 1 },
-        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        "id": { "const": "ffmpeg-skill" }, "version": { "$ref": "#/$defs/text" },
+        "contractVersion": { "$ref": "#/$defs/text" }, "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "root": { "const": "vendor/ffmpeg-skill" }, "treeSha256": { "$ref": "#/$defs/hash" },
+        "package": { "const": "vendor/ffmpeg-skill/package.json" }, "packageSha256": { "$ref": "#/$defs/hash" },
+        "provenance": { "const": "vendor/ffmpeg-skill/CEVRA_PROVENANCE.json" }, "provenanceSha256": { "$ref": "#/$defs/hash" }
       }
     },
     "ffmpeg": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "version",
-        "license",
-        "buildId",
-        "sha256",
-        "ffprobeSha256",
-        "configureFlagsSha256",
-        "configureFlags",
-        "source",
-        "sourceSignature",
-        "signingFingerprint"
-      ],
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "probeVersion", "license", "buildId", "executable", "probeExecutable", "sha256", "ffprobeSha256", "configureFlagsSha256", "configureFlags", "provenance", "provenanceSha256", "source", "sourceSignature", "signingFingerprint", "sourceArchiveSha256", "sourceSignatureSha256", "signingKeySha256"],
       "properties": {
-        "version": { "type": "string", "minLength": 1 },
-        "license": { "enum": ["LGPL-2.1-or-later", "LGPL-3.0-or-later"] },
-        "buildId": { "type": "string", "minLength": 1 },
-        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "ffprobeSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "configureFlagsSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "configureFlags": { "type": "array", "items": { "type": "string" } },
-        "source": { "type": "string", "minLength": 1 },
-        "sourceSignature": { "type": "string", "minLength": 1 },
-        "signingFingerprint": { "type": "string", "minLength": 1 }
+        "version": { "$ref": "#/$defs/text" }, "probeVersion": { "$ref": "#/$defs/text" },
+        "license": { "enum": ["LGPL-2.1-or-later", "LGPL-3.0-or-later"] }, "buildId": { "$ref": "#/$defs/text" },
+        "executable": { "enum": ["bin/ffmpeg", "bin/ffmpeg.exe"] }, "probeExecutable": { "enum": ["bin/ffprobe", "bin/ffprobe.exe"] },
+        "sha256": { "$ref": "#/$defs/hash" }, "ffprobeSha256": { "$ref": "#/$defs/hash" },
+        "configureFlagsSha256": { "$ref": "#/$defs/hash" }, "configureFlags": { "type": "array", "items": { "type": "string" } },
+        "provenance": { "const": "provenance/ffmpeg.json" }, "provenanceSha256": { "$ref": "#/$defs/hash" },
+        "source": { "$ref": "#/$defs/text" }, "sourceSignature": { "$ref": "#/$defs/text" },
+        "signingFingerprint": { "$ref": "#/$defs/text" }, "sourceArchiveSha256": { "$ref": "#/$defs/hash" },
+        "sourceSignatureSha256": { "$ref": "#/$defs/hash" }, "signingKeySha256": { "$ref": "#/$defs/hash" }
       }
+    },
+    "notices": { "type": "array", "minItems": 5, "items": { "$ref": "#/$defs/notice" } }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
+    "file": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+      "properties": { "path": { "$ref": "#/$defs/path" }, "sha256": { "$ref": "#/$defs/hash" } }
+    },
+    "notice": {
+      "type": "object", "additionalProperties": false, "required": ["id", "path", "sha256"],
+      "properties": { "id": { "$ref": "#/$defs/text" }, "path": { "$ref": "#/$defs/path" }, "sha256": { "$ref": "#/$defs/hash" } }
     }
   }
 }

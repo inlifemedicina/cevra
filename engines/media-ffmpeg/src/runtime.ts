@@ -20,22 +20,38 @@ export interface MediaRuntimeManifestV1 {
   workerVersion: string;
   platform: RuntimePlatform;
   arch: string;
-  workerSha256: string;
-  executionBundleSha256: string;
   python: {
     version: string;
+    root: "python";
+    executable: string;
     executableSha256: string;
+    treeSha256: string;
+  };
+  worker: {
+    root: "worker";
+    entrypoint: "worker/cevra_media_worker.py";
+    treeSha256: string;
+    files: Array<{ path: string; sha256: string }>;
   };
   upstream: {
     id: "ffmpeg-skill";
     version: string;
     contractVersion: string;
     commit: string;
+    root: "vendor/ffmpeg-skill";
+    treeSha256: string;
+    package: "vendor/ffmpeg-skill/package.json";
+    packageSha256: string;
+    provenance: "vendor/ffmpeg-skill/CEVRA_PROVENANCE.json";
+    provenanceSha256: string;
   };
   ffmpeg: {
     version: string;
+    probeVersion: string;
     license: "LGPL-2.1-or-later" | "LGPL-3.0-or-later";
     buildId: string;
+    executable: "bin/ffmpeg" | "bin/ffmpeg.exe";
+    probeExecutable: "bin/ffprobe" | "bin/ffprobe.exe";
     sha256: string;
     ffprobeSha256: string;
     configureFlagsSha256: string;
@@ -43,7 +59,13 @@ export interface MediaRuntimeManifestV1 {
     source: string;
     sourceSignature: string;
     signingFingerprint: string;
+    provenance: "provenance/ffmpeg.json";
+    provenanceSha256: string;
+    sourceArchiveSha256: string;
+    sourceSignatureSha256: string;
+    signingKeySha256: string;
   };
+  notices: Array<{ id: string; path: string; sha256: string }>;
 }
 
 export interface VideoEncoderSelection {
