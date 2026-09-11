@@ -5,6 +5,8 @@ export interface WorkerCheck {
   evidence?: Record<string, unknown>;
 }
 
+export type WorkerVideoCodec = "h264" | "h265" | "av1";
+
 export interface MediaRuntimeCapabilities {
   platform: "darwin" | "win32" | "linux" | "unknown";
   arch: string;
@@ -12,6 +14,22 @@ export interface MediaRuntimeCapabilities {
   ffmpegLicense?: string;
   encoders: string[];
   hwaccels: string[];
+}
+
+export interface MediaWorkerRuntimeProfile {
+  h264Encoder?: string;
+  hevcEncoder?: string;
+  av1Encoder?: string;
+  decodeAcceleration?: string;
+}
+
+export interface MediaWorkerEncoderBenchmark {
+  encoder: string;
+  codec: WorkerVideoCodec;
+  success: boolean;
+  fps?: number;
+  realtimeFactor?: number;
+  detail?: string;
 }
 
 export interface MediaWorkerInfo {
@@ -44,6 +62,8 @@ export interface MediaWorkerToolResult {
 export interface MediaWorkerClient {
   info(): Promise<MediaWorkerInfo>;
   health(): Promise<MediaWorkerHealth>;
+  configureRuntime(profile: MediaWorkerRuntimeProfile): Promise<void>;
+  benchmarkVideoEncoders(codec: WorkerVideoCodec, encoders: string[]): Promise<MediaWorkerEncoderBenchmark[]>;
   listTools(): Promise<Array<{ name: string; inputSchema?: Record<string, unknown> }>>;
   callTool(name: string, arguments_: Record<string, unknown>): Promise<MediaWorkerToolResult>;
 }
