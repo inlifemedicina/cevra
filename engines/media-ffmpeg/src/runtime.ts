@@ -1,4 +1,4 @@
-import type { MediaRuntimeCapabilities } from "./worker.js";
+import type { MediaRuntimeCapabilities, MediaWorkerEncoderBenchmark } from "./worker.js";
 
 export const CEVRA_MEDIA_RUNTIME_FORMAT = "cevra-media-runtime" as const;
 export const CEVRA_MEDIA_RUNTIME_FORMAT_VERSION = 1 as const;
@@ -6,6 +6,7 @@ export const CEVRA_MEDIA_RUNTIME_FORMAT_VERSION = 1 as const;
 export type RuntimePlatform = MediaRuntimeCapabilities["platform"];
 export type RuntimeVideoCodec = "h264" | "h265" | "av1";
 export type EncoderSelectionMode = "preview" | "final";
+export type EncoderBenchmarkResult = MediaWorkerEncoderBenchmark;
 
 export interface MediaRuntimeManifestV1 {
   format: typeof CEVRA_MEDIA_RUNTIME_FORMAT;
@@ -24,14 +25,6 @@ export interface MediaRuntimeManifestV1 {
     buildId: string;
     configureFlagsSha256: string;
   };
-}
-
-export interface EncoderBenchmarkResult {
-  encoder: string;
-  codec: RuntimeVideoCodec;
-  success: boolean;
-  fps?: number;
-  realtimeFactor?: number;
 }
 
 export interface VideoEncoderSelection {
