@@ -3,6 +3,15 @@
 ## End-user updates
 Use signed application updates. Normal users should not uninstall/reinstall the application for routine upgrades.
 
+## Managed runtime updates
+- Desktop Python is a private CEVRA-managed runtime, not a system dependency.
+- CPython and Python packages are pinned per CEVRA release.
+- Runtime changes ship through the same signed CEVRA update channel or a signed/verified component manifest controlled by CEVRA.
+- Never run uncontrolled `pip install --upgrade` against the user's system Python.
+- Runtime/package upgrades are validated in CI on supported Windows/macOS architectures before stable release.
+- Major interpreter or ML-stack changes require manual compatibility review.
+- Rollback metadata must allow the previous known-good runtime bundle to be restored when an update fails health checks.
+
 ## Dependency updates
 - Automated detection through repository tooling.
 - Lockfiles committed.

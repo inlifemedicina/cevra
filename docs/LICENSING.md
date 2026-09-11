@@ -6,17 +6,24 @@ CEVRA-owned code is proprietary and all rights are reserved unless explicitly st
 - Apache-2.0
 - MIT
 - BSD-2-Clause / BSD-3-Clause
+- Python Software Foundation License and other permissive runtime component licenses when redistribution obligations are documented
 
 ## Review required
 - LGPL
 - GPL
 - AGPL
+- MPL-2.0 when source from the MPL-covered project itself is incorporated or modified
 - PolyForm or other source-available/noncommercial licenses
 - Proprietary/UNLICENSED
 - Model-specific custom licenses
 
 ## Source reuse
 Permissively licensed code may be reused only after recording exact upstream source, commit/version, license, modifications and required notices.
+
+## Managed Python runtime
+CEVRA may redistribute a private CPython runtime for desktop use. Each release must record the exact interpreter build, source, architecture and bundled native libraries. Required Python and third-party license texts/notices must ship with the commercial release. The release pipeline must avoid runtime builds that introduce unacceptable copyleft obligations unless explicitly reviewed and approved.
+
+The current preferred source for redistributable CPython artifacts is Astral `python-build-standalone`, subject to release-level audit of the selected artifact and its bundled dependency licenses. CEVRA does not depend on or modify the user's global/system Python.
 
 ## Clean-room references
 UNLICENSED/proprietary systems such as Auroq may be studied for externally observable behavior and architecture, but implementation must be independently written unless a separate compatible license is obtained.
