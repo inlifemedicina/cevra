@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cevra.local/schemas/media-runtime-manifest-v1.json",
+  "title": "CEVRA Media Runtime Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "formatVersion", "runtimeVersion", "workerVersion", "upstream", "ffmpeg"],
+  "properties": {
+    "format": { "const": "cevra-media-runtime" },
+    "formatVersion": { "const": 1 },
+    "runtimeVersion": { "type": "string", "minLength": 1 },
+    "workerVersion": { "type": "string", "minLength": 1 },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "contractVersion", "commit"],
+      "properties": {
+        "id": { "const": "ffmpeg-skill" },
+        "version": { "type": "string", "minLength": 1 },
+        "contractVersion": { "type": "string", "minLength": 1 },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "ffmpeg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "license", "buildId", "configureFlagsSha256"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "license": { "enum": ["LGPL-2.1-or-later", "LGPL-3.0-or-later"] },
+        "buildId": { "type": "string", "minLength": 1 },
+        "configureFlagsSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}
