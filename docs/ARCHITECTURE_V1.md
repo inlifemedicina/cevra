@@ -22,6 +22,7 @@ Build a commercial-ready, agent-assisted content creation system with a video ed
 14. Content Intelligence / Content OS is an optional domain separate from Project IR. Content records, ideas, briefs, scripts, performance data and memory must not become audiovisual editing state merely because they are associated with a project.
 15. Social networks, publishing platforms, analytics services, AI vendors and other external content systems are always accessed through provider/adapter contracts. No provider-specific API model is allowed in Content OS core domain types.
 16. The editor must remain fully usable when Content OS is disabled or unavailable.
+17. Workflow / Production Presets are versioned declarative application-level orchestration. They may resolve only to typed validated CEVRA commands/providers and must never become an arbitrary scripting/shell/filtergraph mechanism or an alternate source of truth.
 
 ## 3. Approved target stack
 
@@ -59,6 +60,16 @@ Build a commercial-ready, agent-assisted content creation system with a video ed
 - Optional agent-assisted visual/editorial review
 - QA findings are evidence-bearing PASS/WARN/FAIL/UNKNOWN records
 
+### Workflow / Production Presets
+- Versioned declarative preset schema at the application/orchestration layer
+- Closed typed step vocabulary resolving to approved application commands and adapter/provider operations
+- May reference reusable style, caption, composition and export-profile definitions by stable IDs
+- Preset execution records preset ID/version, resolved parameters and relevant provenance in journal/history
+- Built-in and user-created presets share the same validation and privilege boundary
+- Capability planning must be explicit across desktop/mobile; unavailable required steps fail visibly
+- No arbitrary code, shell, raw FFmpeg arguments/filtergraphs or provider credentials in preset definitions
+- Content OS may later recommend or associate presets but is not required to execute them
+
 ### Content Intelligence / Content OS
 - Separate content domain with its own versioned model and persistence boundary
 - Source ingestion behind `ContentSourceProvider`-style adapters
@@ -79,18 +90,18 @@ Build a commercial-ready, agent-assisted content creation system with a video ed
 
 ## 4. Application layers
 
-1. Presentation — UI, timeline, style controls, simple/manual modes and optional Content OS surfaces.
-2. Application — use-cases, project services, history, export orchestration, content workflows and Content-to-Project handoff.
+1. Presentation — UI, timeline, style controls, simple/manual modes, preset selection and optional Content OS surfaces.
+2. Application — use-cases, project services, history, export orchestration, preset planning/execution, content workflows and Content-to-Project handoff.
 3. Domain — Project IR plus independent Content Intelligence domain types, typed operations, validation, migrations and capabilities.
 4. Infrastructure — media/composition/transcription engines, managed runtimes, filesystem, updater, secure storage, content stores and providers.
 5. Agent Bridge — typed tools for Codex/Claude and future agents operating through application commands rather than direct engine/provider access.
 
-The Project IR domain and Content Intelligence domain are peers. Neither may become the persistence model of the other.
+The Project IR domain and Content Intelligence domain are peers. Neither may become the persistence model of the other. Workflow Presets orchestrate application commands but do not own project state.
 
 ## 5. UX modes
 
 ### Simple mode
-Natural-language editing plus high-level presets.
+Natural-language editing plus high-level presets, including future one-click Workflow / Production Presets.
 
 ### Manual mode
 Timeline and direct property controls without requiring an AI agent.
@@ -104,6 +115,8 @@ Optional research/ideation/planning workflow covering content signals, ideas, br
 
 Desktop is the complete local workstation. Mobile supports project browsing, preview, review, lightweight edits, presets and compatible local functions. Heavy functions may be delegated to a paired trusted desktop execution node. Domain code must never assume desktop-only filesystem paths. The desktop Python runtime is not a mobile requirement.
 
+Workflow Preset schemas and semantics must remain platform-neutral. Individual preset steps declare capability requirements so mobile can execute supported steps locally, explicitly omit optional steps, or delegate where the product supports trusted desktop execution.
+
 Content OS domain types and provider contracts must also remain platform-neutral. Individual content-source, analytics or publishing providers may have platform-specific implementations, but the Content OS core must not.
 
 ## 7. Updates and compatibility
@@ -113,6 +126,7 @@ Content OS domain types and provider contracts must also remain platform-neutral
 - Dependency updates arrive through reviewed pull requests and CI.
 - Major dependency updates require manual review.
 - Project IR migrations protect older projects.
+- Workflow Preset schemas/definitions are versioned and require explicit migrations or compatibility handling once persisted/shared.
 - Content Intelligence schemas, once implemented, are versioned independently from Project IR and receive explicit migrations.
 - Engine/provider adapters isolate upstream breaking changes.
 - Feature flags gate experimental capabilities, including Content OS modules/providers.
@@ -120,8 +134,9 @@ Content OS domain types and provider contracts must also remain platform-neutral
 ## 8. Security
 
 - Secrets live in OS-backed secure storage.
-- No credentials in Project IR, Content OS domain records or logs.
+- No credentials in Project IR, preset definitions, Content OS domain records or logs.
 - Agent tools are allow-listed typed actions.
+- Workflow Presets use only an allow-listed typed step vocabulary and cannot embed arbitrary executable code/shell/filtergraphs.
 - No arbitrary shell access from end-user editing surfaces.
 - Update manifests and release artifacts must be signed.
 - Managed runtime packages and separately downloaded runtime artifacts must be version-pinned and integrity-verified.
@@ -138,4 +153,4 @@ Content OS domain types and provider contracts must also remain platform-neutral
 
 ## 10. Stability policy
 
-External libraries can change. The stable contracts are CEVRA Project IR, Content Intelligence domain contracts, command API, history/journal model, provider interfaces, migration system, adapter interfaces and UX behavior. Upstream changes should require adapter/runtime/provider changes rather than product rewrites.
+External libraries can change. The stable contracts are CEVRA Project IR, Workflow Preset semantics/contracts, Content Intelligence domain contracts, command API, history/journal model, provider interfaces, migration system, adapter interfaces and UX behavior. Upstream changes should require adapter/runtime/provider changes rather than product rewrites.
