@@ -36,6 +36,8 @@ test("persistent worker starts once across calls and can close", async () => {
       if (method === "cevra/info") return { name: "cevra-media-worker", version: "0.1.0", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
       if (method === "cevra/health") return { ok: true, checkedAt: "2026-09-11T00:00:00Z", checks: [], tools: {} };
       if (method === "tools/list") return { tools: [] };
+      if (method === "cevra/configure") return { configured: true };
+      if (method === "cevra/benchmark") return { benchmarks: [{ encoder: "h264_mf", codec: "h264", success: true, fps: 120 }] };
       return { structuredContent: {} };
     }
   };
@@ -43,8 +45,11 @@ test("persistent worker starts once across calls and can close", async () => {
   await client.info();
   await client.health();
   await client.listTools();
+  await client.configureRuntime({ h264Encoder: "h264_mf" });
+  const benchmark = await client.benchmarkVideoEncoders("h264", ["h264_mf"]);
+  assert.equal(benchmark[0].fps, 120);
   assert.equal(starts, 1);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 5);
   await client.close();
   assert.equal(stops, 1);
 });
