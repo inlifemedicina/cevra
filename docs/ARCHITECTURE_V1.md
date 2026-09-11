@@ -18,6 +18,7 @@ Build a commercial-ready, agent-assisted video editor with a simple modern inter
 10. PT-BR and EN-US are mandatory for all user-visible surfaces.
 11. Desktop and mobile share Project IR and UX vocabulary; heavy processing may be delegated to a trusted desktop node.
 12. The application shell, Project IR and history system must remain independent of any single external video engine.
+13. Desktop Python-based engines run only inside a private CEVRA-managed runtime; the product must not depend on or modify a user's global/system Python.
 
 ## 3. Approved target stack
 
@@ -26,11 +27,19 @@ Build a commercial-ready, agent-assisted video editor with a simple modern inter
 - React + TypeScript
 - Shared responsive design system
 
+### Managed Python runtime
+- Private CPython 3.12.x runtime managed by CEVRA desktop releases
+- No manual Python installation required for normal users
+- Runtime and packages pinned and updated through the CEVRA release/update process
+- Preferred redistributable build source: audited pinned `python-build-standalone` artifact or equivalent compatible CPython distribution
+- System Python ignored except in explicit developer mode
+
 ### Media Engine
 - FFmpeg/ffprobe behind `MediaEngineAdapter`
 - Typed validated operations only
 - Evaluate/import compatible MIT capabilities from `ffmpeg-skill`
 - No arbitrary agent-authored filtergraph in the stable execution path
+- Python helpers execute inside the CEVRA-managed runtime
 
 ### Composition Engine
 - HyperFrames behind `CompositionEngineAdapter`
@@ -40,6 +49,7 @@ Build a commercial-ready, agent-assisted video editor with a simple modern inter
 ### Transcription Engine
 - faster-whisper for standard local transcription
 - WhisperX for word-accurate alignment/diarization when needed
+- Python dependencies installed only inside the CEVRA-managed runtime
 
 ### QA Engine
 - Deterministic technical checks
@@ -60,7 +70,7 @@ Build a commercial-ready, agent-assisted video editor with a simple modern inter
 1. Presentation — UI, timeline, style controls, simple/manual modes.
 2. Application — use-cases, project services, history, export orchestration.
 3. Domain — Project IR, typed operations, validation, migrations, capabilities.
-4. Infrastructure — media/composition/transcription engines, filesystem, updater, secure storage and providers.
+4. Infrastructure — media/composition/transcription engines, managed runtimes, filesystem, updater, secure storage and providers.
 5. Agent Bridge — typed tools for Codex/Claude operating through application commands rather than direct engine access.
 
 ## 5. UX modes
@@ -75,11 +85,12 @@ Both operate on the same Project IR and history system.
 
 ## 6. Desktop/mobile
 
-Desktop is the complete local workstation. Mobile supports project browsing, preview, review, lightweight edits, presets and compatible local functions. Heavy functions may be delegated to a paired trusted desktop execution node. Domain code must never assume desktop-only filesystem paths.
+Desktop is the complete local workstation. Mobile supports project browsing, preview, review, lightweight edits, presets and compatible local functions. Heavy functions may be delegated to a paired trusted desktop execution node. Domain code must never assume desktop-only filesystem paths. The desktop Python runtime is not a mobile requirement.
 
 ## 7. Updates and compatibility
 
 - Signed application updates.
+- The managed Python runtime and its pinned packages are versioned release components and update with CEVRA rather than through global `pip`/system package mutation.
 - Dependency updates arrive through reviewed pull requests and CI.
 - Major dependency updates require manual review.
 - Project IR migrations protect older projects.
@@ -93,14 +104,16 @@ Desktop is the complete local workstation. Mobile supports project browsing, pre
 - Agent tools are allow-listed typed actions.
 - No arbitrary shell access from end-user editing surfaces.
 - Update manifests and release artifacts must be signed.
+- Managed runtime packages and separately downloaded runtime artifacts must be version-pinned and integrity-verified.
 
 ## 9. Licensing
 
 - CEVRA-owned application code is proprietary by default.
 - Permissive dependencies are tracked with source, version, license, modifications and notices.
+- Redistributed CPython/runtime components require release-level provenance and bundled notices for Python and native dependencies.
 - EDVID MIT code may be reused with attribution.
 - Proprietary/UNLICENSED references are clean-room reimplementations unless separately licensed.
 
 ## 10. Stability policy
 
-External libraries can change. The stable contracts are CEVRA Project IR, command API, history/journal model, provider interfaces, migration system, adapter interfaces and UX behavior. Upstream changes should require adapter-level changes rather than product rewrites.
+External libraries can change. The stable contracts are CEVRA Project IR, command API, history/journal model, provider interfaces, migration system, adapter interfaces and UX behavior. Upstream changes should require adapter/runtime-bundle changes rather than product rewrites.
