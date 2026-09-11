@@ -51,6 +51,9 @@ export interface MediaEngineAdapter extends EngineAdapter {
 }
 
 const FORBIDDEN_KEYS = new Set(["shell", "command", "filtergraph", "filter_complex", "args", "argv", "exec"]);
+const MEDIA_CONTAINERS = new Set(["mp4", "mov", "webm", "mkv", "wav", "mp3", "m4a"]);
+const VIDEO_CODECS = new Set(["h264", "h265", "vp9", "av1", "copy"]);
+const AUDIO_CODECS = new Set(["aac", "opus", "mp3", "pcm", "copy"]);
 
 export function validateMediaOperation(value: unknown): MediaOperation {
   if (!isRecord(value)) throw new Error("Media operation must be an object.");
@@ -71,18 +74,18 @@ export function validateMediaOperation(value: unknown): MediaOperation {
     case "probe": requireUri("inputUri"); break;
     case "trim": requireUri("inputUri"); requireUri("outputUri"); requireNonNegative("startMs"); requirePositive("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); break;
     case "concat": if (!Array.isArray(value.inputUris) || value.inputUris.length < 1 || value.inputUris.some((uri) => typeof uri !== "string" || uri.length === 0)) throw new Error("inputUris must contain at least one URI."); requireUri("outputUri"); break;
-    case "transcode": requireUri("inputUri"); requireUri("outputUri"); if (value.width !== undefined) requirePositive("width"); if (value.height !== undefined) requirePositive("height"); if (value.fps !== undefined) requirePositive("fps"); break;
+    case "transcode": requireUri("inputUri"); requireUri("outputUri"); if (value.container !== undefined && !MEDIA_CONTAINERS.has(String(value.container))) throw new Error("Invalid media container."); if (value.videoCodec !== undefined && !VIDEO_CODECS.has(String(value.videoCodec))) throw new Error("Invalid video codec."); if (value.audioCodec !== undefined && !AUDIO_CODECS.has(String(value.audioCodec))) throw new Error("Invalid audio codec."); if (value.width !== undefined) requirePositive("width"); if (value.height !== undefined) requirePositive("height"); if (value.fps !== undefined) requirePositive("fps"); break;
     case "fit": requireUri("inputUri"); requireUri("outputUri"); requirePositive("width"); requirePositive("height"); if (!["contain", "cover", "stretch"].includes(String(value.mode))) throw new Error("Invalid fit mode."); break;
     case "crop": requireUri("inputUri"); requireUri("outputUri"); requireNonNegative("x"); requireNonNegative("y"); requirePositive("width"); requirePositive("height"); break;
     case "speed": requireUri("inputUri"); requireUri("outputUri"); requirePositive("factor"); if ((value.factor as number) > 16) throw new Error("factor exceeds supported safety limit."); break;
     case "volume": requireUri("inputUri"); requireUri("outputUri"); if (!isFiniteNumber(value.gainDb)) throw new Error("gainDb must be finite."); break;
-    case "loudness-normalize": requireUri("inputUri"); requireUri("outputUri"); if (!isFiniteNumber(value.targetLufs)) throw new Error("targetLufs must be finite."); break;
+    case "loudness-normalize": requireUri("inputUri"); requireUri("outputUri"); if (!isFiniteNumber(value.targetLufs)) throw new Error("targetLufs must be finite."); if (value.truePeakDb !== undefined && !isFiniteNumber(value.truePeakDb)) throw new Error("truePeakDb must be finite."); break;
     case "audio-fade": requireUri("inputUri"); requireUri("outputUri"); if (value.fadeInMs !== undefined) requireNonNegative("fadeInMs"); if (value.fadeOutMs !== undefined) requireNonNegative("fadeOutMs"); break;
-    case "extract-audio": requireUri("inputUri"); requireUri("outputUri"); break;
+    case "extract-audio": requireUri("inputUri"); requireUri("outputUri"); if (value.audioCodec !== undefined && !AUDIO_CODECS.has(String(value.audioCodec))) throw new Error("Invalid audio codec."); break;
     case "extract-frame": requireUri("inputUri"); requireUri("outputUri"); requireNonNegative("atMs"); break;
     case "detect-silence": requireUri("inputUri"); if (!isFiniteNumber(value.thresholdDb)) throw new Error("thresholdDb must be finite."); requirePositive("minDurationMs"); break;
     case "overlay-media": requireUri("baseUri"); requireUri("overlayUri"); requireUri("outputUri"); requireNonNegative("startMs"); requirePositive("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); requireNonNegative("x"); requireNonNegative("y"); requirePositive("width"); requirePositive("height"); if (value.opacity !== undefined && (!isFiniteNumber(value.opacity) || value.opacity < 0 || value.opacity > 1)) throw new Error("opacity must be between 0 and 1."); break;
-    case "mux-audio": requireUri("videoUri"); requireUri("audioUri"); requireUri("outputUri"); break;
+    case "mux-audio": requireUri("videoUri"); requireUri("audioUri"); requireUri("outputUri"); if (value.replaceExisting !== undefined && typeof value.replaceExisting !== "boolean") throw new Error("replaceExisting must be boolean."); break;
     default: throw new Error(`Unsupported media operation ${String(value.type)}.`);
   }
   return value as unknown as MediaOperation;
