@@ -1,4 +1,12 @@
-import type { MediaWorkerClient, MediaWorkerHealth, MediaWorkerInfo, MediaWorkerToolResult } from "./worker.js";
+import type {
+  MediaWorkerClient,
+  MediaWorkerEncoderBenchmark,
+  MediaWorkerHealth,
+  MediaWorkerInfo,
+  MediaWorkerRuntimeProfile,
+  MediaWorkerToolResult,
+  WorkerVideoCodec
+} from "./worker.js";
 
 export interface PersistentWorkerTransport {
   start(): Promise<void>;
@@ -17,6 +25,15 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
 
   async health(): Promise<MediaWorkerHealth> {
     return this.request<MediaWorkerHealth>("cevra/health");
+  }
+
+  async configureRuntime(profile: MediaWorkerRuntimeProfile): Promise<void> {
+    await this.request<{ configured: true }>("cevra/configure", { profile });
+  }
+
+  async benchmarkVideoEncoders(codec: WorkerVideoCodec, encoders: string[]): Promise<MediaWorkerEncoderBenchmark[]> {
+    const result = await this.request<{ benchmarks: MediaWorkerEncoderBenchmark[] }>("cevra/benchmark", { codec, encoders });
+    return result.benchmarks;
   }
 
   async listTools(): Promise<Array<{ name: string; inputSchema?: Record<string, unknown> }>> {
