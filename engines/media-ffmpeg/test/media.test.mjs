@@ -11,8 +11,8 @@ class FakeWorker {
     return { ok: true, checkedAt: "2026-09-11T18:00:00.000Z", checks: [{ id: "ffmpeg", status: "PASS" }], tools: { probe: { usable: "yes" }, cut: { usable: "yes" }, fit: { usable: "yes" }, silence: { usable: "yes" } } };
   }
   async listTools() { return []; }
-  async callTool(name, arguments_) {
-    this.calls.push({ name, arguments_ });
+  async callTool(name, arguments_, signal) {
+    this.calls.push({ name, arguments_, signal });
     if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: "h264" }, audio: { codec: "aac", sample_rate: 48000, channels: 2 } } };
     if (name === "silence") return { structuredContent: { silences: [[1.2, 2.4], [5.0, null]] } };
     return { structuredContent: { status: "completed", output: arguments_.output, probe: { duration: 1.0 } } };
@@ -35,7 +35,8 @@ test("trim maps milliseconds to accurate upstream cut", async () => {
   const worker = new FakeWorker();
   const engine = new FfmpegMediaEngine(worker);
   await engine.execute({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 500, endMs: 1750 }, context);
-  assert.deepEqual(worker.calls[0], { name: "cut", arguments_: { input: "in.mp4", output: "out.mp4", start: 0.5, end: 1.75, accurate: true } });
+  assert.equal(worker.calls[0].name, "cut");
+  assert.deepEqual(worker.calls[0].arguments_, { input: "in.mp4", output: "out.mp4", start: 0.5, end: 1.75, accurate: true });
 });
 
 test("contain and cover map to upstream pad and crop modes", async () => {
@@ -62,4 +63,32 @@ test("worker error propagates as engine failure", async () => {
   worker.callTool = async () => ({ isError: true, content: [{ type: "text", text: "ffmpeg failed" }] });
   const engine = new FfmpegMediaEngine(worker);
   await assert.rejects(() => engine.execute({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 }, context), /ffmpeg failed/);
+});
+
+test("abort signal is propagated to the worker and pre-aborted jobs fail immediately", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  const controller = new AbortController();
+  await engine.execute({ type: "probe", inputUri: "in.mp4" }, { ...context, signal: controller.signal });
+  assert.equal(worker.calls[0].signal, controller.signal);
+
+  controller.abort();
+  await assert.rejects(
+    () => engine.execute({ type: "probe", inputUri: "in.mp4" }, { ...context, signal: controller.signal }),
+    (error) => error?.name === "AbortError"
+  );
+});
+
+test("incompatible delivery codec/container pairs are rejected before worker execution", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  await assert.rejects(
+    () => engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.webm", container: "webm", videoCodec: "h264", audioCodec: "opus" }, context),
+    /WebM supports VP9\/AV1/
+  );
+  await assert.rejects(
+    () => engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.mp4", container: "mp4", audioCodec: "mp3" }, context),
+    /MP4 audio must be AAC/
+  );
+  assert.equal(worker.calls.length, 0);
 });
