@@ -45,14 +45,19 @@ def _bundle_root() -> Path:
 
 
 RUNTIME_ROOT = _external_runtime_root()
+os.environ["CEVRA_MEDIA_RUNTIME_ROOT"] = str(RUNTIME_ROOT)
 BUNDLE_ROOT = _bundle_root()
-BIN_DIR = Path(os.environ.get("CEVRA_MEDIA_BIN_DIR", str(RUNTIME_ROOT / "bin"))).resolve()
 VENDOR_ROOT = Path(os.environ.get("CEVRA_FFMPEG_SKILL_ROOT", str(BUNDLE_ROOT / "vendor" / "ffmpeg-skill"))).resolve()
 RELEASE_MODE = os.environ.get("CEVRA_RELEASE_MODE", "0") not in ("", "0", "false", "False")
+BIN_DIR = (RUNTIME_ROOT / "bin").resolve() if RELEASE_MODE else Path(os.environ.get("CEVRA_MEDIA_BIN_DIR", str(RUNTIME_ROOT / "bin"))).resolve()
 _UPSTREAM: Any = None
 _CONTROL_STDOUT = sys.stdout
 _CONTROL_WRITE_LOCK = threading.Lock()
 _JOB_THREAD: Optional[threading.Thread] = None
+ALLOWED_UPSTREAM_TOOLS = frozenset({
+    "audio", "crop", "cut", "fit", "join", "look", "loudness", "probe", "silence",
+})
+ALLOWED_TOOLS = ALLOWED_UPSTREAM_TOOLS | CUSTOM_TOOLS
 
 
 def _binary_candidates(name: str) -> List[Path]:
@@ -63,7 +68,9 @@ def _binary_candidates(name: str) -> List[Path]:
 
 
 def _prepare_path() -> None:
-    if BIN_DIR.is_dir():
+    if RELEASE_MODE:
+        os.environ["PATH"] = str(BIN_DIR)
+    elif BIN_DIR.is_dir():
         os.environ["PATH"] = str(BIN_DIR) + os.pathsep + os.environ.get("PATH", "")
 
 
@@ -376,6 +383,10 @@ def benchmark(codec: str, requested: List[str]) -> Dict[str, Any]:
 
 
 def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    if name not in ALLOWED_TOOLS:
+        return {"isError": True, "content": [{"type": "text", "text": f"tool {name} is not allowed by CEVRA"}]}
+    if _contains_raw_argv(arguments):
+        return {"isError": True, "content": [{"type": "text", "text": "raw argv execution is not allowed by CEVRA"}]}
     _ensure_profile()
     custom = call_custom_tool(name, arguments or {}, VENDOR_ROOT)
     if custom is not None:
@@ -444,6 +455,41 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
     return [{"name": name, "description": f"CEVRA typed media operation: {name}", "inputSchema": object_schema} for name in sorted(CUSTOM_TOOLS)]
 
 
+def _contains_raw_argv(value: Any) -> bool:
+    if isinstance(value, list):
+        return any(_contains_raw_argv(item) for item in value)
+    if not isinstance(value, dict):
+        return False
+    return "argv" in value or any(_contains_raw_argv(child) for child in value.values())
+
+
+def _remove_raw_argv(value: Any) -> Any:
+    if isinstance(value, list):
+        return [cleaned for item in value if (cleaned := _remove_raw_argv(item)) is not None]
+    if not isinstance(value, dict):
+        return value
+    required = value.get("required")
+    if isinstance(required, list) and "argv" in required:
+        return None
+    result: Dict[str, Any] = {}
+    for key, child in value.items():
+        if key == "properties" and isinstance(child, dict):
+            result[key] = {name: _remove_raw_argv(spec) for name, spec in child.items() if name != "argv"}
+        else:
+            cleaned = _remove_raw_argv(child)
+            if cleaned is not None:
+                result[key] = cleaned
+    return result
+
+
+def _allowed_tool_specs(upstream: Any) -> List[Dict[str, Any]]:
+    return [
+        _remove_raw_argv(spec)
+        for spec in upstream.tool_list()
+        if spec.get("name") in ALLOWED_UPSTREAM_TOOLS
+    ]
+
+
 def _now_iso() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -470,7 +516,7 @@ def handle(method: str, params: Dict[str, Any]) -> Any:
         return benchmark(str(params.get("codec") or ""), encoders)
     if method == "tools/list":
         upstream = _load_upstream()
-        return {"tools": upstream.tool_list() + _custom_tool_specs()}
+        return {"tools": _allowed_tool_specs(upstream) + _custom_tool_specs()}
     raise KeyError(method)
 
 
@@ -511,6 +557,10 @@ def _start_job(request_id: Any, params: Dict[str, Any]) -> Optional[Dict[str, An
         raise ValueError("tool name must be a non-empty string")
     if not isinstance(arguments, dict):
         raise ValueError("tool arguments must be an object")
+    if name not in ALLOWED_TOOLS:
+        raise PermissionError(f"tool {name} is not allowed by CEVRA")
+    if _contains_raw_argv(arguments):
+        raise PermissionError("raw argv execution is not allowed by CEVRA")
     if _JOB_THREAD is not None or job_control.active_job_id() is not None:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32001, "message": "media worker is busy"}}
     job_control.begin_job(job_id)

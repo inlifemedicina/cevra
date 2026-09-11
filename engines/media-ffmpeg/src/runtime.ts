@@ -95,9 +95,11 @@ export function selectVideoEncoder(
   const candidates = approvedEncoderCandidates(capabilities, codec);
   if (candidates.length === 0) return undefined;
 
-  const benchmarked = benchmarks
-    .filter((item) => item.codec === codec && item.success && candidates.includes(item.encoder) && Number.isFinite(item.fps))
+  const relevantBenchmarks = benchmarks.filter((item) => item.codec === codec && candidates.includes(item.encoder));
+  const benchmarked = relevantBenchmarks
+    .filter((item) => item.success && Number.isFinite(item.fps))
     .sort((a, b) => (b.fps ?? 0) - (a.fps ?? 0));
+  if (relevantBenchmarks.length > 0 && benchmarked.length === 0) return undefined;
   const encoder = benchmarked[0]?.encoder ?? candidates[0]!;
   return {
     encoder,

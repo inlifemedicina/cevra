@@ -16,13 +16,21 @@ WRAPPERS = r'''
 from _cevra_runtime import hdr_encoder_args as _cevra_hdr_encoder_args
 from _cevra_runtime import sdr_encoder_args as _cevra_sdr_encoder_args
 from _cevra_runtime import with_decode_acceleration as _cevra_with_decode_acceleration
+from _cevra_runtime import allow_gpl_dev_encoder as _cevra_allow_gpl_dev_encoder
+from _cevra_runtime import require_media_tool as _cevra_require_media_tool
 from cevra_job_control import popen as _cevra_job_popen
 from cevra_job_control import run as _cevra_job_run
 from cevra_job_control import detach_process as _cevra_detach_process
 
 
-def _cevra_allow_gpl_dev_encoder() -> bool:
-    return os.environ.get("CEVRA_ALLOW_GPL_DEV_ENCODERS", "0") not in ("", "0", "false", "False")
+def require_tool(name: str) -> str:
+    if name in ("ffmpeg", "ffprobe"):
+        path = _cevra_require_media_tool(name)
+        if path:
+            return path
+        die(f"'{name}' is missing from the CEVRA Media Runtime", code=127, kind="missing_tool")
+        return ""
+    return _upstream_require_tool(name)
 
 
 def x264_args(crf: int = 18, preset: str = "medium", keep_bt709: bool = True) -> List[str]:
@@ -68,12 +76,21 @@ def patch(source: Path, runtime_module: Path) -> None:
     text = common_path.read_text(encoding="utf-8")
     if MARKER in text:
         raise SystemExit("ffmpeg-skill source is already patched")
-    if text.count("def x264_args(") != 1 or text.count("def video_args(") != 1 or text.count("def run(") != 1:
+    if text.count("def x264_args(") != 1 or text.count("def video_args(") != 1 or text.count("def run(") != 1 or text.count("def require_tool(") != 1:
         raise SystemExit("pinned ffmpeg-skill execution functions changed; review upstream before updating CEVRA patch")
 
     text = text.replace("def x264_args(", "def _upstream_x264_args(", 1)
     text = text.replace("def video_args(", "def _upstream_video_args(", 1)
     text = text.replace("def run(", "def _upstream_run(", 1)
+    text = text.replace("def require_tool(", "def _upstream_require_tool(", 1)
+    version_probe = 'subprocess.run(["ffprobe", "-version"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)'
+    if text.count(version_probe) != 1:
+        raise SystemExit("pinned ffmpeg-skill version probe changed; review runtime binary isolation patch")
+    text = text.replace(
+        version_probe,
+        'subprocess.run([require_tool("ffprobe"), "-version"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)',
+        1,
+    )
     captured = "subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=limit)"
     if text.count(captured) != 1:
         raise SystemExit("pinned ffmpeg-skill captured process runner changed; review cancellation patch")

@@ -7,7 +7,7 @@ HERE = Path(__file__).resolve().parent
 
 
 def specs():
-    return {"fixture-job": {}, "crash-worker": {}}
+    return {"cut": {}, "redact": {}}
 
 
 def build_argv(name, arguments):
@@ -16,6 +16,6 @@ def build_argv(name, arguments):
 
 def tool_list():
     return [
-        {"name": "fixture-job", "inputSchema": {"type": "object"}},
-        {"name": "crash-worker", "inputSchema": {"type": "object"}},
+        {"name": "cut", "inputSchema": {"type": "object", "properties": {"output": {"type": "string"}, "argv": {"type": "array"}}, "anyOf": [{"required": ["argv"]}, {"required": ["output"]}]}},
+        {"name": "redact", "inputSchema": {"type": "object", "properties": {"input": {"type": "string"}}}},
     ]

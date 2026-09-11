@@ -15,7 +15,7 @@ class FakeWorker {
     this.calls.push({ name, arguments_, jobId, signal });
     if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: "h264" }, audio: { codec: "aac", sample_rate: 48000, channels: 2 } } };
     if (name === "silence") return { structuredContent: { silences: [[1.2, 2.4], [5.0, null]] } };
-    return { structuredContent: { status: "completed", output: arguments_.output, probe: { duration: 1.0 } } };
+    return { structuredContent: { status: "completed", output: arguments_.output, probe: { file: arguments_.output, duration: 1.0 } } };
   }
 }
 
@@ -63,6 +63,43 @@ test("worker error propagates as engine failure", async () => {
   worker.callTool = async () => ({ isError: true, content: [{ type: "text", text: "ffmpeg failed" }] });
   const engine = new FfmpegMediaEngine(worker);
   await assert.rejects(() => engine.execute({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 }, context), /ffmpeg failed/);
+});
+
+test("invalid worker results and file results without output evidence are rejected", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  worker.callTool = async () => ({ content: [{ type: "text", text: "not json" }] });
+  await assert.rejects(() => engine.execute({ type: "probe", inputUri: "in.mp4" }, context), /invalid result/);
+
+  worker.callTool = async () => ({ structuredContent: { status: "completed" } });
+  await assert.rejects(
+    () => engine.execute({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 }, context),
+    /no completed output evidence/
+  );
+
+  worker.callTool = async () => ({ structuredContent: { status: "completed", output: "out.mp4" } });
+  await assert.rejects(
+    () => engine.execute({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 }, context),
+    /no verified output probe/
+  );
+
+  worker.callTool = async () => ({ structuredContent: { status: "completed", output: "other.mp4", probe: { file: "other.mp4" } } });
+  await assert.rejects(
+    () => engine.execute({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 }, context),
+    /no completed output evidence/
+  );
+
+  worker.callTool = async () => ({ structuredContent: { status: "completed", output: "out.mp4", probe: { file: "other.mp4" } } });
+  await assert.rejects(
+    () => engine.execute({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 }, context),
+    /no verified output probe/
+  );
+
+  worker.callTool = async () => ({ structuredContent: { file: "in.mp4" } });
+  await assert.rejects(() => engine.execute({ type: "probe", inputUri: "in.mp4" }, context), /no output evidence/);
+
+  worker.callTool = async () => ({ structuredContent: { file: "other.mp4", duration: 1 } });
+  await assert.rejects(() => engine.execute({ type: "probe", inputUri: "in.mp4" }, context), /no output evidence/);
 });
 
 test("abort signal is propagated to the worker and pre-aborted jobs fail immediately", async () => {

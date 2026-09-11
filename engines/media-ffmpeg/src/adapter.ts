@@ -106,7 +106,11 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     if (signal?.aborted) throw abortError();
     const result = await this.worker.callTool(name, args, jobId, signal);
     if (result.isError) throw new Error(readText(result) || `Media worker tool ${name} failed.`);
-    return result.structuredContent ?? parseTextJson(result) ?? {};
+    const payload = result.structuredContent ?? parseTextJson(result);
+    if (!isRecord(payload) || Object.keys(payload).length === 0) {
+      throw new Error(`Media worker tool ${name} returned an invalid result.`);
+    }
+    return payload;
   }
 }
 
@@ -140,6 +144,9 @@ function validateTranscodeCompatibility(operation: Extract<MediaOperation, { typ
 function parseProbe(payload: Record<string, unknown>, fallbackUri: string): MediaProbeResult {
   const video = isRecord(payload.video) ? payload.video : undefined;
   const audio = isRecord(payload.audio) ? payload.audio : undefined;
+  if (typeof payload.file !== "string" || payload.file.trim().length === 0 || payload.file !== fallbackUri || (!video && !audio && !finite(payload.duration))) {
+    throw new Error("Media worker probe result has no output evidence.");
+  }
   return {
     uri: typeof payload.file === "string" ? payload.file : fallbackUri,
     ...(finite(payload.duration) ? { durationMs: Math.round(payload.duration * 1000) } : {}),
@@ -156,7 +163,13 @@ function parseProbe(payload: Record<string, unknown>, fallbackUri: string): Medi
 }
 
 function fileResult(payload: Record<string, unknown>, fallbackUri: string): MediaOperationResult {
+  if (payload.status !== "completed" || typeof payload.output !== "string" || payload.output.trim().length === 0 || payload.output !== fallbackUri) {
+    throw new Error("Media worker file result has no completed output evidence.");
+  }
   const probe = isRecord(payload.probe) ? payload.probe : undefined;
+  if (!probe || typeof probe.file !== "string" || probe.file.trim().length === 0 || probe.file !== payload.output) {
+    throw new Error("Media worker file result has no verified output probe.");
+  }
   return {
     type: "file",
     outputUri: typeof payload.output === "string" ? payload.output : fallbackUri,

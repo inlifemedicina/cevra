@@ -3,22 +3,32 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { PersistentMediaWorkerClient, ProcessMediaWorkerTransport, WorkerProcessExitedError } from "../dist/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const engine = path.resolve(here, "..");
 const workerScript = path.join(engine, "worker", "cevra_media_worker.py");
+const patchScript = path.join(engine, "runtime", "patch_ffmpeg_skill.py");
+const runtimeModule = path.join(engine, "runtime", "_cevra_runtime.py");
 const vendor = path.join(here, "fixtures", "vendor");
 const python = process.env.CEVRA_TEST_PYTHON || "python3";
 
-function createRuntime() {
+function createRuntime(options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-media-lifecycle-"));
   const transport = new ProcessMediaWorkerTransport({
     pythonExecutable: python,
     workerScript,
     shutdownTimeoutMs: 2000,
-    env: { ...process.env, CEVRA_MEDIA_RUNTIME_ROOT: engine, CEVRA_FFMPEG_SKILL_ROOT: vendor, CEVRA_RELEASE_MODE: "0", PYTHONNOUSERSITE: "1" }
+    env: {
+      ...process.env,
+      CEVRA_MEDIA_RUNTIME_ROOT: options.runtimeRoot || engine,
+      CEVRA_FFMPEG_SKILL_ROOT: vendor,
+      CEVRA_RELEASE_MODE: options.releaseMode ? "1" : "0",
+      PYTHONNOUSERSITE: "1",
+      ...(options.pathValue ? { PATH: options.pathValue } : {})
+    }
   });
   return { directory, transport, client: new PersistentMediaWorkerClient(transport) };
 }
@@ -41,8 +51,8 @@ test("process transport starts once, executes serial jobs and closes the worker"
   const secondOutput = path.join(runtime.directory, "second.txt");
   const firstPid = path.join(runtime.directory, "first.pid");
   const secondPid = path.join(runtime.directory, "second.pid");
-  const first = runtime.client.callTool("fixture-job", { output: firstOutput, pidFile: firstPid, duration: 0.15 }, "serial-1");
-  const second = runtime.client.callTool("fixture-job", { output: secondOutput, pidFile: secondPid, duration: 0.01 }, "serial-2");
+  const first = runtime.client.callTool("cut", { output: firstOutput, pidFile: firstPid, duration: 0.15 }, "serial-1");
+  const second = runtime.client.callTool("cut", { output: secondOutput, pidFile: secondPid, duration: 0.01 }, "serial-2");
   await waitForFile(firstPid);
   assert.equal(fs.existsSync(secondPid), false);
   const workerPid = runtime.transport.workerPid;
@@ -59,7 +69,7 @@ test("cancellation kills only the active subprocess, cleans its new output and k
   const output = path.join(runtime.directory, "cancelled.txt");
   const pidFile = path.join(runtime.directory, "cancelled.pid");
   const controller = new AbortController();
-  const job = runtime.client.callTool("fixture-job", { output, pidFile, duration: 30 }, "cancel-me", controller.signal);
+  const job = runtime.client.callTool("cut", { output, pidFile, duration: 30 }, "cancel-me", controller.signal);
   await waitForFile(pidFile);
   const childPid = Number(fs.readFileSync(pidFile, "utf8"));
   const workerPid = runtime.transport.workerPid;
@@ -74,7 +84,7 @@ test("cancellation kills only the active subprocess, cleans its new output and k
   assert.deepEqual(await runtime.transport.request("ping"), {});
 
   const nextOutput = path.join(runtime.directory, "next.txt");
-  await runtime.client.callTool("fixture-job", { output: nextOutput, pidFile: path.join(runtime.directory, "next.pid"), duration: 0.01 }, "after-cancel");
+  await runtime.client.callTool("cut", { output: nextOutput, pidFile: path.join(runtime.directory, "next.pid"), duration: 0.01 }, "after-cancel");
   assert.equal(fs.readFileSync(nextOutput, "utf8"), "completed");
   await runtime.client.close();
 });
@@ -85,7 +95,7 @@ test("cancellation never deletes a pre-existing output", async () => {
   const pidFile = path.join(runtime.directory, "existing.pid");
   fs.writeFileSync(output, "original");
   const controller = new AbortController();
-  const job = runtime.client.callTool("fixture-job", { output, pidFile, duration: 30 }, "preserve-existing", controller.signal);
+  const job = runtime.client.callTool("cut", { output, pidFile, duration: 30 }, "preserve-existing", controller.signal);
   await waitForFile(pidFile);
   controller.abort();
   await assert.rejects(job, (error) => error?.name === "AbortError");
@@ -98,7 +108,7 @@ test("unexpected worker crash rejects the job and the next request starts a fres
   await runtime.transport.start();
   const oldPid = runtime.transport.workerPid;
   await assert.rejects(
-    runtime.client.callTool("crash-worker", {}, "crash-job"),
+    runtime.client.callTool("cut", { crash: true }, "crash-job"),
     (error) => error instanceof WorkerProcessExitedError
   );
   const info = await runtime.client.info();
@@ -112,7 +122,7 @@ test("close cancels and reaps an active subprocess without leaving the worker al
   const runtime = createRuntime();
   const output = path.join(runtime.directory, "closing.txt");
   const pidFile = path.join(runtime.directory, "closing.pid");
-  const job = runtime.client.callTool("fixture-job", { output, pidFile, duration: 30 }, "close-job");
+  const job = runtime.client.callTool("cut", { output, pidFile, duration: 30 }, "close-job");
   const rejectedJob = assert.rejects(job);
   await waitForFile(pidFile);
   const childPid = Number(fs.readFileSync(pidFile, "utf8"));
@@ -123,4 +133,95 @@ test("close cancels and reaps an active subprocess without leaving the worker al
   assert.equal(processExists(childPid), false);
   assert.equal(processExists(workerPid), false);
   assert.equal(fs.existsSync(output), false);
+});
+
+test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async () => {
+  const runtime = createRuntime();
+  const tools = await runtime.client.listTools();
+  assert.deepEqual(tools.map((tool) => tool.name), ["cut", "cevra-overlay-media", "cevra-scale", "cevra-speed", "cevra-transcode"]);
+  assert.equal(JSON.stringify(tools).includes('"argv"'), false);
+  await assert.rejects(runtime.client.callTool("redact", {}, "blocked-tool"), /not allowed by CEVRA/);
+  await assert.rejects(runtime.client.callTool("cut", { argv: ["--help"] }, "blocked-argv"), /raw argv execution is not allowed/);
+  await assert.rejects(runtime.client.callTool("cut", { nested: { argv: ["--help"] } }, "blocked-nested-argv"), /raw argv execution is not allowed/);
+  await runtime.client.close();
+});
+
+test("release worker resolves ffmpeg and ffprobe only from its runtime bin directory", async () => {
+  const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-release-runtime-"));
+  const systemBin = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-system-bin-"));
+  const runtimeBin = path.join(runtimeRoot, "bin");
+  fs.mkdirSync(runtimeBin);
+  const suffix = process.platform === "win32" ? ".exe" : "";
+  for (const name of ["ffmpeg", "ffprobe"]) {
+    for (const directory of [runtimeBin, systemBin]) {
+      const executable = path.join(directory, `${name}${suffix}`);
+      if (process.platform === "win32") {
+        fs.copyFileSync(python, executable);
+      } else {
+        fs.writeFileSync(executable, `#!/bin/sh\ncase "$1" in\n  -version) echo "${name} version 9.0.1" ;;\n  -buildconf) echo "configuration: --disable-gpl --disable-nonfree" ;;\n  -c) echo "$0" ;;\nesac\n`);
+      }
+      fs.chmodSync(executable, 0o755);
+    }
+  }
+  const directEnv = {
+    ...process.env,
+    PYTHONPATH: path.join(engine, "runtime"),
+    CEVRA_RELEASE_MODE: "1",
+    CEVRA_MEDIA_BIN_DIR: systemBin,
+    PATH: `${systemBin}${path.delimiter}${process.env.PATH || ""}`
+  };
+  delete directEnv.CEVRA_MEDIA_RUNTIME_ROOT;
+  const direct = spawnSync(
+    python,
+    ["-s", "-B", "-c", "from _cevra_runtime import require_media_tool; print(require_media_tool('ffmpeg') or 'none')"],
+    { encoding: "utf8", env: directEnv }
+  );
+  assert.equal(direct.status, 0);
+  assert.equal(direct.stdout.trim(), "none");
+  const runtime = createRuntime({ releaseMode: true, runtimeRoot, pathValue: `${systemBin}${path.delimiter}${process.env.PATH || ""}` });
+  try {
+    const result = await runtime.client.callTool("cut", { resolveTools: true }, "release-tools");
+    const canonicalBin = path.join(fs.realpathSync(runtimeRoot), "bin");
+    assert.equal(result.structuredContent.ffmpeg, path.join(canonicalBin, `ffmpeg${suffix}`));
+    assert.equal(result.structuredContent.ffprobe, path.join(canonicalBin, `ffprobe${suffix}`));
+    assert.equal(fs.realpathSync(result.structuredContent.executed_ffmpeg), path.join(canonicalBin, `ffmpeg${suffix}`));
+    assert.equal(fs.realpathSync(result.structuredContent.executed_ffprobe), path.join(canonicalBin, `ffprobe${suffix}`));
+  } finally {
+    await runtime.client.close();
+  }
+});
+
+test("ffmpeg-skill patch routes its direct ffprobe version call through the CEVRA resolver", () => {
+  const source = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-patch-source-"));
+  const scripts = path.join(source, "scripts");
+  fs.mkdirSync(scripts);
+  fs.writeFileSync(path.join(source, "package.json"), JSON.stringify({ version: "1.4.2" }));
+  fs.writeFileSync(path.join(scripts, "_common.py"), `
+import subprocess
+def x264_args(): pass
+def video_args(): pass
+def run():
+    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=limit)
+    subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+def require_tool(name): pass
+def ffmpeg_version():
+    return subprocess.run(["ffprobe", "-version"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+`);
+  const patched = spawnSync(python, ["-s", "-B", patchScript, source, "--runtime-module", runtimeModule], { encoding: "utf8" });
+  assert.equal(patched.status, 0, patched.stderr);
+  const common = fs.readFileSync(path.join(scripts, "_common.py"), "utf8");
+  assert.match(common, /subprocess\.run\(\[require_tool\("ffprobe"\), "-version"\]/);
+  assert.doesNotMatch(common, /subprocess\.run\(\["ffprobe", "-version"\]/);
+});
+
+test("GPL development encoder override is disabled in release mode", () => {
+  const moduleRoot = path.join(engine, "runtime");
+  const script = "from _cevra_runtime import allow_gpl_dev_encoder; print('yes' if allow_gpl_dev_encoder() else 'no')";
+  const baseEnv = { ...process.env, PYTHONPATH: moduleRoot, CEVRA_ALLOW_GPL_DEV_ENCODERS: "1" };
+  const development = spawnSync(python, ["-s", "-B", "-c", script], { encoding: "utf8", env: { ...baseEnv, CEVRA_RELEASE_MODE: "0" } });
+  const release = spawnSync(python, ["-s", "-B", "-c", script], { encoding: "utf8", env: { ...baseEnv, CEVRA_RELEASE_MODE: "1" } });
+  assert.equal(development.status, 0);
+  assert.equal(release.status, 0);
+  assert.equal(development.stdout.trim(), "yes");
+  assert.equal(release.stdout.trim(), "no");
 });

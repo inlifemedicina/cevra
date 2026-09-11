@@ -24,6 +24,24 @@ test("GPL-only software encoders are not implicit fallback", () => {
   assert.equal(result, undefined);
 });
 
+test("all failed encoder benchmarks report no functional encoder", () => {
+  const caps = { platform: "win32", arch: "x64", encoders: ["h264_nvenc", "h264_qsv"], hwaccels: [] };
+  const result = selectVideoEncoder(caps, "h264", "final", [
+    { encoder: "h264_nvenc", codec: "h264", success: false, detail: "device unavailable" },
+    { encoder: "h264_qsv", codec: "h264", success: false, detail: "initialization failed" }
+  ]);
+  assert.equal(result, undefined);
+});
+
+test("benchmarks for another codec do not suppress platform priority", () => {
+  const caps = { platform: "win32", arch: "x64", encoders: ["h264_nvenc", "hevc_nvenc"], hwaccels: [] };
+  const result = selectVideoEncoder(caps, "h264", "final", [
+    { encoder: "hevc_nvenc", codec: "h265", success: false, detail: "device unavailable" }
+  ]);
+  assert.equal(result.encoder, "h264_nvenc");
+  assert.equal(result.reason, "platform-priority");
+});
+
 test("runtime optimization benchmarks approved encoders and configures decode acceleration", async () => {
   let configured;
   const worker = {

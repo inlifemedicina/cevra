@@ -2,7 +2,32 @@ from __future__ import annotations
 
 import math
 import os
+import shutil
 from typing import Any, Dict, List, Optional, Sequence
+
+
+def allow_gpl_dev_encoder() -> bool:
+    release = os.environ.get("CEVRA_RELEASE_MODE", "0") not in ("", "0", "false", "False")
+    enabled = os.environ.get("CEVRA_ALLOW_GPL_DEV_ENCODERS", "0") not in ("", "0", "false", "False")
+    return enabled and not release
+
+
+def require_media_tool(name: str) -> Optional[str]:
+    if name not in ("ffmpeg", "ffprobe"):
+        raise ValueError(f"unsupported media executable {name}")
+    release = os.environ.get("CEVRA_RELEASE_MODE", "0") not in ("", "0", "false", "False")
+    runtime_root = os.environ.get("CEVRA_MEDIA_RUNTIME_ROOT")
+    bin_override = os.environ.get("CEVRA_MEDIA_BIN_DIR")
+    if release:
+        bin_dir = os.path.join(runtime_root, "bin") if runtime_root else None
+    else:
+        bin_dir = bin_override
+    if bin_dir:
+        candidates = [os.path.join(bin_dir, f"{name}.exe"), os.path.join(bin_dir, name)] if os.name == "nt" else [os.path.join(bin_dir, name)]
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return os.path.realpath(candidate)
+    return None if release else shutil.which(name)
 
 
 def _quality_scale(crf: int) -> float:
