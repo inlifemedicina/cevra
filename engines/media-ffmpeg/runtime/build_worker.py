@@ -25,7 +25,7 @@ def run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.Comple
 
 
 def python_version(python_executable: Path) -> str:
-    proc = run([str(python_executable), "-I", "-c", "import platform; print(platform.python_version())"])
+    proc = run([str(python_executable), "-s", "-c", "import platform; print(platform.python_version())"])
     return proc.stdout.strip()
 
 
@@ -66,7 +66,7 @@ def build(output_dir: Path, python_executable: Path) -> Path:
         "PYTHONNOUSERSITE": "1",
         "PYTHONDONTWRITEBYTECODE": "1",
     })
-    info = run([str(python_executable), "-I", str(entry), "--info"], env=env)
+    info = run([str(python_executable), "-s", str(entry), "--info"], env=env)
     parsed = json.loads(info.stdout)
     if parsed.get("version") != VERSIONS["mediaRuntime"]:
         raise SystemExit("staged worker version does not match versions.json")
