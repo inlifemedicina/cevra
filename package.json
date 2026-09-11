@@ -5,8 +5,8 @@
   "license": "UNLICENSED",
   "workspaces": ["apps/*", "packages/*", "engines/*"],
   "scripts": {
-    "build": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/project-store",
-    "test": "npm run test -w @cevra/project-ir && npm run test -w @cevra/contracts && npm run test -w @cevra/project-store",
+    "build": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/project-store && npm run build -w @cevra/media-ffmpeg",
+    "test": "npm run test -w @cevra/project-ir && npm run test -w @cevra/contracts && npm run test -w @cevra/project-store && npm run test -w @cevra/media-ffmpeg",
     "doctor": "python3 scripts/doctor.py"
   },
   "devDependencies": {
