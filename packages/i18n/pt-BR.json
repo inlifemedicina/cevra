@@ -1,0 +1,18 @@
+{
+  "app.name": "CEVRA",
+  "nav.media": "Mídia",
+  "nav.ai": "IA",
+  "nav.style": "Estilo",
+  "nav.captions": "Legendas",
+  "nav.properties": "Propriedades",
+  "action.undo": "Desfazer",
+  "action.redo": "Refazer",
+  "action.export": "Exportar",
+  "project.new": "Novo projeto",
+  "project.open": "Abrir projeto",
+  "status.ready": "Pronto",
+  "status.notInstalled": "Não instalado",
+  "status.processing": "Processando",
+  "timeline.title": "Linha do tempo",
+  "preview.title": "Pré-visualização"
+}

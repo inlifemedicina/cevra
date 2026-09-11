@@ -1,0 +1,10 @@
+{
+  "name": "cevra",
+  "private": true,
+  "version": "0.1.0",
+  "license": "UNLICENSED",
+  "workspaces": ["apps/*", "packages/*", "engines/*"],
+  "scripts": {
+    "doctor": "python3 scripts/doctor.py"
+  }
+}

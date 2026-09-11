@@ -1,0 +1,13 @@
+{
+  "cevraDoctorVersion": 1,
+  "tools": {
+    "git": {"available": true},
+    "node": {"available": true},
+    "npm": {"available": true},
+    "rustc": {"available": true},
+    "cargo": {"available": true},
+    "ffmpeg": {"available": true},
+    "ffprobe": {"available": true},
+    "python": {"available": true}
+  }
+}

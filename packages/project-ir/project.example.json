@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "example-project",
+    "title": "Example",
+    "locale": "pt-BR",
+    "createdAt": "2026-09-11T00:00:00.000Z",
+    "updatedAt": "2026-09-11T00:00:00.000Z"
+  },
+  "sources": [],
+  "transcript": null,
+  "timeline": {"tracks": [], "clips": []},
+  "captions": [],
+  "graphics": [],
+  "layouts": [],
+  "audio": {},
+  "style": {"preset": "clean"},
+  "generation": [],
+  "history": {"currentSnapshotId": null},
+  "qa": [],
+  "exports": [],
+  "extensions": {}
+}
