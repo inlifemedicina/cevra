@@ -24,6 +24,11 @@ def run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.Comple
     return proc
 
 
+def python_version(python_executable: Path) -> str:
+    proc = run([str(python_executable), "-I", "-c", "import platform; print(platform.python_version())"])
+    return proc.stdout.strip()
+
+
 def build(output_dir: Path, python_executable: Path) -> Path:
     """Stage the persistent worker for CEVRA's private managed CPython runtime.
 
@@ -32,6 +37,11 @@ def build(output_dir: Path, python_executable: Path) -> Path:
     Keeping one managed interpreter avoids duplicate runtimes and lets ffmpeg-skill tools run
     in-process instead of spawning a Python child process for every media operation.
     """
+    expected_python = VERSIONS["python"]["version"]
+    actual_python = python_version(python_executable)
+    if actual_python != expected_python:
+        raise SystemExit(f"managed Python version {actual_python} does not match pin {expected_python}")
+
     output_dir.mkdir(parents=True, exist_ok=True)
     worker_dir = output_dir / "worker"
     vendor_dir = output_dir / "vendor" / "ffmpeg-skill"
@@ -63,17 +73,13 @@ def build(output_dir: Path, python_executable: Path) -> Path:
     upstream = parsed.get("upstream") or {}
     if upstream.get("commit") != VERSIONS["ffmpegSkill"]["commit"]:
         raise SystemExit("staged worker upstream provenance mismatch")
-    expected_python = VERSIONS["python"]["version"]
-    actual_python = str((parsed.get("python") or {}).get("version") or "")
-    if actual_python and actual_python != expected_python:
-        raise SystemExit(f"managed Python version {actual_python} does not match pin {expected_python}")
     return entry
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("output", type=Path)
-    ap.add_argument("--python", type=Path, default=Path(sys.executable), help="CEVRA-managed CPython executable; current interpreter is allowed for development staging")
+    ap.add_argument("--python", type=Path, default=Path(sys.executable), help="CEVRA-managed CPython executable; current interpreter is allowed only when it matches the release pin")
     args = ap.parse_args()
     python_executable = args.python.resolve()
     if not python_executable.is_file():
