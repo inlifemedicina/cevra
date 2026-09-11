@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PersistentMediaWorkerClient, selectDecodeAcceleration, selectVideoEncoder } from "../dist/index.js";
+import { PersistentMediaWorkerClient, optimizeMediaRuntime, selectDecodeAcceleration, selectVideoEncoder } from "../dist/index.js";
 
 test("macOS chooses VideoToolbox when available", () => {
   const result = selectVideoEncoder({ platform: "darwin", arch: "arm64", encoders: ["h264_videotoolbox"], hwaccels: ["videotoolbox"] }, "h264", "final");
@@ -22,6 +22,33 @@ test("Windows benchmark can override static encoder priority", () => {
 test("GPL-only software encoders are not implicit fallback", () => {
   const result = selectVideoEncoder({ platform: "linux", arch: "x64", encoders: ["libx264"], hwaccels: [] }, "h264", "final");
   assert.equal(result, undefined);
+});
+
+test("runtime optimization benchmarks approved encoders and configures decode acceleration", async () => {
+  let configured;
+  const worker = {
+    async info() {
+      return {
+        name: "cevra-media-worker",
+        version: "0.1.0",
+        protocolVersion: 1,
+        upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" },
+        runtime: { platform: "win32", arch: "x64", encoders: ["h264_nvenc", "h264_qsv"], hwaccels: ["d3d11va"] }
+      };
+    },
+    async health() { return { ok: true, checkedAt: "2026-09-11T00:00:00Z", checks: [], tools: {} }; },
+    async configureRuntime(profile) { configured = profile; },
+    async benchmarkVideoEncoders(codec, encoders) {
+      return encoders.map((encoder) => ({ encoder, codec, success: true, fps: encoder.endsWith("qsv") ? 250 : 180 }));
+    },
+    async listTools() { return []; },
+    async callTool() { return { structuredContent: {} }; }
+  };
+  const result = await optimizeMediaRuntime(worker, "final");
+  assert.equal(result.selections.h264.encoder, "h264_qsv");
+  assert.equal(result.recommendedDecodeAcceleration, "d3d11va");
+  assert.equal(configured.h264Encoder, "h264_qsv");
+  assert.equal(configured.decodeAcceleration, "d3d11va");
 });
 
 test("persistent worker starts once across calls and can close", async () => {
