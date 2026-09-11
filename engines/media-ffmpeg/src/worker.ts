@@ -5,6 +5,15 @@ export interface WorkerCheck {
   evidence?: Record<string, unknown>;
 }
 
+export interface MediaRuntimeCapabilities {
+  platform: "darwin" | "win32" | "linux" | "unknown";
+  arch: string;
+  ffmpegVersion?: string;
+  ffmpegLicense?: string;
+  encoders: string[];
+  hwaccels: string[];
+}
+
 export interface MediaWorkerInfo {
   name: string;
   version: string;
@@ -13,7 +22,9 @@ export interface MediaWorkerInfo {
     id: "ffmpeg-skill";
     version: string;
     contractVersion: string;
+    commit?: string;
   };
+  runtime?: MediaRuntimeCapabilities;
 }
 
 export interface MediaWorkerHealth {
@@ -21,6 +32,7 @@ export interface MediaWorkerHealth {
   checkedAt: string;
   checks: WorkerCheck[];
   tools: Record<string, { usable: "yes" | "no" | "unknown"; missing?: string[]; detail?: string }>;
+  runtime?: MediaRuntimeCapabilities;
 }
 
 export interface MediaWorkerToolResult {
