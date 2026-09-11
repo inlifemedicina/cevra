@@ -8,8 +8,9 @@ import os
 import platform
 import re
 import subprocess
+import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 HERE = Path(__file__).resolve().parent
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
@@ -21,6 +22,33 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def tree_sha256(roots: Iterable[Path], base: Path) -> str:
+    digest = hashlib.sha256()
+    files: list[Path] = []
+    for root in roots:
+        if root.is_file():
+            files.append(root)
+        elif root.is_dir():
+            files.extend(path for path in root.rglob("*") if path.is_file() and "__pycache__" not in path.parts)
+    for path in sorted(files, key=lambda item: item.relative_to(base).as_posix()):
+        rel = path.relative_to(base).as_posix().encode("utf-8")
+        digest.update(len(rel).to_bytes(4, "big"))
+        digest.update(rel)
+        digest.update(bytes.fromhex(sha256(path)))
+    return digest.hexdigest()
+
+
+def python_version(binary: Path) -> str:
+    proc = subprocess.run(
+        [str(binary), "-s", "-c", "import platform; print(platform.python_version())"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    )
+    return proc.stdout.strip()
 
 
 def ffmpeg_metadata(binary: Path) -> dict[str, Any]:
@@ -47,16 +75,38 @@ def ffmpeg_metadata(binary: Path) -> dict[str, Any]:
     }
 
 
-def generate(runtime_dir: Path) -> dict[str, Any]:
+def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
     exe = ".exe" if os.name == "nt" else ""
-    worker = runtime_dir / f"cevra-media-worker{exe}"
+    worker_dir = runtime_dir / "worker"
+    worker = worker_dir / "cevra_media_worker.py"
+    vendor = runtime_dir / "vendor" / "ffmpeg-skill"
     ffmpeg = runtime_dir / "bin" / f"ffmpeg{exe}"
     ffprobe = runtime_dir / "bin" / f"ffprobe{exe}"
-    for path in (worker, ffmpeg, ffprobe):
+    for path in (worker, vendor / "package.json", vendor / "CEVRA_PROVENANCE.json", ffmpeg, ffprobe, python_binary):
         if not path.is_file():
             raise SystemExit(f"runtime component missing: {path}")
 
-    worker_info = subprocess.run([str(worker), "--info"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+    actual_python = python_version(python_binary)
+    pinned_python = VERSIONS["python"]["version"]
+    if actual_python != pinned_python:
+        raise SystemExit(f"Python version {actual_python} does not match pin {pinned_python}")
+
+    env = os.environ.copy()
+    env.update({
+        "CEVRA_MEDIA_RUNTIME_ROOT": str(runtime_dir),
+        "CEVRA_FFMPEG_SKILL_ROOT": str(vendor),
+        "CEVRA_RELEASE_MODE": "1",
+        "PYTHONNOUSERSITE": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    })
+    worker_info = subprocess.run(
+        [str(python_binary), "-s", str(worker), "--info"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+        env=env,
+    )
     info = json.loads(worker_info.stdout)
     meta = ffmpeg_metadata(ffmpeg)
     pinned_ffmpeg = VERSIONS["ffmpeg"]["version"]
@@ -76,7 +126,7 @@ def generate(runtime_dir: Path) -> dict[str, Any]:
         raise SystemExit("worker upstream provenance does not match versions.json")
 
     ffmpeg_sha = sha256(ffmpeg)
-    manifest = {
+    return {
         "format": "cevra-media-runtime",
         "formatVersion": 1,
         "runtimeVersion": VERSIONS["mediaRuntime"],
@@ -84,6 +134,11 @@ def generate(runtime_dir: Path) -> dict[str, Any]:
         "platform": sys_platform(),
         "arch": platform.machine() or "unknown",
         "workerSha256": sha256(worker),
+        "executionBundleSha256": tree_sha256((worker_dir, vendor), runtime_dir),
+        "python": {
+            "version": actual_python,
+            "executableSha256": sha256(python_binary),
+        },
         "upstream": {
             "id": "ffmpeg-skill",
             "version": pin["version"],
@@ -103,13 +158,11 @@ def generate(runtime_dir: Path) -> dict[str, Any]:
             "signingFingerprint": VERSIONS["ffmpeg"]["signingFingerprint"],
         },
     }
-    return manifest
 
 
 def sys_platform() -> str:
     if os.name == "nt":
         return "win32"
-    import sys
     if sys.platform == "darwin":
         return "darwin"
     if sys.platform.startswith("linux"):
@@ -120,10 +173,12 @@ def sys_platform() -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("runtime", type=Path)
+    ap.add_argument("--python", type=Path, default=Path(sys.executable), help="CEVRA-managed CPython executable")
     ap.add_argument("--output", type=Path)
     args = ap.parse_args()
     runtime = args.runtime.resolve()
-    manifest = generate(runtime)
+    python_binary = args.python.resolve()
+    manifest = generate(runtime, python_binary)
     output = args.output.resolve() if args.output else runtime / "manifest.json"
     output.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(output)
