@@ -41,8 +41,9 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
     return result.tools;
   }
 
-  async callTool(name: string, arguments_: Record<string, unknown>): Promise<MediaWorkerToolResult> {
-    return this.request<MediaWorkerToolResult>("tools/call", { name, arguments: arguments_ });
+  async callTool(name: string, arguments_: Record<string, unknown>, signal?: AbortSignal): Promise<MediaWorkerToolResult> {
+    if (signal?.aborted) throw abortError();
+    return this.request<MediaWorkerToolResult>("tools/call", { name, arguments: arguments_ }, signal);
   }
 
   async close(): Promise<void> {
@@ -56,7 +57,9 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
   }
 
   private async request<T>(method: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) throw abortError();
     await this.ensureStarted();
+    if (signal?.aborted) throw abortError();
     return this.transport.request<T>(method, params, signal);
   }
 
@@ -67,4 +70,10 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
     });
     return this.startPromise;
   }
+}
+
+function abortError(): Error {
+  const error = new Error("CEVRA media operation was cancelled.");
+  error.name = "AbortError";
+  return error;
 }
