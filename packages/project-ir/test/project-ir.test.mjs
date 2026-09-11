@@ -77,3 +77,30 @@ test("clip references are validated", () => {
   assert.equal(result.ok, false);
   if (!result.ok) assert.ok(result.issues.some((issue) => issue.code === "reference"));
 });
+
+test("validator rejects malformed nested source and caption data", () => {
+  const project = createEmptyProject({ id: "project-1", now: fixedTime });
+  project.sources.push({ id: "bad", kind: "document", uri: "x", displayName: "x" });
+  project.captions.push({ id: "c1", startMs: 1000, endMs: 500, text: "bad" });
+  const result = validateProjectIR(project);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.ok(result.issues.some((issue) => issue.path === "sources[0].kind"));
+    assert.ok(result.issues.some((issue) => issue.path === "captions[0]" && issue.code === "range"));
+  }
+});
+
+test("history preserves an existing baseline revision", () => {
+  let seq = 0;
+  const project = createEmptyProject({ id: "project-1", now: fixedTime });
+  project.history.revision = 7;
+  project.history.headEntryId = "existing-entry";
+  const history = new ProjectHistory(project, {
+    idGenerator: () => `id-${++seq}`,
+    clock: () => fixedTime
+  });
+  assert.equal(history.current.history.revision, 7);
+  assert.equal(history.current.history.headEntryId, "existing-entry");
+  const changed = history.commit({ type: "project.rename", name: "Next" });
+  assert.equal(changed.history.revision, 8);
+});
