@@ -62,11 +62,14 @@ def ensure_functional_profile(ffmpeg: Optional[str], runtime: Dict[str, Any]) ->
     platform_name = str(runtime.get("platform") or "unknown")
     available = runtime.get("encoders") or []
     for codec, env_name in _ENV.items():
+        approved = candidates(platform_name, codec, available)
         configured = os.environ.get(env_name, "").strip()
-        if configured and configured in available:
-            result[codec] = configured
-            continue
-        for encoder in candidates(platform_name, codec, available):
+        if configured:
+            if configured in approved and _smoke(ffmpeg, configured):
+                result[codec] = configured
+                continue
+            os.environ.pop(env_name, None)
+        for encoder in approved:
             if _smoke(ffmpeg, encoder):
                 os.environ[env_name] = encoder
                 result[codec] = encoder
