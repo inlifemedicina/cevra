@@ -42,8 +42,10 @@ export class ProjectHistory {
     const project = assertValidProjectIR(clone(initialProject));
     const now = this.clock();
     const snapshotId = this.idGenerator();
-    project.history = { revision: 0, headSnapshotId: snapshotId };
-    this.snapshotsInternal.push({ id: snapshotId, revision: 0, createdAt: now, project: clone(project) });
+    const revision = project.history.revision;
+    const headEntryId = project.history.headEntryId;
+    project.history = { revision, ...(headEntryId ? { headEntryId } : {}), headSnapshotId: snapshotId };
+    this.snapshotsInternal.push({ id: snapshotId, revision, createdAt: now, project: clone(project) });
   }
 
   get current(): ProjectIR {
