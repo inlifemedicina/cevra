@@ -15,7 +15,9 @@ export interface PersistentWorkerTransport {
 }
 
 export class PersistentMediaWorkerClient implements MediaWorkerClient {
-  private startPromise?: Promise<void>;
+  private startPromise: Promise<void> | undefined;
+  private jobQueue: Promise<void> = Promise.resolve();
+  private closed = false;
 
   constructor(private readonly transport: PersistentWorkerTransport) {}
 
@@ -41,12 +43,24 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
     return result.tools;
   }
 
-  async callTool(name: string, arguments_: Record<string, unknown>, signal?: AbortSignal): Promise<MediaWorkerToolResult> {
+  async callTool(name: string, arguments_: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<MediaWorkerToolResult> {
+    if (!jobId.trim()) throw new Error("Media jobId is required.");
     if (signal?.aborted) throw abortError();
-    return this.request<MediaWorkerToolResult>("tools/call", { name, arguments: arguments_ }, signal);
+    const run = this.jobQueue.then(async () => {
+      if (signal?.aborted) throw abortError();
+      try {
+        return await this.request<MediaWorkerToolResult>("tools/call", { name, arguments: arguments_, jobId }, signal);
+      } catch (error) {
+        if (signal?.aborted) throw abortError();
+        throw error;
+      }
+    });
+    this.jobQueue = run.then(() => undefined, () => undefined);
+    return run;
   }
 
   async close(): Promise<void> {
+    this.closed = true;
     if (!this.startPromise) return;
     try {
       await this.startPromise;
@@ -57,6 +71,7 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
   }
 
   private async request<T>(method: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
+    if (this.closed) throw new Error("CEVRA media worker client is closed.");
     if (signal?.aborted) throw abortError();
     await this.ensureStarted();
     if (signal?.aborted) throw abortError();

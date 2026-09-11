@@ -14,7 +14,7 @@ ENGINE = HERE.parent
 WORKER_SOURCE = ENGINE / "worker"
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 
-WORKER_FILES = ("cevra_media_worker.py", "cevra_native_tools.py", "runtime_profile.py")
+WORKER_FILES = ("cevra_media_worker.py", "cevra_native_tools.py", "cevra_job_control.py", "runtime_profile.py")
 
 
 def run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:

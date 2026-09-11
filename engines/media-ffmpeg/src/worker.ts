@@ -65,5 +65,5 @@ export interface MediaWorkerClient {
   configureRuntime(profile: MediaWorkerRuntimeProfile): Promise<void>;
   benchmarkVideoEncoders(codec: WorkerVideoCodec, encoders: string[]): Promise<MediaWorkerEncoderBenchmark[]>;
   listTools(): Promise<Array<{ name: string; inputSchema?: Record<string, unknown> }>>;
-  callTool(name: string, arguments_: Record<string, unknown>, signal?: AbortSignal): Promise<MediaWorkerToolResult>;
+  callTool(name: string, arguments_: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<MediaWorkerToolResult>;
 }

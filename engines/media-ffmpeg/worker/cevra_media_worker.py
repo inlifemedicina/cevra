@@ -11,11 +11,13 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from cevra_native_tools import CUSTOM_TOOLS, call_custom_tool
+import cevra_job_control as job_control
 from runtime_profile import adapt_required_capabilities, configured_profile, ensure_functional_profile
 
 WORKER_VERSION = "0.1.0"
@@ -48,6 +50,9 @@ BIN_DIR = Path(os.environ.get("CEVRA_MEDIA_BIN_DIR", str(RUNTIME_ROOT / "bin")))
 VENDOR_ROOT = Path(os.environ.get("CEVRA_FFMPEG_SKILL_ROOT", str(BUNDLE_ROOT / "vendor" / "ffmpeg-skill"))).resolve()
 RELEASE_MODE = os.environ.get("CEVRA_RELEASE_MODE", "0") not in ("", "0", "false", "False")
 _UPSTREAM: Any = None
+_CONTROL_STDOUT = sys.stdout
+_CONTROL_WRITE_LOCK = threading.Lock()
+_JOB_THREAD: Optional[threading.Thread] = None
 
 
 def _binary_candidates(name: str) -> List[Path]:
@@ -466,12 +471,53 @@ def handle(method: str, params: Dict[str, Any]) -> Any:
     if method == "tools/list":
         upstream = _load_upstream()
         return {"tools": upstream.tool_list() + _custom_tool_specs()}
-    if method == "tools/call":
-        arguments = params.get("arguments") or {}
-        if not isinstance(arguments, dict):
-            raise ValueError("tool arguments must be an object")
-        return _call_tool_in_process(str(params.get("name") or ""), arguments)
     raise KeyError(method)
+
+
+def _write_response(response: Dict[str, Any]) -> None:
+    with _CONTROL_WRITE_LOCK:
+        _CONTROL_STDOUT.write(json.dumps(response) + "\n")
+        _CONTROL_STDOUT.flush()
+
+
+def _job_response(request_id: Any, job_id: str, name: str, arguments: Dict[str, Any]) -> None:
+    global _JOB_THREAD
+    response: Dict[str, Any]
+    try:
+        result = _call_tool_in_process(name, arguments)
+        cancelled = job_control.finish_job(job_id)
+        if cancelled:
+            response = {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32800, "message": f"media job {job_id} was cancelled"}}
+        else:
+            response = {"jsonrpc": "2.0", "id": request_id, "result": result}
+    except BaseException as exc:
+        cancelled = job_control.finish_job(job_id)
+        code = -32800 if cancelled else -32000
+        message = f"media job {job_id} was cancelled" if cancelled else str(exc)
+        response = {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
+    finally:
+        _JOB_THREAD = None
+    _write_response(response)
+
+
+def _start_job(request_id: Any, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    global _JOB_THREAD
+    job_id = params.get("jobId")
+    name = params.get("name")
+    arguments = params.get("arguments") or {}
+    if not isinstance(job_id, str) or not job_id.strip():
+        raise ValueError("jobId must be a non-empty string")
+    if not isinstance(name, str) or not name:
+        raise ValueError("tool name must be a non-empty string")
+    if not isinstance(arguments, dict):
+        raise ValueError("tool arguments must be an object")
+    if _JOB_THREAD is not None or job_control.active_job_id() is not None:
+        return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32001, "message": "media worker is busy"}}
+    job_control.begin_job(job_id)
+    thread = threading.Thread(target=_job_response, args=(request_id, job_id, name, arguments), name=f"cevra-media-job-{job_id}")
+    _JOB_THREAD = thread
+    thread.start()
+    return None
 
 
 def main() -> int:
@@ -482,28 +528,56 @@ def main() -> int:
     if "--health" in sys.argv:
         print(json.dumps(health(), indent=2))
         return 0
-    for raw in sys.stdin.buffer:
-        line = raw.decode("utf-8", errors="replace").strip()
-        if not line:
-            continue
-        try:
-            req = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(req, dict) or "id" not in req:
-            continue
-        try:
-            params = req.get("params") or {}
-            if not isinstance(params, dict):
-                raise ValueError("params must be an object")
-            result = handle(str(req.get("method") or ""), params)
-            response = {"jsonrpc": "2.0", "id": req["id"], "result": result}
-        except KeyError as exc:
-            response = {"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": f"method not found: {exc}"}}
-        except Exception as exc:
-            response = {"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32000, "message": str(exc)}}
-        sys.stdout.write(json.dumps(response) + "\n")
-        sys.stdout.flush()
+    shutting_down = False
+    try:
+        for raw in sys.stdin.buffer:
+            line = raw.decode("utf-8", errors="replace").strip()
+            if not line:
+                continue
+            try:
+                req = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(req, dict) or "id" not in req:
+                continue
+            response: Optional[Dict[str, Any]] = None
+            try:
+                params = req.get("params") or {}
+                if not isinstance(params, dict):
+                    raise ValueError("params must be an object")
+                method = str(req.get("method") or "")
+                if method == "tools/call":
+                    response = _start_job(req["id"], params)
+                elif method == "cevra/cancel":
+                    job_id = params.get("jobId")
+                    if not isinstance(job_id, str) or not job_id:
+                        raise ValueError("jobId must be a non-empty string")
+                    response = {"jsonrpc": "2.0", "id": req["id"], "result": {"cancelled": job_control.cancel(job_id), "jobId": job_id}}
+                elif method == "cevra/shutdown":
+                    active = job_control.active_job_id()
+                    if active:
+                        job_control.cancel(active)
+                    shutting_down = True
+                    response = {"jsonrpc": "2.0", "id": req["id"], "result": {"shuttingDown": True}}
+                elif job_control.active_job_id() is not None and method not in ("ping",):
+                    response = {"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32001, "message": "media worker is busy"}}
+                else:
+                    response = {"jsonrpc": "2.0", "id": req["id"], "result": handle(method, params)}
+            except KeyError as exc:
+                response = {"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": f"method not found: {exc}"}}
+            except Exception as exc:
+                response = {"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32000, "message": str(exc)}}
+            if response is not None:
+                _write_response(response)
+            if shutting_down:
+                break
+    finally:
+        active = job_control.active_job_id()
+        if active:
+            job_control.cancel(active)
+        thread = _JOB_THREAD
+        if thread is not None:
+            thread.join(timeout=5.0)
     return 0
 
 

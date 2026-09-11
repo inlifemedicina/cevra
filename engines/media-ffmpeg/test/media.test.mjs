@@ -11,8 +11,8 @@ class FakeWorker {
     return { ok: true, checkedAt: "2026-09-11T18:00:00.000Z", checks: [{ id: "ffmpeg", status: "PASS" }], tools: { probe: { usable: "yes" }, cut: { usable: "yes" }, fit: { usable: "yes" }, silence: { usable: "yes" } } };
   }
   async listTools() { return []; }
-  async callTool(name, arguments_, signal) {
-    this.calls.push({ name, arguments_, signal });
+  async callTool(name, arguments_, jobId, signal) {
+    this.calls.push({ name, arguments_, jobId, signal });
     if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: "h264" }, audio: { codec: "aac", sample_rate: 48000, channels: 2 } } };
     if (name === "silence") return { structuredContent: { silences: [[1.2, 2.4], [5.0, null]] } };
     return { structuredContent: { status: "completed", output: arguments_.output, probe: { duration: 1.0 } } };
@@ -71,6 +71,7 @@ test("abort signal is propagated to the worker and pre-aborted jobs fail immedia
   const controller = new AbortController();
   await engine.execute({ type: "probe", inputUri: "in.mp4" }, { ...context, signal: controller.signal });
   assert.equal(worker.calls[0].signal, controller.signal);
+  assert.equal(worker.calls[0].jobId, context.jobId);
 
   controller.abort();
   await assert.rejects(

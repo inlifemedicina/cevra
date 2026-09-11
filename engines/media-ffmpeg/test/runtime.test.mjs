@@ -80,3 +80,29 @@ test("persistent worker starts once across calls and can close", async () => {
   await client.close();
   assert.equal(stops, 1);
 });
+
+test("persistent client serializes jobs and forwards stable job ids", async () => {
+  const events = [];
+  let releaseFirst;
+  const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+  const transport = {
+    async start() {},
+    async stop() {},
+    async request(method, params) {
+      if (method !== "tools/call") return {};
+      events.push(`start:${params.jobId}`);
+      if (params.jobId === "job-1") await firstGate;
+      events.push(`end:${params.jobId}`);
+      return { structuredContent: {} };
+    }
+  };
+  const client = new PersistentMediaWorkerClient(transport);
+  const first = client.callTool("probe", {}, "job-1");
+  const second = client.callTool("probe", {}, "job-2");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(events, ["start:job-1"]);
+  releaseFirst();
+  await Promise.all([first, second]);
+  assert.deepEqual(events, ["start:job-1", "end:job-1", "start:job-2", "end:job-2"]);
+  await client.close();
+});

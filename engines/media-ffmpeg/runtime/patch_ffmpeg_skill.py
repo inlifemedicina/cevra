@@ -16,6 +16,9 @@ WRAPPERS = r'''
 from _cevra_runtime import hdr_encoder_args as _cevra_hdr_encoder_args
 from _cevra_runtime import sdr_encoder_args as _cevra_sdr_encoder_args
 from _cevra_runtime import with_decode_acceleration as _cevra_with_decode_acceleration
+from cevra_job_control import popen as _cevra_job_popen
+from cevra_job_control import run as _cevra_job_run
+from cevra_job_control import detach_process as _cevra_detach_process
 
 
 def _cevra_allow_gpl_dev_encoder() -> bool:
@@ -71,6 +74,15 @@ def patch(source: Path, runtime_module: Path) -> None:
     text = text.replace("def x264_args(", "def _upstream_x264_args(", 1)
     text = text.replace("def video_args(", "def _upstream_video_args(", 1)
     text = text.replace("def run(", "def _upstream_run(", 1)
+    captured = "subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=limit)"
+    if text.count(captured) != 1:
+        raise SystemExit("pinned ffmpeg-skill captured process runner changed; review cancellation patch")
+    text = text.replace(captured, "_cevra_job_run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=limit, artifact_paths=[cmd[-1]] if _is_ffmpeg(cmd) else [])", 1)
+    progress = "subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)"
+    if text.count(progress) != 1:
+        raise SystemExit("pinned ffmpeg-skill progress process runner changed; review cancellation patch")
+    text = text.replace(progress, "_cevra_job_popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, artifact_paths=[cmd[-1]])", 1)
+    text = text.replace("return subprocess.CompletedProcess(full, proc.returncode, \"\", err)", "_cevra_detach_process(proc)\n    return subprocess.CompletedProcess(full, proc.returncode, \"\", err)", 1)
     text += WRAPPERS
     common_path.write_text(text, encoding="utf-8")
     shutil.copy2(runtime_module, source / "scripts" / "_cevra_runtime.py")

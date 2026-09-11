@@ -49,30 +49,31 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     const operation = validateMediaOperation(operationInput);
     const signal = context.signal;
     if (signal?.aborted) throw abortError();
+    const call = (name: string, args: Record<string, unknown>) => this.call(name, args, context.jobId, signal);
     switch (operation.type) {
       case "probe":
-        return { type: "probe", probe: parseProbe(await this.call("probe", { inputs: [operation.inputUri] }, signal), operation.inputUri) };
+        return { type: "probe", probe: parseProbe(await call("probe", { inputs: [operation.inputUri] }), operation.inputUri) };
       case "trim":
-        return fileResult(await this.call("cut", { input: operation.inputUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), accurate: true }, signal), operation.outputUri);
+        return fileResult(await call("cut", { input: operation.inputUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), accurate: true }), operation.outputUri);
       case "concat":
-        return fileResult(await this.call("join", { inputs: operation.inputUris, output: operation.outputUri }, signal), operation.outputUri);
+        return fileResult(await call("join", { inputs: operation.inputUris, output: operation.outputUri }), operation.outputUri);
       case "fit":
-        if (operation.mode === "stretch") return fileResult(await this.call("cevra-scale", { input: operation.inputUri, output: operation.outputUri, width: operation.width, height: operation.height }, signal), operation.outputUri);
-        return fileResult(await this.call("fit", { input: operation.inputUri, output: operation.outputUri, width: operation.width, height: operation.height, fit: operation.mode === "cover" ? "crop" : "pad", ...(operation.backgroundColor ? { pad_color: operation.backgroundColor } : {}) }, signal), operation.outputUri);
+        if (operation.mode === "stretch") return fileResult(await call("cevra-scale", { input: operation.inputUri, output: operation.outputUri, width: operation.width, height: operation.height }), operation.outputUri);
+        return fileResult(await call("fit", { input: operation.inputUri, output: operation.outputUri, width: operation.width, height: operation.height, fit: operation.mode === "cover" ? "crop" : "pad", ...(operation.backgroundColor ? { pad_color: operation.backgroundColor } : {}) }), operation.outputUri);
       case "crop":
-        return fileResult(await this.call("crop", { input: operation.inputUri, output: operation.outputUri, x: operation.x, y: operation.y, width: operation.width, height: operation.height }, signal), operation.outputUri);
+        return fileResult(await call("crop", { input: operation.inputUri, output: operation.outputUri, x: operation.x, y: operation.y, width: operation.width, height: operation.height }), operation.outputUri);
       case "volume":
-        return fileResult(await this.call("audio", { input: operation.inputUri, output: operation.outputUri, gain: operation.gainDb }, signal), operation.outputUri);
+        return fileResult(await call("audio", { input: operation.inputUri, output: operation.outputUri, gain: operation.gainDb }), operation.outputUri);
       case "loudness-normalize":
-        return fileResult(await this.call("loudness", { input: operation.inputUri, output: operation.outputUri, lufs: operation.targetLufs, ...(operation.truePeakDb !== undefined ? { tp: operation.truePeakDb } : {}) }, signal), operation.outputUri);
+        return fileResult(await call("loudness", { input: operation.inputUri, output: operation.outputUri, lufs: operation.targetLufs, ...(operation.truePeakDb !== undefined ? { tp: operation.truePeakDb } : {}) }), operation.outputUri);
       case "audio-fade":
-        return fileResult(await this.call("audio", { input: operation.inputUri, output: operation.outputUri, ...(operation.fadeInMs !== undefined ? { fade_in: seconds(operation.fadeInMs) } : {}), ...(operation.fadeOutMs !== undefined ? { fade_out: seconds(operation.fadeOutMs) } : {}) }, signal), operation.outputUri);
+        return fileResult(await call("audio", { input: operation.inputUri, output: operation.outputUri, ...(operation.fadeInMs !== undefined ? { fade_in: seconds(operation.fadeInMs) } : {}), ...(operation.fadeOutMs !== undefined ? { fade_out: seconds(operation.fadeOutMs) } : {}) }), operation.outputUri);
       case "extract-audio":
-        return fileResult(await this.call("audio", { input: operation.inputUri, output: operation.outputUri }, signal), operation.outputUri);
+        return fileResult(await call("audio", { input: operation.inputUri, output: operation.outputUri }), operation.outputUri);
       case "extract-frame":
-        return fileResult(await this.call("look", { input: operation.inputUri, output: operation.outputUri, at: seconds(operation.atMs), tiles: 1, no_timecode: true }, signal), operation.outputUri);
+        return fileResult(await call("look", { input: operation.inputUri, output: operation.outputUri, at: seconds(operation.atMs), tiles: 1, no_timecode: true }), operation.outputUri);
       case "detect-silence": {
-        const payload = await this.call("silence", { input: operation.inputUri, threshold: operation.thresholdDb, min_silence: seconds(operation.minDurationMs), list: true }, signal);
+        const payload = await call("silence", { input: operation.inputUri, threshold: operation.thresholdDb, min_silence: seconds(operation.minDurationMs), list: true });
         const silences = payload.silences;
         if (!Array.isArray(silences)) throw new Error("Media worker silence result is missing silences.");
         return {
@@ -81,14 +82,14 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
         };
       }
       case "overlay-media":
-        return fileResult(await this.call("cevra-overlay-media", { base: operation.baseUri, overlay: operation.overlayUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), x: operation.x, y: operation.y, width: operation.width, height: operation.height, ...(operation.opacity !== undefined ? { opacity: operation.opacity } : {}) }, signal), operation.outputUri);
+        return fileResult(await call("cevra-overlay-media", { base: operation.baseUri, overlay: operation.overlayUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), x: operation.x, y: operation.y, width: operation.width, height: operation.height, ...(operation.opacity !== undefined ? { opacity: operation.opacity } : {}) }), operation.outputUri);
       case "mux-audio":
-        return fileResult(await this.call("audio", { input: operation.videoUri, replace: operation.audioUri, output: operation.outputUri }, signal), operation.outputUri);
+        return fileResult(await call("audio", { input: operation.videoUri, replace: operation.audioUri, output: operation.outputUri }), operation.outputUri);
       case "speed":
-        return fileResult(await this.call("cevra-speed", { input: operation.inputUri, output: operation.outputUri, factor: operation.factor }, signal), operation.outputUri);
+        return fileResult(await call("cevra-speed", { input: operation.inputUri, output: operation.outputUri, factor: operation.factor }), operation.outputUri);
       case "transcode":
         validateTranscodeCompatibility(operation);
-        return fileResult(await this.call("cevra-transcode", {
+        return fileResult(await call("cevra-transcode", {
           input: operation.inputUri,
           output: operation.outputUri,
           ...(operation.container ? { container: operation.container } : {}),
@@ -97,13 +98,13 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
           ...(operation.width ? { width: operation.width } : {}),
           ...(operation.height ? { height: operation.height } : {}),
           ...(operation.fps ? { fps: operation.fps } : {})
-        }, signal), operation.outputUri);
+        }), operation.outputUri);
     }
   }
 
-  private async call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<Record<string, unknown>> {
+  private async call(name: string, args: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (signal?.aborted) throw abortError();
-    const result = await this.worker.callTool(name, args, signal);
+    const result = await this.worker.callTool(name, args, jobId, signal);
     if (result.isError) throw new Error(readText(result) || `Media worker tool ${name} failed.`);
     return result.structuredContent ?? parseTextJson(result) ?? {};
   }
