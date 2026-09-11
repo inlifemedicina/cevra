@@ -18,6 +18,14 @@ export interface MediaRuntimeManifestV1 {
   formatVersion: typeof CEVRA_MEDIA_RUNTIME_FORMAT_VERSION;
   runtimeVersion: string;
   workerVersion: string;
+  platform: RuntimePlatform;
+  arch: string;
+  workerSha256: string;
+  executionBundleSha256: string;
+  python: {
+    version: string;
+    executableSha256: string;
+  };
   upstream: {
     id: "ffmpeg-skill";
     version: string;
@@ -28,7 +36,13 @@ export interface MediaRuntimeManifestV1 {
     version: string;
     license: "LGPL-2.1-or-later" | "LGPL-3.0-or-later";
     buildId: string;
+    sha256: string;
+    ffprobeSha256: string;
     configureFlagsSha256: string;
+    configureFlags: string[];
+    source: string;
+    sourceSignature: string;
+    signingFingerprint: string;
   };
 }
 
@@ -36,7 +50,7 @@ export interface VideoEncoderSelection {
   encoder: string;
   codec: RuntimeVideoCodec;
   hardware: boolean;
-  family: "videotoolbox" | "mediafoundation" | "nvenc" | "qsv" | "amf" | "vaapi" | "software";
+  family: "videotoolbox" | "mediafoundation" | "nvenc" | "qsv" | "amf" | "software";
   reason: "benchmark" | "platform-priority";
 }
 
@@ -88,7 +102,7 @@ export function selectVideoEncoder(
   return {
     encoder,
     codec,
-    hardware: !encoder.startsWith("lib"),
+    hardware: true,
     family: encoderFamily(encoder),
     reason: benchmarked.length > 0 ? "benchmark" : "platform-priority"
   };
@@ -108,13 +122,14 @@ export async function optimizeMediaRuntime(worker: MediaWorkerClient, mode: Enco
     if (selection) selections[codec] = selection;
   }
 
+  const recommendedDecodeAcceleration = selectDecodeAcceleration(capabilities);
   const profile: MediaWorkerRuntimeProfile = {
     ...(selections.h264 ? { h264Encoder: selections.h264.encoder } : {}),
     ...(selections.h265 ? { hevcEncoder: selections.h265.encoder } : {}),
-    ...(selections.av1 ? { av1Encoder: selections.av1.encoder } : {})
+    ...(selections.av1 ? { av1Encoder: selections.av1.encoder } : {}),
+    ...(recommendedDecodeAcceleration ? { decodeAcceleration: recommendedDecodeAcceleration } : {})
   };
   await worker.configureRuntime(profile);
-  const recommendedDecodeAcceleration = selectDecodeAcceleration(capabilities);
   return {
     profile,
     selections,
@@ -139,6 +154,5 @@ export function encoderFamily(encoder: string): VideoEncoderSelection["family"] 
   if (encoder.endsWith("_nvenc")) return "nvenc";
   if (encoder.endsWith("_qsv")) return "qsv";
   if (encoder.endsWith("_amf")) return "amf";
-  if (encoder.endsWith("_vaapi")) return "vaapi";
   return "software";
 }
