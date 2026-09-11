@@ -29,6 +29,13 @@ export interface HistoryOptions {
   clock?: () => string;
 }
 
+export interface HistoryArchive {
+  version: 1;
+  entries: JournalEntry[];
+  snapshots: ProjectSnapshot[];
+  cursorSnapshotId: Id;
+}
+
 export class ProjectHistory {
   private readonly idGenerator: () => string;
   private readonly clock: () => string;
@@ -66,6 +73,27 @@ export class ProjectHistory {
 
   get snapshots(): readonly ProjectSnapshot[] {
     return clone(this.snapshotsInternal);
+  }
+
+  toArchive(): HistoryArchive {
+    return {
+      version: 1,
+      entries: clone(this.entriesInternal),
+      snapshots: clone(this.snapshotsInternal),
+      cursorSnapshotId: this.snapshotsInternal[this.cursor]!.id
+    };
+  }
+
+  static fromArchive(archive: HistoryArchive, options: HistoryOptions = {}): ProjectHistory {
+    validateArchive(archive);
+    const baseline = archive.snapshots[0]!.project;
+    const history = new ProjectHistory(baseline, options);
+    history.entriesInternal = clone(archive.entries);
+    history.snapshotsInternal = clone(archive.snapshots);
+    const cursor = history.snapshotsInternal.findIndex((snapshot) => snapshot.id === archive.cursorSnapshotId);
+    if (cursor < 0) throw new Error(`History cursor references unknown snapshot ${archive.cursorSnapshotId}.`);
+    history.cursor = cursor;
+    return history;
   }
 
   commit(command: EditCommand, actor: JournalActor = { type: "user" }): ProjectIR {
@@ -127,4 +155,32 @@ function defaultId(): string {
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function validateArchive(archive: HistoryArchive): void {
+  if (archive.version !== 1) throw new Error(`Unsupported history archive version ${String(archive.version)}.`);
+  if (!Array.isArray(archive.snapshots) || archive.snapshots.length === 0) throw new Error("History archive must contain at least one snapshot.");
+  if (!Array.isArray(archive.entries)) throw new Error("History archive entries must be an array.");
+
+  const snapshotIds = new Set<string>();
+  let previousRevision = -1;
+  for (const snapshot of archive.snapshots) {
+    if (snapshotIds.has(snapshot.id)) throw new Error(`Duplicate snapshot id ${snapshot.id}.`);
+    snapshotIds.add(snapshot.id);
+    assertValidProjectIR(snapshot.project);
+    if (snapshot.project.history.revision !== snapshot.revision) throw new Error(`Snapshot ${snapshot.id} revision does not match Project IR history.`);
+    if (snapshot.revision <= previousRevision) throw new Error("Snapshot revisions must be strictly increasing.");
+    previousRevision = snapshot.revision;
+  }
+  if (!snapshotIds.has(archive.cursorSnapshotId)) throw new Error(`History cursor references unknown snapshot ${archive.cursorSnapshotId}.`);
+
+  const entryIds = new Set<string>();
+  for (const entry of archive.entries) {
+    if (entryIds.has(entry.id)) throw new Error(`Duplicate journal entry id ${entry.id}.`);
+    entryIds.add(entry.id);
+    const snapshot = archive.snapshots.find((candidate) => candidate.id === entry.snapshotId);
+    if (!snapshot) throw new Error(`Journal entry ${entry.id} references unknown snapshot ${entry.snapshotId}.`);
+    if (snapshot.revision !== entry.revision) throw new Error(`Journal entry ${entry.id} revision does not match its snapshot.`);
+    if (snapshot.project.history.headEntryId !== entry.id) throw new Error(`Snapshot ${snapshot.id} does not point to journal entry ${entry.id}.`);
+  }
 }
