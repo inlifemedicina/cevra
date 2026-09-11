@@ -15,6 +15,7 @@ WRAPPERS = r'''
 # CEVRA_MEDIA_RUNTIME_PATCH_V1
 from _cevra_runtime import hdr_encoder_args as _cevra_hdr_encoder_args
 from _cevra_runtime import sdr_encoder_args as _cevra_sdr_encoder_args
+from _cevra_runtime import with_decode_acceleration as _cevra_with_decode_acceleration
 
 
 def x264_args(crf: int = 18, preset: str = "medium", keep_bt709: bool = True) -> List[str]:
@@ -35,6 +36,10 @@ def video_args(meta: Optional[Dict[str, Any]], crf: int = 18, preset: str = "med
         if encoder:
             return _cevra_sdr_encoder_args(encoder, crf, preset, True, meta)
     return _upstream_video_args(meta, crf, preset)
+
+
+def run(cmd: Sequence[str], *, quiet: bool = False, check: bool = True) -> subprocess.CompletedProcess:
+    return _upstream_run(_cevra_with_decode_acceleration(cmd), quiet=quiet, check=check)
 '''
 
 
@@ -47,11 +52,12 @@ def patch(source: Path, runtime_module: Path) -> None:
     text = common_path.read_text(encoding="utf-8")
     if MARKER in text:
         raise SystemExit("ffmpeg-skill source is already patched")
-    if text.count("def x264_args(") != 1 or text.count("def video_args(") != 1:
-        raise SystemExit("pinned encoder functions changed; review upstream before updating CEVRA patch")
+    if text.count("def x264_args(") != 1 or text.count("def video_args(") != 1 or text.count("def run(") != 1:
+        raise SystemExit("pinned ffmpeg-skill execution functions changed; review upstream before updating CEVRA patch")
 
     text = text.replace("def x264_args(", "def _upstream_x264_args(", 1)
     text = text.replace("def video_args(", "def _upstream_video_args(", 1)
+    text = text.replace("def run(", "def _upstream_run(", 1)
     text += WRAPPERS
     common_path.write_text(text, encoding="utf-8")
     shutil.copy2(runtime_module, source / "scripts" / "_cevra_runtime.py")
