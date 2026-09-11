@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import platform
@@ -275,6 +277,65 @@ def benchmark(codec: str, requested: List[str]) -> Dict[str, Any]:
     return {"benchmarks": results}
 
 
+def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    upstream = _load_upstream()
+    specs = upstream.specs()
+    script = VENDOR_ROOT / "scripts" / f"{name}.py"
+    if name not in specs or not script.is_file():
+        return {"isError": True, "content": [{"type": "text", "text": f"unknown tool {name}"}]}
+
+    argv = upstream.build_argv(name, arguments or {})
+    module_name = f"_cevra_ffmpeg_tool_{name}_{time.time_ns()}"
+    spec = importlib.util.spec_from_file_location(module_name, script)
+    if spec is None or spec.loader is None:
+        return {"isError": True, "content": [{"type": "text", "text": f"cannot load tool {name}"}]}
+    module = importlib.util.module_from_spec(spec)
+    old_argv = sys.argv
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    exit_code = 0
+    try:
+        common = sys.modules.get("_common")
+        if common is not None and hasattr(common, "STATE") and hasattr(common.STATE, "reset"):
+            common.STATE.reset()
+        sys.argv = [str(script), *argv]
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            spec.loader.exec_module(module)
+            returned = module.main() if hasattr(module, "main") else 0
+            if isinstance(returned, int):
+                exit_code = returned
+    except SystemExit as exc:
+        if isinstance(exc.code, int):
+            exit_code = exc.code
+        elif exc.code in (None, False):
+            exit_code = 0
+        else:
+            exit_code = 1
+    except Exception as exc:
+        exit_code = 1
+        stderr.write(f"{type(exc).__name__}: {exc}\n")
+    finally:
+        sys.argv = old_argv
+        sys.modules.pop(module_name, None)
+
+    out = stdout.getvalue().strip()
+    err = stderr.getvalue().strip()
+    structured: Any = None
+    if out.startswith("{") or out.startswith("["):
+        try:
+            structured = json.loads(out)
+        except ValueError:
+            structured = None
+    if exit_code != 0:
+        tail = "\n".join(err.splitlines()[-12:]) or out
+        return {"isError": True, "content": [{"type": "text", "text": f"{name} failed (exit {exit_code})\n{tail}"}]}
+    text = out or "\n".join(err.splitlines()[-5:])
+    result: Dict[str, Any] = {"content": [{"type": "text", "text": text}]}
+    if structured is not None:
+        result["structuredContent"] = structured if isinstance(structured, dict) else {"result": structured}
+    return result
+
+
 def _now_iso() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -303,7 +364,7 @@ def handle(method: str, params: Dict[str, Any]) -> Any:
     if method == "tools/list":
         return {"tools": upstream.tool_list()}
     if method == "tools/call":
-        return upstream.call_tool(str(params.get("name") or ""), params.get("arguments") or {})
+        return _call_tool_in_process(str(params.get("name") or ""), params.get("arguments") or {})
     raise KeyError(method)
 
 
