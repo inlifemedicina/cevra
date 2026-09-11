@@ -104,3 +104,21 @@ test("history preserves an existing baseline revision", () => {
   const changed = history.commit({ type: "project.rename", name: "Next" });
   assert.equal(changed.history.revision, 8);
 });
+
+test("history archive round-trips current state and redo cursor", () => {
+  let seq = 0;
+  const history = new ProjectHistory(createEmptyProject({ id: "project-1", name: "A", now: fixedTime }), {
+    idGenerator: () => `id-${++seq}`,
+    clock: () => fixedTime
+  });
+  history.commit({ type: "project.rename", name: "B" });
+  history.commit({ type: "project.rename", name: "C" });
+  history.undo();
+  const restored = ProjectHistory.fromArchive(history.toArchive(), {
+    idGenerator: () => `restored-${++seq}`,
+    clock: () => fixedTime
+  });
+  assert.equal(restored.current.project.name, "B");
+  assert.equal(restored.canRedo, true);
+  assert.equal(restored.redo().project.name, "C");
+});
