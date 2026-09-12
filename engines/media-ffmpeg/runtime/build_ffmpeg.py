@@ -10,11 +10,13 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 PIN = VERSIONS["ffmpeg"]
+INSTALL_PREFIX = "/cevra-media-runtime"
 
 COMMON_FLAGS = [
     "--disable-autodetect",
@@ -87,6 +89,7 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
         "source": PIN["source"],
         "signature": PIN["signature"],
         "signingFingerprint": PIN["signingFingerprint"],
+        "verifiedSignerFingerprint": PIN["signingFingerprint"].upper(),
         "verified": True,
     }
     if any(source_info.get(key) != value for key, value in required_source.items()):
@@ -95,11 +98,15 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
         if re.fullmatch(r"[0-9a-f]{64}", str(source_info.get(field) or "")) is None:
             raise SystemExit(f"FFmpeg source provenance is missing {field}")
 
-    prefix.mkdir(parents=True, exist_ok=True)
-    flags = [*COMMON_FLAGS, *PLATFORM_FLAGS[system], f"--prefix={prefix}"]
+    if prefix.exists():
+        if not prefix.is_dir() or any(prefix.iterdir()):
+            raise SystemExit(f"FFmpeg output prefix must be empty: {prefix}")
+        prefix.rmdir()
+    prefix.parent.mkdir(parents=True, exist_ok=True)
+    flags = [*COMMON_FLAGS, *PLATFORM_FLAGS[system], f"--prefix={INSTALL_PREFIX}"]
     validate_flags(flags)
     env = os.environ.copy()
-    env.setdefault("SOURCE_DATE_EPOCH", "0")
+    env["SOURCE_DATE_EPOCH"] = "0"
 
     # configure is a POSIX shell script. On Windows this script is expected to run inside
     # an MSYS2/Git-Bash environment with the MSVC toolchain environment already activated.
@@ -112,7 +119,12 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
 
     run([shell, str(configure), *flags], cwd=source, env=env)
     run([make, f"-j{max(1, jobs)}"], cwd=source, env=env)
-    run([make, "install"], cwd=source, env=env)
+    with tempfile.TemporaryDirectory(prefix="cevra-ffmpeg-install-", dir=prefix.parent) as stage_name:
+        run([make, f"DESTDIR={stage_name}", "install"], cwd=source, env=env)
+        staged_prefix = Path(stage_name) / INSTALL_PREFIX.lstrip("/")
+        if not staged_prefix.is_dir():
+            raise SystemExit("FFmpeg staged install did not produce the stable runtime prefix")
+        shutil.copytree(staged_prefix, prefix, symlinks=True)
 
     binary = prefix / "bin" / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
     probe = prefix / "bin" / ("ffprobe.exe" if os.name == "nt" else "ffprobe")
@@ -164,6 +176,7 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
         "source": source_info["source"],
         "sourceSignature": source_info["signature"],
         "signingFingerprint": source_info["signingFingerprint"],
+        "verifiedSignerFingerprint": source_info["verifiedSignerFingerprint"],
         "sourceArchiveSha256": source_info["archiveSha256"],
         "sourceSignatureSha256": source_info["signatureSha256"],
         "signingKeySha256": source_info["signingKeySha256"],

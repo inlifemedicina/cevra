@@ -61,6 +61,7 @@ def fixture(version: str = "9.0.1", probe_version: str | None = None) -> tuple[P
         "id": "ffmpeg", "version": version, "probeVersion": probe_version,
         "license": "LGPL-2.1-or-later", "source": FFMPEG_SOURCE,
         "sourceSignature": FFMPEG_SIGNATURE, "signingFingerprint": FFMPEG_FINGERPRINT,
+        "verifiedSignerFingerprint": FFMPEG_FINGERPRINT,
         "sourceArchiveSha256": SOURCE_HASH, "sourceSignatureSha256": SIGNATURE_HASH,
         "signingKeySha256": KEY_HASH, "verified": True, "configureFlags": FLAGS,
         "configureFlagsSha256": FLAGS_HASH, "ffmpegSha256": sha256(ffmpeg), "ffprobeSha256": sha256(ffprobe),
@@ -74,7 +75,7 @@ def fixture(version: str = "9.0.1", probe_version: str | None = None) -> tuple[P
         "python": {"version": PYTHON_VERSION, "root": "python", "executable": "python/bin/python3", "executableSha256": sha256(python), "treeSha256": tree_sha256(root / "python")},
         "worker": {"root": "worker", "entrypoint": "worker/cevra_media_worker.py", "treeSha256": tree_sha256(root / "worker"), "files": [{"path": relative, "sha256": sha256(root / relative)} for relative in CRITICAL_WORKER_FILES]},
         "upstream": {"id": "ffmpeg-skill", "version": "1.4.2", "contractVersion": "1.0", "commit": UPSTREAM_COMMIT, "root": "vendor/ffmpeg-skill", "treeSha256": tree_sha256(root / "vendor/ffmpeg-skill"), "package": "vendor/ffmpeg-skill/package.json", "packageSha256": sha256(root / "vendor/ffmpeg-skill/package.json"), "provenance": "vendor/ffmpeg-skill/CEVRA_PROVENANCE.json", "provenanceSha256": sha256(root / "vendor/ffmpeg-skill/CEVRA_PROVENANCE.json")},
-        "ffmpeg": {"version": version, "probeVersion": probe_version, "license": "LGPL-2.1-or-later", "buildId": sha256(ffmpeg)[:16], "executable": f"bin/ffmpeg{suffix}", "probeExecutable": f"bin/ffprobe{suffix}", "sha256": sha256(ffmpeg), "ffprobeSha256": sha256(ffprobe), "configureFlags": FLAGS, "configureFlagsSha256": FLAGS_HASH, "provenance": "provenance/ffmpeg.json", "provenanceSha256": sha256(provenance_path), "source": FFMPEG_SOURCE, "sourceSignature": FFMPEG_SIGNATURE, "signingFingerprint": FFMPEG_FINGERPRINT, "sourceArchiveSha256": SOURCE_HASH, "sourceSignatureSha256": SIGNATURE_HASH, "signingKeySha256": KEY_HASH},
+        "ffmpeg": {"version": version, "probeVersion": probe_version, "license": "LGPL-2.1-or-later", "buildId": sha256(ffmpeg)[:16], "executable": f"bin/ffmpeg{suffix}", "probeExecutable": f"bin/ffprobe{suffix}", "sha256": sha256(ffmpeg), "ffprobeSha256": sha256(ffprobe), "configureFlags": FLAGS, "configureFlagsSha256": FLAGS_HASH, "provenance": "provenance/ffmpeg.json", "provenanceSha256": sha256(provenance_path), "source": FFMPEG_SOURCE, "sourceSignature": FFMPEG_SIGNATURE, "signingFingerprint": FFMPEG_FINGERPRINT, "verifiedSignerFingerprint": FFMPEG_FINGERPRINT, "sourceArchiveSha256": SOURCE_HASH, "sourceSignatureSha256": SIGNATURE_HASH, "signingKeySha256": KEY_HASH},
         "notices": [{"id": ident, "path": relative, "sha256": sha256(root / relative)} for ident, relative in REQUIRED_NOTICE_PATHS.items()],
     }
     write(root / "manifest.json", json.dumps(manifest))
@@ -130,6 +131,14 @@ def run(scenario: str) -> None:
             write(provenance_path, json.dumps(bad))
             manifest["ffmpeg"]["provenanceSha256"] = sha256(provenance_path)
             write(root / "manifest.json", json.dumps(manifest))
+        elif scenario == "ffmpeg-signer":
+            provenance_path = root / "provenance/ffmpeg.json"
+            bad = json.loads(provenance_path.read_text())
+            bad["verifiedSignerFingerprint"] = "0" * 40
+            write(provenance_path, json.dumps(bad))
+            manifest["ffmpeg"]["verifiedSignerFingerprint"] = "0" * 40
+            manifest["ffmpeg"]["provenanceSha256"] = sha256(provenance_path)
+            write(root / "manifest.json", json.dumps(manifest))
         elif scenario == "png-capability":
             provenance_path = root / "provenance/ffmpeg.json"
             provenance = json.loads(provenance_path.read_text())
@@ -146,13 +155,13 @@ def run(scenario: str) -> None:
             del manifest["notices"]
             write(root / "manifest.json", json.dumps(manifest))
         elif scenario == "environment":
-            for name in ("PATH", "PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "CEVRA_MEDIA_BIN_DIR", "CEVRA_FFMPEG_SKILL_ROOT", "CEVRA_ALLOW_GPL_DEV_ENCODERS"):
+            for name in ("PATH", "PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "DYLD_FRAMEWORK_PATH", "LD_AUDIT", "CEVRA_MEDIA_BIN_DIR", "CEVRA_FFMPEG_SKILL_ROOT", "CEVRA_ALLOW_GPL_DEV_ENCODERS"):
                 os.environ[name] = "/untrusted"
             sanitize_release_environment(root)
             assert os.environ["PATH"] == str(root / "bin")
             assert os.environ["CEVRA_MEDIA_RUNTIME_ROOT"] == str(root)
             assert os.environ["PYTHONNOUSERSITE"] == "1"
-            assert all(name not in os.environ for name in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "CEVRA_MEDIA_BIN_DIR", "CEVRA_FFMPEG_SKILL_ROOT", "CEVRA_ALLOW_GPL_DEV_ENCODERS"))
+            assert all(name not in os.environ for name in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "DYLD_FRAMEWORK_PATH", "LD_AUDIT", "CEVRA_MEDIA_BIN_DIR", "CEVRA_FFMPEG_SKILL_ROOT", "CEVRA_ALLOW_GPL_DEV_ENCODERS"))
             return
 
         if scenario == "ok":

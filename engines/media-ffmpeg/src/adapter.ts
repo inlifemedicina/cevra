@@ -2,6 +2,7 @@ import {
   CEVRA_ENGINE_API_VERSION,
   MEDIA_DELIVERY_MATRIX,
   resolveAudioDelivery,
+  resolveAudioMutationDelivery,
   resolveMediaContainer,
   resolveTranscodeDelivery,
   validateCopyCompatibility,
@@ -68,10 +69,13 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
       case "crop":
         return fileResult(await call("crop", { input: operation.inputUri, output: operation.outputUri, x: operation.x, y: operation.y, width: operation.width, height: operation.height }), operation.outputUri);
       case "volume":
+        await this.validateAudioMutationInput(call, operation.inputUri, operation.outputUri);
         return fileResult(await call("audio", { input: operation.inputUri, output: operation.outputUri, gain: operation.gainDb }), operation.outputUri);
       case "loudness-normalize":
+        await this.validateAudioMutationInput(call, operation.inputUri, operation.outputUri);
         return fileResult(await call("loudness", { input: operation.inputUri, output: operation.outputUri, lufs: operation.targetLufs, ...(operation.truePeakDb !== undefined ? { tp: operation.truePeakDb } : {}) }), operation.outputUri);
       case "audio-fade":
+        await this.validateAudioMutationInput(call, operation.inputUri, operation.outputUri);
         return fileResult(await call("audio", { input: operation.inputUri, output: operation.outputUri, ...(operation.fadeInMs !== undefined ? { fade_in: seconds(operation.fadeInMs) } : {}), ...(operation.fadeOutMs !== undefined ? { fade_out: seconds(operation.fadeOutMs) } : {}) }), operation.outputUri);
       case "extract-audio": {
         const delivery = resolveAudioDelivery(operation.outputUri, operation.audioCodec);
@@ -144,6 +148,17 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     inputUri: string
   ): Promise<MediaProbeResult> {
     return parseProbe(await call("probe", { inputs: [inputUri] }), inputUri);
+  }
+
+  private async validateAudioMutationInput(
+    call: (name: string, args: Record<string, unknown>) => Promise<Record<string, unknown>>,
+    inputUri: string,
+    outputUri: string
+  ): Promise<void> {
+    const delivery = resolveAudioMutationDelivery(outputUri);
+    if (delivery.videoCodec !== "copy") return;
+    const evidence = await this.probeForDelivery(call, inputUri);
+    if (evidence.hasVideo) validateCopyCompatibility(delivery, evidence);
   }
 
   private async call(name: string, args: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {

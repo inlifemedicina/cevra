@@ -79,10 +79,55 @@ _CONTROL_STDOUT = sys.stdout
 _CONTROL_WRITE_LOCK = threading.Lock()
 _JOB_THREAD: Optional[threading.Thread] = None
 ALLOWED_UPSTREAM_TOOLS = frozenset({
-    "audio", "crop", "cut", "fit", "join", "look", "loudness", "probe", "silence",
+    "audio", "crop", "cut", "fit", "join", "loudness", "probe", "silence",
 })
 ALLOWED_TOOLS = ALLOWED_UPSTREAM_TOOLS | CUSTOM_TOOLS
 DELIVERY_CONTAINERS = frozenset(DELIVERY_MATRIX)
+
+
+def _object_schema(properties: Dict[str, Any], required: List[str]) -> Dict[str, Any]:
+    return {"type": "object", "additionalProperties": False, "properties": properties, "required": required}
+
+
+_PATH_SCHEMA = {"type": "string", "minLength": 1, "cevraMediaPath": True}
+_NUMBER_SCHEMA = {"type": "number"}
+_POSITIVE_SCHEMA = {"type": "number", "exclusiveMinimum": 0}
+_NON_NEGATIVE_SCHEMA = {"type": "number", "minimum": 0}
+_POSITIVE_INTEGER_SCHEMA = {"type": "integer", "minimum": 1}
+_NON_NEGATIVE_INTEGER_SCHEMA = {"type": "integer", "minimum": 0}
+_UPSTREAM_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
+    "audio": _object_schema({
+        "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "gain": _NUMBER_SCHEMA,
+        "fade_in": _NON_NEGATIVE_SCHEMA, "fade_out": _NON_NEGATIVE_SCHEMA,
+    }, ["input", "output"]),
+    "crop": _object_schema({
+        "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "x": _NON_NEGATIVE_INTEGER_SCHEMA,
+        "y": _NON_NEGATIVE_INTEGER_SCHEMA, "width": _POSITIVE_INTEGER_SCHEMA,
+        "height": _POSITIVE_INTEGER_SCHEMA,
+    }, ["input", "output", "x", "y", "width", "height"]),
+    "cut": _object_schema({
+        "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "start": _NON_NEGATIVE_SCHEMA,
+        "end": _POSITIVE_SCHEMA, "accurate": {"type": "boolean"},
+    }, ["input", "output", "start", "end", "accurate"]),
+    "fit": _object_schema({
+        "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "width": _POSITIVE_INTEGER_SCHEMA,
+        "height": _POSITIVE_INTEGER_SCHEMA, "fit": {"type": "string", "enum": ["pad", "crop"]},
+        "pad_color": _PATH_SCHEMA,
+    }, ["input", "output", "width", "height", "fit"]),
+    "join": _object_schema({
+        "inputs": {"type": "array", "minItems": 1, "items": _PATH_SCHEMA}, "output": _PATH_SCHEMA,
+    }, ["inputs", "output"]),
+    "loudness": _object_schema({
+        "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "lufs": _NUMBER_SCHEMA, "tp": _NUMBER_SCHEMA,
+    }, ["input", "output", "lufs"]),
+    "probe": _object_schema({
+        "inputs": {"type": "array", "minItems": 1, "items": _PATH_SCHEMA},
+    }, ["inputs"]),
+    "silence": _object_schema({
+        "input": _PATH_SCHEMA, "threshold": _NUMBER_SCHEMA, "min_silence": _POSITIVE_SCHEMA,
+        "list": {"type": "boolean"},
+    }, ["input", "threshold", "min_silence", "list"]),
+}
 
 
 def _binary_candidates(name: str) -> List[Path]:
@@ -93,6 +138,7 @@ def _binary_candidates(name: str) -> List[Path]:
 
 
 def _prepare_path() -> None:
+    os.environ["FFMPEG_SKILL_NO_OVERWRITE"] = "1"
     if RELEASE_MODE:
         os.environ["PATH"] = str(BIN_DIR)
     elif BIN_DIR.is_dir():
@@ -120,7 +166,13 @@ def _is_within(path: str, parent: Path) -> bool:
 
 
 def _run(argv: List[str], timeout: float = 10.0) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+    active = job_control.active_job_id()
+    if active is None:
+        return subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+    result = job_control.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+    if job_control.is_cancelled(active):
+        raise InterruptedError(f"media job {active} was cancelled")
+    return result
 
 
 def _ffmpeg_build() -> Dict[str, Any]:
@@ -281,6 +333,11 @@ def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ff
             tools[name] = {"usable": "yes", "detail": detail}
     for name in ("cevra-transcode", "cevra-mux-audio"):
         tools[name] = {"usable": "yes" if ffmpeg_present else "no", **({} if ffmpeg_present else {"missing": ["ffmpeg"]})}
+    png_available = ffmpeg_present and "png" in _encoders()
+    tools["cevra-extract-frame"] = {
+        "usable": "yes" if png_available else "no",
+        **({} if png_available else {"missing": ["PNG encoder" if ffmpeg_present else "ffmpeg"]}),
+    }
 
 
 def health() -> Dict[str, Any]:
@@ -331,6 +388,8 @@ def health() -> Dict[str, Any]:
         available = set(caps.get("available") or [])
         missing = set(caps.get("missing") or [])
         for spec in contract.get("tools") or []:
+            if spec.get("name") not in ALLOWED_UPSTREAM_TOOLS:
+                continue
             required = set(((spec.get("capabilities") or {}).get("required") or []))
             normal_required, cevra_missing = adapt_required_capabilities(required)
             missing_known = sorted(normal_required & missing) + cevra_missing
@@ -418,10 +477,10 @@ def benchmark(codec: str, requested: List[str]) -> Dict[str, Any]:
 def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     if name not in ALLOWED_TOOLS:
         return {"isError": True, "content": [{"type": "text", "text": f"tool {name} is not allowed by CEVRA"}]}
-    if _contains_raw_argv(arguments):
-        return {"isError": True, "content": [{"type": "text", "text": "raw argv execution is not allowed by CEVRA"}]}
-    if _contains_non_finite_number(arguments):
-        return {"isError": True, "content": [{"type": "text", "text": "tool arguments must contain only finite numbers"}]}
+    try:
+        _validate_tool_arguments(name, arguments)
+    except (PermissionError, ValueError) as exc:
+        return {"isError": True, "content": [{"type": "text", "text": str(exc)}]}
     _ensure_profile()
     custom = call_custom_tool(name, arguments or {}, VENDOR_ROOT)
     if custom is not None:
@@ -486,7 +545,7 @@ def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any
 
 
 def _custom_tool_specs() -> List[Dict[str, Any]]:
-    path = {"type": "string", "minLength": 1}
+    path = _PATH_SCHEMA
     positive = {"type": "number", "exclusiveMinimum": 0}
     non_negative = {"type": "number", "minimum": 0}
     positive_integer = {"type": "integer", "minimum": 1}
@@ -523,6 +582,72 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
     ]
 
 
+def _schema_for_tool(name: str) -> Dict[str, Any]:
+    if name in _UPSTREAM_TOOL_SCHEMAS:
+        return _UPSTREAM_TOOL_SCHEMAS[name]
+    for spec in _custom_tool_specs():
+        if spec["name"] == name:
+            return spec["inputSchema"]
+    raise PermissionError(f"tool {name} is not allowed by CEVRA")
+
+
+def _validate_schema_value(value: Any, schema: Dict[str, Any], location: str) -> None:
+    expected = schema.get("type")
+    valid_type = {
+        "object": isinstance(value, dict),
+        "array": isinstance(value, list),
+        "string": isinstance(value, str),
+        "integer": isinstance(value, int) and not isinstance(value, bool),
+        "number": isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value),
+        "boolean": isinstance(value, bool),
+    }
+    if expected is not None and not valid_type.get(expected, False):
+        raise ValueError(f"{location} must be {expected}")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ValueError(f"{location} is outside its allowed values")
+    if isinstance(value, str) and len(value) < int(schema.get("minLength", 0)):
+        raise ValueError(f"{location} must not be empty")
+    if isinstance(value, str) and schema.get("cevraMediaPath"):
+        if value.startswith("-") or "\x00" in value or "\r" in value or "\n" in value:
+            raise ValueError(f"{location} contains an unsafe media path")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            raise ValueError(f"{location} is below its minimum")
+        if "maximum" in schema and value > schema["maximum"]:
+            raise ValueError(f"{location} exceeds its maximum")
+        if "exclusiveMinimum" in schema and value <= schema["exclusiveMinimum"]:
+            raise ValueError(f"{location} must be greater than its minimum")
+    if isinstance(value, list):
+        if len(value) < int(schema.get("minItems", 0)):
+            raise ValueError(f"{location} has too few items")
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            for index, item in enumerate(value):
+                _validate_schema_value(item, item_schema, f"{location}[{index}]")
+    if isinstance(value, dict):
+        properties = schema.get("properties") or {}
+        required = schema.get("required") or []
+        missing = [key for key in required if key not in value]
+        if missing:
+            raise ValueError(f"{location} is missing required fields: {', '.join(missing)}")
+        if schema.get("additionalProperties") is False:
+            extras = sorted(set(value) - set(properties))
+            if extras:
+                raise ValueError(f"{location} contains unexpected fields: {', '.join(extras)}")
+        for key, child in value.items():
+            child_schema = properties.get(key)
+            if isinstance(child_schema, dict):
+                _validate_schema_value(child, child_schema, f"{location}.{key}")
+
+
+def _validate_tool_arguments(name: str, arguments: Dict[str, Any]) -> None:
+    if _contains_raw_argv(arguments):
+        raise PermissionError("raw argv execution is not allowed by CEVRA")
+    if _contains_non_finite_number(arguments):
+        raise ValueError("tool arguments must contain only finite numbers")
+    _validate_schema_value(arguments, _schema_for_tool(name), f"tool {name} arguments")
+
+
 def _contains_raw_argv(value: Any) -> bool:
     if isinstance(value, list):
         return any(_contains_raw_argv(item) for item in value)
@@ -543,30 +668,16 @@ def _contains_non_finite_number(value: Any) -> bool:
     return False
 
 
-def _remove_raw_argv(value: Any) -> Any:
-    if isinstance(value, list):
-        return [cleaned for item in value if (cleaned := _remove_raw_argv(item)) is not None]
-    if not isinstance(value, dict):
-        return value
-    required = value.get("required")
-    if isinstance(required, list) and "argv" in required:
-        return None
-    result: Dict[str, Any] = {}
-    for key, child in value.items():
-        if key == "properties" and isinstance(child, dict):
-            result[key] = {name: _remove_raw_argv(spec) for name, spec in child.items() if name != "argv"}
-        else:
-            cleaned = _remove_raw_argv(child)
-            if cleaned is not None:
-                result[key] = cleaned
-    return result
-
-
 def _allowed_tool_specs(upstream: Any) -> List[Dict[str, Any]]:
+    available = set(upstream.specs())
     return [
-        _remove_raw_argv(spec)
-        for spec in upstream.tool_list()
-        if spec.get("name") in ALLOWED_UPSTREAM_TOOLS
+        {
+            "name": name,
+            "description": f"CEVRA typed media operation: {name}",
+            "inputSchema": _UPSTREAM_TOOL_SCHEMAS[name],
+        }
+        for name in sorted(ALLOWED_UPSTREAM_TOOLS)
+        if name in available and (VENDOR_ROOT / "scripts" / f"{name}.py").is_file()
     ]
 
 
@@ -585,12 +696,12 @@ def handle(method: str, params: Dict[str, Any]) -> Any:
     if method == "cevra/health":
         return health()
     if method == "cevra/configure":
-        profile = params.get("profile") or {}
+        profile = params.get("profile", {})
         if not isinstance(profile, dict):
             raise ValueError("profile must be an object")
         return configure(profile)
     if method == "cevra/benchmark":
-        encoders = params.get("encoders") or []
+        encoders = params.get("encoders", [])
         if not isinstance(encoders, list):
             raise ValueError("encoders must be an array")
         codec = params.get("codec")
@@ -635,7 +746,7 @@ def _start_job(request_id: Any, params: Dict[str, Any]) -> Optional[Dict[str, An
     global _JOB_THREAD
     job_id = params.get("jobId")
     name = params.get("name")
-    arguments = params.get("arguments") or {}
+    arguments = params.get("arguments", {})
     if not isinstance(job_id, str) or not job_id.strip():
         raise ValueError("jobId must be a non-empty string")
     if not isinstance(name, str) or not name:
@@ -644,10 +755,7 @@ def _start_job(request_id: Any, params: Dict[str, Any]) -> Optional[Dict[str, An
         raise ValueError("tool arguments must be an object")
     if name not in ALLOWED_TOOLS:
         raise PermissionError(f"tool {name} is not allowed by CEVRA")
-    if _contains_raw_argv(arguments):
-        raise PermissionError("raw argv execution is not allowed by CEVRA")
-    if _contains_non_finite_number(arguments):
-        raise ValueError("tool arguments must contain only finite numbers")
+    _validate_tool_arguments(name, arguments)
     if _JOB_THREAD is not None or job_control.active_job_id() is not None:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32001, "message": "media worker is busy"}}
     job_control.begin_job(job_id)
@@ -679,10 +787,12 @@ def main() -> int:
                 continue
             response: Optional[Dict[str, Any]] = None
             try:
-                params = req.get("params") or {}
+                params = req.get("params", {})
                 if not isinstance(params, dict):
                     raise ValueError("params must be an object")
-                method = str(req.get("method") or "")
+                method = req.get("method", "")
+                if not isinstance(method, str):
+                    raise ValueError("method must be a string")
                 if method == "tools/call":
                     response = _start_job(req["id"], params)
                 elif method == "cevra/cancel":

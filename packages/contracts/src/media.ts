@@ -91,6 +91,21 @@ export function resolveAudioDelivery(outputUri: string, audioCodec?: AudioCodec)
   return { container, audioOnly: true, audioCodec: resolvedAudioCodec };
 }
 
+export function resolveStandardAvDelivery(outputUri: string, allowAudioOnly = false): ResolvedMediaDelivery {
+  const container = resolveMediaContainer(outputUri);
+  if (MEDIA_DELIVERY_MATRIX[container].audioOnly) {
+    if (!allowAudioOnly) throw new Error(`${container.toUpperCase()} is audio-only and cannot contain video.`);
+    return resolveAudioDelivery(outputUri);
+  }
+  return resolveTranscodeDelivery({ outputUri, videoCodec: "h264", audioCodec: "aac" });
+}
+
+export function resolveAudioMutationDelivery(outputUri: string): ResolvedMediaDelivery {
+  const container = resolveMediaContainer(outputUri);
+  if (MEDIA_DELIVERY_MATRIX[container].audioOnly) return resolveAudioDelivery(outputUri);
+  return resolveTranscodeDelivery({ outputUri, videoCodec: "copy", audioCodec: "aac" });
+}
+
 export function validateCopyCompatibility(delivery: ResolvedMediaDelivery, input: MediaInputCodecEvidence): void {
   const rule = MEDIA_DELIVERY_MATRIX[delivery.container];
   if (delivery.videoCodec === "copy") {
@@ -193,7 +208,7 @@ export function validateMediaOperation(value: unknown): MediaOperation {
   if (typeof value.type !== "string") throw new Error("Media operation type is required.");
 
   const requireUri = (key: string): void => {
-    if (typeof value[key] !== "string" || (value[key] as string).trim().length === 0) throw new Error(`${key} is required.`);
+    if (!isSafeMediaUri(value[key])) throw new Error(`${key} must be a safe non-empty media URI.`);
   };
   const requirePositive = (key: string): void => {
     if (!isFiniteNumber(value[key]) || (value[key] as number) <= 0) throw new Error(`${key} must be greater than 0.`);
@@ -211,8 +226,8 @@ export function validateMediaOperation(value: unknown): MediaOperation {
 
   switch (value.type) {
     case "probe": requireUri("inputUri"); break;
-    case "trim": requireUri("inputUri"); requireUri("outputUri"); requireNonNegativeInteger("startMs"); requirePositiveInteger("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); break;
-    case "concat": if (!Array.isArray(value.inputUris) || value.inputUris.length < 1 || value.inputUris.some((uri) => typeof uri !== "string" || uri.length === 0)) throw new Error("inputUris must contain at least one URI."); requireUri("outputUri"); break;
+    case "trim": requireUri("inputUri"); requireUri("outputUri"); requireNonNegativeInteger("startMs"); requirePositiveInteger("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); resolveStandardAvDelivery(value.outputUri as string, true); break;
+    case "concat": if (!Array.isArray(value.inputUris) || value.inputUris.length < 1 || value.inputUris.some((uri) => !isSafeMediaUri(uri))) throw new Error("inputUris must contain at least one safe media URI."); requireUri("outputUri"); resolveStandardAvDelivery(value.outputUri as string, true); break;
     case "transcode": {
       requireUri("inputUri"); requireUri("outputUri");
       optionalEnum("container", MEDIA_CONTAINERS, "media container"); optionalEnum("videoCodec", VIDEO_CODECS, "video codec"); optionalEnum("audioCodec", AUDIO_CODECS, "audio codec");
@@ -226,16 +241,16 @@ export function validateMediaOperation(value: unknown): MediaOperation {
       });
       break;
     }
-    case "fit": requireUri("inputUri"); requireUri("outputUri"); requirePositiveInteger("width"); requirePositiveInteger("height"); if (typeof value.mode !== "string" || !["contain", "cover", "stretch"].includes(value.mode)) throw new Error("Invalid fit mode."); break;
-    case "crop": requireUri("inputUri"); requireUri("outputUri"); requireNonNegativeInteger("x"); requireNonNegativeInteger("y"); requirePositiveInteger("width"); requirePositiveInteger("height"); break;
-    case "speed": requireUri("inputUri"); requireUri("outputUri"); requirePositive("factor"); if ((value.factor as number) < MIN_MEDIA_SPEED || (value.factor as number) > MAX_MEDIA_SPEED) throw new Error(`factor must be between ${MIN_MEDIA_SPEED} and ${MAX_MEDIA_SPEED}.`); break;
-    case "volume": requireUri("inputUri"); requireUri("outputUri"); if (!isFiniteNumber(value.gainDb)) throw new Error("gainDb must be finite."); break;
-    case "loudness-normalize": requireUri("inputUri"); requireUri("outputUri"); if (!isFiniteNumber(value.targetLufs)) throw new Error("targetLufs must be finite."); if (value.truePeakDb !== undefined && !isFiniteNumber(value.truePeakDb)) throw new Error("truePeakDb must be finite."); break;
-    case "audio-fade": requireUri("inputUri"); requireUri("outputUri"); if (value.fadeInMs !== undefined) requireNonNegativeInteger("fadeInMs"); if (value.fadeOutMs !== undefined) requireNonNegativeInteger("fadeOutMs"); break;
+    case "fit": requireUri("inputUri"); requireUri("outputUri"); requirePositiveInteger("width"); requirePositiveInteger("height"); if (typeof value.mode !== "string" || !["contain", "cover", "stretch"].includes(value.mode)) throw new Error("Invalid fit mode."); resolveStandardAvDelivery(value.outputUri as string); break;
+    case "crop": requireUri("inputUri"); requireUri("outputUri"); requireNonNegativeInteger("x"); requireNonNegativeInteger("y"); requirePositiveInteger("width"); requirePositiveInteger("height"); resolveStandardAvDelivery(value.outputUri as string); break;
+    case "speed": requireUri("inputUri"); requireUri("outputUri"); requirePositive("factor"); if ((value.factor as number) < MIN_MEDIA_SPEED || (value.factor as number) > MAX_MEDIA_SPEED) throw new Error(`factor must be between ${MIN_MEDIA_SPEED} and ${MAX_MEDIA_SPEED}.`); resolveStandardAvDelivery(value.outputUri as string); break;
+    case "volume": requireUri("inputUri"); requireUri("outputUri"); if (!isFiniteNumber(value.gainDb)) throw new Error("gainDb must be finite."); resolveAudioMutationDelivery(value.outputUri as string); break;
+    case "loudness-normalize": requireUri("inputUri"); requireUri("outputUri"); if (!isFiniteNumber(value.targetLufs)) throw new Error("targetLufs must be finite."); if (value.truePeakDb !== undefined && !isFiniteNumber(value.truePeakDb)) throw new Error("truePeakDb must be finite."); resolveAudioMutationDelivery(value.outputUri as string); break;
+    case "audio-fade": requireUri("inputUri"); requireUri("outputUri"); if (value.fadeInMs !== undefined) requireNonNegativeInteger("fadeInMs"); if (value.fadeOutMs !== undefined) requireNonNegativeInteger("fadeOutMs"); resolveAudioMutationDelivery(value.outputUri as string); break;
     case "extract-audio": requireUri("inputUri"); requireUri("outputUri"); optionalEnum("audioCodec", AUDIO_CODECS, "audio codec"); resolveAudioDelivery(value.outputUri as string, value.audioCodec as AudioCodec | undefined); break;
-    case "extract-frame": requireUri("inputUri"); requireUri("outputUri"); requireNonNegativeInteger("atMs"); break;
+    case "extract-frame": requireUri("inputUri"); requireUri("outputUri"); requireNonNegativeInteger("atMs"); if (!/\.png(?:[?#]|$)/iu.test(value.outputUri as string)) throw new Error("extract-frame outputUri must use the PNG container."); break;
     case "detect-silence": requireUri("inputUri"); if (!isFiniteNumber(value.thresholdDb)) throw new Error("thresholdDb must be finite."); requirePositiveInteger("minDurationMs"); break;
-    case "overlay-media": requireUri("baseUri"); requireUri("overlayUri"); requireUri("outputUri"); requireNonNegativeInteger("startMs"); requirePositiveInteger("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); requireNonNegativeInteger("x"); requireNonNegativeInteger("y"); requirePositiveInteger("width"); requirePositiveInteger("height"); if (value.opacity !== undefined && (!isFiniteNumber(value.opacity) || value.opacity < 0 || value.opacity > 1)) throw new Error("opacity must be between 0 and 1."); break;
+    case "overlay-media": requireUri("baseUri"); requireUri("overlayUri"); requireUri("outputUri"); requireNonNegativeInteger("startMs"); requirePositiveInteger("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); requireNonNegativeInteger("x"); requireNonNegativeInteger("y"); requirePositiveInteger("width"); requirePositiveInteger("height"); if (value.opacity !== undefined && (!isFiniteNumber(value.opacity) || value.opacity < 0 || value.opacity > 1)) throw new Error("opacity must be between 0 and 1."); resolveStandardAvDelivery(value.outputUri as string); break;
     case "mux-audio": {
       requireUri("videoUri"); requireUri("audioUri"); requireUri("outputUri");
       if (value.replaceExisting !== undefined && typeof value.replaceExisting !== "boolean") throw new Error("replaceExisting must be boolean.");
@@ -263,4 +278,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function isSafeMediaUri(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0 && !value.startsWith("-") && !/[\0\r\n]/u.test(value);
 }

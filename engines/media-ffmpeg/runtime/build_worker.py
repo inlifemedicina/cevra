@@ -25,7 +25,7 @@ def run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.Comple
 
 
 def python_version(python_executable: Path) -> str:
-    proc = run([str(python_executable), "-s", "-c", "import platform; print(platform.python_version())"])
+    proc = run([str(python_executable), "-I", "-B", "-c", "import platform; print(platform.python_version())"])
     return proc.stdout.strip()
 
 

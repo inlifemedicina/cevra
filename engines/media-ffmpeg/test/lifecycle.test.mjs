@@ -20,6 +20,7 @@ const python = resolvedPython.status === 0 ? resolvedPython.stdout.trim() : requ
 function createRuntime(options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-media-lifecycle-"));
   const transport = new ProcessMediaWorkerTransport({
+    mode: options.releaseMode ? "release" : "development",
     pythonExecutable: python,
     workerScript,
     shutdownTimeoutMs: 2000,
@@ -47,14 +48,18 @@ function processExists(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
+function cutArguments(output, pidFile, duration) {
+  return { input: pidFile, output, start: 0, end: duration, accurate: true };
+}
+
 test("process transport starts once, executes serial jobs and closes the worker", async () => {
   const runtime = createRuntime();
   const firstOutput = path.join(runtime.directory, "first.txt");
   const secondOutput = path.join(runtime.directory, "second.txt");
   const firstPid = path.join(runtime.directory, "first.pid");
   const secondPid = path.join(runtime.directory, "second.pid");
-  const first = runtime.client.callTool("cut", { output: firstOutput, pidFile: firstPid, duration: 0.15 }, "serial-1");
-  const second = runtime.client.callTool("cut", { output: secondOutput, pidFile: secondPid, duration: 0.01 }, "serial-2");
+  const first = runtime.client.callTool("cut", cutArguments(firstOutput, firstPid, 0.15), "serial-1");
+  const second = runtime.client.callTool("cut", cutArguments(secondOutput, secondPid, 0.01), "serial-2");
   await waitForFile(firstPid);
   assert.equal(fs.existsSync(secondPid), false);
   const workerPid = runtime.transport.workerPid;
@@ -71,7 +76,7 @@ test("cancellation kills only the active subprocess, cleans its new output and k
   const output = path.join(runtime.directory, "cancelled.txt");
   const pidFile = path.join(runtime.directory, "cancelled.pid");
   const controller = new AbortController();
-  const job = runtime.client.callTool("cut", { output, pidFile, duration: 30 }, "cancel-me", controller.signal);
+  const job = runtime.client.callTool("cut", cutArguments(output, pidFile, 30), "cancel-me", controller.signal);
   await waitForFile(pidFile);
   const childPid = Number(fs.readFileSync(pidFile, "utf8"));
   const workerPid = runtime.transport.workerPid;
@@ -86,22 +91,21 @@ test("cancellation kills only the active subprocess, cleans its new output and k
   assert.deepEqual(await runtime.transport.request("ping"), {});
 
   const nextOutput = path.join(runtime.directory, "next.txt");
-  await runtime.client.callTool("cut", { output: nextOutput, pidFile: path.join(runtime.directory, "next.pid"), duration: 0.01 }, "after-cancel");
+  await runtime.client.callTool("cut", cutArguments(nextOutput, path.join(runtime.directory, "next.pid"), 0.01), "after-cancel");
   assert.equal(fs.readFileSync(nextOutput, "utf8"), "completed");
   await runtime.client.close();
 });
 
-test("cancellation never deletes a pre-existing output", async () => {
+test("worker refuses a pre-existing output without altering it", async () => {
   const runtime = createRuntime();
   const output = path.join(runtime.directory, "existing.txt");
   const pidFile = path.join(runtime.directory, "existing.pid");
   fs.writeFileSync(output, "original");
-  const controller = new AbortController();
-  const job = runtime.client.callTool("cut", { output, pidFile, duration: 30 }, "preserve-existing", controller.signal);
-  await waitForFile(pidFile);
-  controller.abort();
-  await assert.rejects(job, (error) => error?.name === "AbortError");
-  assert.equal(fs.existsSync(output), true);
+  const result = await runtime.client.callTool("cut", cutArguments(output, pidFile, 30), "preserve-existing");
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /refusing to overwrite existing output/);
+  assert.equal(fs.readFileSync(output, "utf8"), "original");
+  assert.equal(fs.existsSync(pidFile), false);
   await runtime.client.close();
 });
 
@@ -110,7 +114,7 @@ test("unexpected worker crash rejects the job and the next request starts a fres
   await runtime.transport.start();
   const oldPid = runtime.transport.workerPid;
   await assert.rejects(
-    runtime.client.callTool("cut", { crash: true }, "crash-job"),
+    runtime.client.callTool("cut", { input: "__fixture_crash__", output: path.join(runtime.directory, "crash.txt"), start: 0, end: 1, accurate: true }, "crash-job"),
     (error) => error instanceof WorkerProcessExitedError
   );
   const info = await runtime.client.info();
@@ -124,7 +128,7 @@ test("close cancels and reaps an active subprocess without leaving the worker al
   const runtime = createRuntime();
   const output = path.join(runtime.directory, "closing.txt");
   const pidFile = path.join(runtime.directory, "closing.pid");
-  const job = runtime.client.callTool("cut", { output, pidFile, duration: 30 }, "close-job");
+  const job = runtime.client.callTool("cut", cutArguments(output, pidFile, 30), "close-job");
   const rejectedJob = assert.rejects(job);
   await waitForFile(pidFile);
   const childPid = Number(fs.readFileSync(pidFile, "utf8"));
@@ -140,9 +144,14 @@ test("close cancels and reaps an active subprocess without leaving the worker al
 test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async () => {
   const runtime = createRuntime();
   const tools = await runtime.client.listTools();
-  assert.deepEqual(tools.map((tool) => tool.name), ["cut", "cevra-extract-frame", "cevra-mux-audio", "cevra-overlay-media", "cevra-scale", "cevra-speed", "cevra-transcode"]);
+  const expectedTools = ["cut", "cevra-extract-frame", "cevra-mux-audio", "cevra-overlay-media", "cevra-scale", "cevra-speed", "cevra-transcode"];
+  assert.deepEqual(tools.map((tool) => tool.name), expectedTools);
+  const health = await runtime.client.health();
+  assert.equal(Object.hasOwn(health.tools, "redact"), false);
+  assert.equal(Object.hasOwn(health.tools, "look"), false);
+  for (const name of expectedTools.filter((item) => item.startsWith("cevra-"))) assert.equal(Object.hasOwn(health.tools, name), true);
   assert.equal(JSON.stringify(tools).includes('"argv"'), false);
-  for (const tool of tools.filter((item) => item.name.startsWith("cevra-"))) {
+  for (const tool of tools) {
     assert.equal(tool.inputSchema.additionalProperties, false);
   }
   const transcode = tools.find((tool) => tool.name === "cevra-transcode");
@@ -151,6 +160,10 @@ test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async (
   await assert.rejects(runtime.client.callTool("redact", {}, "blocked-tool"), /not allowed by CEVRA/);
   await assert.rejects(runtime.client.callTool("cut", { argv: ["--help"] }, "blocked-argv"), /raw argv execution is not allowed/);
   await assert.rejects(runtime.client.callTool("cut", { nested: { argv: ["--help"] } }, "blocked-nested-argv"), /raw argv execution is not allowed/);
+  await assert.rejects(runtime.client.callTool("cut", { ...cutArguments("out", "in", 1), filtergraph: "null" }, "blocked-extra"), /unexpected fields: filtergraph/);
+  await assert.rejects(runtime.client.callTool("cut", { ...cutArguments("out", "in", 1), start: [] }, "blocked-type"), /start must be number/);
+  await assert.rejects(runtime.client.callTool("cut", { input: "in", output: "out", start: 0, accurate: true }, "blocked-missing"), /missing required fields: end/);
+  await assert.rejects(runtime.client.callTool("cut", cutArguments("-", "in", 1), "blocked-path"), /unsafe media path/);
   await runtime.client.close();
 });
 

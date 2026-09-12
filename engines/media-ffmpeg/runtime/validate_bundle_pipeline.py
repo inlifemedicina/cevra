@@ -63,6 +63,7 @@ def _ffmpeg_fixture(root: Path) -> Path:
         "source": VERSIONS["ffmpeg"]["source"],
         "sourceSignature": VERSIONS["ffmpeg"]["signature"],
         "signingFingerprint": VERSIONS["ffmpeg"]["signingFingerprint"],
+        "verifiedSignerFingerprint": VERSIONS["ffmpeg"]["signingFingerprint"].upper(),
         "sourceArchiveSha256": "a" * 64,
         "sourceSignatureSha256": "b" * 64,
         "signingKeySha256": "c" * 64,

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MEDIA_DELIVERY_MATRIX, resolveAudioDelivery, resolveTranscodeDelivery, validateCopyCompatibility, validateMediaOperation } from "../dist/index.js";
+import { MEDIA_DELIVERY_MATRIX, resolveAudioDelivery, resolveAudioMutationDelivery, resolveStandardAvDelivery, resolveTranscodeDelivery, validateCopyCompatibility, validateMediaOperation } from "../dist/index.js";
 
 test("valid typed trim operation is accepted", () => {
   const operation = validateMediaOperation({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 });
@@ -10,6 +10,8 @@ test("valid typed trim operation is accepted", () => {
 test("raw shell and ffmpeg filtergraph injection fields are rejected", () => {
   assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "in.mp4", shell: "rm -rf /" }), /Forbidden execution field/);
   assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "in.mp4", nested: { filtergraph: "evil" } }), /Forbidden execution field/);
+  assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "-f" }), /safe non-empty media URI/);
+  assert.throws(() => validateMediaOperation({ type: "concat", inputUris: ["safe.mp4", "evil\nfile.mp4"], outputUri: "out.mp4" }), /safe media URI/);
 });
 
 test("unsafe timing and speed values are rejected", () => {
@@ -55,6 +57,15 @@ test("container inference applies compatible defaults and rejects extension conf
   });
   assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.webm", container: "mp4" }), /does not match/);
   assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.unknown" }), /must be inferable/);
+});
+
+test("fixed media operations reject containers their actual codecs cannot produce", () => {
+  assert.throws(() => validateMediaOperation({ type: "fit", inputUri: "in.mp4", outputUri: "out.webm", width: 10, height: 10, mode: "contain" }), /incompatible with WEBM/);
+  assert.throws(() => validateMediaOperation({ type: "volume", inputUri: "in.mp4", outputUri: "out.webm", gainDb: 1 }), /incompatible with WEBM/);
+  assert.throws(() => validateMediaOperation({ type: "extract-frame", inputUri: "in.mp4", outputUri: "frame.jpg", atMs: 0 }), /PNG container/);
+  assert.equal(resolveStandardAvDelivery("out.mov").videoCodec, "h264");
+  assert.equal(resolveStandardAvDelivery("out.wav", true).audioOnly, true);
+  assert.equal(resolveAudioMutationDelivery("out.mkv").videoCodec, "copy");
 });
 
 test("stream copy requires compatible codecs proven by input metadata", () => {

@@ -38,6 +38,19 @@ def command(argv: list[str], env: dict[str, str] | None = None) -> str:
     return (proc.stdout or "") + (proc.stderr or "")
 
 
+def signature_matches(status_output: str, expected_fingerprint: str) -> bool:
+    expected = expected_fingerprint.upper()
+    for line in status_output.splitlines():
+        fields = line.split()
+        if len(fields) < 11 or fields[:2] != ["[GNUPG:]", "VALIDSIG"]:
+            continue
+        signer = fields[2].upper()
+        primary = fields[11].upper() if len(fields) > 11 else signer
+        if expected in (signer, primary):
+            return True
+    return False
+
+
 def prepare(destination: Path) -> Path:
     if shutil.which("gpg") is None:
         raise SystemExit("gpg is required to verify the FFmpeg release signature")
@@ -61,7 +74,9 @@ def prepare(destination: Path) -> Path:
         if expected not in fingerprints:
             raise SystemExit(f"FFmpeg signing key fingerprint mismatch: expected {expected}")
         command(["gpg", "--batch", "--import", str(key)], env=env)
-        command(["gpg", "--batch", "--verify", str(signature), str(archive)], env=env)
+        verification = command(["gpg", "--batch", "--status-fd", "1", "--verify", str(signature), str(archive)], env=env)
+        if not signature_matches(verification, expected):
+            raise SystemExit(f"FFmpeg release signature was not made by pinned fingerprint {expected}")
 
         extract_root = temp / "extract"
         extract_root.mkdir()
@@ -80,6 +95,7 @@ def prepare(destination: Path) -> Path:
             "source": PIN["source"],
             "signature": PIN["signature"],
             "signingFingerprint": PIN["signingFingerprint"],
+            "verifiedSignerFingerprint": expected,
             "archiveSha256": sha256(archive),
             "signatureSha256": sha256(signature),
             "signingKeySha256": sha256(key),

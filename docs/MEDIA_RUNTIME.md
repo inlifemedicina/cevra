@@ -24,8 +24,10 @@ platform hardware / CPU
 ## Runtime requirements
 - Worker stays alive for the desktop session and is restarted only after failure/update.
 - JSON-RPC is the process boundary; the application never sends arbitrary shell commands or raw FFmpeg filtergraphs.
+- The RPC publishes only CEVRA allow-listed tools and validates their closed input schemas before execution.
 - Runtime paths are supplied by the signed application package; release execution must not silently fall back to arbitrary binaries from the user's PATH.
 - Every release carries a runtime manifest with exact worker/upstream/FFmpeg versions, build provenance and license classification.
+- Desktop composition must select `release` mode explicitly; a missing or invalid bundle manifest then fails before the worker accepts RPC.
 - Experimental or optional codecs are capability-gated.
 
 The pinned assembly commands, CI coverage and current platform evidence are

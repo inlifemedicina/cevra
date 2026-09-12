@@ -9,8 +9,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = path.join(here, "fixtures", "native_tool_matrix.py");
 const python = process.env.CEVRA_TEST_PYTHON || "python3";
 
-function run(operation, arguments_, metadata = {}) {
-  const result = spawnSync(python, ["-s", "-B", fixture, JSON.stringify({ operation, arguments: arguments_, metadata })], { encoding: "utf8" });
+function run(operation, arguments_, metadata = {}, encoders) {
+  const result = spawnSync(python, ["-s", "-B", fixture, JSON.stringify({ operation, arguments: arguments_, metadata, encoders })], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout);
 }
@@ -37,6 +37,18 @@ test("Python worker applies WebM defaults from its delivery matrix", () => {
   assert.equal(result.command.includes("libvpx-vp9"), true);
   assert.equal(result.command.includes("libopus"), true);
   assert.equal(result.command.includes("h264_test"), false);
+});
+
+test("Python worker fails explicitly when a requested bundle encoder is unavailable", () => {
+  const metadata = { "in.mp4": { video: { codec: "h264" }, audio: { codec: "aac" } } };
+  const missingVp9 = run("transcode", { input: "in.mp4", output: "out.webm" }, metadata, ["aac"]);
+  assert.match(missingVp9.error, /VP9 encoder is not available/);
+  const missingOpus = run("transcode", { input: "in.mp4", output: "out.webm", video_codec: "copy" }, {
+    "in.mp4": { video: { codec: "vp9" }, audio: { codec: "opus" } }
+  }, ["libvpx-vp9"]);
+  assert.match(missingOpus.error, /OPUS encoder libopus is not available/);
+  const missingMp3 = run("transcode", { input: "in.mp4", output: "out.mp3" }, metadata, ["aac"]);
+  assert.match(missingMp3.error, /MP3 encoder libmp3lame is not available/);
 });
 
 test("Python worker drops video explicitly for inferred audio-only containers", () => {

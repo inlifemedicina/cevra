@@ -43,7 +43,7 @@
     },
     "ffmpeg": {
       "type": "object", "additionalProperties": false,
-      "required": ["version", "probeVersion", "license", "buildId", "executable", "probeExecutable", "sha256", "ffprobeSha256", "configureFlagsSha256", "configureFlags", "provenance", "provenanceSha256", "source", "sourceSignature", "signingFingerprint", "sourceArchiveSha256", "sourceSignatureSha256", "signingKeySha256"],
+      "required": ["version", "probeVersion", "license", "buildId", "executable", "probeExecutable", "sha256", "ffprobeSha256", "configureFlagsSha256", "configureFlags", "provenance", "provenanceSha256", "source", "sourceSignature", "signingFingerprint", "verifiedSignerFingerprint", "sourceArchiveSha256", "sourceSignatureSha256", "signingKeySha256"],
       "properties": {
         "version": { "$ref": "#/$defs/text" }, "probeVersion": { "$ref": "#/$defs/text" },
         "license": { "enum": ["LGPL-2.1-or-later", "LGPL-3.0-or-later"] }, "buildId": { "$ref": "#/$defs/text" },
@@ -52,7 +52,7 @@
         "configureFlagsSha256": { "$ref": "#/$defs/hash" }, "configureFlags": { "type": "array", "items": { "type": "string" } },
         "provenance": { "const": "provenance/ffmpeg.json" }, "provenanceSha256": { "$ref": "#/$defs/hash" },
         "source": { "$ref": "#/$defs/text" }, "sourceSignature": { "$ref": "#/$defs/text" },
-        "signingFingerprint": { "$ref": "#/$defs/text" }, "sourceArchiveSha256": { "$ref": "#/$defs/hash" },
+        "signingFingerprint": { "$ref": "#/$defs/text" }, "verifiedSignerFingerprint": { "$ref": "#/$defs/text" }, "sourceArchiveSha256": { "$ref": "#/$defs/hash" },
         "sourceSignatureSha256": { "$ref": "#/$defs/hash" }, "signingKeySha256": { "$ref": "#/$defs/hash" }
       }
     },

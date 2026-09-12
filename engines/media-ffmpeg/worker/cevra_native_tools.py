@@ -321,21 +321,24 @@ def _ffmpeg_encoders(common: Any) -> List[str]:
     return values
 
 
-def _audio_args(codec: Optional[str], has_audio: bool) -> List[str]:
+def _audio_args(common: Any, codec: Optional[str], has_audio: bool) -> List[str]:
     if not has_audio:
         return ["-an"]
+    selected = codec or "aac"
     mapping = {
-        None: ["-c:a", "aac", "-b:a", "192k"],
-        "": ["-c:a", "aac", "-b:a", "192k"],
         "aac": ["-c:a", "aac", "-b:a", "192k"],
         "opus": ["-c:a", "libopus", "-b:a", "160k"],
         "mp3": ["-c:a", "libmp3lame", "-b:a", "192k"],
         "pcm": ["-c:a", "pcm_s16le"],
         "copy": ["-c:a", "copy"],
     }
-    if codec not in mapping:
-        raise ValueError(f"unsupported audio codec {codec}")
-    return mapping[codec]
+    if selected not in mapping:
+        raise ValueError(f"unsupported audio codec {selected}")
+    if selected != "copy":
+        encoder = mapping[selected][1]
+        if encoder not in set(_ffmpeg_encoders(common)):
+            raise RuntimeError(f"{selected.upper()} encoder {encoder} is not available in this CEVRA Media Runtime")
+    return mapping[selected]
 
 
 def _run_transcode(common: Any, runtime: Any, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -370,7 +373,7 @@ def _run_transcode(common: Any, runtime: Any, args: Dict[str, Any]) -> Dict[str,
         cmd += ["-map", "0:a:0"]
     elif drop_video:
         raise ValueError("input has no audio stream")
-    cmd += _audio_args(audio_codec, bool(meta.get("audio")))
+    cmd += _audio_args(common, audio_codec, bool(meta.get("audio")))
     cmd += _container_args(container)
     common.run(cmd + [output])
     return _file_result(common, output)
@@ -404,7 +407,7 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     if not replace_existing and video_meta.get("audio"):
         cmd += ["-map", "0:a:0"]
     cmd += ["-map", "1:a:0"]
-    cmd += _audio_args(audio_codec, True)
+    cmd += _audio_args(common, audio_codec, True)
     cmd += _container_args(container)
     common.run(cmd + [output])
     return _file_result(common, output, {"replacedExistingAudio": replace_existing})

@@ -211,3 +211,19 @@ test("mux-audio preserves or replaces existing audio according to replaceExistin
   await engine.execute({ type: "mux-audio", videoUri: "video.mp4", audioUri: "new.wav", outputUri: "replaced.mp4" }, context);
   assert.equal(worker.calls[1].arguments_.replace_existing, true);
 });
+
+test("audio mutations validate copied input video against the output container", async () => {
+  const compatible = new FakeWorker();
+  const engine = new FfmpegMediaEngine(compatible);
+  await engine.execute({ type: "volume", inputUri: "in.mp4", outputUri: "out.mp4", gainDb: -2 }, context);
+  assert.deepEqual(compatible.calls.map((call) => call.name), ["probe", "audio"]);
+
+  const incompatible = new FakeWorker();
+  incompatible.probeVideoCodec = "vp9";
+  const incompatibleEngine = new FfmpegMediaEngine(incompatible);
+  await assert.rejects(
+    () => incompatibleEngine.execute({ type: "volume", inputUri: "in.webm", outputUri: "out.mp4", gainDb: -2 }, context),
+    /video codec cannot be copied/
+  );
+  assert.deepEqual(incompatible.calls.map((call) => call.name), ["probe"]);
+});

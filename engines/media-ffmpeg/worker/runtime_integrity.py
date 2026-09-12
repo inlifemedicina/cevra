@@ -18,15 +18,28 @@ class RuntimeIntegrityError(RuntimeError):
 
 SENSITIVE_ENVIRONMENT = frozenset({
     "CEVRA_ALLOW_GPL_DEV_ENCODERS",
+    "CEVRA_DECODE_ACCELERATION",
     "CEVRA_FFMPEG_SKILL_ROOT",
     "CEVRA_MEDIA_BIN_DIR",
     "CEVRA_MEDIA_RUNTIME_ROOT",
+    "CEVRA_VIDEO_ENCODER_AV1",
+    "CEVRA_VIDEO_ENCODER_H264",
+    "CEVRA_VIDEO_ENCODER_HEVC",
     "CONDA_PREFIX",
+    "DYLD_FALLBACK_FRAMEWORK_PATH",
     "DYLD_FALLBACK_LIBRARY_PATH",
+    "DYLD_FRAMEWORK_PATH",
+    "DYLD_IMAGE_SUFFIX",
     "DYLD_INSERT_LIBRARIES",
     "DYLD_LIBRARY_PATH",
+    "DYLD_ROOT_PATH",
+    "DYLD_VERSIONED_FRAMEWORK_PATH",
+    "DYLD_VERSIONED_LIBRARY_PATH",
+    "LD_AUDIT",
     "LD_LIBRARY_PATH",
     "LD_PRELOAD",
+    "FFMPEG_SKILL_NO_OVERWRITE",
+    "FFMPEG_SKILL_TIMEOUT",
     "PYTHONBREAKPOINT",
     "PYTHONCASEOK",
     "PYTHONEXECUTABLE",
@@ -114,6 +127,7 @@ def sanitize_release_environment(runtime_root: Path) -> None:
         "PATH": str(runtime_root / "bin"),
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONNOUSERSITE": "1",
+        "FFMPEG_SKILL_NO_OVERWRITE": "1",
     })
 
 
@@ -333,6 +347,7 @@ def verify_release_bundle(
         "source": expected_ffmpeg_source,
         "sourceSignature": expected_ffmpeg_signature,
         "signingFingerprint": expected_ffmpeg_fingerprint,
+        "verifiedSignerFingerprint": expected_ffmpeg_fingerprint.upper(),
         "verified": True,
         "configureFlags": flags,
         "ffmpegSha256": ffmpeg.get("sha256"),
@@ -343,6 +358,7 @@ def verify_release_bundle(
         "source": expected_ffmpeg_source,
         "sourceSignature": expected_ffmpeg_signature,
         "signingFingerprint": expected_ffmpeg_fingerprint,
+        "verifiedSignerFingerprint": expected_ffmpeg_fingerprint.upper(),
     }
     if any(ffmpeg.get(key) != value for key, value in manifest_sources.items()):
         raise RuntimeIntegrityError("FFmpeg manifest provenance does not match the release source")

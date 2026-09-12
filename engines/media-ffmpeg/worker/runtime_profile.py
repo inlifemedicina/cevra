@@ -4,6 +4,8 @@ import os
 import subprocess
 from typing import Any, Dict, Iterable, List, Optional
 
+import cevra_job_control as job_control
+
 APPROVED: Dict[str, Dict[str, List[str]]] = {
     "darwin": {
         "h264": ["h264_videotoolbox"],
@@ -47,7 +49,13 @@ def _smoke(ffmpeg: str, encoder: str) -> bool:
         "-frames:v", "8", "-an", "-c:v", encoder, "-f", "null", "-",
     ]
     try:
-        proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=8.0)
+        active = job_control.active_job_id()
+        if active is None:
+            proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=8.0)
+        else:
+            proc = job_control.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=8.0)
+            if job_control.is_cancelled(active):
+                raise InterruptedError(f"media job {active} was cancelled")
         ok = proc.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         ok = False

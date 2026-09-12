@@ -14,9 +14,10 @@ import cevra_media_worker as worker
 
 
 class FakeCommon:
-    def __init__(self, metadata: Dict[str, Any]) -> None:
+    def __init__(self, metadata: Dict[str, Any], encoders: list[str] | None = None) -> None:
         self.metadata = metadata
         self.command = []
+        self.encoders = encoders if encoders is not None else ["aac", "libmp3lame", "libopus", "libvpx-vp9", "pcm_s16le"]
 
     def probe(self, path: str, role: str = "input") -> Dict[str, Any]:
         if role == "output":
@@ -31,7 +32,8 @@ class FakeCommon:
 
     def run(self, command: list[str], **_: Any) -> Any:
         if "-encoders" in command:
-            return SimpleNamespace(stdout=" V..... libvpx-vp9\n", stderr="", returncode=0)
+            lines = [f" {'V' if name == 'libvpx-vp9' else 'A'}..... {name}" for name in self.encoders]
+            return SimpleNamespace(stdout="\n".join(lines), stderr="", returncode=0)
         self.command = command
         return SimpleNamespace(stdout="", stderr="", returncode=0)
 
@@ -81,7 +83,7 @@ def main() -> int:
             print(json.dumps({"failures": failures, "boundaryRejections": boundary_rejections}))
             return 0
 
-        common = FakeCommon(request["metadata"])
+        common = FakeCommon(request["metadata"], request.get("encoders"))
         sys.modules["_common"] = common
         if request["operation"] == "transcode":
             tools._run_transcode(common, FakeRuntime(), request["arguments"])

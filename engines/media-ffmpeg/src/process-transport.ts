@@ -1,9 +1,9 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { PersistentWorkerTransport } from "./persistent-worker.js";
 
 export interface MediaWorkerProcessOptions {
+  mode: "release" | "development";
   pythonExecutable: string;
   workerScript: string;
   cwd?: string;
@@ -62,7 +62,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   private async spawnWorker(): Promise<void> {
     const runtimeRoot = resolve(dirname(this.options.workerScript), "..");
     const sourceEnv = this.options.env ?? process.env;
-    const releaseMode = existsSync(join(runtimeRoot, "manifest.json")) || isEnabled(sourceEnv.CEVRA_RELEASE_MODE);
+    const releaseMode = this.options.mode === "release";
     const env = { ...sourceEnv };
     env.PYTHONNOUSERSITE = "1";
     env.PYTHONDONTWRITEBYTECODE = "1";
@@ -173,19 +173,20 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
 }
 
 const PYTHON_PROCESS_OVERRIDES = [
-  "CONDA_PREFIX", "DYLD_FALLBACK_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH",
-  "LD_LIBRARY_PATH", "LD_PRELOAD", "PYTHONBREAKPOINT", "PYTHONCASEOK", "PYTHONEXECUTABLE",
+  "CONDA_PREFIX", "DYLD_FALLBACK_FRAMEWORK_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH",
+  "DYLD_IMAGE_SUFFIX", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_ROOT_PATH",
+  "DYLD_VERSIONED_FRAMEWORK_PATH", "DYLD_VERSIONED_LIBRARY_PATH", "LD_AUDIT", "LD_LIBRARY_PATH",
+  "LD_PRELOAD", "PYTHONBREAKPOINT", "PYTHONCASEOK", "PYTHONEXECUTABLE",
   "PYTHONHOME", "PYTHONINSPECT", "PYTHONPATH", "PYTHONPLATLIBDIR", "PYTHONSTARTUP",
   "PYTHONUSERBASE", "PYTHONWARNINGS", "VIRTUAL_ENV"
 ] as const;
 
 const CEVRA_RELEASE_OVERRIDES = [
-  "CEVRA_ALLOW_GPL_DEV_ENCODERS", "CEVRA_FFMPEG_SKILL_ROOT", "CEVRA_MEDIA_BIN_DIR", "CEVRA_MEDIA_RUNTIME_ROOT"
+  "CEVRA_ALLOW_GPL_DEV_ENCODERS", "CEVRA_DECODE_ACCELERATION", "CEVRA_FFMPEG_SKILL_ROOT",
+  "CEVRA_MEDIA_BIN_DIR", "CEVRA_MEDIA_RUNTIME_ROOT", "CEVRA_VIDEO_ENCODER_AV1",
+  "CEVRA_VIDEO_ENCODER_H264", "CEVRA_VIDEO_ENCODER_HEVC", "FFMPEG_SKILL_NO_OVERWRITE",
+  "FFMPEG_SKILL_TIMEOUT"
 ] as const;
-
-function isEnabled(value: string | undefined): boolean {
-  return value !== undefined && !["", "0", "false", "False"].includes(value);
-}
 
 function abortError(): Error {
   const error = new Error("CEVRA media operation was cancelled.");
