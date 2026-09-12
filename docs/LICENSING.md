@@ -20,6 +20,8 @@ CEVRA-owned code is proprietary and all rights are reserved unless explicitly st
 ## Source reuse
 Permissively licensed code may be reused only after recording exact upstream source, commit/version, license, modifications and required notices.
 
+This rule also applies to Content OS references such as comment-search, research, social-listening, ideation or creator-workflow products. Product similarity or public source availability alone does not authorize copying. If an exact compatible license/provenance cannot be verified, CEVRA may study observable behavior and independently reimplement the required functionality.
+
 ## Managed Python runtime
 CEVRA may redistribute a private CPython runtime for desktop use. Each release must record the exact interpreter build, source, architecture and bundled native libraries. Required Python and third-party license texts/notices must ship with the commercial release. The release pipeline must avoid runtime builds that introduce unacceptable copyleft obligations unless explicitly reviewed and approved.
 
@@ -27,6 +29,9 @@ The current preferred source for redistributable CPython artifacts is Astral `py
 
 ## Clean-room references
 UNLICENSED/proprietary systems such as Auroq may be studied for externally observable behavior and architecture, but implementation must be independently written unless a separate compatible license is obtained.
+
+## Models, APIs and content providers
+AI models, social APIs, content-source providers, analytics providers and publishing integrations are audited independently from CEVRA-owned code. Their licenses, API terms, redistribution limits, platform policies and data-use restrictions must be reviewed before a concrete integration ships.
 
 ## Release requirement
 Commercial releases must include the required third-party notices, license texts and any source/source-offer obligations applicable to redistributed components.
