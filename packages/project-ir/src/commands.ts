@@ -49,6 +49,10 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
     case "style.patch":
       next.style = mergeDefined(next.style, command.patch);
       break;
+    case "export.add":
+      rejectDuplicate(next.exports, command.export.id, "export");
+      next.exports.push(clone(command.export));
+      break;
     default:
       assertNever(command);
   }

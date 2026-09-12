@@ -31,6 +31,9 @@ platform hardware / CPU
 The pinned assembly commands, CI coverage and current platform evidence are
 documented in [Media Runtime build and CI](MEDIA_RUNTIME_BUILD.md).
 
+Application execution, Project IR commits, recovery records and localized errors
+are defined by the [Media application service](MEDIA_APPLICATION_SERVICE.md).
+
 ## Encoder selection
 CEVRA discovers the actual encoders exposed by its bundled FFmpeg build and the current system. Static platform ordering is only a fallback.
 

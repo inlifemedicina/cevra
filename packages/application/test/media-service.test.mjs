@@ -1,0 +1,327 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { CEVRA_ENGINE_API_VERSION } from "@cevra/contracts";
+import { createEmptyProject, ProjectHistory } from "@cevra/project-ir";
+import {
+  InMemoryMediaExecutionRepository,
+  MediaApplicationError,
+  MediaApplicationService
+} from "../dist/index.js";
+
+const now = "2026-09-12T12:00:00.000Z";
+const trim = { type: "trim", inputUri: "/media/in.mp4", outputUri: "/media/out.mp4", startMs: 0, endMs: 1000 };
+const sourceMutation = { type: "source.add", source: { id: "source-out", kind: "video", displayName: "Output" } };
+
+class MemoryArtifacts {
+  files = new Set();
+  removed = [];
+
+  async exists(uri) { return this.files.has(uri); }
+  async remove(uri) { this.files.delete(uri); this.removed.push(uri); }
+}
+
+class FakeEngine {
+  calls = [];
+
+  constructor(execute) { this.executeImpl = execute; }
+  async identity() {
+    return { id: "test.media", kind: "media", displayName: "Test Media", version: "1.2.3", apiVersion: CEVRA_ENGINE_API_VERSION };
+  }
+  async healthcheck() { return { status: "ready", checkedAt: now, checks: [] }; }
+  async capabilities() { return []; }
+  async execute(operation, context) {
+    this.calls.push({ operation, context });
+    return this.executeImpl(operation, context);
+  }
+}
+
+function fixture(engine, artifacts = new MemoryArtifacts(), repository = new InMemoryMediaExecutionRepository()) {
+  let id = 0;
+  const history = new ProjectHistory(
+    createEmptyProject({ id: "project-1", name: "Project", locale: "pt-BR", now }),
+    { clock: () => now, idGenerator: () => `history-${++id}` }
+  );
+  const service = new MediaApplicationService({
+    engine,
+    history,
+    executions: repository,
+    artifacts,
+    clock: () => now,
+    idGenerator: () => "generated-execution"
+  });
+  return { service, history, artifacts, repository };
+}
+
+test("successful file operation commits one typed command and recoverable Project IR snapshot", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(trim.outputUri);
+    return { type: "file", outputUri: trim.outputUri, durationMs: 1000 };
+  });
+  const { service, history, repository } = fixture(engine, artifacts);
+
+  const outcome = await service.execute({ id: "execution-1", operation: trim, mutation: sourceMutation, actor: { type: "agent", id: "agent-1" } });
+
+  assert.equal(outcome.record.status, "succeeded");
+  assert.equal(outcome.record.attempts[0].result.outputUri, trim.outputUri);
+  assert.deepEqual(outcome.record.attempts[0].outputUris, [trim.outputUri]);
+  assert.deepEqual(outcome.record.attempts[0].provenance, {
+    engineId: "test.media", engineVersion: "1.2.3", engineApiVersion: 1, engineDisplayName: "Test Media"
+  });
+  assert.equal(outcome.project.history.revision, 1);
+  assert.equal(outcome.project.sources[0].uri, trim.outputUri);
+  assert.equal(outcome.project.sources[0].extensions["cevra.media"].executionId, "execution-1");
+  assert.equal(history.entries.length, 1);
+  assert.equal(history.entries[0].command.type, "source.add");
+  assert.deepEqual(history.entries[0].actor, { type: "agent", id: "agent-1" });
+  assert.equal(history.snapshots.length, 2);
+  assert.equal(outcome.record.attempts[0].projectJournalEntryId, history.entries[0].id);
+  assert.deepEqual((await repository.get("execution-1")).status, "succeeded");
+});
+
+test("successful export is added through the Project IR command API", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(trim.outputUri);
+    return { type: "file", outputUri: trim.outputUri };
+  });
+  const { service, history } = fixture(engine, artifacts);
+
+  const outcome = await service.execute({
+    id: "export-execution",
+    operation: trim,
+    mutation: { type: "export.add", exportId: "export-1", presetId: "delivery-1080p" }
+  });
+
+  assert.equal(outcome.project.exports[0].status, "completed");
+  assert.equal(outcome.project.exports[0].outputUri, trim.outputUri);
+  assert.equal(history.entries[0].command.type, "export.add");
+});
+
+test("engine failure removes a new partial output and leaves Project IR unchanged", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(trim.outputUri);
+    throw new Error("ffmpeg exited with status 1");
+  });
+  const { service, history, repository } = fixture(engine, artifacts);
+
+  await assert.rejects(
+    service.execute({ id: "failed-execution", locale: "en-US", operation: trim, mutation: sourceMutation }),
+    (error) => error instanceof MediaApplicationError
+      && error.code === "MEDIA_OPERATION_FAILED"
+      && error.message === "The media operation could not be completed."
+  );
+
+  assert.equal(artifacts.files.has(trim.outputUri), false);
+  assert.deepEqual(artifacts.removed, [trim.outputUri]);
+  assert.equal(history.current.history.revision, 0);
+  assert.equal(history.entries.length, 0);
+  const record = await repository.get("failed-execution");
+  assert.equal(record.status, "failed");
+  assert.equal(record.attempts[0].technicalError, "ffmpeg exited with status 1");
+  assert.deepEqual(record.attempts[0].removedPartialOutputUris, [trim.outputUri]);
+});
+
+test("cancellation records a stable code, cleans partial output and keeps the project snapshot", async () => {
+  const artifacts = new MemoryArtifacts();
+  let started;
+  const didStart = new Promise((resolve) => { started = resolve; });
+  const engine = new FakeEngine(async (_operation, context) => {
+    artifacts.files.add(trim.outputUri);
+    started();
+    return new Promise((_resolve, reject) => {
+      context.signal.addEventListener("abort", () => {
+        const error = new Error("worker cancelled job");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+    });
+  });
+  const { service, history, repository } = fixture(engine, artifacts);
+  const controller = new AbortController();
+  const execution = service.execute({ id: "cancelled-execution", operation: trim, mutation: sourceMutation }, controller.signal);
+  await didStart;
+  controller.abort();
+
+  await assert.rejects(execution, (error) => error instanceof MediaApplicationError
+    && error.code === "MEDIA_OPERATION_CANCELLED"
+    && error.message === "A operação de mídia foi cancelada.");
+  assert.equal(history.current.history.revision, 0);
+  assert.equal(artifacts.files.has(trim.outputUri), false);
+  assert.equal((await repository.get("cancelled-execution")).status, "cancelled");
+});
+
+test("retry reuses the application record with a new worker job and commits only the successful attempt", async () => {
+  const artifacts = new MemoryArtifacts();
+  let calls = 0;
+  const engine = new FakeEngine(async () => {
+    calls += 1;
+    artifacts.files.add(trim.outputUri);
+    if (calls === 1) throw new Error("transient failure");
+    return { type: "file", outputUri: trim.outputUri };
+  });
+  const { service, history, repository } = fixture(engine, artifacts);
+  await assert.rejects(service.execute({ id: "retry-execution", operation: trim, mutation: sourceMutation }));
+
+  const outcome = await service.retry("retry-execution");
+
+  assert.equal(outcome.record.status, "succeeded");
+  assert.equal(outcome.record.attempts.length, 2);
+  assert.deepEqual(outcome.record.attempts.map((attempt) => attempt.jobId), ["retry-execution:1", "retry-execution:2"]);
+  assert.equal(history.entries.length, 1);
+  assert.equal(history.current.sources.length, 1);
+  assert.equal((await repository.get("retry-execution")).attempts.length, 2);
+});
+
+test("crash recovery removes an uncommitted partial artifact and retries from persisted execution state", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.files.add(trim.outputUri);
+  const repository = new InMemoryMediaExecutionRepository({
+    version: 1,
+    records: [{
+      id: "crashed-execution",
+      projectId: "project-1",
+      locale: "pt-BR",
+      operation: trim,
+      mutation: sourceMutation,
+      actor: { type: "system" },
+      status: "running",
+      createdAt: now,
+      attempts: [{
+        number: 1,
+        jobId: "crashed-execution:1",
+        status: "running",
+        requestedAt: now,
+        startedAt: now,
+        outputUris: [trim.outputUri],
+        preexistingOutputUris: [],
+        removedPartialOutputUris: [],
+        cleanupFailedOutputUris: [],
+        projectRevisionBefore: 0
+      }]
+    }]
+  });
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(trim.outputUri);
+    return { type: "file", outputUri: trim.outputUri };
+  });
+  const { service, history } = fixture(engine, artifacts, repository);
+
+  const result = await service.recoverPending();
+
+  assert.deepEqual(result, [{ executionId: "crashed-execution", status: "succeeded" }]);
+  assert.deepEqual(artifacts.removed, [trim.outputUri]);
+  const recovered = await repository.get("crashed-execution");
+  assert.equal(recovered.attempts[0].status, "interrupted");
+  assert.equal(recovered.attempts[1].status, "succeeded");
+  assert.equal(history.current.history.revision, 1);
+});
+
+test("crash recovery reconciles an already committed Project IR mutation without rerunning the engine", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.files.add(trim.outputUri);
+  const repository = new InMemoryMediaExecutionRepository();
+  const engine = new FakeEngine(async () => assert.fail("committed operation must not run again"));
+  const { service, history } = fixture(engine, artifacts, repository);
+  const project = history.commit({
+    type: "source.add",
+    source: {
+      id: sourceMutation.source.id,
+      kind: sourceMutation.source.kind,
+      uri: trim.outputUri,
+      displayName: sourceMutation.source.displayName,
+      extensions: { "cevra.media": { executionId: "commit-crash", attempt: 1 } }
+    }
+  }, { type: "system" });
+  await repository.save({
+    id: "commit-crash",
+    projectId: "project-1",
+    locale: "pt-BR",
+    operation: trim,
+    mutation: sourceMutation,
+    actor: { type: "system" },
+    status: "committing",
+    createdAt: now,
+    attempts: [{
+      number: 1,
+      jobId: "commit-crash:1",
+      status: "committing",
+      requestedAt: now,
+      startedAt: now,
+      outputUris: [trim.outputUri],
+      preexistingOutputUris: [],
+      removedPartialOutputUris: [],
+      cleanupFailedOutputUris: [],
+      projectRevisionBefore: 0,
+      result: { type: "file", outputUri: trim.outputUri },
+      provenance: { engineId: "test.media", engineVersion: "1.2.3", engineApiVersion: 1, engineDisplayName: "Test Media" }
+    }]
+  });
+
+  const recovered = await service.recoverPending();
+
+  assert.deepEqual(recovered, [{ executionId: "commit-crash", status: "succeeded" }]);
+  assert.equal(engine.calls.length, 0);
+  assert.equal(artifacts.files.has(trim.outputUri), true);
+  assert.deepEqual(artifacts.removed, []);
+  assert.equal(history.current.history.revision, project.history.revision);
+  assert.equal((await repository.get("commit-crash")).attempts[0].projectJournalEntryId, history.entries[0].id);
+});
+
+test("pre-existing output is preserved and the engine is never invoked", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.files.add(trim.outputUri);
+  const engine = new FakeEngine(async () => assert.fail("engine must not execute"));
+  const { service, history, repository } = fixture(engine, artifacts);
+
+  await assert.rejects(
+    service.execute({ id: "protected-execution", locale: "en-US", operation: trim, mutation: sourceMutation }),
+    (error) => error instanceof MediaApplicationError
+      && error.code === "MEDIA_OUTPUT_EXISTS"
+      && error.message.includes(trim.outputUri)
+  );
+
+  assert.equal(engine.calls.length, 0);
+  assert.equal(artifacts.files.has(trim.outputUri), true);
+  assert.deepEqual(artifacts.removed, []);
+  assert.equal(history.current.history.revision, 0);
+  assert.deepEqual((await repository.get("protected-execution")).attempts[0].preexistingOutputUris, [trim.outputUri]);
+});
+
+test("concurrent Project IR change rejects the stale result and preserves the newer snapshot", async () => {
+  const artifacts = new MemoryArtifacts();
+  let history;
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(trim.outputUri);
+    history.commit({ type: "project.rename", name: "Changed concurrently" }, { type: "user" });
+    return { type: "file", outputUri: trim.outputUri };
+  });
+  const context = fixture(engine, artifacts);
+  history = context.history;
+
+  await assert.rejects(
+    context.service.execute({ id: "conflict-execution", operation: trim, mutation: sourceMutation }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_PROJECT_CONFLICT"
+  );
+
+  assert.equal(history.current.project.name, "Changed concurrently");
+  assert.equal(history.current.sources.length, 0);
+  assert.equal(history.current.history.revision, 1);
+  assert.equal(history.entries.length, 1);
+  assert.equal(artifacts.files.has(trim.outputUri), false);
+});
+
+test("read-only probe is recorded without creating a Project IR mutation", async () => {
+  const operation = { type: "probe", inputUri: "/media/in.mp4" };
+  const engine = new FakeEngine(async () => ({ type: "probe", probe: { uri: operation.inputUri, hasVideo: true, hasAudio: true } }));
+  const { service, history } = fixture(engine);
+
+  const outcome = await service.execute({ id: "probe-execution", operation, mutation: { type: "none" } });
+
+  assert.equal(outcome.record.status, "succeeded");
+  assert.equal(history.current.history.revision, 0);
+  assert.equal(history.entries.length, 0);
+  assert.equal(history.snapshots.length, 1);
+});

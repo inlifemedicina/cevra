@@ -29,10 +29,22 @@ declare module "node:fs" {
   export function existsSync(path: string): boolean;
 }
 
+declare module "node:fs/promises" {
+  export interface Stats {
+    isFile(): boolean;
+  }
+  export function lstat(path: string): Promise<Stats>;
+  export function unlink(path: string): Promise<void>;
+}
+
 declare module "node:path" {
   export function dirname(path: string): string;
   export function join(...paths: string[]): string;
   export function resolve(...paths: string[]): string;
+}
+
+declare module "node:url" {
+  export function fileURLToPath(url: URL): string;
 }
 
 declare const process: {
