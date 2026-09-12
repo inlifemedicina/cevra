@@ -6,4 +6,6 @@ CEVRA-owned source code is proprietary unless explicitly stated otherwise.
 Third-party software, source code, models, fonts, media and other dependencies retain their own licenses and notices. Required attribution, license texts, source-offer obligations and notices must be tracked in THIRD_PARTY_LICENSES.md and shipped with release artifacts where required.
 
 Current third-party attribution:
-- ffmpeg-skill — Copyright (c) 2026 kajisho5 — MIT License. Pinned source provenance and license text are recorded under `third_party/` and `THIRD_PARTY_LICENSES.md`.
+- ffmpeg-skill — Copyright (c) 2026 kajisho5 — MIT License. Pinned source provenance and license text are recorded in the Media Runtime vendor tree and `THIRD_PARTY_LICENSES.md`.
+- FFmpeg 9.0.1 — LGPL-only CEVRA release build. Source and build provenance and the applicable LGPL text ship with the Media Runtime.
+- CPython 3.12.14 — Python Software Foundation License Version 2 and historical notices. The Python license text ships with the Media Runtime.

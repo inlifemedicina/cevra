@@ -3,7 +3,36 @@
   "python": {
     "version": "3.12.14",
     "series": "3.12",
-    "distribution": "CEVRA-managed CPython; exact redistributable artifact is pinned by the desktop release manifest"
+    "distribution": "astral-sh/python-build-standalone",
+    "release": "20260901",
+    "licenseSha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+    "artifacts": {
+      "darwin-arm64": {
+        "executable": "bin/python3.12",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-aarch64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "81a359f1cfadd4da11766534c5913791cea55f26e1bb902cacd2a531bb1e4b2b"
+      },
+      "darwin-x64": {
+        "executable": "bin/python3.12",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "65b195c9cedc1fef6767f044f9822069adbd1bd9204d424ece4628776fdc04bb"
+      },
+      "linux-arm64": {
+        "executable": "bin/python3.12",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "577b4bec0793ad1ff0cbff9adbd0df078eddde38a4c41bf5d83ad381a85ee39d"
+      },
+      "linux-x64": {
+        "executable": "bin/python3.12",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "72748da13197c1fb161e3afeef20a6a385ff24f2165e6e2758e47008e7faba4c"
+      },
+      "win32-x64": {
+        "executable": "python.exe",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "7c45c9622400d578709a9b2cddbe8124cc21d382409d9f13406d706d28e31b14"
+      }
+    }
   },
   "ffmpeg": {
     "version": "9.0.1",
@@ -16,6 +45,8 @@
     "version": "1.4.2",
     "repository": "https://github.com/kajisho5/ffmpeg-skill.git",
     "commit": "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a",
-    "contractVersion": "1.0"
+    "contractVersion": "1.0",
+    "license": "MIT",
+    "licenseSha256": "7522b29e4d6e90f2a8fab15f07d224b1064c70692a872be9996ac1a88cf474e9"
   }
 }

@@ -29,7 +29,7 @@ def python_version(python_executable: Path) -> str:
     return proc.stdout.strip()
 
 
-def build(output_dir: Path, python_executable: Path) -> Path:
+def build(output_dir: Path, python_executable: Path, vendor_source: Path | None = None) -> Path:
     """Stage the persistent worker for CEVRA's private managed CPython runtime.
 
     The worker is intentionally not frozen with PyInstaller. Desktop CEVRA already owns a
@@ -55,7 +55,11 @@ def build(output_dir: Path, python_executable: Path) -> Path:
             raise SystemExit(f"worker source missing: {source}")
         shutil.copy2(source, worker_dir / name)
 
-    run([str(python_executable), "-I", "-B", str(HERE / "prepare_vendor.py"), str(vendor_dir)])
+    if vendor_source is None:
+        run([str(python_executable), "-I", "-B", str(HERE / "prepare_vendor.py"), str(vendor_dir)])
+    else:
+        run([str(python_executable), "-I", "-B", str(HERE / "prepare_vendor.py"), str(vendor_source), "--verify-only"])
+        shutil.copytree(vendor_source, vendor_dir, symlinks=True)
 
     repository_root = ENGINE.parents[1]
     for name in ("NOTICE", "THIRD_PARTY_LICENSES.md"):
@@ -98,11 +102,13 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("output", type=Path)
     ap.add_argument("--python", type=Path, default=Path(sys.executable), help="CEVRA-managed CPython executable; current interpreter is allowed only when it matches the release pin")
+    ap.add_argument("--vendor-source", type=Path, help="already prepared and verified ffmpeg-skill tree")
     args = ap.parse_args()
     python_executable = args.python.resolve()
     if not python_executable.is_file():
         raise SystemExit(f"Python executable missing: {python_executable}")
-    result = build(args.output.resolve(), python_executable)
+    vendor_source = args.vendor_source.resolve() if args.vendor_source else None
+    result = build(args.output.resolve(), python_executable, vendor_source)
     print(result)
     return 0
 

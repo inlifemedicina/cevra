@@ -28,6 +28,9 @@ platform hardware / CPU
 - Every release carries a runtime manifest with exact worker/upstream/FFmpeg versions, build provenance and license classification.
 - Experimental or optional codecs are capability-gated.
 
+The pinned assembly commands, CI coverage and current platform evidence are
+documented in [Media Runtime build and CI](MEDIA_RUNTIME_BUILD.md).
+
 ## Encoder selection
 CEVRA discovers the actual encoders exposed by its bundled FFmpeg build and the current system. Static platform ordering is only a fallback.
 

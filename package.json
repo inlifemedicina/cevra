@@ -3,10 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
   "workspaces": ["apps/*", "packages/*", "engines/*"],
   "scripts": {
     "build": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/project-store && npm run build -w @cevra/media-ffmpeg",
     "test": "npm run test -w @cevra/project-ir && npm run test -w @cevra/contracts && npm run test -w @cevra/project-store && npm run test -w @cevra/media-ffmpeg",
+    "test:ci": "node --test packages/project-ir/test/*.test.mjs packages/contracts/test/*.test.mjs packages/project-store/test/*.test.mjs engines/media-ffmpeg/test/*.test.mjs",
+    "ci": "npm run build && npm run test:ci",
     "doctor": "python3 scripts/doctor.py"
   },
   "devDependencies": {

@@ -1,0 +1,95 @@
+# CEVRA Media Runtime build and CI
+
+## Reproducible inputs
+
+The release bundle is assembled only from inputs pinned in
+`engines/media-ffmpeg/runtime/versions.json`:
+
+- a platform-specific `astral-sh/python-build-standalone` CPython archive, with its
+  release URL, SHA-256 digest and audited Python license digest;
+- the FFmpeg source archive, detached signature and signing-key fingerprint;
+- the exact `ffmpeg-skill` commit, package version and audited MIT license digest;
+- the CEVRA worker sources and repository notices.
+
+The assembler refuses an existing output directory. It stages into a temporary
+directory, validates the complete release layout, and renames the validated tree
+into place only after all checks pass.
+
+## Preparing a bundle
+
+Run these commands from the repository root with Python 3.12:
+
+```sh
+python engines/media-ffmpeg/runtime/prepare_python_runtime.py /tmp/cevra-python
+python engines/media-ffmpeg/runtime/prepare_vendor.py /tmp/ffmpeg-skill
+python engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py /tmp/ffmpeg-source
+python engines/media-ffmpeg/runtime/build_ffmpeg.py \
+  /tmp/ffmpeg-source/ffmpeg-9.0.1 /tmp/cevra-ffmpeg
+python engines/media-ffmpeg/runtime/assemble_runtime.py /tmp/cevra-media-runtime \
+  --python-root /tmp/cevra-python \
+  --python-executable bin/python3.12 \
+  --ffmpeg-prefix /tmp/cevra-ffmpeg \
+  --vendor-source /tmp/ffmpeg-skill
+```
+
+On Windows, the pinned Python executable is `python.exe`. FFmpeg source
+preparation requires GnuPG. FFmpeg compilation also requires the platform
+toolchain described by `build_ffmpeg.py`; installing that toolchain is outside the
+assembly script.
+
+Preparation and assembly fail when a download hash, source signature, signing-key
+fingerprint, upstream commit, audited license, provenance record, notice, runtime
+component, or manifest field is missing or invalid. Release assembly accepts the
+pinned managed CPython provenance and an LGPL-only FFmpeg build with
+`--disable-autodetect`, `--disable-gpl`, and `--disable-nonfree`.
+
+## npm installation and monorepo checks
+
+The root `package-lock.json` is the installation source of truth. CI and release
+validation use:
+
+```sh
+npm ci
+npm run ci
+```
+
+`npm run ci` builds all current workspaces and runs the complete Node test set in
+one process so its pass count is unambiguous.
+
+## Current CI evidence
+
+The GitHub Actions workflow currently proves the following on Ubuntu 24.04 x64:
+
+- Node.js 22 installation through the committed npm lockfile;
+- all monorepo TypeScript builds and Node tests;
+- syntax validation for the Media Runtime Python sources;
+- parsing of the pin file and runtime manifest schema;
+- download, SHA-256 verification, version check, license check and provenance for
+  the pinned Linux x64 private CPython archive;
+- checkout, patching and verification of the exact `ffmpeg-skill` commit, version
+  and audited MIT license;
+- assembly of the release directory shape with the real private CPython and
+  prepared vendor tree;
+- manifest-schema validation, startup under the assembled private interpreter,
+  and fail-closed checks for incomplete manifests, modified notices and invalid
+  FFmpeg license classification.
+
+The CI assembly check uses deterministic FFmpeg/ffprobe fixtures with the same
+release metadata contract. It validates the build pipeline and integrity gates; it
+does not prove a native FFmpeg build, hardware encoders, or redistribution on that
+runner.
+
+## Platform status
+
+| Platform | Automated evidence | Release claim |
+| --- | --- | --- |
+| Ubuntu 24.04 x64 | Monorepo build/tests, pinned CPython and ffmpeg-skill preparation, release-layout assembly and negative integrity/license checks | Native FFmpeg bundle validation still requires a dedicated build runner |
+| macOS arm64 | Pinned CPython preparation and local pipeline validation can run on the current development host | Full bundle remains unproven until a signed-source FFmpeg build is produced and validated |
+| macOS x64 | Artifact URL and digest are pinned | Runner and native bundle validation pending |
+| Linux arm64 | Artifact URL and digest are pinned | Runner and native bundle validation pending |
+| Windows x64 | Artifact URL and digest are pinned | Runner, toolchain and native bundle validation pending |
+
+Pinned metadata alone is not a platform support claim. A platform becomes a
+supported release target only after its CI runner builds the native FFmpeg inputs,
+assembles the bundle, runs the integrity verifier, starts the worker, and completes
+the media smoke tests on the produced artifact.
