@@ -10,7 +10,7 @@ const fixture = path.join(here, "fixtures", "runtime_integrity_case.py");
 const worker = path.join(engine, "worker", "cevra_media_worker.py");
 const python = process.env.CEVRA_TEST_PYTHON || "python3";
 
-for (const scenario of ["ok", "hash", "symlink", "wrong-python", "python-version", "wrong-ffmpeg", "wrong-ffprobe", "vendor", "vendor-provenance", "ffmpeg-provenance", "incomplete", "environment"]) {
+for (const scenario of ["ok", "hash", "symlink", "wrong-python", "python-version", "wrong-ffmpeg", "wrong-ffprobe", "vendor", "vendor-provenance", "ffmpeg-provenance", "png-capability", "incomplete", "environment"]) {
   test(`release integrity: ${scenario}`, () => {
     const result = spawnSync(python, ["-I", "-B", fixture, engine, scenario], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr || result.stdout);

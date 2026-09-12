@@ -85,7 +85,7 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
         }), operation.outputUri);
       }
       case "extract-frame":
-        return fileResult(await call("look", { input: operation.inputUri, output: operation.outputUri, at: seconds(operation.atMs), tiles: 1, no_timecode: true }), operation.outputUri);
+        return fileResult(await call("cevra-extract-frame", { input: operation.inputUri, output: operation.outputUri, at: seconds(operation.atMs) }), operation.outputUri);
       case "detect-silence": {
         const payload = await call("silence", { input: operation.inputUri, threshold: operation.thresholdDb, min_silence: seconds(operation.minDurationMs), list: true });
         const silences = payload.silences;

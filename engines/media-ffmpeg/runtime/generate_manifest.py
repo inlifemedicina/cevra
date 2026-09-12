@@ -153,7 +153,7 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
     if metadata["license"] not in ("LGPL-2.1-or-later", "LGPL-3.0-or-later"):
         raise SystemExit(f"refusing runtime FFmpeg classified as {metadata['license']}")
     forbidden = ("--enable-gpl", "--enable-nonfree", "--enable-libx264", "--enable-libx265")
-    if "--disable-autodetect" not in metadata["configureFlags"] or any(flag.startswith(forbidden) for flag in metadata["configureFlags"]):
+    if "--disable-autodetect" not in metadata["configureFlags"] or "--enable-zlib" not in metadata["configureFlags"] or any(flag.startswith(forbidden) for flag in metadata["configureFlags"]):
         raise SystemExit("refusing FFmpeg configure provenance outside the CEVRA release policy")
 
     ffmpeg_sha = sha256(ffmpeg)

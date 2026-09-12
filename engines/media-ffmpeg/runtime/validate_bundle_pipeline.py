@@ -23,7 +23,7 @@ from runtime_integrity import RuntimeIntegrityError, sha256, verify_release_bund
 from schema_validator import SchemaValidationError, validate as validate_schema
 
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
-FLAGS = ["--disable-autodetect", "--disable-gpl", "--disable-nonfree"]
+FLAGS = ["--disable-autodetect", "--disable-gpl", "--disable-nonfree", "--enable-zlib"]
 
 
 def _write(path: Path, content: str, *, executable: bool = False) -> None:

@@ -87,6 +87,8 @@ def main() -> int:
             tools._run_transcode(common, FakeRuntime(), request["arguments"])
         elif request["operation"] == "mux":
             tools._run_mux_audio(common, request["arguments"])
+        elif request["operation"] == "extract-frame":
+            tools._run_extract_frame(common, request["arguments"])
         else:
             raise ValueError("unknown fixture operation")
         print(json.dumps({"command": common.command}))

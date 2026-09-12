@@ -320,7 +320,7 @@ def verify_release_bundle(
     if flags_hash != _digest(ffmpeg.get("configureFlagsSha256"), "ffmpeg.configureFlagsSha256"):
         raise RuntimeIntegrityError("FFmpeg configure flags hash mismatch")
     forbidden = ("--enable-gpl", "--enable-nonfree", "--enable-libx264", "--enable-libx265")
-    if "--disable-autodetect" not in flags or any(flag.startswith(forbidden) for flag in flags):
+    if "--disable-autodetect" not in flags or "--enable-zlib" not in flags or any(flag.startswith(forbidden) for flag in flags):
         raise RuntimeIntegrityError("FFmpeg configure provenance violates the release policy")
     ffmpeg_provenance_path = _safe_path(root, ffmpeg.get("provenance"), "ffmpeg.provenance")
     _check_hash(ffmpeg_provenance_path, ffmpeg.get("provenanceSha256"), "ffmpeg.provenanceSha256")

@@ -188,6 +188,18 @@ test("extract-audio forwards its resolved codec through the typed transcode tool
   });
 });
 
+test("extract-frame uses the typed CEVRA tool and preserves the requested output path", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  await engine.execute({ type: "extract-frame", inputUri: "in.mp4", outputUri: "frame.png", atMs: 1250 }, context);
+  assert.deepEqual(worker.calls[0], {
+    name: "cevra-extract-frame",
+    arguments_: { input: "in.mp4", output: "frame.png", at: 1.25 },
+    jobId: "job-1",
+    signal: undefined
+  });
+});
+
 test("mux-audio preserves or replaces existing audio according to replaceExisting", async () => {
   const worker = new FakeWorker();
   const engine = new FfmpegMediaEngine(worker);

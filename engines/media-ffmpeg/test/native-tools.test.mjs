@@ -94,3 +94,12 @@ test("Python mux keeps the existing audio stream only when replacement is disabl
   assert.equal(replaced.command.join(" ").includes("0:a:0"), false);
   assert.equal(replaced.command.join(" ").includes("-map 1:a:0"), true);
 });
+
+test("Python frame extraction writes exactly the requested output using the PNG encoder", () => {
+  const result = run("extract-frame", { input: "in.mp4", output: "frame.png", at: 1.25 }, {
+    "in.mp4": { video: { codec: "h264" }, audio: { codec: "aac" } }
+  });
+  assert.equal(result.error, undefined);
+  assert.deepEqual(result.command.slice(-7), ["-map", "0:v:0", "-frames:v", "1", "-c:v", "png", "frame.png"]);
+  assert.equal(result.command.includes("frame_1.250s.png"), false);
+});

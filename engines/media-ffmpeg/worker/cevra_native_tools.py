@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-CUSTOM_TOOLS = {"cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio"}
+CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio"}
 
 DELIVERY_MATRIX: Dict[str, Dict[str, Any]] = {
     "mp4": {"video": {"h264", "h265", "av1"}, "audio": {"aac"}, "default_video": "h264", "default_audio": "aac", "format": "mp4", "audio_only": False},
@@ -118,6 +118,21 @@ def _run_scale(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     cmd += common.video_args(meta) + common.cfr_args(meta)
     cmd += common.aac_args() if meta.get("audio") else ["-an"]
     common.run(cmd + [output])
+    return _file_result(common, output)
+
+
+def _run_extract_frame(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
+    input_path = _required_string(args, "input")
+    output = _required_string(args, "output")
+    at = _non_negative_number(args, "at")
+    meta = common.probe(input_path)
+    if not meta.get("video"):
+        raise ValueError("input has no video stream")
+    cmd = common.ffmpeg_base() + [
+        "-ss", f"{at:.6f}", "-i", input_path,
+        "-map", "0:v:0", "-frames:v", "1", "-c:v", "png", output,
+    ]
+    common.run(cmd)
     return _file_result(common, output)
 
 
@@ -406,6 +421,8 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
         if hasattr(common, "STATE") and hasattr(common.STATE, "reset"):
             common.STATE.reset()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            if name == "cevra-extract-frame":
+                return _run_extract_frame(common, args)
             if name == "cevra-scale":
                 return _run_scale(common, args)
             if name == "cevra-overlay-media":

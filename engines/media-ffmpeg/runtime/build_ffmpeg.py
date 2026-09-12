@@ -24,6 +24,7 @@ COMMON_FLAGS = [
     "--disable-doc",
     "--disable-ffplay",
     "--disable-network",
+    "--enable-zlib",
     "--enable-ffmpeg",
     "--enable-ffprobe",
 ]
@@ -65,6 +66,8 @@ def validate_flags(flags: list[str]) -> None:
         raise SystemExit(f"forbidden FFmpeg configure flags: {bad}")
     if "--disable-autodetect" not in flags:
         raise SystemExit("CEVRA FFmpeg builds must disable external autodetection")
+    if "--enable-zlib" not in flags:
+        raise SystemExit("CEVRA FFmpeg builds must enable zlib for typed PNG frame extraction")
 
 
 def build(source: Path, prefix: Path, jobs: int) -> None:
@@ -129,6 +132,8 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
         raise SystemExit("release FFmpeg contains forbidden GPL/nonfree configuration")
     if "--disable-autodetect" not in buildconf:
         raise SystemExit("release FFmpeg provenance is missing --disable-autodetect")
+    if "--enable-zlib" not in buildconf:
+        raise SystemExit("release FFmpeg provenance is missing --enable-zlib")
 
     probe_version_output = subprocess.run([str(probe), "-version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True).stdout
     probe_first = probe_version_output.splitlines()[0] if probe_version_output else ""

@@ -18,7 +18,7 @@ FFMPEG_SOURCE = "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz"
 FFMPEG_SIGNATURE = FFMPEG_SOURCE + ".asc"
 FFMPEG_FINGERPRINT = "FCF986EA15E6E293A5644F10B4322F04D67658D8"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
-FLAGS = ["--disable-autodetect", "--disable-gpl", "--disable-nonfree"]
+FLAGS = ["--disable-autodetect", "--disable-gpl", "--disable-nonfree", "--enable-zlib"]
 FLAGS_HASH = hashlib.sha256("\n".join(FLAGS).encode()).hexdigest()
 SOURCE_HASH = "a" * 64
 SIGNATURE_HASH = "b" * 64
@@ -128,6 +128,18 @@ def run(scenario: str) -> None:
             bad = json.loads(provenance_path.read_text())
             bad["source"] = "https://invalid.example/ffmpeg.tar.xz"
             write(provenance_path, json.dumps(bad))
+            manifest["ffmpeg"]["provenanceSha256"] = sha256(provenance_path)
+            write(root / "manifest.json", json.dumps(manifest))
+        elif scenario == "png-capability":
+            provenance_path = root / "provenance/ffmpeg.json"
+            provenance = json.loads(provenance_path.read_text())
+            flags = [flag for flag in FLAGS if flag != "--enable-zlib"]
+            flags_hash = hashlib.sha256("\n".join(flags).encode()).hexdigest()
+            provenance["configureFlags"] = flags
+            provenance["configureFlagsSha256"] = flags_hash
+            write(provenance_path, json.dumps(provenance))
+            manifest["ffmpeg"]["configureFlags"] = flags
+            manifest["ffmpeg"]["configureFlagsSha256"] = flags_hash
             manifest["ffmpeg"]["provenanceSha256"] = sha256(provenance_path)
             write(root / "manifest.json", json.dumps(manifest))
         elif scenario == "incomplete":

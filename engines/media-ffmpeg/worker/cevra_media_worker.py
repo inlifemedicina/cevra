@@ -492,6 +492,10 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
     positive_integer = {"type": "integer", "minimum": 1}
     non_negative_integer = {"type": "integer", "minimum": 0}
     schemas = {
+        "cevra-extract-frame": {
+            "properties": {"input": path, "output": path, "at": non_negative},
+            "required": ["input", "output", "at"],
+        },
         "cevra-scale": {
             "properties": {"input": path, "output": path, "width": positive_integer, "height": positive_integer},
             "required": ["input", "output", "width", "height"],
