@@ -14,14 +14,43 @@ No social network, publishing platform, analytics vendor or AI vendor may be rep
 - disconnect
 
 ## Existing categories
-- Agent hosts: Codex, Claude Code
+- Agent hosts: embedded Codex through an official supported mechanism when appropriate, external Codex with a CEVRA Skill, external Claude Code with a CEVRA Skill, and future local or remote agents
 - Stock media: local files first; optional external stock providers
 - Image generation: local provider slot
 - Video generation: local provider slot
 - Music/audio generation: optional provider slot
 - External editor interchange: OpenTimelineIO; reserved adapters for OpenCut/Premiere/Resolve
 
-## Content OS provider categories
+## Agent Gateway
+
+Agent integrations enter CEVRA Vids through a provider-neutral Agent Gateway:
+
+```text
+CEVRA Vids UI
+      ↓
+Agent Gateway
+  /      |       \
+Codex  Claude  Local / future
+      ↓
+typed CEVRA commands
+      ↓
+Project IR
+```
+
+Embedded Codex through Codex App Server or another official supported harness is distinct from external Codex using a CEVRA Skill. External Claude Code uses the same typed application surface through a CEVRA Skill. A future embedded Claude path requires an official, commercially appropriate mechanism. No claim is made that EDVID uses Codex App Server.
+
+Agents never bypass application commands, Project IR validation, journal/history or adapter capability checks.
+
+## CEVRA-owned skill installation
+
+After explicit user authorization, CEVRA Vids may install, update, reinstall or remove only its own skills in supported local-agent directories:
+
+- Claude Code: `~/.claude/skills/`
+- Codex: `$CODEX_HOME/skills/`, normally `~/.codex/skills/`
+
+Managed skills use a CEVRA owner manifest with version, hashes, minimum and maximum compatibility, provenance and rollback metadata. Management does not modify non-CEVRA skills, follow destructive symlinks, overwrite a Git checkout blindly or remove user configuration and secrets. User-scoped installation avoids administrator privileges where possible. Embedded agents may use internal skills without global installation.
+
+## Content Intelligence provider categories
 These categories are architectural reservations. No network-specific implementation is required by the current foundation.
 
 ### Content sources
@@ -51,7 +80,7 @@ Implementations may use:
 - future AI providers
 - deterministic/non-AI processors where appropriate.
 
-No AI vendor is mandatory for the Content OS architecture.
+No AI vendor is mandatory for the Content Intelligence architecture or for CEVRA Vids core editing.
 
 ### Analytics / performance
 Future category for importing performance observations such as reach, retention, engagement and other provider-supported metrics. Provider-native metrics are normalized before entering the Content domain. Analytics is not part of the current MVP implementation.
@@ -63,16 +92,28 @@ Future category for platform publication/scheduling actions. Publishing is optio
 Future adapter boundary for persistent content knowledge, embeddings/indexes or agent memory. The Content Intelligence domain owns semantic records and references; storage/vector/model technology remains replaceable.
 
 ## Content profiles
-Specialized content profiles such as health/medical, business or creator are not external providers and are not core-domain branches. They are versioned configuration/skill/policy packs consumed by application services and agents. Domain-specific medical/business rules must not be hard-coded into generic Content OS entities.
+Specialized content profiles such as health/medical, business or creator are not external providers and are not core-domain branches. They are versioned configuration/skill/policy packs consumed by application services and agents. Domain-specific medical/business rules must not be hard-coded into generic Content Intelligence entities.
 
 ## Content-to-editor handoff
-Content OS may create a brief/script/content item and request creation or association of an audiovisual project through application services. The relationship is represented by stable IDs/references outside Project IR core state. The Content OS must not bypass the editor command/history system to mutate an audiovisual project.
+Content Intelligence may create a brief, script or content item and request creation or association of an audiovisual project through application services. The relationship is represented by stable IDs/references outside Project IR core state. Content Intelligence must not bypass the CEVRA Vids command/history system to mutate an audiovisual project.
+
+## Generative asset planning
+
+Image, video and future audio or creative generators implement provider contracts. Planning prefers, when available:
+
+1. existing project assets;
+2. stock or local resources;
+3. native host generation covered by the user's entitlement;
+4. local models;
+5. optional external or BYOK providers.
+
+CEVRA Vids works without a paid generative provider. Every accepted generated result becomes a normal editable Project IR asset and timeline item with provenance.
 
 ## Credentials
 Keys/tokens are never stored in repository files, Project IR or Content Intelligence records. Use OS-backed secure storage. Providers should request the minimum scopes needed for their capability.
 
 ## Optional APIs
-Any API requiring additional cost must be explicitly optional and clearly identified in onboarding/settings. Core editing remains operational without paid AI API usage. Content OS should also offer provider-independent/manual workflows where practical.
+Any API requiring additional cost must be explicitly optional and clearly identified in onboarding or settings. Core editing remains operational without paid AI API usage. Content Intelligence should also offer provider-independent and manual workflows where practical.
 
 ## Reference implementations and source reuse
 External products may be studied for workflows and behavior. Code reuse is allowed only after exact license/provenance verification demonstrates compatibility with CEVRA's proprietary commercial distribution and all notice obligations are recorded. Auroq and other proprietary/UNLICENSED references remain clean-room functional references unless separately licensed.

@@ -22,7 +22,7 @@ A workflow preset:
 - records the exact preset ID/version and resolved parameters in journal/provenance so results are inspectable and reproducible where practical;
 - may include deterministic steps and optional AI-assisted decision steps, but AI providers remain replaceable behind provider contracts;
 - must degrade explicitly when an optional capability is unavailable rather than silently changing behavior;
-- is usable without Content OS; Content OS may later recommend, create or attach presets but does not own editor preset execution;
+- is usable without Content Intelligence or Marketplace; Content Intelligence may later recommend, create or attach presets but does not own CEVRA Vids preset execution;
 - remains platform-neutral at the semantic contract level, while individual steps may declare desktop/mobile capability requirements.
 
 ## Preset classes
@@ -55,7 +55,7 @@ The preset defines intent and typed configuration. Engines execute only their ap
 - enables the core one-click daily editing workflow;
 - preserves deterministic/reversible editor architecture;
 - avoids hard-coding recurring workflows into UI components or AI prompts;
-- allows user-created, built-in and future marketplace/team presets without changing Project IR;
+- allows user-created, built-in and future Marketplace/team presets without changing Project IR; Marketplace belongs to CEVRA Orbit and cannot withhold core presets needed for the improved EDVID baseline;
 - supports desktop/mobile capability negotiation without duplicating workflow semantics.
 
 ### Risks
@@ -73,4 +73,4 @@ The preset defines intent and typed configuration. Engines execute only their ap
 
 ## Non-goals for this phase
 
-This ADR does not implement the preset engine, preset UI, cloud preset synchronization, marketplace, automatic Content OS recommendation, or provider-specific publishing flows. It only establishes the architectural boundary so later implementation does not require structural refactoring.
+This ADR does not implement the preset engine, preset UI, cloud preset synchronization, Marketplace, automatic Content Intelligence recommendation, or provider-specific publishing flows. It only establishes the architectural boundary so later implementation does not require structural refactoring.

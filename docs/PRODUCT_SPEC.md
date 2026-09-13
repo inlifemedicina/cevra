@@ -1,105 +1,178 @@
 # CEVRA Product Specification v1
 
-## Product
-CEVRA is a proprietary agent-assisted content creation system with an intuitive video creation/editing application as its audiovisual core and an optional Content Intelligence / Content OS layer for research, ideation, planning and performance feedback.
+## Product family
 
-## Primary editor experience
-A user can import media, request an edit in natural language, review the deterministic result in a modern visual editor, make manual or conversational adjustments, undo/redo any operation and export a validated final file.
+CEVRA Orbit is the ecosystem for CEVRA products, Marketplace and future shared platform services. CEVRA Vids is Orbit's first and highest-priority product: an AI-first video editor and creator that can be purchased, installed and used independently.
 
-The editor remains fully usable without Content OS, external social integrations or a paid AI provider.
+Marketplace belongs to Orbit and may serve Vids and future CEVRA products. Content Intelligence is an optional provider-neutral domain that may also serve multiple products. Neither is required for Vids to deliver its primary workflow.
 
-A second primary path is one-click recurring production: a user imports media, selects a versioned Workflow / Production Preset and receives a completed edit using approved typed operations, with review remaining available rather than mandatory.
+## CEVRA Vids product promise
 
-## Content OS vision
-Content OS extends CEVRA from editing into the full content lifecycle:
+The primary experience is:
 
-external/internal sources
-→ signals, questions, topics, trends, objections and opportunities
-→ organized idea bank
-→ brief/pauta assistance
-→ script
-→ recording/import
-→ CEVRA editing
-→ versions/cuts
-→ captions/covers/metadata
-→ export and future publishing
-→ performance analysis
-→ feedback into content intelligence.
+```text
+open CEVRA Vids
+→ import or drag raw videos
+→ say what you want
+→ AI performs the work through typed CEVRA operations
+→ layered editable timeline updates
+→ preview
+→ approval by default, configurable
+→ refine if needed
+→ export
+```
 
-The Content OS is optional and must not become a prerequisite for audiovisual editing.
+CEVRA Vids is not a traditional manual editor with a chatbot attached. Manual mode supports refinement, correction, adjustment, fallback and advanced control. It does not make the user perform routine work that the requested automation can complete safely.
 
-## Core launch capabilities
-- Import common video/audio/image formats
-- Local transcription with word timing when required
-- Silence/retake/repetition-aware editing workflows
-- Multi-track timeline and preview
-- Captions with reusable styles and positioning rules
-- Headlines, overlays, split-screen and layout presets
-- Typed media operations
-- Style presets separated from content decisions
-- Versioned Workflow / Production Presets for reusable one-click editing flows
-- User-created presets using the same constrained schema as built-in presets
-- Autosave, crash recovery, history/journal and snapshots
-- Technical QA before export
-- PT-BR and EN-US parity
-- Signed in-app updates
-- Codex and Claude-compatible agent bridge
+Every AI edit is inspectable, editable, journaled and reversible. Project IR remains the audiovisual source of truth for AI-first and manual workflows.
 
-## Workflow / Production Presets
-Workflow Presets are application-level declarative orchestration, not Project IR state and not executable scripts.
+## Independence requirement
 
-They may combine typed steps such as transcription, cleanup, reframing, audio normalization, captions, overlays, composition choices, QA and export profiles. They may reference reusable style/caption/composition presets and expose validated user parameters.
+CEVRA Vids remains completely usable without:
 
-Preset execution must:
-- resolve only to approved typed application commands and provider/engine operations;
-- preserve Project IR as the audiovisual source of truth;
-- journal the preset ID/version and resolved parameters/provenance;
-- remain inspectable, cancelable and recoverable;
-- support PT-BR and EN-US metadata;
-- work without Content OS;
-- never expose arbitrary shell, raw FFmpeg/filtergraph execution or arbitrary executable code.
+- Marketplace;
+- Orbit services that are not implemented or configured;
+- Content Intelligence;
+- Claude;
+- external Codex;
+- paid OpenAI or Anthropic APIs;
+- external generative providers;
+- future Orbit products.
 
-The canonical boundary is documented in `docs/WORKFLOW_PRESETS.md` and ADR 0010.
+Local, deterministic and manual paths provide the supported core experience when optional agents or providers are unavailable. Future shared identity, licensing, entitlement, package, update, recommendation and sync services integrate through stable boundaries rather than turning Vids into a monolith.
 
-## Content OS architecture reserved from this phase
-- Content-source provider adapters for manual input, URLs, text/documents, transcripts, comments, feeds/APIs and future platform integrations
-- Provider-neutral intelligence for clustering, question/objection extraction, trend/opportunity detection, idea generation, briefs and scripts
-- Separate Content Intelligence domain/store linked to audiovisual projects by IDs/references
-- Idea bank and content lifecycle state independent from Project IR
-- Specialized content profiles such as health/medical, business and creator as optional configuration/skill packs, never hard-coded into the core
-- Persistent content memory/knowledge through a future storage/memory adapter
-- Future performance/analytics providers that feed observations back into the Content domain
-- Future publishing providers; automatic publication is not an MVP requirement
-- Future agent/skill workflows operating through typed application services
+## Functional baseline: EDVID
 
-## Extensibility reserved from v1
-- Image generation providers
-- Video generation providers
-- Stock-media providers
-- OpenTimelineIO interchange
-- OpenCut adapter
-- Premiere/Resolve adapters
-- Creator-workflow agents beyond editing
-- Content-source providers
-- Content analytics providers
-- Content publishing providers
-- Specialized content intelligence profiles
-- Preset sharing/synchronization and future team/marketplace distribution
+The public `fillrochaa/edvid` repository under the MIT license is the initial functional and editorial baseline for CEVRA Vids. The implementation policy is **port what works, adapt it to CEVRA architecture, test parity, then improve it**.
 
-## Out of scope for current Content OS foundation
-- Social-network scrapers
-- Instagram/YouTube/TikTok implementations
-- Full Content OS UI
-- Automatic publishing
-- Analytics ingestion implementation
-- Selection of a concrete Content OS database
-- Medical/business domain rules inside the CEVRA core
+The expected Vids baseline includes:
 
-## UX principles
-- Flat, modern, professional visual language
-- AI is a capability, not the visual identity
-- No required terminal use for normal end users
-- Manual control always remains available
-- AI edits must be inspectable and reversible
-- One-click preset workflows must not remove the ability to inspect or manually refine the resulting edit
-- Content OS must be discoverable but optional; users who only want the editor should not be forced through research/ideation workflows
+- ingest and media organization;
+- local transcription;
+- speech and content analysis;
+- automatic take selection;
+- silence and error removal;
+- word-boundary cuts and configurable cut padding;
+- J-cuts and audio fades;
+- voice leveling and mastering;
+- color correction and grading;
+- short-form and long-form workflows;
+- captions and headlines;
+- zooms and dynamic camera treatments;
+- face tracking;
+- B-roll and other inserts;
+- photos, videos and graphics;
+- automatic asset placement;
+- preview;
+- layered timeline;
+- approval and review flow;
+- manual refinement;
+- export;
+- deterministic technical and editorial QA.
+
+Essential baseline capability stays in the Vids core rather than being moved into Marketplace. A future implementation that intentionally differs from proven EDVID behavior records **DIVERGÊNCIA EDVID** and explains why its result is equivalent or better. CEVRA does not copy EDVID branding, trade dress or product names. Source reuse requires exact provenance, license verification and MIT attribution.
+
+## Layered timeline
+
+The conceptual starting layout is:
+
+```text
+V4 — motion graphics / overlays
+V3 — photos / images / B-roll
+V2 — captions / headline
+V1 — main video
+
+A3 — SFX
+A2 — music
+A1 — voice / original audio
+```
+
+User imports, automatically found assets, generated assets and provider results become normal editable assets and timeline items in Project IR. Files produced by engines do not become a second project model.
+
+## AI and Agent Gateway
+
+CEVRA Vids uses an Agent Gateway between the UI and agent hosts. The gateway exposes typed CEVRA application commands, which preserve Project IR validation, journal/history and recovery.
+
+Initial integration paths are embedded Codex through an official supported mechanism when appropriate, external Codex with a CEVRA Skill and external Claude Code with a CEVRA Skill. The product remains prepared for a future official Claude embedded path and local or other agents. Embedded Codex and an external Codex skill are separate product modes. No claim is made that EDVID uses Codex App Server.
+
+The core editor does not require an agent. Manual editing and review functions supported by the UI remain available without one.
+
+## CEVRA-owned skill management
+
+After explicit user authorization, CEVRA Vids may detect supported local agents and install, update, reinstall or remove only CEVRA-owned skills. Claude Code uses `~/.claude/skills/`; Codex uses `$CODEX_HOME/skills/`, normally `~/.codex/skills/`.
+
+Managed skills carry owner, version, hash, minimum and maximum compatibility, provenance and rollback data. CEVRA does not modify third-party skills, follow destructive symlinks, overwrite Git checkouts blindly or remove user settings and secrets. User-scoped installation should avoid administrator privileges. Embedded agents may use an internal control surface without a global skill installation.
+
+## Workflow and Production Presets
+
+Workflow Presets are versioned application-level orchestration, not Project IR state or executable scripts. They may combine transcription, cleanup, reframing, audio normalization, captions, overlays, composition choices, QA and export profiles through approved typed steps.
+
+Preset execution preserves Project IR, journal/history, cancellation, recovery, capability planning and PT-BR/EN-US metadata. Built-in and user-created presets share one constrained schema and privilege boundary. Presets work without Content Intelligence and Marketplace.
+
+## Composition quality gate
+
+Composition implementations remain behind `CompositionEngineAdapter`. HyperFrames is a preferred candidate only if it reaches or exceeds the proven EDVID-equivalent Remotion baseline for captions, headlines, split-screen, cards, images, B-roll, camera movement, zooms, face tracking, motion graphics, SFX, transitions, exact timing, data-driven templates and horizontal and vertical rendering.
+
+If it does not, Remotion or another demonstrably better engine remains behind the adapter. Remotion is not prohibited, and engine or license preference does not override quality, automation or editorial capability.
+
+## Generative assets
+
+Image, video and future audio or creative generation use provider contracts. Asset planning prefers existing project assets, then stock or local resources, host-native generation covered by the user's entitlement, local models, and finally optional external or BYOK providers.
+
+CEVRA Vids works without a paid generative provider. Generated results enter Project IR and the timeline as ordinary editable assets with provenance.
+
+## Creative Intelligence
+
+CEVRA Creative Intelligence uses progressive disclosure:
+
+```text
+CEVRA Creative Intelligence
+├── Core Editorial Director
+├── Editing Director
+├── Generative Director
+├── Creative Playbooks
+└── Providers
+```
+
+A router selects only the skills and playbooks relevant to the task. Potential categories include Cinematic, Product, Fashion, Property, Food, Social Hook, Motion Graphics, Music, Anime, Cartoon and 3D/CGI.
+
+External skills require source, version, license and commercial-compatibility review. MIT, Apache and BSD are preferred. Paid or proprietary skills, including BUDOSKILL, are not copied or redistributed without an explicit license. Public descriptions may inform independent implementation.
+
+## Content Intelligence
+
+Content Intelligence preserves technically useful research, source, signal, question, trend, idea, brief, script, future analytics, future publishing and future content-memory concepts. It remains optional, provider-neutral, separate from Project IR and available to Vids or other Orbit products through stable application boundaries.
+
+Disabling or omitting Content Intelligence never blocks Vids import, edit, preview, review or export.
+
+## Marketplace
+
+The Vids core is complete and excellent; Marketplace adds specialization and expansion. Marketplace does not sell back baseline features required for the improved EDVID parity target.
+
+Future categories may include advanced Editorial Skills, vertical packs, Workflow Presets, Style Packs, Caption Packs, Composition Packs, Brand Packs, automations, providers and future Orbit applications. Premium examples include Medical Creator Pro, Luxury Property Film, Automotive Commercial, Fashion Editorial, Product Launch Pro, Documentary Director, UGC Conversion and advanced Anime, CGI or Comic packs.
+
+The future `cevra-package` concept supports a manifest plus skill, workflow, composition, style, asset, provider and license areas. Its conceptual manifest includes identity, publisher, semantic version, CEVRA compatibility range, capabilities, permissions, platforms, dependencies, license, signature and entitlement metadata. Built-in, first-party premium and future third-party packages share this technical base while distribution and entitlement differ.
+
+No store, billing or package runtime is implemented in this documentation step.
+
+## Internationalization and versioning
+
+PT-BR is the initial default language. EN-US is selectable by the customer and maintains feature parity. UI, messages, errors, presets, workflows and metadata use translation resources rather than scattered hard-coded strings.
+
+Schemas, packages, skills, presets, engines and product releases use semantic `x.x.x` versions where applicable. Version numbers appear discreetly in About, Settings, diagnostics, logs and support. They are not primary visual branding.
+
+## Roadmap and release focus
+
+- **Track A — CEVRA Vids:** Foundation / Media Runtime → architecture canon → EDVID parity → editorial intelligence → agent integration → UI/timeline → composition benchmark → generative assets core → CEVRA Vids 1.0.
+- **Track B — Orbit Platform:** package format → identity/licensing → entitlements → Marketplace → recommendations → future shared services.
+- **Track C — Creative Ecosystem:** built-in skills → premium first-party packs → Marketplace → third-party SDK and publisher system.
+- **Track D — Expansion:** mobile → additional CEVRA apps → sync, publishing and analytics → broader Orbit.
+
+Orbit, Marketplace, mobile, broad provider coverage and a large playbook catalog must not delay Vids once this primary flow is solid:
+
+```text
+import → ask AI → automatic edit → layered editable timeline → preview / review → export
+```
+
+## Current scope discipline
+
+This canon reserves architecture and product direction only. It does not implement Orbit services, Marketplace, package runtime, UI, agents, composition engines, generative providers or Content Intelligence.

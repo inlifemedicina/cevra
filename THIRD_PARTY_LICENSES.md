@@ -23,8 +23,9 @@ Every incorporated dependency, model, copied permissive source component or redi
 
 | Project | Intended role | License status | Incorporated? |
 |---|---|---|---|
-| EDVID | Editorial UX/logic reference and selective source reuse | MIT | No |
-| HyperFrames | Composition engine | Apache-2.0 | No |
+| EDVID (`fillrochaa/edvid`) | Initial functional/editorial parity baseline and potential selective source reuse after exact commit audit | MIT | No |
+| HyperFrames | Preferred composition-engine benchmark candidate behind `CompositionEngineAdapter` | Apache-2.0 | No |
+| Remotion | Proven EDVID-equivalent composition baseline and benchmark candidate behind `CompositionEngineAdapter` | License/version review required before incorporation | No |
 | mcpCut | History/journal reference/selective reuse | MIT | No |
 | MaxAzure video-editing-skill | Editorial workflow/QA library | MIT | No |
 | OpenTimelineIO | Interchange adapter | Apache-2.0 | No |

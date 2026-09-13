@@ -66,17 +66,23 @@ Full orchestration of reusable editing/analysis/export steps. They may reference
 
 The architecture must permit users to save a successful workflow as their own preset later. User presets use the same versioned schema as built-in presets and cannot gain broader execution privileges.
 
-## Content OS relationship
+## Content Intelligence relationship
 
-Workflow Presets belong to the editor/application domain and work independently from Content OS.
+Workflow Presets belong to the CEVRA Vids application domain and work independently from Content Intelligence, Marketplace and unimplemented Orbit services.
 
-Content OS may later:
+Content Intelligence may later:
 - recommend a preset based on content intent;
 - create a draft preset configuration;
 - associate a preset with a content profile or campaign;
 - learn from performance outcomes.
 
 It must not become required for preset execution.
+
+## Orbit and Marketplace relationship
+
+Core built-in presets required for the improved EDVID baseline ship with CEVRA Vids. Future Marketplace distribution belongs to CEVRA Orbit and may add specialized vertical, style, caption, composition, brand and automation packs without selling back essential Vids functionality.
+
+Built-in, first-party premium and future third-party definitions may share the conceptual `cevra-package` format. Entitlement and distribution differ; preset schema validation, typed execution, capability checks and the Project IR boundary remain the same.
 
 ## Desktop/mobile
 
@@ -96,4 +102,4 @@ A future preset engine should provide:
 - preset import/export and duplication;
 - built-in and user-created preset libraries.
 
-This foundation does not implement the runtime or UI yet.
+This foundation does not implement the preset runtime, UI, package system or Marketplace.

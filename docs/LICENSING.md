@@ -20,7 +20,11 @@ CEVRA-owned code is proprietary and all rights are reserved unless explicitly st
 ## Source reuse
 Permissively licensed code may be reused only after recording exact upstream source, commit/version, license, modifications and required notices.
 
-This rule also applies to Content OS references such as comment-search, research, social-listening, ideation or creator-workflow products. Product similarity or public source availability alone does not authorize copying. If an exact compatible license/provenance cannot be verified, CEVRA may study observable behavior and independently reimplement the required functionality.
+This rule also applies to Content Intelligence references such as comment-search, research, social-listening, ideation or creator-workflow products. Product similarity or public source availability alone does not authorize copying. If an exact compatible license/provenance cannot be verified, CEVRA may study observable behavior and independently reimplement the required functionality.
+
+The public `fillrochaa/edvid` project under the MIT license is the initial CEVRA Vids functional baseline. Source reuse requires an exact commit, license verification, recorded modifications and required MIT attribution. CEVRA does not copy EDVID branding, trade dress or product names.
+
+External creative skills require the same source, version, license and commercial-compatibility review. Paid or proprietary skills, including BUDOSKILL, must not be copied or redistributed without an explicit license. Public capability descriptions may guide independent implementation but do not license proprietary source.
 
 ## Managed Python runtime
 CEVRA may redistribute a private CPython runtime for desktop use. Each release must record the exact interpreter build, source, architecture and bundled native libraries. Required Python and third-party license texts/notices must ship with the commercial release. The release pipeline must avoid runtime builds that introduce unacceptable copyleft obligations unless explicitly reviewed and approved.
