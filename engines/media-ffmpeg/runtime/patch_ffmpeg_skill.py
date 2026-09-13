@@ -36,7 +36,7 @@ def require_tool(name: str) -> str:
 def x264_args(crf: int = 18, preset: str = "medium", keep_bt709: bool = True) -> List[str]:
     encoder = os.environ.get("CEVRA_VIDEO_ENCODER_H264", "").strip()
     if encoder:
-        return _cevra_sdr_encoder_args(encoder, crf, preset, keep_bt709)
+        return _cevra_sdr_encoder_args(encoder, crf, preset, None, keep_bt709)
     if _cevra_allow_gpl_dev_encoder():
         return _upstream_x264_args(crf, preset, keep_bt709)
     die("no approved CEVRA H.264 encoder is configured; GPL libx264 fallback is disabled", kind="missing_tool")
@@ -55,7 +55,7 @@ def video_args(meta: Optional[Dict[str, Any]], crf: int = 18, preset: str = "med
         return []
     encoder = os.environ.get("CEVRA_VIDEO_ENCODER_H264", "").strip()
     if encoder:
-        return _cevra_sdr_encoder_args(encoder, crf, preset, True, meta)
+        return _cevra_sdr_encoder_args(encoder, crf, preset, meta)
     if _cevra_allow_gpl_dev_encoder():
         return _upstream_video_args(meta, crf, preset)
     die("no approved CEVRA H.264 encoder is configured; GPL libx264 fallback is disabled", kind="missing_tool")
@@ -78,6 +78,17 @@ def patch(source: Path, runtime_module: Path) -> None:
         raise SystemExit("ffmpeg-skill source is already patched")
     if text.count("def x264_args(") != 1 or text.count("def video_args(") != 1 or text.count("def run(") != 1 or text.count("def require_tool(") != 1:
         raise SystemExit("pinned ffmpeg-skill execution functions changed; review upstream before updating CEVRA patch")
+    ffmpeg_base_anchor = 'cmd = [require_tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-nostdin"]'
+    if text.count(ffmpeg_base_anchor) != 1:
+        raise SystemExit("pinned ffmpeg-skill ffmpeg_base() lost the required -nostdin invariant")
+    timeout_anchor = "DEFAULT_TIMEOUT = 1800.0"
+    if text.count(timeout_anchor) != 1:
+        raise SystemExit("pinned ffmpeg-skill timeout policy changed; review CEVRA render-timeout patch")
+    text = text.replace(timeout_anchor, 'DEFAULT_TIMEOUT = max(0.0, float(os.environ.get("CEVRA_MEDIA_RENDER_TIMEOUT_SECONDS", "0")))', 1)
+    env_timeout = 'return max(0.0, float(os.environ.get("FFMPEG_SKILL_TIMEOUT", DEFAULT_TIMEOUT)))'
+    if text.count(env_timeout) != 1:
+        raise SystemExit("pinned ffmpeg-skill environment timeout hook changed")
+    text = text.replace(env_timeout, "return DEFAULT_TIMEOUT", 1)
 
     text = text.replace("def x264_args(", "def _upstream_x264_args(", 1)
     text = text.replace("def video_args(", "def _upstream_video_args(", 1)

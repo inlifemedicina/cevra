@@ -15,10 +15,20 @@ const sourceMutation = { type: "source.add", source: { id: "source-out", kind: "
 
 class MemoryArtifacts {
   files = new Set();
+  symlinks = new Set();
   removed = [];
 
+  async kind(uri) { return this.symlinks.has(uri) ? "symlink" : this.files.has(uri) ? "file" : "missing"; }
   async exists(uri) { return this.files.has(uri); }
-  async remove(uri) { this.files.delete(uri); this.removed.push(uri); }
+  async remove(uri) { this.files.delete(uri); this.symlinks.delete(uri); this.removed.push(uri); }
+}
+
+function completedFile(outputUri, durationMs = 1000) {
+  return {
+    type: "file", outputUri, durationMs,
+    probe: { uri: outputUri, durationMs, width: 1920, height: 1080, frameRate: 30, hasVideo: true, hasAudio: true, videoCodec: "h264", audioCodec: "aac" },
+    effectiveProfile: { container: "mp4", videoCodec: "h264", audioCodec: "aac", videoEncoder: "h264_videotoolbox", audioEncoder: "aac" }
+  };
 }
 
 class FakeEngine {
@@ -57,7 +67,7 @@ test("successful file operation commits one typed command and recoverable Projec
   const artifacts = new MemoryArtifacts();
   const engine = new FakeEngine(async () => {
     artifacts.files.add(trim.outputUri);
-    return { type: "file", outputUri: trim.outputUri, durationMs: 1000 };
+    return completedFile(trim.outputUri);
   });
   const { service, history, repository } = fixture(engine, artifacts);
 
@@ -84,7 +94,7 @@ test("successful export is added through the Project IR command API", async () =
   const artifacts = new MemoryArtifacts();
   const engine = new FakeEngine(async () => {
     artifacts.files.add(trim.outputUri);
-    return { type: "file", outputUri: trim.outputUri };
+    return completedFile(trim.outputUri);
   });
   const { service, history } = fixture(engine, artifacts);
 
@@ -160,7 +170,7 @@ test("retry reuses the application record with a new worker job and commits only
     calls += 1;
     artifacts.files.add(trim.outputUri);
     if (calls === 1) throw new Error("transient failure");
-    return { type: "file", outputUri: trim.outputUri };
+    return completedFile(trim.outputUri);
   });
   const { service, history, repository } = fixture(engine, artifacts);
   await assert.rejects(service.execute({ id: "retry-execution", operation: trim, mutation: sourceMutation }));
@@ -205,7 +215,7 @@ test("crash recovery removes an uncommitted partial artifact and retries from pe
   });
   const engine = new FakeEngine(async () => {
     artifacts.files.add(trim.outputUri);
-    return { type: "file", outputUri: trim.outputUri };
+    return completedFile(trim.outputUri);
   });
   const { service, history } = fixture(engine, artifacts, repository);
 
@@ -296,7 +306,7 @@ test("concurrent Project IR change rejects the stale result and preserves the ne
   const engine = new FakeEngine(async () => {
     artifacts.files.add(trim.outputUri);
     history.commit({ type: "project.rename", name: "Changed concurrently" }, { type: "user" });
-    return { type: "file", outputUri: trim.outputUri };
+    return completedFile(trim.outputUri);
   });
   const context = fixture(engine, artifacts);
   history = context.history;
@@ -324,4 +334,86 @@ test("read-only probe is recorded without creating a Project IR mutation", async
   assert.equal(history.current.history.revision, 0);
   assert.equal(history.entries.length, 0);
   assert.equal(history.snapshots.length, 1);
+});
+
+test("read-only probe succeeds across a concurrent Project IR revision", async () => {
+  const operation = { type: "probe", inputUri: "/media/in.mp4" };
+  let history;
+  const engine = new FakeEngine(async () => {
+    history.commit({ type: "project.rename", name: "Concurrent edit" }, { type: "user" });
+    return { type: "probe", probe: { uri: operation.inputUri, hasVideo: true, hasAudio: false, videoCodec: "h264" } };
+  });
+  const context = fixture(engine);
+  history = context.history;
+  const outcome = await context.service.execute({ id: "concurrent-probe", operation, mutation: { type: "none" } });
+  assert.equal(outcome.record.status, "succeeded");
+  assert.equal(history.current.project.name, "Concurrent edit");
+  assert.equal(history.current.history.revision, 1);
+});
+
+test("application service rejects pre-existing symlink outputs and preserves the link target", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.symlinks.add(trim.outputUri);
+  const engine = new FakeEngine(async () => assert.fail("engine must not execute for a symlink output"));
+  const { service } = fixture(engine, artifacts);
+  await assert.rejects(
+    service.execute({ id: "symlink-output", operation: trim, mutation: sourceMutation }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_INVALID_REQUEST"
+  );
+  assert.equal(artifacts.symlinks.has(trim.outputUri), true);
+  assert.deepEqual(artifacts.removed, []);
+});
+
+test("file result without A/V streams fails before Project IR commit", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(trim.outputUri);
+    return { type: "file", outputUri: trim.outputUri, probe: { uri: trim.outputUri, hasVideo: false, hasAudio: false }, effectiveProfile: { container: "mp4" } };
+  });
+  const { service, history } = fixture(engine, artifacts);
+  await assert.rejects(service.execute({ id: "empty-output", operation: trim, mutation: sourceMutation }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OUTPUT_MISSING");
+  assert.equal(history.current.history.revision, 0);
+  assert.equal(artifacts.files.has(trim.outputUri), false);
+});
+
+test("postcondition rejects produced codec/profile mismatch before Project IR commit", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(trim.outputUri);
+    const result = completedFile(trim.outputUri);
+    result.probe.videoCodec = "h265";
+    result.effectiveProfile.videoCodec = "h265";
+    return result;
+  });
+  const { service, history } = fixture(engine, artifacts);
+  await assert.rejects(service.execute({ id: "codec-mismatch", operation: trim, mutation: sourceMutation }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED");
+  assert.equal(history.current.history.revision, 0);
+  assert.equal(artifacts.files.has(trim.outputUri), false);
+});
+
+test("recovery preserves outputs referenced by a reachable redo snapshot", async () => {
+  const artifacts = new MemoryArtifacts();
+  const repository = new InMemoryMediaExecutionRepository();
+  const engine = new FakeEngine(async () => assert.fail("protected redo artifact must not be regenerated"));
+  const context = fixture(engine, artifacts, repository);
+  context.history.commit({
+    type: "source.add",
+    source: { id: "redo-source", kind: "video", uri: trim.outputUri, displayName: "Redo output" }
+  }, { type: "user" });
+  context.history.undo();
+  artifacts.files.add(trim.outputUri);
+  await repository.save({
+    id: "redo-recovery", projectId: "project-1", locale: "pt-BR", operation: trim, mutation: sourceMutation,
+    actor: { type: "system" }, status: "running", createdAt: now,
+    attempts: [{ number: 1, jobId: "redo-recovery:1", status: "running", requestedAt: now, startedAt: now,
+      outputUris: [trim.outputUri], preexistingOutputUris: [], removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0 }]
+  });
+  const recovered = await context.service.recoverPending();
+  assert.equal(artifacts.files.has(trim.outputUri), true);
+  assert.deepEqual(artifacts.removed, []);
+  assert.equal(context.history.canRedo, true);
+  assert.equal(context.history.redo().sources[0].uri, trim.outputUri);
+  assert.equal(recovered[0].status, "failed");
 });

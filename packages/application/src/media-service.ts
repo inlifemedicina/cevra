@@ -1,4 +1,12 @@
 import {
+  MEDIA_DELIVERY_MATRIX,
+  normalizeAudioCodec,
+  normalizeVideoCodec,
+  resolveAudioDelivery,
+  resolveAudioMutationDelivery,
+  resolveMediaContainer,
+  resolveStandardAvDelivery,
+  resolveTranscodeDelivery,
   validateMediaOperation,
   type MediaEngineAdapter,
   type MediaOperation,
@@ -19,6 +27,7 @@ import {
 } from "./types.js";
 
 export interface MediaArtifactStore {
+  kind(uri: string): Promise<"missing" | "file" | "symlink" | "other">;
   exists(uri: string): Promise<boolean>;
   remove(uri: string): Promise<void>;
 }
@@ -176,7 +185,10 @@ export class MediaApplicationService {
     try {
       prevalidateMutation(current, record, outputUris[0]);
       for (const uri of outputUris) {
-        if (await this.artifacts.exists(uri)) attempt.preexistingOutputUris.push(uri);
+        const kind = await this.artifacts.kind(uri);
+        if (kind !== "missing") attempt.preexistingOutputUris.push(uri);
+        if (kind === "symlink") throw new AttemptFailure("MEDIA_INVALID_REQUEST", "Output path must not be a symlink.", uri);
+        if (kind === "other") throw new AttemptFailure("MEDIA_INVALID_REQUEST", "Output path must be absent or a regular file.", uri);
       }
       if (attempt.preexistingOutputUris.length) {
         throw new AttemptFailure("MEDIA_OUTPUT_EXISTS", "Output already exists.", attempt.preexistingOutputUris[0]);
@@ -192,8 +204,9 @@ export class MediaApplicationService {
 
       const result = await this.engine.execute(record.operation, { jobId: attempt.jobId, locale: record.locale, ...(signal ? { signal } : {}) });
       await this.validateResult(record.operation, result, outputUris);
+      if (result.type === "file") attempt.effectiveProfile = clone(result.effectiveProfile);
       const latest = this.history.current;
-      if (latest.history.revision !== attempt.projectRevisionBefore || latest.history.headSnapshotId !== attempt.projectSnapshotBefore) {
+      if (record.mutation.type !== "none" && (latest.history.revision !== attempt.projectRevisionBefore || latest.history.headSnapshotId !== attempt.projectSnapshotBefore)) {
         throw new AttemptFailure("MEDIA_PROJECT_CONFLICT", "Project changed while media execution was active.");
       }
 
@@ -260,19 +273,21 @@ export class MediaApplicationService {
     if (!await this.artifacts.exists(result.outputUri)) {
       throw new AttemptFailure("MEDIA_OUTPUT_MISSING", "Media engine output is absent from the artifact store.");
     }
+    validateDeliveryPostcondition(operation, result);
   }
 
   private async cleanup(outputUris: readonly string[], preexisting: readonly string[]): Promise<{ removed: string[]; failed: string[] }> {
     const protectedUris = new Set(preexisting);
-    const project = this.history.current;
-    for (const source of project.sources) protectedUris.add(source.uri);
-    for (const record of project.exports) if (record.outputUri) protectedUris.add(record.outputUri);
+    for (const snapshot of this.history.snapshots) {
+      for (const source of snapshot.project.sources) protectedUris.add(source.uri);
+      for (const record of snapshot.project.exports) if (record.outputUri) protectedUris.add(record.outputUri);
+    }
     const removed: string[] = [];
     const failed: string[] = [];
     for (const uri of outputUris) {
       if (protectedUris.has(uri)) continue;
       try {
-        if (!await this.artifacts.exists(uri)) continue;
+        if (await this.artifacts.kind(uri) === "missing") continue;
         await this.artifacts.remove(uri);
         if (await this.artifacts.exists(uri)) failed.push(uri);
         else removed.push(uri);
@@ -303,7 +318,7 @@ function prevalidateMutation(project: ProjectIR, record: MediaExecutionRecord, o
 
 function mutationCommand(
   record: MediaExecutionRecord,
-  result: MediaOperationResult,
+  result: MediaOperationResult | { type: "file"; outputUri: string },
   attempt: MediaExecutionAttempt | undefined,
   clock: () => string
 ): EditCommand | undefined {
@@ -331,7 +346,7 @@ function mutationCommand(
       kind: record.mutation.source.kind,
       uri: result.outputUri,
       displayName: record.mutation.source.displayName,
-      ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
+      ...("durationMs" in result && result.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
       ...(record.mutation.source.checksum ? { checksum: record.mutation.source.checksum } : {}),
       extensions: {
         ...(record.mutation.source.extensions ?? {}),
@@ -342,7 +357,8 @@ function mutationCommand(
             engineId: provenance.engineId,
             engineVersion: provenance.engineVersion,
             engineApiVersion: provenance.engineApiVersion
-          } : {})
+          } : {}),
+          ...(attempt?.effectiveProfile ? { effectiveProfile: attempt.effectiveProfile } : {})
         }
       }
     }
@@ -413,6 +429,39 @@ function isAbort(error: unknown, signal?: AbortSignal): boolean {
 
 function technicalMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function validateDeliveryPostcondition(operation: MediaOperation, result: Extract<MediaOperationResult, { type: "file" }>): void {
+  if (!result.probe.hasVideo && !result.probe.hasAudio) throw new AttemptFailure("MEDIA_OUTPUT_MISSING", "Output contains no audio or video stream.");
+  if (operation.type === "extract-frame") {
+    if (!result.probe.hasVideo || result.probe.videoCodec?.toLowerCase() !== "png" || result.probe.hasAudio) {
+      throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Extracted frame does not satisfy the PNG output contract.");
+    }
+    return;
+  }
+  const delivery = resolvedDelivery(operation);
+  if (!delivery) return;
+  const actualVideo = normalizeVideoCodec(result.probe.videoCodec);
+  const actualAudio = normalizeAudioCodec(result.probe.audioCodec);
+  if (delivery.audioOnly && result.probe.hasVideo) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Audio-only output contains a video stream.");
+  if (!delivery.audioOnly && !result.probe.hasVideo) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Output is missing its required video stream.");
+  if (delivery.audioOnly && !result.probe.hasAudio) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Audio-only output is missing its audio stream.");
+  if (delivery.videoCodec && delivery.videoCodec !== "copy" && actualVideo !== delivery.videoCodec) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Output video codec does not match resolved delivery.");
+  if (result.probe.hasAudio && delivery.audioCodec !== "copy" && actualAudio !== delivery.audioCodec) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Output audio codec does not match resolved delivery.");
+  if (result.effectiveProfile.container !== delivery.container || result.effectiveProfile.videoCodec !== actualVideo || result.effectiveProfile.audioCodec !== actualAudio) {
+    throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Effective encoder profile does not match verified output streams.");
+  }
+}
+
+function resolvedDelivery(operation: MediaOperation) {
+  switch (operation.type) {
+    case "probe": case "detect-silence": case "extract-frame": return undefined;
+    case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
+    case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
+    case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);
+    case "mux-audio": { const container = resolveMediaContainer(operation.outputUri); const rule = MEDIA_DELIVERY_MATRIX[container]; return { container, audioOnly: false, videoCodec: "copy" as const, audioCodec: rule.defaultAudioCodec }; }
+    default: return resolveStandardAvDelivery(operation.outputUri, operation.type === "trim" || operation.type === "concat");
+  }
 }
 
 function defaultId(): string {

@@ -12,16 +12,8 @@ APPROVED: Dict[str, Dict[str, List[str]]] = {
         "h265": ["hevc_videotoolbox"],
         "av1": ["av1_videotoolbox"],
     },
-    "win32": {
-        "h264": ["h264_nvenc", "h264_qsv", "h264_amf", "h264_mf"],
-        "h265": ["hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_mf"],
-        "av1": ["av1_nvenc", "av1_qsv", "av1_amf", "av1_mf"],
-    },
-    "linux": {
-        "h264": ["h264_nvenc", "h264_qsv", "h264_amf"],
-        "h265": ["hevc_nvenc", "hevc_qsv", "hevc_amf"],
-        "av1": ["av1_nvenc", "av1_qsv"],
-    },
+    "win32": {"h264": [], "h265": [], "av1": []},
+    "linux": {"h264": [], "h265": [], "av1": []},
     "unknown": {"h264": [], "h265": [], "av1": []},
 }
 
@@ -31,7 +23,7 @@ _ENV = {
     "av1": "CEVRA_VIDEO_ENCODER_AV1",
 }
 
-_SMOKE_CACHE: Dict[str, bool] = {}
+_SMOKE_CACHE: Dict[tuple[Any, ...], bool] = {}
 
 
 def candidates(platform_name: str, codec: str, available: Iterable[str]) -> List[str]:
@@ -41,8 +33,13 @@ def candidates(platform_name: str, codec: str, available: Iterable[str]) -> List
 
 
 def _smoke(ffmpeg: str, encoder: str) -> bool:
-    if encoder in _SMOKE_CACHE:
-        return _SMOKE_CACHE[encoder]
+    try:
+        metadata = os.stat(ffmpeg)
+        key: tuple[Any, ...] = (os.path.realpath(ffmpeg), metadata.st_size, metadata.st_mtime_ns, encoder)
+    except OSError:
+        return False
+    if key in _SMOKE_CACHE:
+        return _SMOKE_CACHE[key]
     cmd = [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
         "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30",
@@ -51,7 +48,7 @@ def _smoke(ffmpeg: str, encoder: str) -> bool:
     try:
         active = job_control.active_job_id()
         if active is None:
-            proc = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=8.0)
+            proc = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=8.0)
         else:
             proc = job_control.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=8.0)
             if job_control.is_cancelled(active):
@@ -59,8 +56,12 @@ def _smoke(ffmpeg: str, encoder: str) -> bool:
         ok = proc.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         ok = False
-    _SMOKE_CACHE[encoder] = ok
+    _SMOKE_CACHE[key] = ok
     return ok
+
+
+def invalidate_cache() -> None:
+    _SMOKE_CACHE.clear()
 
 
 def ensure_functional_profile(ffmpeg: Optional[str], runtime: Dict[str, Any]) -> Dict[str, str]:

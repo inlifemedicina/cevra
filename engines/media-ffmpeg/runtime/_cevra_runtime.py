@@ -68,18 +68,20 @@ def sdr_encoder_args(
     encoder: str,
     crf: int = 18,
     preset: str = "medium",
-    keep_bt709: bool = True,
     meta: Optional[Dict[str, Any]] = None,
+    tag_bt709: bool = True,
 ) -> List[str]:
-    del keep_bt709  # Colour tags are handled only after the CEVRA colour pipeline validates them.
     bitrate = _target_bitrate(meta, crf, "h264")
-    return [
+    result = [
         "-c:v", encoder,
         *_preset_args(encoder, preset),
         "-b:v", str(bitrate),
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
     ]
+    if tag_bt709:
+        result += ["-bsf:v", "h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1"]
+    return result
 
 
 def hevc_encoder_args(

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -78,6 +79,20 @@ def build(output_dir: Path, python_executable: Path, vendor_source: Path | None 
     license_dir = output_dir / "licenses" / "python"
     license_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(python_license, license_dir / "LICENSE.txt")
+    component_license_dir = license_dir / "components"
+    component_license_dir.mkdir(parents=True, exist_ok=True)
+    repository_root = ENGINE.parents[1]
+    component_notices = VERSIONS["python"].get("componentNotices", []) if sys.platform == "darwin" else []
+    for notice in component_notices:
+        source = repository_root / notice["source"]
+        if not source.is_file():
+            raise SystemExit(f"required Python component notice missing: {source}")
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        if digest != notice["sha256"]:
+            raise SystemExit(f"Python component notice digest mismatch: {notice['id']}")
+        destination = output_dir / notice["path"]
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
 
     entry = worker_dir / "cevra_media_worker.py"
     env = os.environ.copy()

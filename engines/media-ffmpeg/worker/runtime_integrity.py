@@ -9,7 +9,7 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 
 class RuntimeIntegrityError(RuntimeError):
@@ -68,6 +68,19 @@ REQUIRED_NOTICE_PATHS = {
     "ffmpeg-license": "licenses/ffmpeg/COPYING.LGPLv2.1",
     "python-license": "licenses/python/LICENSE.txt",
 }
+DARWIN_PYTHON_NOTICE_PATHS = {
+    "python-openssl-license": "licenses/python/components/openssl-3.5.8-LICENSE.txt",
+    "python-liblzma-license": "licenses/python/components/xz-5.4.3-COPYING.txt",
+    "python-bzip2-license": "licenses/python/components/bzip2-1.0.8-LICENSE.txt",
+    "python-libffi-license": "licenses/python/components/libffi-3.4.8-LICENSE.txt",
+}
+
+
+def required_notice_paths(platform_name: Optional[str] = None) -> dict[str, str]:
+    result = dict(REQUIRED_NOTICE_PATHS)
+    if (platform_name or _platform()) == "darwin":
+        result.update(DARWIN_PYTHON_NOTICE_PATHS)
+    return result
 
 
 def sha256(path: Path) -> str:
@@ -92,12 +105,15 @@ def _entries(root: Path) -> list[Path]:
     return entries
 
 
-def tree_sha256(root: Path) -> str:
+def tree_sha256(root: Path, exclude: frozenset[str] = frozenset()) -> str:
     if not root.is_dir():
         raise RuntimeIntegrityError(f"runtime tree is missing: {root}")
     digest = hashlib.sha256()
     for path in sorted(_entries(root), key=lambda item: item.relative_to(root).as_posix()):
-        relative = path.relative_to(root).as_posix().encode("utf-8")
+        relative_text = path.relative_to(root).as_posix()
+        if relative_text in exclude:
+            continue
+        relative = relative_text.encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
         if path.is_symlink():
@@ -215,6 +231,7 @@ def verify_release_bundle(
     runtime_root: Path,
     python_executable: Path,
     *,
+    require_running_python: bool = True,
     expected_python: str,
     expected_ffmpeg: str,
     expected_ffmpeg_source: str,
@@ -232,13 +249,23 @@ def verify_release_bundle(
     manifest = _read_json(manifest_path, "manifest")
     if manifest.get("format") != "cevra-media-runtime" or manifest.get("formatVersion") != 1:
         raise RuntimeIntegrityError("unsupported or incomplete media runtime manifest")
-    required = {"format", "formatVersion", "runtimeVersion", "workerVersion", "platform", "arch", "python", "worker", "upstream", "ffmpeg", "notices"}
+    required = {"format", "formatVersion", "runtimeVersion", "workerVersion", "platform", "arch", "bundleTreeSha256", "binFiles", "python", "worker", "upstream", "ffmpeg", "notices"}
     if not required.issubset(manifest):
         raise RuntimeIntegrityError("media runtime manifest is incomplete")
     if manifest.get("runtimeVersion") != expected_worker or manifest.get("workerVersion") != expected_worker:
         raise RuntimeIntegrityError("worker version does not match the release runtime")
     if manifest.get("platform") != _platform() or manifest.get("arch") != (platform.machine() or "unknown"):
         raise RuntimeIntegrityError("media runtime platform does not match this host")
+    suffix = ".exe" if os.name == "nt" else ""
+    expected_bin = [f"bin/ffmpeg{suffix}", f"bin/ffprobe{suffix}"]
+    if manifest.get("binFiles") != expected_bin:
+        raise RuntimeIntegrityError("manifest bin inventory is invalid")
+    bin_root = _safe_path(root, "bin", "bin", directory=True)
+    actual_bin = sorted(path.relative_to(root).as_posix() for path in bin_root.iterdir() if path.is_file() or path.is_symlink())
+    if actual_bin != expected_bin:
+        raise RuntimeIntegrityError("runtime bin directory contains undeclared files")
+    if tree_sha256(root, frozenset({"manifest.json"})) != _digest(manifest.get("bundleTreeSha256"), "bundleTreeSha256"):
+        raise RuntimeIntegrityError("complete media runtime tree hash mismatch")
 
     python = _object(manifest["python"], "python")
     if python.get("root") != "python":
@@ -249,12 +276,36 @@ def verify_release_bundle(
         raise RuntimeIntegrityError("release worker is not running under its declared private Python")
     if python.get("version") != expected_python:
         raise RuntimeIntegrityError("private Python version does not match the release pin")
-    if platform.python_version() != expected_python:
+    if require_running_python and platform.python_version() != expected_python:
         raise RuntimeIntegrityError("running CPython version does not match the release pin")
     _check_hash(python_path, python.get("executableSha256"), "python.executableSha256")
     python_root = _safe_path(root, python.get("root"), "python.root", directory=True)
     if tree_sha256(python_root) != _digest(python.get("treeSha256"), "python.treeSha256"):
         raise RuntimeIntegrityError("private Python runtime tree hash mismatch")
+    if python.get("provenance") != "python/CEVRA_PYTHON_PROVENANCE.json":
+        raise RuntimeIntegrityError("private Python provenance path is invalid")
+    python_provenance_path = _safe_path(root, python.get("provenance"), "python.provenance")
+    _check_hash(python_provenance_path, python.get("provenanceSha256"), "python.provenanceSha256")
+    python_provenance = _read_json(python_provenance_path, "managed Python provenance")
+    if python_provenance.get("pruning") != python.get("pruning") or python_provenance.get("nativeComponents") != python.get("nativeComponents"):
+        raise RuntimeIntegrityError("managed Python pruning/component provenance is invalid")
+    pruning = _object(python.get("pruning"), "python.pruning")
+    if pruning.get("verifiedAbsent") is not True:
+        raise RuntimeIntegrityError("managed Python runtime is not marked as pruned")
+    forbidden_python_paths = (
+        "python/lib/python3.12/ensurepip", "python/lib/python3.12/idlelib", "python/lib/python3.12/lib2to3",
+        "python/lib/python3.12/tkinter", "python/lib/python3.12/turtledemo", "python/lib/python3.12/site-packages",
+        "python/lib/tcl9", "python/lib/tcl9.0", "python/lib/tk9.0",
+    )
+    if any((root / relative).exists() or (root / relative).is_symlink() for relative in forbidden_python_paths):
+        raise RuntimeIntegrityError("managed Python runtime contains a forbidden pruned component")
+    components = python.get("nativeComponents")
+    if not isinstance(components, list) or any(not isinstance(item, dict) for item in components):
+        raise RuntimeIntegrityError("managed Python native component inventory is invalid")
+    component_ids = {str(item.get("id")) for item in components}
+    required_components = {"cpython", "openssl", "sqlite", "zlib", "liblzma", "bzip2", "libffi"}
+    if _platform() == "darwin" and component_ids != required_components:
+        raise RuntimeIntegrityError("macOS managed Python component inventory is incomplete")
 
     worker = _object(manifest["worker"], "worker")
     if worker.get("root") != "worker" or worker.get("entrypoint") != "worker/cevra_media_worker.py":
@@ -306,7 +357,6 @@ def verify_release_bundle(
         raise RuntimeIntegrityError("vendored ffmpeg-skill package version is invalid")
 
     ffmpeg = _object(manifest["ffmpeg"], "ffmpeg")
-    suffix = ".exe" if os.name == "nt" else ""
     if (
         ffmpeg.get("executable") != f"bin/ffmpeg{suffix}"
         or ffmpeg.get("probeExecutable") != f"bin/ffprobe{suffix}"
@@ -368,18 +418,44 @@ def verify_release_bundle(
         value = _digest(ffmpeg.get(field), f"ffmpeg.{field}")
         if ffmpeg_provenance.get(field) != value:
             raise RuntimeIntegrityError(f"FFmpeg provenance content is missing or invalid: {field}")
+    source_paths = {
+        "sourceArchive": "sourceArchiveSha256",
+        "sourceSignatureFile": "sourceSignatureSha256",
+        "signingKeyFile": "signingKeySha256",
+    }
+    for path_field, digest_field in source_paths.items():
+        relative = _text(ffmpeg.get(path_field), f"ffmpeg.{path_field}")
+        if ffmpeg_provenance.get(path_field) != relative:
+            raise RuntimeIntegrityError(f"FFmpeg provenance path is invalid: {path_field}")
+        _check_hash(_safe_path(root, relative, f"ffmpeg.{path_field}"), ffmpeg.get(digest_field), f"ffmpeg.{digest_field}")
+    instructions = _text(ffmpeg.get("buildInstructions"), "ffmpeg.buildInstructions")
+    if ffmpeg_provenance.get("buildInstructions") != instructions:
+        raise RuntimeIntegrityError("FFmpeg build instructions provenance is invalid")
+    _safe_path(root, instructions, "ffmpeg.buildInstructions")
+    toolchain = _object(ffmpeg.get("toolchain"), "ffmpeg.toolchain")
+    if ffmpeg_provenance.get("toolchain") != toolchain:
+        raise RuntimeIntegrityError("FFmpeg toolchain provenance is invalid")
 
     notices = manifest["notices"]
     if not isinstance(notices, list):
         raise RuntimeIntegrityError("manifest field notices must be an array")
     notice_records = {_text(_object(item, "notice").get("id"), "notice.id"): _object(item, "notice") for item in notices}
-    if set(notice_records) != set(REQUIRED_NOTICE_PATHS):
+    required_notices = required_notice_paths(str(manifest.get("platform")))
+    if set(notice_records) != set(required_notices):
         raise RuntimeIntegrityError("manifest does not enumerate all required notices and licenses")
-    for ident, relative in REQUIRED_NOTICE_PATHS.items():
+    for ident, relative in required_notices.items():
         record = notice_records[ident]
         if record.get("path") != relative:
             raise RuntimeIntegrityError(f"notice path is invalid: {ident}")
         _check_hash(_safe_path(root, relative, f"notice:{ident}"), record.get("sha256"), f"notice:{ident}")
+        if ident in DARWIN_PYTHON_NOTICE_PATHS:
+            component_id = _text(record.get("component"), f"notice:{ident}.component")
+            component_version = _text(record.get("version"), f"notice:{ident}.version")
+            matching = [item for item in components if item.get("id") == component_id and item.get("version") == component_version]
+            if len(matching) != 1:
+                raise RuntimeIntegrityError(f"notice does not match managed Python component inventory: {ident}")
+        elif "component" in record or "version" in record:
+            raise RuntimeIntegrityError(f"non-component notice contains unexpected component metadata: {ident}")
     return manifest
 
 

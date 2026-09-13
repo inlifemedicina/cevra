@@ -5,6 +5,8 @@ import argparse
 import hashlib
 import json
 import os
+import platform
+import shutil
 import stat
 import subprocess
 import sys
@@ -44,7 +46,7 @@ def _fake_tool(product: str) -> str:
     )
 
 
-def _ffmpeg_fixture(root: Path) -> Path:
+def _ffmpeg_fixture(root: Path, verified_source: Path) -> Path:
     prefix = root / "ffmpeg-prefix"
     suffix = ".exe" if os.name == "nt" else ""
     if os.name == "nt":
@@ -64,16 +66,27 @@ def _ffmpeg_fixture(root: Path) -> Path:
         "sourceSignature": VERSIONS["ffmpeg"]["signature"],
         "signingFingerprint": VERSIONS["ffmpeg"]["signingFingerprint"],
         "verifiedSignerFingerprint": VERSIONS["ffmpeg"]["signingFingerprint"].upper(),
-        "sourceArchiveSha256": "a" * 64,
-        "sourceSignatureSha256": "b" * 64,
-        "signingKeySha256": "c" * 64,
+        "sourceArchiveSha256": VERSIONS["ffmpeg"]["archiveSha256"],
+        "sourceSignatureSha256": VERSIONS["ffmpeg"]["signatureSha256"],
+        "signingKeySha256": VERSIONS["ffmpeg"]["signingKeySha256"],
         "verified": True,
         "configureFlags": FLAGS,
         "configureFlagsSha256": flags_hash,
         "ffmpegSha256": sha256(ffmpeg),
         "ffprobeSha256": sha256(ffprobe),
+        "toolchain": {"host": "synthetic-ci", "arch": "x64", "compiler": "synthetic", "python": platform.python_version(), "sourceDateEpoch": "0"},
+        "sourceArchive": f"sources/ffmpeg/ffmpeg-{VERSIONS['ffmpeg']['version']}.tar.xz",
+        "sourceSignatureFile": f"sources/ffmpeg/ffmpeg-{VERSIONS['ffmpeg']['version']}.tar.xz.asc",
+        "signingKeyFile": "sources/ffmpeg/ffmpeg-devel.asc",
+        "buildInstructions": "sources/ffmpeg/BUILD.md",
     }
     _write(prefix / "provenance/ffmpeg.json", json.dumps(provenance, indent=2) + "\n")
+    source_target = prefix / "sources" / "ffmpeg"
+    source_target.mkdir(parents=True)
+    shutil.copy2(verified_source / "CEVRA_SOURCE_ARCHIVE.tar.xz", source_target / f"ffmpeg-{VERSIONS['ffmpeg']['version']}.tar.xz")
+    shutil.copy2(verified_source / "CEVRA_SOURCE_ARCHIVE.tar.xz.asc", source_target / f"ffmpeg-{VERSIONS['ffmpeg']['version']}.tar.xz.asc")
+    shutil.copy2(verified_source / "CEVRA_SIGNING_KEY.asc", source_target / "ffmpeg-devel.asc")
+    _write(source_target / "BUILD.md", "Synthetic pipeline build instructions; native release builds record the exact toolchain and flags.\n")
     return prefix
 
 
@@ -81,6 +94,7 @@ def _verify(bundle: Path, python_relative: Path) -> None:
     verify_release_bundle(
         bundle,
         bundle / "python" / python_relative,
+        require_running_python=False,
         expected_python=VERSIONS["python"]["version"],
         expected_ffmpeg=VERSIONS["ffmpeg"]["version"],
         expected_ffmpeg_source=VERSIONS["ffmpeg"]["source"],
@@ -93,12 +107,12 @@ def _verify(bundle: Path, python_relative: Path) -> None:
     )
 
 
-def validate_pipeline(vendor: Path, python_root: Path) -> None:
+def validate_pipeline(vendor: Path, python_root: Path, verified_source: Path) -> None:
     python_path = verify_python_runtime(python_root)
     python_relative = python_path.relative_to(python_root)
     with tempfile.TemporaryDirectory(prefix="cevra-runtime-pipeline-") as temp_name:
         temp = Path(temp_name)
-        ffmpeg_prefix = _ffmpeg_fixture(temp)
+        ffmpeg_prefix = _ffmpeg_fixture(temp, verified_source)
         bundle = temp / "bundle"
         manifest_path = assemble(bundle, python_root, python_relative, ffmpeg_prefix, vendor)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -160,8 +174,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--vendor", type=Path, required=True)
     parser.add_argument("--python-root", type=Path, required=True)
+    parser.add_argument("--ffmpeg-source", type=Path, required=True)
     args = parser.parse_args()
-    validate_pipeline(args.vendor.resolve(), args.python_root.resolve())
+    validate_pipeline(args.vendor.resolve(), args.python_root.resolve(), args.ffmpeg_source.resolve())
     print("CEVRA Media Runtime pipeline validation PASS")
     return 0
 

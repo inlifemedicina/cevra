@@ -19,6 +19,19 @@ HERE = Path(__file__).resolve().parent
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 PIN = VERSIONS["python"]
 PROVENANCE_NAME = "CEVRA_PYTHON_PROVENANCE.json"
+PRUNING_POLICY = {
+    "version": 1,
+    "paths": [
+        "lib/python3.12/ensurepip", "lib/python3.12/idlelib", "lib/python3.12/lib2to3",
+        "lib/python3.12/tkinter", "lib/python3.12/turtledemo", "lib/python3.12/site-packages",
+        "lib/tcl9", "lib/tcl9.0", "lib/tk9.0",
+    ],
+    "globs": [
+        "bin/pip*", "bin/idle*", "bin/2to3*", "bin/tclsh*", "bin/wish*",
+        "lib/itcl*", "lib/thread*", "lib/libtcl*", "lib/libtk*",
+        "lib/python3.12/lib-dynload/_tkinter*", "share/man/man1/pip*", "share/man/man1/idle*", "share/man/man1/2to3*",
+    ],
+}
 
 
 def sha256(path: Path) -> str:
@@ -106,6 +119,53 @@ def _extract_archive(archive: Path, destination: Path) -> None:
             package.extractall(destination)
 
 
+def _prune(root: Path) -> list[str]:
+    removed: list[str] = []
+    candidates = [root / relative for relative in PRUNING_POLICY["paths"]]
+    for pattern in PRUNING_POLICY["globs"]:
+        candidates.extend(root.glob(pattern))
+    for path in sorted(set(candidates), key=lambda item: len(item.parts), reverse=True):
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.is_dir():
+            shutil.rmtree(path)
+        else:
+            continue
+        removed.append(path.relative_to(root).as_posix())
+    return sorted(removed)
+
+
+def _assert_pruned(root: Path) -> None:
+    remaining = [relative for relative in PRUNING_POLICY["paths"] if (root / relative).exists()]
+    for pattern in PRUNING_POLICY["globs"]:
+        remaining.extend(path.relative_to(root).as_posix() for path in root.glob(pattern))
+    if remaining:
+        raise SystemExit(f"managed CPython pruning is incomplete: {sorted(remaining)}")
+
+
+def _runtime_components(executable: Path) -> list[dict[str, str]]:
+    script = """import ctypes,json,platform,ssl,sqlite3,zlib,lzma,bz2
+process = ctypes.CDLL(None)
+def native_version(symbol, fallback):
+ try:
+  fn = getattr(process, symbol); fn.restype = ctypes.c_char_p
+  return fn().decode().split(',')[0]
+ except (AttributeError, OSError):
+  return fallback
+components = [
+ {'id':'cpython','version':platform.python_version(),'license':'PSF-2.0'},
+ {'id':'openssl','version':ssl.OPENSSL_VERSION.split()[1],'license':'Apache-2.0'},
+ {'id':'sqlite','version':sqlite3.sqlite_version,'license':'blessing/public-domain'},
+ {'id':'zlib','version':zlib.ZLIB_VERSION,'license':'Zlib'},
+ {'id':'liblzma','version':native_version('lzma_version_string','embedded'),'license':'0BSD/LGPL-2.1-or-later'},
+ {'id':'bzip2','version':native_version('BZ2_bzlibVersion','1.0.8'),'license':'bzip2-1.0.8'},
+ {'id':'libffi','version':'3.4.8','license':'MIT'}]
+if platform.system() == 'Darwin': components[3]['providedByPlatform'] = 'true'
+print(json.dumps(components))"""
+    result = subprocess.run([str(executable), "-I", "-B", "-c", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30, check=True)
+    return json.loads(result.stdout)
+
+
 def verify_prepared(root: Path) -> Path:
     key, artifact = artifact_for_host()
     provenance_path = root / PROVENANCE_NAME
@@ -141,6 +201,12 @@ def verify_prepared(root: Path) -> Path:
         raise SystemExit("managed CPython license text is missing")
     if sha256(license_path) != PIN["licenseSha256"]:
         raise SystemExit("managed CPython license text does not match the audited pin")
+    _assert_pruned(root)
+    components = _runtime_components(executable)
+    if provenance.get("pruning") != {"policy": PRUNING_POLICY, "verifiedAbsent": True, "dependencyAudit": "CEVRA worker and ffmpeg-skill 1.4.2 use Python stdlib only and do not import pip, ensurepip, IDLE, lib2to3, tkinter, turtledemo or Tcl/Tk."}:
+        raise SystemExit("managed CPython pruning provenance is missing or invalid")
+    if provenance.get("nativeComponents") != components:
+        raise SystemExit("managed CPython native component provenance does not match the prepared runtime")
     return executable
 
 
@@ -165,6 +231,9 @@ def prepare(destination: Path, archive: Path | None = None) -> Path:
         root = extract / "python"
         if not root.is_dir():
             raise SystemExit("managed CPython archive does not contain the expected python/ root")
+        removed = _prune(root)
+        executable = root / artifact["executable"]
+        _assert_pruned(root)
         provenance = {
             "format": "cevra-managed-python",
             "formatVersion": 1,
@@ -176,6 +245,13 @@ def prepare(destination: Path, archive: Path | None = None) -> Path:
             "artifactSha256": artifact["sha256"],
             "licenseSha256": PIN["licenseSha256"],
             "verified": True,
+            "pruning": {
+                "policy": PRUNING_POLICY,
+                "verifiedAbsent": True,
+                "dependencyAudit": "CEVRA worker and ffmpeg-skill 1.4.2 use Python stdlib only and do not import pip, ensurepip, IDLE, lib2to3, tkinter, turtledemo or Tcl/Tk.",
+            },
+            "removed": removed,
+            "nativeComponents": _runtime_components(executable),
         }
         (root / PROVENANCE_NAME).write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
         root.rename(destination)

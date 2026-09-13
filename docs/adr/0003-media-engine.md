@@ -16,7 +16,7 @@ Desktop media execution is packaged as one versioned **CEVRA Media Runtime** con
 - CPU fallback must remain explicit and licensing-compatible; `libx264`/`libx265` are not implicit fallbacks in the CEVRA-distributed runtime.
 
 ## Licensing policy
-CEVRA's redistributed FFmpeg build must remain redistributable with the proprietary application. The default build must not enable GPL-only components such as libx264/libx265. Exact FFmpeg version, build ID, configure flags and applicable license are recorded in the signed Media Runtime manifest and third-party notices.
+CEVRA's redistributed FFmpeg build must remain redistributable with the proprietary application. The default build must not enable GPL-only components such as libx264/libx265. Exact FFmpeg version, build ID, configure flags and applicable license are recorded in the Media Runtime manifest and third-party notices. The manifest verifies internal bundle consistency; authenticity comes from the platform-signed application, installer or update artifact that contains it. A separately downloaded runtime must be authenticated by the signed CEVRA updater.
 
 ffmpeg-skill is MIT and may be reused/adapted, but CEVRA owns its adapter contract and maintains a small compatibility layer so upstream encoder assumptions do not dictate CEVRA's distribution license or hardware policy.
 

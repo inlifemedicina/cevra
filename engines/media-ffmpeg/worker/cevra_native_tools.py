@@ -15,14 +15,12 @@ CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "ce
 DELIVERY_MATRIX: Dict[str, Dict[str, Any]] = {
     "mp4": {"video": {"h264", "h265", "av1"}, "audio": {"aac"}, "default_video": "h264", "default_audio": "aac", "format": "mp4", "audio_only": False},
     "mov": {"video": {"h264", "h265", "av1"}, "audio": {"aac", "pcm"}, "default_video": "h264", "default_audio": "aac", "format": "mov", "audio_only": False},
-    "webm": {"video": {"vp9", "av1"}, "audio": {"opus"}, "default_video": "vp9", "default_audio": "opus", "format": "webm", "audio_only": False},
-    "mkv": {"video": {"h264", "h265", "vp9", "av1"}, "audio": {"aac", "opus", "mp3", "pcm"}, "default_video": "h264", "default_audio": "aac", "format": "matroska", "audio_only": False},
+    "mkv": {"video": {"h264", "h265", "av1"}, "audio": {"aac", "opus", "pcm"}, "default_video": "h264", "default_audio": "aac", "format": "matroska", "audio_only": False},
     "wav": {"video": set(), "audio": {"pcm"}, "default_video": None, "default_audio": "pcm", "format": "wav", "audio_only": True},
-    "mp3": {"video": set(), "audio": {"mp3"}, "default_video": None, "default_audio": "mp3", "format": "mp3", "audio_only": True},
     "m4a": {"video": set(), "audio": {"aac"}, "default_video": None, "default_audio": "aac", "format": "ipod", "audio_only": True},
 }
-VIDEO_CODECS = {"h264", "h265", "vp9", "av1", "copy"}
-AUDIO_CODECS = {"aac", "opus", "mp3", "pcm", "copy"}
+VIDEO_CODECS = {"h264", "h265", "av1", "copy"}
+AUDIO_CODECS = {"aac", "opus", "pcm", "copy"}
 
 
 def _load_common(vendor_root: Path) -> Any:
@@ -91,7 +89,7 @@ def _optional_boolean(args: Dict[str, Any], key: str, default: bool = False) -> 
 
 
 def _file_result(common: Any, output: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    probe = common.probe(output, role="output")
+    probe = common.verify_output(output)
     payload: Dict[str, Any] = {"status": "completed", "output": output, "probe": probe}
     if extra:
         payload.update(extra)
@@ -233,8 +231,6 @@ def _normalize_video_codec(codec: Any) -> Optional[str]:
         return "h264"
     if value in {"h265", "hevc", "hev1", "hvc1"}:
         return "h265"
-    if value in {"vp9", "vp09"}:
-        return "vp9"
     if value in {"av1", "av01"}:
         return "av1"
     return None
@@ -244,8 +240,8 @@ def _normalize_audio_codec(codec: Any) -> Optional[str]:
     if not isinstance(codec, str):
         return None
     value = codec.strip().lower()
-    if value in {"aac", "opus", "mp3", "mp3float"}:
-        return "mp3" if value == "mp3float" else value
+    if value in {"aac", "opus"}:
+        return value
     if value.startswith("pcm_"):
         return "pcm"
     return None
@@ -291,7 +287,7 @@ def _explicit_video_args(runtime: Any, meta: Dict[str, Any], codec: Optional[str
         encoder = os.environ.get("CEVRA_VIDEO_ENCODER_H264", "").strip()
         if not encoder:
             raise RuntimeError("no approved H.264 encoder is configured")
-        return runtime.sdr_encoder_args(encoder, 18, "medium", True, meta)
+        return runtime.sdr_encoder_args(encoder, 18, "medium", meta)
     if codec == "h265":
         encoder = os.environ.get("CEVRA_VIDEO_ENCODER_HEVC", "").strip()
         if not encoder:
@@ -302,11 +298,6 @@ def _explicit_video_args(runtime: Any, meta: Dict[str, Any], codec: Optional[str
         if not encoder:
             raise RuntimeError("no approved AV1 encoder is configured")
         return runtime.av1_encoder_args(encoder, meta, 24, "medium")
-    if codec == "vp9":
-        available = set(_ffmpeg_encoders(importlib.import_module("_common")))
-        if "libvpx-vp9" not in available:
-            raise RuntimeError("VP9 encoder is not available in this CEVRA Media Runtime")
-        return ["-c:v", "libvpx-vp9", "-crf", "30", "-b:v", "0", "-pix_fmt", "yuv420p"]
     raise ValueError(f"unsupported video codec {codec}")
 
 
@@ -325,10 +316,11 @@ def _audio_args(common: Any, codec: Optional[str], has_audio: bool) -> List[str]
     if not has_audio:
         return ["-an"]
     selected = codec or "aac"
+    available = set(_ffmpeg_encoders(common))
+    opus_encoder = "libopus" if "libopus" in available else "opus"
     mapping = {
         "aac": ["-c:a", "aac", "-b:a", "192k"],
-        "opus": ["-c:a", "libopus", "-b:a", "160k"],
-        "mp3": ["-c:a", "libmp3lame", "-b:a", "192k"],
+        "opus": ["-c:a", opus_encoder, *(["-strict", "-2"] if opus_encoder == "opus" else []), "-b:a", "160k"],
         "pcm": ["-c:a", "pcm_s16le"],
         "copy": ["-c:a", "copy"],
     }
@@ -336,7 +328,7 @@ def _audio_args(common: Any, codec: Optional[str], has_audio: bool) -> List[str]
         raise ValueError(f"unsupported audio codec {selected}")
     if selected != "copy":
         encoder = mapping[selected][1]
-        if encoder not in set(_ffmpeg_encoders(common)):
+        if encoder not in available:
             raise RuntimeError(f"{selected.upper()} encoder {encoder} is not available in this CEVRA Media Runtime")
     return mapping[selected]
 
@@ -403,10 +395,9 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     elif audio_codec not in rule["audio"]:
         raise ValueError(f"audio codec {audio_codec} is incompatible with {container}")
 
-    cmd = common.ffmpeg_base() + ["-i", video_path, "-i", audio_path, "-map", "0:v:0", "-c:v", "copy"]
+    cmd = common.ffmpeg_base() + ["-i", video_path, "-i", audio_path, "-map", "0:v:0", "-c:v", "copy", "-map", "1:a:0"]
     if not replace_existing and video_meta.get("audio"):
         cmd += ["-map", "0:a:0"]
-    cmd += ["-map", "1:a:0"]
     cmd += _audio_args(common, audio_codec, True)
     cmd += _container_args(container)
     common.run(cmd + [output])

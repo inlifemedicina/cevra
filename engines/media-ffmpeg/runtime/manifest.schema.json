@@ -4,7 +4,7 @@
   "title": "CEVRA Media Runtime Manifest v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["format", "formatVersion", "runtimeVersion", "workerVersion", "platform", "arch", "python", "worker", "upstream", "ffmpeg", "notices"],
+  "required": ["format", "formatVersion", "runtimeVersion", "workerVersion", "platform", "arch", "bundleTreeSha256", "binFiles", "python", "worker", "upstream", "ffmpeg", "notices"],
   "properties": {
     "format": { "const": "cevra-media-runtime" },
     "formatVersion": { "const": 1 },
@@ -12,13 +12,18 @@
     "workerVersion": { "$ref": "#/$defs/text" },
     "platform": { "enum": ["darwin", "win32", "linux", "unknown"] },
     "arch": { "$ref": "#/$defs/text" },
+    "bundleTreeSha256": { "$ref": "#/$defs/hash" },
+    "binFiles": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/path" } },
     "python": {
       "type": "object", "additionalProperties": false,
-      "required": ["version", "root", "executable", "executableSha256", "treeSha256"],
+      "required": ["version", "root", "executable", "executableSha256", "treeSha256", "provenance", "provenanceSha256", "pruning", "nativeComponents"],
       "properties": {
         "version": { "$ref": "#/$defs/text" }, "root": { "const": "python" },
         "executable": { "$ref": "#/$defs/path" }, "executableSha256": { "$ref": "#/$defs/hash" },
-        "treeSha256": { "$ref": "#/$defs/hash" }
+        "treeSha256": { "$ref": "#/$defs/hash" },
+        "provenance": { "const": "python/CEVRA_PYTHON_PROVENANCE.json" }, "provenanceSha256": { "$ref": "#/$defs/hash" },
+        "pruning": { "$ref": "#/$defs/pruning" },
+        "nativeComponents": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/component" } }
       }
     },
     "worker": {
@@ -27,7 +32,7 @@
       "properties": {
         "root": { "const": "worker" }, "entrypoint": { "const": "worker/cevra_media_worker.py" },
         "treeSha256": { "$ref": "#/$defs/hash" },
-        "files": { "type": "array", "minItems": 5, "items": { "$ref": "#/$defs/file" } }
+        "files": { "type": "array", "minItems": 5, "maxItems": 5, "items": { "$ref": "#/$defs/file" } }
       }
     },
     "upstream": {
@@ -43,20 +48,27 @@
     },
     "ffmpeg": {
       "type": "object", "additionalProperties": false,
-      "required": ["version", "probeVersion", "license", "buildId", "executable", "probeExecutable", "sha256", "ffprobeSha256", "configureFlagsSha256", "configureFlags", "provenance", "provenanceSha256", "source", "sourceSignature", "signingFingerprint", "verifiedSignerFingerprint", "sourceArchiveSha256", "sourceSignatureSha256", "signingKeySha256"],
+      "required": ["version", "probeVersion", "license", "buildId", "executable", "probeExecutable", "sha256", "ffprobeSha256", "configureFlagsSha256", "configureFlags", "provenance", "provenanceSha256", "source", "sourceSignature", "signingFingerprint", "verifiedSignerFingerprint", "sourceArchiveSha256", "sourceSignatureSha256", "signingKeySha256", "sourceArchive", "sourceSignatureFile", "signingKeyFile", "buildInstructions", "toolchain"],
       "properties": {
         "version": { "$ref": "#/$defs/text" }, "probeVersion": { "$ref": "#/$defs/text" },
         "license": { "enum": ["LGPL-2.1-or-later", "LGPL-3.0-or-later"] }, "buildId": { "$ref": "#/$defs/text" },
         "executable": { "enum": ["bin/ffmpeg", "bin/ffmpeg.exe"] }, "probeExecutable": { "enum": ["bin/ffprobe", "bin/ffprobe.exe"] },
         "sha256": { "$ref": "#/$defs/hash" }, "ffprobeSha256": { "$ref": "#/$defs/hash" },
-        "configureFlagsSha256": { "$ref": "#/$defs/hash" }, "configureFlags": { "type": "array", "items": { "type": "string" } },
+        "configureFlagsSha256": { "$ref": "#/$defs/hash" }, "configureFlags": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "type": "string", "maxLength": 1024 } },
         "provenance": { "const": "provenance/ffmpeg.json" }, "provenanceSha256": { "$ref": "#/$defs/hash" },
         "source": { "$ref": "#/$defs/text" }, "sourceSignature": { "$ref": "#/$defs/text" },
         "signingFingerprint": { "$ref": "#/$defs/text" }, "verifiedSignerFingerprint": { "$ref": "#/$defs/text" }, "sourceArchiveSha256": { "$ref": "#/$defs/hash" },
-        "sourceSignatureSha256": { "$ref": "#/$defs/hash" }, "signingKeySha256": { "$ref": "#/$defs/hash" }
+        "sourceSignatureSha256": { "$ref": "#/$defs/hash" }, "signingKeySha256": { "$ref": "#/$defs/hash" },
+        "sourceArchive": { "$ref": "#/$defs/path" }, "sourceSignatureFile": { "$ref": "#/$defs/path" },
+        "signingKeyFile": { "$ref": "#/$defs/path" }, "buildInstructions": { "$ref": "#/$defs/path" },
+        "toolchain": {
+          "type": "object", "additionalProperties": false,
+          "required": ["host", "arch", "compiler", "python", "sourceDateEpoch"],
+          "properties": { "host": { "$ref": "#/$defs/text" }, "arch": { "$ref": "#/$defs/text" }, "compiler": { "$ref": "#/$defs/text" }, "python": { "$ref": "#/$defs/text" }, "sourceDateEpoch": { "const": "0" } }
+        }
       }
     },
-    "notices": { "type": "array", "minItems": 5, "items": { "$ref": "#/$defs/notice" } }
+    "notices": { "type": "array", "minItems": 5, "maxItems": 32, "items": { "$ref": "#/$defs/notice" } }
   },
   "$defs": {
     "text": { "type": "string", "minLength": 1 },
@@ -68,7 +80,28 @@
     },
     "notice": {
       "type": "object", "additionalProperties": false, "required": ["id", "path", "sha256"],
-      "properties": { "id": { "$ref": "#/$defs/text" }, "path": { "$ref": "#/$defs/path" }, "sha256": { "$ref": "#/$defs/hash" } }
+      "properties": { "id": { "$ref": "#/$defs/text" }, "path": { "$ref": "#/$defs/path" }, "sha256": { "$ref": "#/$defs/hash" }, "component": { "$ref": "#/$defs/text" }, "version": { "$ref": "#/$defs/text" } }
+    },
+    "component": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version", "license"],
+      "properties": { "id": { "$ref": "#/$defs/text" }, "version": { "$ref": "#/$defs/text" }, "license": { "$ref": "#/$defs/text" }, "providedByPlatform": { "enum": ["true"] } }
+    },
+    "pruning": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy", "verifiedAbsent", "dependencyAudit"],
+      "properties": {
+        "policy": {
+          "type": "object", "additionalProperties": false,
+          "required": ["version", "paths", "globs"],
+          "properties": {
+            "version": { "const": 1 },
+            "paths": { "type": "array", "maxItems": 128, "items": { "$ref": "#/$defs/path" } },
+            "globs": { "type": "array", "maxItems": 128, "items": { "$ref": "#/$defs/text" } }
+          }
+        },
+        "verifiedAbsent": { "const": true },
+        "dependencyAudit": { "$ref": "#/$defs/text" }
+      }
     }
   }
 }

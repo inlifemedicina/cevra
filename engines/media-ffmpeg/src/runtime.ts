@@ -10,7 +10,6 @@ export const CEVRA_MEDIA_RUNTIME_FORMAT_VERSION = 1 as const;
 
 export type RuntimePlatform = MediaRuntimeCapabilities["platform"];
 export type RuntimeVideoCodec = "h264" | "h265" | "av1";
-export type EncoderSelectionMode = "preview" | "final";
 export type EncoderBenchmarkResult = MediaWorkerEncoderBenchmark;
 
 export interface MediaRuntimeManifestV1 {
@@ -20,12 +19,18 @@ export interface MediaRuntimeManifestV1 {
   workerVersion: string;
   platform: RuntimePlatform;
   arch: string;
+  bundleTreeSha256: string;
+  binFiles: [string, string];
   python: {
     version: string;
     root: "python";
     executable: string;
     executableSha256: string;
     treeSha256: string;
+    provenance: "python/CEVRA_PYTHON_PROVENANCE.json";
+    provenanceSha256: string;
+    pruning: Record<string, unknown>;
+    nativeComponents: Array<{ id: string; version: string; license: string; providedByPlatform?: "true" }>;
   };
   worker: {
     root: "worker";
@@ -64,8 +69,13 @@ export interface MediaRuntimeManifestV1 {
     sourceArchiveSha256: string;
     sourceSignatureSha256: string;
     signingKeySha256: string;
+    sourceArchive: string;
+    sourceSignatureFile: string;
+    signingKeyFile: string;
+    buildInstructions: string;
+    toolchain: { host: string; arch: string; compiler: string; python: string; sourceDateEpoch: "0" };
   };
-  notices: Array<{ id: string; path: string; sha256: string }>;
+  notices: Array<{ id: string; path: string; sha256: string; component?: string; version?: string }>;
 }
 
 export interface VideoEncoderSelection {
@@ -85,20 +95,20 @@ export interface MediaRuntimeOptimization {
 const ENCODER_CANDIDATES: Record<RuntimeVideoCodec, Record<RuntimePlatform, readonly string[]>> = {
   h264: {
     darwin: ["h264_videotoolbox"],
-    win32: ["h264_nvenc", "h264_qsv", "h264_amf", "h264_mf"],
-    linux: ["h264_nvenc", "h264_qsv", "h264_amf"],
+    win32: [],
+    linux: [],
     unknown: []
   },
   h265: {
     darwin: ["hevc_videotoolbox"],
-    win32: ["hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_mf"],
-    linux: ["hevc_nvenc", "hevc_qsv", "hevc_amf"],
+    win32: [],
+    linux: [],
     unknown: []
   },
   av1: {
     darwin: ["av1_videotoolbox"],
-    win32: ["av1_nvenc", "av1_qsv", "av1_amf", "av1_mf"],
-    linux: ["av1_nvenc", "av1_qsv"],
+    win32: [],
+    linux: [],
     unknown: []
   }
 };
@@ -111,16 +121,14 @@ export function approvedEncoderCandidates(capabilities: MediaRuntimeCapabilities
 export function selectVideoEncoder(
   capabilities: MediaRuntimeCapabilities,
   codec: RuntimeVideoCodec,
-  _mode: EncoderSelectionMode,
   benchmarks: readonly EncoderBenchmarkResult[] = []
 ): VideoEncoderSelection | undefined {
   const candidates = approvedEncoderCandidates(capabilities, codec);
   if (candidates.length === 0) return undefined;
 
   const relevantBenchmarks = benchmarks.filter((item) => item.codec === codec && candidates.includes(item.encoder));
-  const benchmarked = relevantBenchmarks
-    .filter((item) => item.success && Number.isFinite(item.fps))
-    .sort((a, b) => (b.fps ?? 0) - (a.fps ?? 0));
+  const successful = relevantBenchmarks.filter((item) => item.success && Number.isFinite(item.fps));
+  const benchmarked = candidates.map((encoder) => successful.find((item) => item.encoder === encoder)).filter((item): item is EncoderBenchmarkResult => item !== undefined);
   if (relevantBenchmarks.length > 0 && benchmarked.length === 0) return undefined;
   const encoder = benchmarked[0]?.encoder ?? candidates[0]!;
   return {
@@ -132,7 +140,7 @@ export function selectVideoEncoder(
   };
 }
 
-export async function optimizeMediaRuntime(worker: MediaWorkerClient, mode: EncoderSelectionMode = "final"): Promise<MediaRuntimeOptimization> {
+export async function optimizeMediaRuntime(worker: MediaWorkerClient): Promise<MediaRuntimeOptimization> {
   const info = await worker.info();
   const capabilities = info.runtime;
   if (!capabilities) throw new Error("CEVRA Media Runtime did not report hardware capabilities.");
@@ -142,7 +150,7 @@ export async function optimizeMediaRuntime(worker: MediaWorkerClient, mode: Enco
     const candidates = approvedEncoderCandidates(capabilities, codec);
     if (candidates.length === 0) continue;
     const benchmarks = await worker.benchmarkVideoEncoders(codec, candidates);
-    const selection = selectVideoEncoder(capabilities, codec, mode, benchmarks);
+    const selection = selectVideoEncoder(capabilities, codec, benchmarks);
     if (selection) selections[codec] = selection;
   }
 
@@ -165,8 +173,8 @@ export function selectDecodeAcceleration(capabilities: MediaRuntimeCapabilities)
   const available = new Set(capabilities.hwaccels);
   const priorities: Record<RuntimePlatform, readonly string[]> = {
     darwin: ["videotoolbox"],
-    win32: ["d3d11va", "cuda", "dxva2"],
-    linux: ["vaapi", "cuda", "vulkan"],
+    win32: [],
+    linux: [],
     unknown: []
   };
   return priorities[capabilities.platform].find((name) => available.has(name));

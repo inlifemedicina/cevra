@@ -94,9 +94,10 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
     }
     if any(source_info.get(key) != value for key, value in required_source.items()):
         raise SystemExit("FFmpeg source provenance does not match the pinned verified release")
-    for field in ("archiveSha256", "signatureSha256", "signingKeySha256"):
-        if re.fullmatch(r"[0-9a-f]{64}", str(source_info.get(field) or "")) is None:
-            raise SystemExit(f"FFmpeg source provenance is missing {field}")
+    pinned_digests = {"archiveSha256": PIN["archiveSha256"], "signatureSha256": PIN["signatureSha256"], "signingKeySha256": PIN["signingKeySha256"]}
+    for field, expected_digest in pinned_digests.items():
+        if source_info.get(field) != expected_digest:
+            raise SystemExit(f"FFmpeg source provenance {field} does not match the pin")
 
     if prefix.exists():
         if not prefix.is_dir() or any(prefix.iterdir()):
@@ -166,6 +167,29 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
     license_directory.mkdir(parents=True, exist_ok=True)
     shutil.copy2(license_source, license_directory / "COPYING.LGPLv2.1")
 
+    source_directory = prefix / "sources" / "ffmpeg"
+    source_directory.mkdir(parents=True, exist_ok=True)
+    source_inputs = {
+        "CEVRA_SOURCE_ARCHIVE.tar.xz": f"ffmpeg-{PIN['version']}.tar.xz",
+        "CEVRA_SOURCE_ARCHIVE.tar.xz.asc": f"ffmpeg-{PIN['version']}.tar.xz.asc",
+        "CEVRA_SIGNING_KEY.asc": "ffmpeg-devel.asc",
+    }
+    for source_name, target_name in source_inputs.items():
+        source_file = source / source_name
+        if not source_file.is_file():
+            raise SystemExit(f"verified FFmpeg source artifact is missing: {source_name}")
+        shutil.copy2(source_file, source_directory / target_name)
+    compiler = subprocess.run([os.environ.get("CC", "cc"), "--version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True).stdout.splitlines()[0]
+    toolchain = {"host": system, "arch": platform.machine() or "unknown", "compiler": compiler, "python": platform.python_version(), "sourceDateEpoch": "0"}
+    build_instructions = (
+        f"# Reproducing CEVRA FFmpeg {PIN['version']}\n\n"
+        f"Verify `ffmpeg-{PIN['version']}.tar.xz` against SHA-256 `{PIN['archiveSha256']}` and its detached signature with the included key.\n\n"
+        "Configure the verified source with these exact flags, then run `make` and `make install` using `SOURCE_DATE_EPOCH=0`:\n\n"
+        "```text\n" + " ".join(flags) + "\n```\n\n"
+        f"Recorded toolchain: `{compiler}` on `{system} {platform.machine()}`.\n"
+    )
+    (source_directory / "BUILD.md").write_text(build_instructions, encoding="utf-8")
+
     provenance_directory = prefix / "provenance"
     provenance_directory.mkdir(parents=True, exist_ok=True)
     build_provenance = {
@@ -185,6 +209,11 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
         "configureFlagsSha256": configure_hash,
         "ffmpegSha256": sha256(binary),
         "ffprobeSha256": sha256(probe),
+        "toolchain": toolchain,
+        "sourceArchive": f"sources/ffmpeg/ffmpeg-{PIN['version']}.tar.xz",
+        "sourceSignatureFile": f"sources/ffmpeg/ffmpeg-{PIN['version']}.tar.xz.asc",
+        "signingKeyFile": "sources/ffmpeg/ffmpeg-devel.asc",
+        "buildInstructions": "sources/ffmpeg/BUILD.md",
     }
     (provenance_directory / "ffmpeg.json").write_text(json.dumps(build_provenance, indent=2) + "\n", encoding="utf-8")
 

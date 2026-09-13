@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import math
 from typing import Any
 
 
@@ -49,6 +50,8 @@ def _validate(instance: Any, schema: dict[str, Any], root: dict[str, Any], locat
     if isinstance(instance, str):
         if len(instance) < schema.get("minLength", 0):
             raise SchemaValidationError(f"{location} is shorter than minLength")
+        if "maxLength" in schema and len(instance) > schema["maxLength"]:
+            raise SchemaValidationError(f"{location} is longer than maxLength")
         pattern = schema.get("pattern")
         if pattern is not None and re.search(pattern, instance) is None:
             raise SchemaValidationError(f"{location} does not match schema pattern")
@@ -56,10 +59,24 @@ def _validate(instance: Any, schema: dict[str, Any], root: dict[str, Any], locat
     if isinstance(instance, list):
         if len(instance) < schema.get("minItems", 0):
             raise SchemaValidationError(f"{location} has fewer than minItems")
+        if "maxItems" in schema and len(instance) > schema["maxItems"]:
+            raise SchemaValidationError(f"{location} has more than maxItems")
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(instance):
                 _validate(item, item_schema, root, f"{location}[{index}]")
+
+    if isinstance(instance, (int, float)) and not isinstance(instance, bool):
+        if not math.isfinite(instance):
+            raise SchemaValidationError(f"{location} must be finite")
+        if "minimum" in schema and instance < schema["minimum"]:
+            raise SchemaValidationError(f"{location} is below minimum")
+        if "exclusiveMinimum" in schema and instance <= schema["exclusiveMinimum"]:
+            raise SchemaValidationError(f"{location} is at or below exclusiveMinimum")
+        if "maximum" in schema and instance > schema["maximum"]:
+            raise SchemaValidationError(f"{location} exceeds maximum")
+        if "exclusiveMaximum" in schema and instance >= schema["exclusiveMaximum"]:
+            raise SchemaValidationError(f"{location} is at or above exclusiveMaximum")
 
     if isinstance(instance, dict):
         required = schema.get("required", [])

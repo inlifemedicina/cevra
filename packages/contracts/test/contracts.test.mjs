@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MEDIA_DELIVERY_MATRIX, resolveAudioDelivery, resolveAudioMutationDelivery, resolveStandardAvDelivery, resolveTranscodeDelivery, validateCopyCompatibility, validateMediaOperation } from "../dist/index.js";
+import { MAX_MEDIA_DURATION_MS, MAX_MEDIA_FPS, MAX_MEDIA_HEIGHT, MAX_MEDIA_INPUTS, MAX_MEDIA_URI_LENGTH, MAX_MEDIA_WIDTH, MEDIA_DELIVERY_MATRIX, resolveAudioDelivery, resolveAudioMutationDelivery, resolveStandardAvDelivery, resolveTranscodeDelivery, validateCopyCompatibility, validateMediaOperation } from "../dist/index.js";
 
 test("valid typed trim operation is accepted", () => {
   const operation = validateMediaOperation({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 });
@@ -10,8 +10,9 @@ test("valid typed trim operation is accepted", () => {
 test("raw shell and ffmpeg filtergraph injection fields are rejected", () => {
   assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "in.mp4", shell: "rm -rf /" }), /Forbidden execution field/);
   assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "in.mp4", nested: { filtergraph: "evil" } }), /Forbidden execution field/);
-  assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "-f" }), /safe non-empty media URI/);
+  assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "-f" }), /safe media URI/);
   assert.throws(() => validateMediaOperation({ type: "concat", inputUris: ["safe.mp4", "evil\nfile.mp4"], outputUri: "out.mp4" }), /safe media URI/);
+  assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "in.mp4", futureField: true }), /unexpected fields/);
 });
 
 test("unsafe timing and speed values are rejected", () => {
@@ -41,7 +42,9 @@ test("delivery matrix accepts every declared codec and rejects cross-container c
       assert.equal(resolveAudioDelivery(`out.${container}`, audioCodec).audioCodec, audioCodec);
     }
   }
-  assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.webm", videoCodec: "h264" }), /incompatible with WEBM/);
+  assert.equal(Object.hasOwn(MEDIA_DELIVERY_MATRIX, "webm"), false);
+  assert.equal(Object.hasOwn(MEDIA_DELIVERY_MATRIX, "mp3"), false);
+  assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.webm", videoCodec: "h264" }), /must be inferable/);
   assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.mp4", audioCodec: "opus" }), /incompatible with MP4/);
   assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.wav", videoCodec: "h264" }), /audio-only/);
   assert.throws(() => validateMediaOperation({ type: "extract-audio", inputUri: "in.mp4", outputUri: "out.m4a", audioCodec: "opus" }), /incompatible with M4A/);
@@ -49,23 +52,31 @@ test("delivery matrix accepts every declared codec and rejects cross-container c
 });
 
 test("container inference applies compatible defaults and rejects extension conflicts", () => {
-  assert.deepEqual(resolveTranscodeDelivery({ outputUri: "OUT.WEBM" }), {
-    container: "webm", audioOnly: false, videoCodec: "vp9", audioCodec: "opus"
+  assert.deepEqual(resolveTranscodeDelivery({ outputUri: "OUT.MKV" }), {
+    container: "mkv", audioOnly: false, videoCodec: "h264", audioCodec: "aac"
   });
   assert.deepEqual(resolveTranscodeDelivery({ outputUri: "out.wav" }), {
     container: "wav", audioOnly: true, audioCodec: "pcm"
   });
-  assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.webm", container: "mp4" }), /does not match/);
+  assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.mkv", container: "mp4" }), /does not match/);
   assert.throws(() => resolveTranscodeDelivery({ outputUri: "out.unknown" }), /must be inferable/);
 });
 
 test("fixed media operations reject containers their actual codecs cannot produce", () => {
-  assert.throws(() => validateMediaOperation({ type: "fit", inputUri: "in.mp4", outputUri: "out.webm", width: 10, height: 10, mode: "contain" }), /incompatible with WEBM/);
-  assert.throws(() => validateMediaOperation({ type: "volume", inputUri: "in.mp4", outputUri: "out.webm", gainDb: 1 }), /incompatible with WEBM/);
+  assert.throws(() => validateMediaOperation({ type: "fit", inputUri: "in.mp4", outputUri: "out.wav", width: 10, height: 10, mode: "contain" }), /audio-only/);
+  assert.throws(() => validateMediaOperation({ type: "volume", inputUri: "in.mp4", outputUri: "out.m4a", gainDb: 1 }), /audio-only/);
   assert.throws(() => validateMediaOperation({ type: "extract-frame", inputUri: "in.mp4", outputUri: "frame.jpg", atMs: 0 }), /PNG container/);
   assert.equal(resolveStandardAvDelivery("out.mov").videoCodec, "h264");
   assert.equal(resolveStandardAvDelivery("out.wav", true).audioOnly, true);
   assert.equal(resolveAudioMutationDelivery("out.mkv").videoCodec, "copy");
+});
+
+test("shared resource limits accept legitimate boundaries and reject overflow", () => {
+  assert.doesNotThrow(() => validateMediaOperation({ type: "transcode", inputUri: "i", outputUri: "o.mp4", width: MAX_MEDIA_WIDTH, height: MAX_MEDIA_HEIGHT, fps: MAX_MEDIA_FPS }));
+  assert.throws(() => validateMediaOperation({ type: "transcode", inputUri: "i", outputUri: "o.mp4", width: MAX_MEDIA_WIDTH + 1 }), /exceeds/);
+  assert.throws(() => validateMediaOperation({ type: "trim", inputUri: "i", outputUri: "o.mp4", startMs: 0, endMs: MAX_MEDIA_DURATION_MS + 1 }), /maximum media duration/);
+  assert.throws(() => validateMediaOperation({ type: "concat", inputUris: Array(MAX_MEDIA_INPUTS + 1).fill("i.mp4"), outputUri: "o.mp4" }), /1-128/);
+  assert.throws(() => validateMediaOperation({ type: "probe", inputUri: "a".repeat(MAX_MEDIA_URI_LENGTH + 1) }), /no longer than/);
 });
 
 test("stream copy requires compatible codecs proven by input metadata", () => {

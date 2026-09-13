@@ -24,6 +24,9 @@ function createRuntime(options = {}) {
     pythonExecutable: python,
     workerScript,
     shutdownTimeoutMs: 2000,
+    controlTimeoutMs: options.controlTimeoutMs ?? 1000,
+    renderTimeoutMs: options.renderTimeoutMs ?? 0,
+    renderLivenessIntervalMs: options.renderLivenessIntervalMs ?? 50,
     env: {
       ...process.env,
       CEVRA_MEDIA_RUNTIME_ROOT: options.runtimeRoot || engine,
@@ -83,17 +86,91 @@ test("cancellation kills only the active subprocess, cleans its new output and k
   assert.deepEqual(await runtime.transport.request("cevra/cancel", { jobId: "different-job" }), { cancelled: false, jobId: "different-job" });
   assert.equal(processExists(childPid), true);
   controller.abort();
+  const nextOutput = path.join(runtime.directory, "next.txt");
+  const next = runtime.client.callTool("cut", cutArguments(nextOutput, path.join(runtime.directory, "next.pid"), 0.01), "after-cancel");
   await assert.rejects(job, (error) => error?.name === "AbortError");
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await next;
   assert.equal(processExists(childPid), false);
   assert.equal(fs.existsSync(output), false);
   assert.equal(runtime.transport.workerPid, workerPid);
-  assert.deepEqual(await runtime.transport.request("ping"), {});
-
-  const nextOutput = path.join(runtime.directory, "next.txt");
-  await runtime.client.callTool("cut", cutArguments(nextOutput, path.join(runtime.directory, "next.pid"), 0.01), "after-cancel");
+  assert.deepEqual(await runtime.transport.request("ping"), { activeJobId: null });
   assert.equal(fs.readFileSync(nextOutput, "utf8"), "completed");
   await runtime.client.close();
+});
+
+test("configured render timeout cancels and reaps the active subprocess", async () => {
+  const runtime = createRuntime({ renderTimeoutMs: 1000 });
+  const output = path.join(runtime.directory, "timed-out.txt");
+  const pidFile = path.join(runtime.directory, "timed-out.pid");
+  const job = runtime.client.callTool("cut", cutArguments(output, pidFile, 30), "timed-out");
+  const rejectedJob = assert.rejects(job, (error) => error?.name === "TimeoutError");
+  try {
+    await waitForFile(pidFile);
+    const childPid = Number(fs.readFileSync(pidFile, "utf8"));
+    await rejectedJob;
+    const deadline = Date.now() + 3000;
+    while (processExists(childPid) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(processExists(childPid), false);
+    assert.equal(fs.existsSync(output), false);
+  } finally {
+    await runtime.client.close();
+  }
+});
+
+test("zero render timeout disables the wall-clock limit while liveness remains bounded", async () => {
+  const runtime = createRuntime({ renderTimeoutMs: 0, renderLivenessIntervalMs: 20, controlTimeoutMs: 500 });
+  const output = path.join(runtime.directory, "timeout-disabled.txt");
+  const result = await runtime.client.callTool("cut", cutArguments(output, path.join(runtime.directory, "timeout-disabled.pid"), 0.15), "timeout-disabled");
+  assert.equal(result.structuredContent.status, "completed");
+  assert.equal(fs.readFileSync(output, "utf8"), "completed");
+  await runtime.client.close();
+});
+
+test("control request timeout kills an unresponsive worker and permits a clean retry", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-control-timeout-"));
+  const hangingWorker = path.join(directory, "worker.py");
+  fs.writeFileSync(hangingWorker, "import sys,time\nfor line in sys.stdin:\n time.sleep(30)\n");
+  const transport = new ProcessMediaWorkerTransport({
+    mode: "development", pythonExecutable: python, workerScript: hangingWorker,
+    controlTimeoutMs: 30, shutdownTimeoutMs: 30, renderLivenessIntervalMs: 30
+  });
+  await assert.rejects(transport.start(), (error) => error?.name === "TimeoutError");
+  const pid = transport.workerPid;
+  assert.equal(pid === undefined || !processExists(pid), true);
+  await transport.stop();
+});
+
+test("disabled render timeout still rejects a lost completed-job response", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-lost-response-"));
+  const worker = path.join(directory, "worker.py");
+  fs.writeFileSync(worker, `import json,sys\nactive=None\nfor line in sys.stdin:\n r=json.loads(line); m=r['method']; p=r.get('params',{})\n if m=='tools/call': active=p['jobId']; active=None; continue\n result={'activeJobId':active} if m=='ping' else {'shuttingDown':True}\n print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}),flush=True)\n if m=='cevra/shutdown': break\n`);
+  const transport = new ProcessMediaWorkerTransport({
+    mode: "development", pythonExecutable: python, workerScript: worker,
+    controlTimeoutMs: 200, shutdownTimeoutMs: 200, renderTimeoutMs: 0, renderLivenessIntervalMs: 20
+  });
+  try {
+    await assert.rejects(transport.request("tools/call", { name: "probe", arguments: {}, jobId: "lost-job" }), /lost the response/);
+  } finally {
+    await transport.stop();
+  }
+});
+
+test("render timeout settles when cancellation succeeds but the terminal job response is lost", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-lost-cancel-response-"));
+  const worker = path.join(directory, "worker.py");
+  fs.writeFileSync(worker, `import json,sys\nactive=None\nfor line in sys.stdin:\n r=json.loads(line); m=r['method']; p=r.get('params',{})\n if m=='tools/call': active=p['jobId']; continue\n if m=='cevra/cancel': active=None; result={'cancelled':True,'jobId':p['jobId']}\n elif m=='ping': result={'activeJobId':active}\n else: result={'shuttingDown':True}\n print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}),flush=True)\n if m=='cevra/shutdown': break\n`);
+  const transport = new ProcessMediaWorkerTransport({
+    mode: "development", pythonExecutable: python, workerScript: worker,
+    controlTimeoutMs: 200, shutdownTimeoutMs: 200, renderTimeoutMs: 30, renderLivenessIntervalMs: 20
+  });
+  try {
+    await assert.rejects(
+      transport.request("tools/call", { name: "probe", arguments: {}, jobId: "lost-cancel-job" }),
+      (error) => error?.name === "TimeoutError"
+    );
+  } finally {
+    await transport.stop();
+  }
 });
 
 test("worker refuses a pre-existing output without altering it", async () => {
@@ -107,6 +184,26 @@ test("worker refuses a pre-existing output without altering it", async () => {
   assert.equal(fs.readFileSync(output, "utf8"), "original");
   assert.equal(fs.existsSync(pidFile), false);
   await runtime.client.close();
+});
+
+test("worker rejects valid and dangling output symlinks before spawning FFmpeg", async () => {
+  if (process.platform === "win32") return;
+  const runtime = createRuntime();
+  const target = path.join(runtime.directory, "external.txt");
+  fs.writeFileSync(target, "preserved");
+  try {
+    for (const [name, linkTarget] of [["valid.txt", target], ["dangling.txt", path.join(runtime.directory, "missing.txt")]]) {
+      const output = path.join(runtime.directory, name);
+      const pidFile = path.join(runtime.directory, `${name}.pid`);
+      fs.symlinkSync(linkTarget, output);
+      await assert.rejects(runtime.client.callTool("cut", cutArguments(output, pidFile, 1), `link-${name}`), /must not be a symlink/);
+      assert.equal(fs.existsSync(pidFile), false);
+      assert.equal(fs.lstatSync(output).isSymbolicLink(), true);
+    }
+    assert.equal(fs.readFileSync(target, "utf8"), "preserved");
+  } finally {
+    await runtime.client.close();
+  }
 });
 
 test("unexpected worker crash rejects the job and the next request starts a fresh worker", async () => {
@@ -129,7 +226,7 @@ test("close cancels and reaps an active subprocess without leaving the worker al
   const output = path.join(runtime.directory, "closing.txt");
   const pidFile = path.join(runtime.directory, "closing.pid");
   const job = runtime.client.callTool("cut", cutArguments(output, pidFile, 30), "close-job");
-  const rejectedJob = assert.rejects(job);
+  const rejectedJob = assert.rejects(job, (error) => error?.name === "AbortError");
   await waitForFile(pidFile);
   const childPid = Number(fs.readFileSync(pidFile, "utf8"));
   const workerPid = runtime.transport.workerPid;
@@ -214,6 +311,12 @@ test("ffmpeg-skill patch routes its direct ffprobe version call through the CEVR
   fs.writeFileSync(path.join(source, "package.json"), JSON.stringify({ version: "1.4.2" }));
   fs.writeFileSync(path.join(scripts, "_common.py"), `
 import subprocess
+DEFAULT_TIMEOUT = 1800.0
+def _env_timeout():
+    return max(0.0, float(os.environ.get("FFMPEG_SKILL_TIMEOUT", DEFAULT_TIMEOUT)))
+def ffmpeg_base():
+    cmd = [require_tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-nostdin"]
+    return cmd
 def x264_args(): pass
 def video_args(): pass
 def run():
@@ -228,6 +331,31 @@ def ffmpeg_version():
   const common = fs.readFileSync(path.join(scripts, "_common.py"), "utf8");
   assert.match(common, /subprocess\.run\(\[require_tool\("ffprobe"\), "-version"\]/);
   assert.doesNotMatch(common, /subprocess\.run\(\["ffprobe", "-version"\]/);
+  assert.match(common, /CEVRA_MEDIA_RENDER_TIMEOUT_SECONDS/);
+  assert.doesNotMatch(common, /FFMPEG_SKILL_TIMEOUT", DEFAULT_TIMEOUT/);
+});
+
+test("ffmpeg-skill patch fails closed if the pinned ffmpeg_base loses -nostdin", () => {
+  const source = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-patch-nostdin-"));
+  const scripts = path.join(source, "scripts");
+  fs.mkdirSync(scripts);
+  fs.writeFileSync(path.join(source, "package.json"), JSON.stringify({ version: "1.4.2" }));
+  fs.writeFileSync(path.join(scripts, "_common.py"), `
+import subprocess
+DEFAULT_TIMEOUT = 1800.0
+def _env_timeout(): return max(0.0, float(os.environ.get("FFMPEG_SKILL_TIMEOUT", DEFAULT_TIMEOUT)))
+def ffmpeg_base(): return [require_tool("ffmpeg")]
+def x264_args(): pass
+def video_args(): pass
+def run():
+    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=limit)
+    subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+def require_tool(name): pass
+def ffmpeg_version(): return subprocess.run(["ffprobe", "-version"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+`);
+  const patched = spawnSync(python, ["-s", "-B", patchScript, source, "--runtime-module", runtimeModule], { encoding: "utf8" });
+  assert.notEqual(patched.status, 0);
+  assert.match(patched.stderr, /lost the required -nostdin invariant/);
 });
 
 test("GPL development encoder override is disabled in release mode", () => {

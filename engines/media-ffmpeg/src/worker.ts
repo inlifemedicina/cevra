@@ -7,6 +7,15 @@ export interface WorkerCheck {
 
 export type WorkerVideoCodec = "h264" | "h265" | "av1";
 
+export interface EffectiveDeliveryCapability {
+  container: "mp4" | "mov" | "mkv" | "wav" | "m4a";
+  audioOnly: boolean;
+  videoCodec?: WorkerVideoCodec | "copy";
+  audioCodec: "aac" | "opus" | "pcm" | "copy";
+  videoEncoder?: string;
+  audioEncoder: string;
+}
+
 export interface MediaRuntimeCapabilities {
   platform: "darwin" | "win32" | "linux" | "unknown";
   arch: string;
@@ -14,6 +23,7 @@ export interface MediaRuntimeCapabilities {
   ffmpegLicense?: string;
   encoders: string[];
   hwaccels: string[];
+  effectiveDeliveries?: EffectiveDeliveryCapability[];
 }
 
 export interface MediaWorkerRuntimeProfile {
@@ -51,6 +61,7 @@ export interface MediaWorkerHealth {
   checks: WorkerCheck[];
   tools: Record<string, { usable: "yes" | "no" | "unknown"; missing?: string[]; detail?: string }>;
   runtime?: MediaRuntimeCapabilities;
+  effectiveDeliveries: EffectiveDeliveryCapability[];
 }
 
 export interface MediaWorkerToolResult {

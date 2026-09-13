@@ -31,7 +31,7 @@ def run(*argv: str, cwd: Path | None = None) -> str:
 
 def prepare(destination: Path) -> None:
     if destination.exists():
-        shutil.rmtree(destination)
+        raise SystemExit(f"refusing to replace existing ffmpeg-skill destination: {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     run("git", "clone", "--filter=blob:none", "--no-checkout", PIN["repository"], str(destination))
     run("git", "checkout", "--detach", PIN["commit"], cwd=destination)

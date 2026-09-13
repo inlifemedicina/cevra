@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,12 +18,15 @@ class FakeCommon:
     def __init__(self, metadata: Dict[str, Any], encoders: list[str] | None = None) -> None:
         self.metadata = metadata
         self.command = []
-        self.encoders = encoders if encoders is not None else ["aac", "libmp3lame", "libopus", "libvpx-vp9", "pcm_s16le"]
+        self.encoders = encoders if encoders is not None else ["aac", "opus", "pcm_s16le"]
 
     def probe(self, path: str, role: str = "input") -> Dict[str, Any]:
         if role == "output":
             return {"file": path, "duration": 1.0, "video": {"codec": "h264"}, "audio": {"codec": "aac"}}
         return self.metadata[path]
+
+    def verify_output(self, path: str) -> Dict[str, Any]:
+        return self.probe(path, "output")
 
     def ffmpeg_base(self) -> list[str]:
         return ["ffmpeg"]
@@ -54,6 +58,9 @@ class FakeRuntime:
 
 def main() -> int:
     request = json.loads(sys.argv[1])
+    os.environ["CEVRA_VIDEO_ENCODER_H264"] = "h264_test"
+    os.environ["CEVRA_VIDEO_ENCODER_HEVC"] = "h265_test"
+    os.environ["CEVRA_VIDEO_ENCODER_AV1"] = "av1_test"
     try:
         if request["operation"] == "matrix":
             matrix = {
@@ -67,6 +74,16 @@ def main() -> int:
                 for container, rule in tools.DELIVERY_MATRIX.items()
             }
             print(json.dumps({"matrix": matrix}))
+            return 0
+        if request["operation"] == "limits":
+            print(json.dumps({
+                "width": worker.MAX_MEDIA_WIDTH,
+                "height": worker.MAX_MEDIA_HEIGHT,
+                "fps": worker.MAX_MEDIA_FPS,
+                "durationMs": worker.MAX_MEDIA_DURATION_SECONDS * 1000,
+                "inputs": worker.MAX_MEDIA_INPUTS,
+                "uriLength": worker.MAX_MEDIA_PATH_LENGTH,
+            }))
             return 0
         if request["operation"] == "numbers":
             failures = []

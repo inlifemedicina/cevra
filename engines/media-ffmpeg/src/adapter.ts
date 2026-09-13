@@ -4,6 +4,7 @@ import {
   resolveAudioDelivery,
   resolveAudioMutationDelivery,
   resolveMediaContainer,
+  resolveStandardAvDelivery,
   resolveTranscodeDelivery,
   validateCopyCompatibility,
   validateMediaOperation,
@@ -11,10 +12,12 @@ import {
   type EngineHealth,
   type EngineIdentity,
   type ExecutionContext,
+  type EffectiveMediaProfile,
   type MediaEngineAdapter,
   type MediaOperation,
   type MediaOperationResult,
-  type MediaProbeResult
+  type MediaProbeResult,
+  type ResolvedMediaDelivery
 } from "@cevra/contracts";
 import type { MediaWorkerClient, MediaWorkerToolResult } from "./worker.js";
 
@@ -43,18 +46,27 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
 
   async capabilities(): Promise<CapabilityDescriptor[]> {
     const health = await this.worker.health();
-    return Object.entries(health.tools).map(([id, tool]) => ({
+    const tools = Object.entries(health.tools).map(([id, tool]) => ({
       id: `media.${id}`,
       version: 1,
       available: tool.usable === "yes",
       ...(tool.detail ? { detail: tool.detail } : tool.missing?.length ? { detail: `Missing: ${tool.missing.join(", ")}` } : {})
     }));
+    const deliveries = health.effectiveDeliveries.map((delivery) => ({
+      id: `media.delivery.${delivery.container}.${delivery.videoCodec ?? "audio"}.${delivery.audioCodec}`,
+      version: 1,
+      available: true,
+      detail: [delivery.videoEncoder, delivery.audioEncoder].filter(Boolean).join(" + ")
+    }));
+    return [...tools, ...deliveries];
   }
 
   async execute(operationInput: MediaOperation, context: ExecutionContext): Promise<MediaOperationResult> {
     const operation = validateMediaOperation(operationInput);
     const signal = context.signal;
     if (signal?.aborted) throw abortError();
+    const plannedDelivery = operationDelivery(operation);
+    if (plannedDelivery) await this.assertDeliveryAvailable(plannedDelivery);
     const call = (name: string, args: Record<string, unknown>) => this.call(name, args, context.jobId, signal);
     switch (operation.type) {
       case "probe":
@@ -96,7 +108,7 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
         if (!Array.isArray(silences)) throw new Error("Media worker silence result is missing silences.");
         return {
           type: "detect-silence",
-          ranges: silences.filter(Array.isArray).map((range) => ({ startMs: milliseconds(range[0]), endMs: range[1] === null ? Number.MAX_SAFE_INTEGER : milliseconds(range[1]) }))
+          ranges: silences.filter(Array.isArray).map((range) => ({ startMs: milliseconds(range[0]), endMs: range[1] === null ? null : milliseconds(range[1]) }))
         };
       }
       case "overlay-media":
@@ -161,6 +173,15 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     if (evidence.hasVideo) validateCopyCompatibility(delivery, evidence);
   }
 
+  private async assertDeliveryAvailable(delivery: ResolvedMediaDelivery): Promise<void> {
+    const health = await this.worker.health();
+    const available = health.effectiveDeliveries.some((candidate) => candidate.container === delivery.container
+      && candidate.audioOnly === delivery.audioOnly
+      && candidate.audioCodec === delivery.audioCodec
+      && candidate.videoCodec === delivery.videoCodec);
+    if (!available) throw new Error(`CEVRA Media Runtime cannot execute ${delivery.container}/${delivery.videoCodec ?? "audio"}/${delivery.audioCodec} with its functional encoder profile.`);
+  }
+
   private async call(name: string, args: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (signal?.aborted) throw abortError();
     const result = await this.worker.callTool(name, args, jobId, signal);
@@ -202,11 +223,36 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
   if (!probe || typeof probe.file !== "string" || probe.file.trim().length === 0 || probe.file !== payload.output) {
     throw new Error("Media worker file result has no verified output probe.");
   }
+  const parsedProbe = parseProbe(probe, fallbackUri);
+  if (!parsedProbe.hasVideo && !parsedProbe.hasAudio) throw new Error("Media worker output probe contains no audio or video stream.");
+  const effectiveProfile = parseEffectiveProfile(payload.effectiveProfile);
   return {
     type: "file",
     outputUri: typeof payload.output === "string" ? payload.output : fallbackUri,
-    ...(probe && finite(probe.duration) ? { durationMs: Math.round(probe.duration * 1000) } : {})
+    ...(probe && finite(probe.duration) ? { durationMs: Math.round(probe.duration * 1000) } : {}),
+    probe: parsedProbe,
+    effectiveProfile
   };
+}
+
+function parseEffectiveProfile(value: unknown): EffectiveMediaProfile {
+  if (!isRecord(value) || typeof value.container !== "string") throw new Error("Media worker result has no effective encoder profile.");
+  const profile = value as Record<string, unknown>;
+  for (const key of ["videoCodec", "audioCodec", "videoEncoder", "audioEncoder"]) {
+    if (profile[key] !== undefined && (typeof profile[key] !== "string" || !profile[key])) throw new Error("Media worker effective profile is invalid.");
+  }
+  return profile as unknown as EffectiveMediaProfile;
+}
+
+function operationDelivery(operation: MediaOperation): ResolvedMediaDelivery | undefined {
+  switch (operation.type) {
+    case "probe": case "detect-silence": case "extract-frame": return undefined;
+    case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
+    case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
+    case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);
+    case "mux-audio": { const container = resolveMediaContainer(operation.outputUri); const rule = MEDIA_DELIVERY_MATRIX[container]; return { container, audioOnly: false, videoCodec: "copy", audioCodec: rule.defaultAudioCodec }; }
+    default: return resolveStandardAvDelivery(operation.outputUri, operation.type === "trim" || operation.type === "concat");
+  }
 }
 
 function abortError(): Error { const error = new Error("CEVRA media operation was cancelled."); error.name = "AbortError"; return error; }

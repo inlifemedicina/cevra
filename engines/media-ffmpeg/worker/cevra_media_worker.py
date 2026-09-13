@@ -72,12 +72,20 @@ if RELEASE_MODE:
 from cevra_native_tools import AUDIO_CODECS as DELIVERY_AUDIO_CODECS
 from cevra_native_tools import CUSTOM_TOOLS, DELIVERY_MATRIX, VIDEO_CODECS as DELIVERY_VIDEO_CODECS, call_custom_tool
 import cevra_job_control as job_control
-from runtime_profile import adapt_required_capabilities, configured_profile, ensure_functional_profile
+from runtime_profile import adapt_required_capabilities, candidates, configured_profile, ensure_functional_profile, invalidate_cache as invalidate_profile_cache
 
 _UPSTREAM: Any = None
+_RUNTIME_CAPABILITIES_CACHE: Optional[tuple[tuple[Any, ...], Dict[str, Any]]] = None
+_AUDIO_SMOKE_CACHE: Dict[tuple[Any, ...], bool] = {}
 _CONTROL_STDOUT = sys.stdout
 _CONTROL_WRITE_LOCK = threading.Lock()
 _JOB_THREAD: Optional[threading.Thread] = None
+MAX_MEDIA_WIDTH = 16_384
+MAX_MEDIA_HEIGHT = 16_384
+MAX_MEDIA_FPS = 240
+MAX_MEDIA_DURATION_SECONDS = 7 * 24 * 60 * 60
+MAX_MEDIA_INPUTS = 128
+MAX_MEDIA_PATH_LENGTH = 32_768
 ALLOWED_UPSTREAM_TOOLS = frozenset({
     "audio", "crop", "cut", "fit", "join", "loudness", "probe", "silence",
 })
@@ -89,12 +97,14 @@ def _object_schema(properties: Dict[str, Any], required: List[str]) -> Dict[str,
     return {"type": "object", "additionalProperties": False, "properties": properties, "required": required}
 
 
-_PATH_SCHEMA = {"type": "string", "minLength": 1, "cevraMediaPath": True}
+_PATH_SCHEMA = {"type": "string", "minLength": 1, "maxLength": MAX_MEDIA_PATH_LENGTH, "cevraMediaPath": True}
 _NUMBER_SCHEMA = {"type": "number"}
-_POSITIVE_SCHEMA = {"type": "number", "exclusiveMinimum": 0}
-_NON_NEGATIVE_SCHEMA = {"type": "number", "minimum": 0}
+_POSITIVE_SCHEMA = {"type": "number", "exclusiveMinimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS}
+_NON_NEGATIVE_SCHEMA = {"type": "number", "minimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS}
 _POSITIVE_INTEGER_SCHEMA = {"type": "integer", "minimum": 1}
 _NON_NEGATIVE_INTEGER_SCHEMA = {"type": "integer", "minimum": 0}
+_WIDTH_SCHEMA = {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_WIDTH}
+_HEIGHT_SCHEMA = {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_HEIGHT}
 _UPSTREAM_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "audio": _object_schema({
         "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "gain": _NUMBER_SCHEMA,
@@ -102,26 +112,26 @@ _UPSTREAM_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
     }, ["input", "output"]),
     "crop": _object_schema({
         "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "x": _NON_NEGATIVE_INTEGER_SCHEMA,
-        "y": _NON_NEGATIVE_INTEGER_SCHEMA, "width": _POSITIVE_INTEGER_SCHEMA,
-        "height": _POSITIVE_INTEGER_SCHEMA,
+        "y": _NON_NEGATIVE_INTEGER_SCHEMA, "width": _WIDTH_SCHEMA,
+        "height": _HEIGHT_SCHEMA,
     }, ["input", "output", "x", "y", "width", "height"]),
     "cut": _object_schema({
         "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "start": _NON_NEGATIVE_SCHEMA,
         "end": _POSITIVE_SCHEMA, "accurate": {"type": "boolean"},
     }, ["input", "output", "start", "end", "accurate"]),
     "fit": _object_schema({
-        "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "width": _POSITIVE_INTEGER_SCHEMA,
-        "height": _POSITIVE_INTEGER_SCHEMA, "fit": {"type": "string", "enum": ["pad", "crop"]},
+        "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "width": _WIDTH_SCHEMA,
+        "height": _HEIGHT_SCHEMA, "fit": {"type": "string", "enum": ["pad", "crop"]},
         "pad_color": _PATH_SCHEMA,
     }, ["input", "output", "width", "height", "fit"]),
     "join": _object_schema({
-        "inputs": {"type": "array", "minItems": 1, "items": _PATH_SCHEMA}, "output": _PATH_SCHEMA,
+        "inputs": {"type": "array", "minItems": 1, "maxItems": MAX_MEDIA_INPUTS, "items": _PATH_SCHEMA}, "output": _PATH_SCHEMA,
     }, ["inputs", "output"]),
     "loudness": _object_schema({
         "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "lufs": _NUMBER_SCHEMA, "tp": _NUMBER_SCHEMA,
     }, ["input", "output", "lufs"]),
     "probe": _object_schema({
-        "inputs": {"type": "array", "minItems": 1, "items": _PATH_SCHEMA},
+        "inputs": {"type": "array", "minItems": 1, "maxItems": MAX_MEDIA_INPUTS, "items": _PATH_SCHEMA},
     }, ["inputs"]),
     "silence": _object_schema({
         "input": _PATH_SCHEMA, "threshold": _NUMBER_SCHEMA, "min_silence": _POSITIVE_SCHEMA,
@@ -168,7 +178,7 @@ def _is_within(path: str, parent: Path) -> bool:
 def _run(argv: List[str], timeout: float = 10.0) -> subprocess.CompletedProcess[str]:
     active = job_control.active_job_id()
     if active is None:
-        return subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+        return subprocess.run(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
     result = job_control.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
     if job_control.is_cancelled(active):
         raise InterruptedError(f"media job {active} was cancelled")
@@ -239,8 +249,19 @@ def _platform() -> str:
 
 
 def runtime_capabilities() -> Dict[str, Any]:
+    global _RUNTIME_CAPABILITIES_CACHE
+    ffmpeg = _tool("ffmpeg")
+    signature: tuple[Any, ...] = (_platform(), ffmpeg)
+    if ffmpeg:
+        try:
+            metadata = Path(ffmpeg).stat()
+            signature += (metadata.st_size, metadata.st_mtime_ns)
+        except OSError:
+            signature += (None, None)
+    if _RUNTIME_CAPABILITIES_CACHE is not None and _RUNTIME_CAPABILITIES_CACHE[0] == signature:
+        return dict(_RUNTIME_CAPABILITIES_CACHE[1])
     build = _ffmpeg_build()
-    return {
+    result = {
         "platform": _platform(),
         "arch": platform.machine() or "unknown",
         "ffmpegVersion": build.get("version"),
@@ -248,6 +269,71 @@ def runtime_capabilities() -> Dict[str, Any]:
         "encoders": _encoders(),
         "hwaccels": _hwaccels(),
     }
+    _RUNTIME_CAPABILITIES_CACHE = (signature, result)
+    return dict(result)
+
+
+def _invalidate_runtime_capabilities() -> None:
+    global _RUNTIME_CAPABILITIES_CACHE
+    _RUNTIME_CAPABILITIES_CACHE = None
+    _AUDIO_SMOKE_CACHE.clear()
+
+
+def _audio_encoder(codec: str, available: set[str]) -> Optional[str]:
+    if codec == "opus":
+        return "libopus" if "libopus" in available else ("opus" if "opus" in available else None)
+    mapping = {"aac": "aac", "pcm": "pcm_s16le"}
+    selected = mapping.get(codec)
+    return selected if selected in available else None
+
+
+def _audio_encoder_functional(ffmpeg: str, encoder: str) -> bool:
+    try:
+        metadata = Path(ffmpeg).stat()
+        key: tuple[Any, ...] = (str(Path(ffmpeg).resolve()), metadata.st_size, metadata.st_mtime_ns, encoder)
+    except OSError:
+        return False
+    if key in _AUDIO_SMOKE_CACHE:
+        return _AUDIO_SMOKE_CACHE[key]
+    command = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "lavfi", "-i", "sine=frequency=1000:duration=0.05", "-frames:a", "1", "-c:a", encoder]
+    if encoder == "opus":
+        command.extend(["-strict", "-2"])
+    command.extend(["-f", "null", "-"])
+    try:
+        functional = _run(command, timeout=5.0).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        functional = False
+    _AUDIO_SMOKE_CACHE[key] = functional
+    return functional
+
+
+def effective_deliveries(profile: Dict[str, str], available_values: List[str], ffmpeg: Optional[str] = None) -> List[Dict[str, str]]:
+    available = set(available_values)
+    audio = {
+        codec: encoder
+        for codec in ("aac", "opus", "pcm")
+        if (encoder := _audio_encoder(codec, available)) and (ffmpeg is None or _audio_encoder_functional(ffmpeg, encoder))
+    }
+    result: List[Dict[str, str]] = []
+    for container, rule in DELIVERY_MATRIX.items():
+        audio_capabilities = [(codec, audio[codec]) for codec in sorted(rule["audio"]) if codec in audio]
+        audio_capabilities.append(("copy", "copy"))
+        for audio_codec, audio_encoder in audio_capabilities:
+            result.append({"container": container, "audioOnly": True, "audioCodec": audio_codec, "audioEncoder": audio_encoder})
+            if rule["audio_only"]:
+                continue
+            video_capabilities = [(codec, profile[codec]) for codec in sorted(rule["video"]) if codec in profile]
+            video_capabilities.append(("copy", "copy"))
+            for video_codec, video_encoder in video_capabilities:
+                result.append({
+                    "container": container,
+                    "audioOnly": False,
+                    "videoCodec": video_codec,
+                    "audioCodec": audio_codec,
+                    "videoEncoder": video_encoder,
+                    "audioEncoder": audio_encoder,
+                })
+    return result
 
 
 def _ensure_profile() -> Dict[str, str]:
@@ -318,7 +404,7 @@ def _check(checks: List[Dict[str, Any]], ident: str, status: str, message: str, 
     checks.append(item)
 
 
-def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ffmpeg_present: bool) -> None:
+def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ffmpeg_present: bool, deliveries: List[Dict[str, str]]) -> None:
     h264 = profile.get("h264")
     hevc = profile.get("h265")
     for name in ("cevra-scale", "cevra-overlay-media", "cevra-speed"):
@@ -329,10 +415,11 @@ def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ff
         else:
             detail = f"SDR encoder {h264}"
             if not hevc:
-                detail += "; HDR output requires an approved HEVC encoder"
+                detail += "; no functional HEVC encoder"
             tools[name] = {"usable": "yes", "detail": detail}
-    for name in ("cevra-transcode", "cevra-mux-audio"):
-        tools[name] = {"usable": "yes" if ffmpeg_present else "no", **({} if ffmpeg_present else {"missing": ["ffmpeg"]})}
+    tools["cevra-transcode"] = {"usable": "yes" if deliveries else "no", **({"detail": f"{len(deliveries)} effective delivery combinations"} if deliveries else {"missing": ["functional delivery encoder profile"]})}
+    mux_usable = any(not item.get("audioOnly", False) and item.get("videoCodec") == "copy" and item.get("audioCodec") != "copy" for item in deliveries)
+    tools["cevra-mux-audio"] = {"usable": "yes" if mux_usable else "no", **({} if mux_usable else {"missing": ["functional video/audio delivery combination"]})}
     png_available = ffmpeg_present and "png" in _encoders()
     tools["cevra-extract-frame"] = {
         "usable": "yes" if png_available else "no",
@@ -404,14 +491,18 @@ def health() -> Dict[str, Any]:
     except Exception as exc:
         _check(checks, "ffmpeg-skill", "FAIL", str(exc))
 
-    _custom_health(tools, profile, bool(ffmpeg and ffprobe))
+    runtime = runtime_capabilities()
+    deliveries = effective_deliveries(profile, runtime.get("encoders") or [], ffmpeg) if ffmpeg else []
+    runtime["effectiveDeliveries"] = deliveries
+    _custom_health(tools, profile, bool(ffmpeg and ffprobe), deliveries)
     ok = not any(item["status"] == "FAIL" for item in checks)
     return {
         "ok": ok,
         "checkedAt": _now_iso(),
         "checks": checks,
         "tools": tools,
-        "runtime": runtime_capabilities(),
+        "runtime": runtime,
+        "effectiveDeliveries": deliveries,
     }
 
 
@@ -420,25 +511,33 @@ def configure(profile: Dict[str, Any]) -> Dict[str, Any]:
     encoders = set(caps["encoders"])
     hwaccels = set(caps["hwaccels"])
     mappings = {
-        "h264Encoder": "CEVRA_VIDEO_ENCODER_H264",
-        "hevcEncoder": "CEVRA_VIDEO_ENCODER_HEVC",
-        "av1Encoder": "CEVRA_VIDEO_ENCODER_AV1",
+        "h264Encoder": ("h264", "CEVRA_VIDEO_ENCODER_H264"),
+        "hevcEncoder": ("h265", "CEVRA_VIDEO_ENCODER_HEVC"),
+        "av1Encoder": ("av1", "CEVRA_VIDEO_ENCODER_AV1"),
     }
-    for key, env_name in mappings.items():
+    expected_fields = {*mappings, "decodeAcceleration"}
+    extras = sorted(set(profile) - expected_fields)
+    if extras:
+        raise ValueError(f"profile contains unexpected fields: {', '.join(extras)}")
+    for key, (codec, env_name) in mappings.items():
         value = profile.get(key)
         if value is None or value == "":
             os.environ.pop(env_name, None)
             continue
-        if not isinstance(value, str) or value not in encoders:
-            raise ValueError(f"encoder {value!r} for {key} is not available in this runtime")
+        allowed = candidates(str(caps.get("platform") or "unknown"), codec, encoders)
+        if not isinstance(value, str) or value not in allowed:
+            raise ValueError(f"encoder {value!r} for {key} is not allowed and available in this runtime")
         os.environ[env_name] = value
     accel = profile.get("decodeAcceleration")
     if accel is None or accel == "":
         os.environ.pop("CEVRA_DECODE_ACCELERATION", None)
     else:
-        if not isinstance(accel, str) or accel not in hwaccels:
+        allowed_acceleration = {"darwin": {"videotoolbox"}, "win32": set(), "linux": set(), "unknown": set()}.get(str(caps.get("platform")), set())
+        if not isinstance(accel, str) or accel not in hwaccels or accel not in allowed_acceleration:
             raise ValueError(f"decode acceleration {accel!r} is not available")
         os.environ["CEVRA_DECODE_ACCELERATION"] = accel
+    _invalidate_runtime_capabilities()
+    invalidate_profile_cache()
     return {"configured": True, "profile": configured_profile()}
 
 
@@ -474,6 +573,42 @@ def benchmark(codec: str, requested: List[str]) -> Dict[str, Any]:
     return {"benchmarks": results}
 
 
+def _attach_effective_profile(result: Dict[str, Any], name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    payload = result.get("structuredContent")
+    if not isinstance(payload, dict) or not isinstance(payload.get("output"), str) or not isinstance(payload.get("probe"), dict):
+        return result
+    probe = payload["probe"]
+    output = str(payload["output"])
+    container = Path(output.split("?", 1)[0].split("#", 1)[0]).suffix.lower().lstrip(".")
+    profile: Dict[str, str] = {"container": "png" if container == "png" else container}
+    video = probe.get("video")
+    audio = probe.get("audio")
+    configured = configured_profile()
+    if isinstance(video, dict) and isinstance(video.get("codec"), str):
+        codec = str(video["codec"]).lower()
+        normalized = "h265" if codec in {"hevc", "h265"} else ("h264" if codec in {"h264", "avc"} else ("av1" if codec == "av1" else ("png" if codec == "png" else codec)))
+        profile["videoCodec"] = normalized
+        copied_video = arguments.get("video_codec") == "copy" or name in {"audio", "loudness", "cevra-mux-audio"}
+        if copied_video:
+            profile["videoEncoder"] = "copy"
+        elif normalized in configured:
+            profile["videoEncoder"] = configured[normalized]
+        elif normalized == "png":
+            profile["videoEncoder"] = "png"
+        else:
+            profile["videoEncoder"] = "copy"
+    if isinstance(audio, dict) and isinstance(audio.get("codec"), str):
+        codec = str(audio["codec"]).lower()
+        normalized = "pcm" if codec.startswith("pcm_") else codec
+        profile["audioCodec"] = normalized
+        available = set(runtime_capabilities().get("encoders") or [])
+        copied_audio = arguments.get("audio_codec") == "copy"
+        profile["audioEncoder"] = "copy" if copied_audio else (_audio_encoder(normalized, available) or "unknown")
+    payload["effectiveProfile"] = profile
+    result["structuredContent"] = payload
+    return result
+
+
 def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     if name not in ALLOWED_TOOLS:
         return {"isError": True, "content": [{"type": "text", "text": f"tool {name} is not allowed by CEVRA"}]}
@@ -484,7 +619,7 @@ def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any
     _ensure_profile()
     custom = call_custom_tool(name, arguments or {}, VENDOR_ROOT)
     if custom is not None:
-        return custom
+        return _attach_effective_profile(custom, name, arguments)
 
     upstream = _load_upstream()
     specs = upstream.specs()
@@ -541,13 +676,13 @@ def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any
     result: Dict[str, Any] = {"content": [{"type": "text", "text": text}]}
     if structured is not None:
         result["structuredContent"] = structured if isinstance(structured, dict) else {"result": structured}
-    return result
+    return _attach_effective_profile(result, name, arguments)
 
 
 def _custom_tool_specs() -> List[Dict[str, Any]]:
     path = _PATH_SCHEMA
-    positive = {"type": "number", "exclusiveMinimum": 0}
-    non_negative = {"type": "number", "minimum": 0}
+    positive = {"type": "number", "exclusiveMinimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS}
+    non_negative = {"type": "number", "minimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS}
     positive_integer = {"type": "integer", "minimum": 1}
     non_negative_integer = {"type": "integer", "minimum": 0}
     schemas = {
@@ -556,11 +691,11 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
             "required": ["input", "output", "at"],
         },
         "cevra-scale": {
-            "properties": {"input": path, "output": path, "width": positive_integer, "height": positive_integer},
+            "properties": {"input": path, "output": path, "width": {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_WIDTH}, "height": {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_HEIGHT}},
             "required": ["input", "output", "width", "height"],
         },
         "cevra-overlay-media": {
-            "properties": {"base": path, "overlay": path, "output": path, "start": non_negative, "end": positive, "x": non_negative_integer, "y": non_negative_integer, "width": positive_integer, "height": positive_integer, "opacity": {"type": "number", "minimum": 0, "maximum": 1}},
+            "properties": {"base": path, "overlay": path, "output": path, "start": {"type": "number", "minimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS}, "end": {"type": "number", "exclusiveMinimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS}, "x": non_negative_integer, "y": non_negative_integer, "width": {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_WIDTH}, "height": {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_HEIGHT}, "opacity": {"type": "number", "minimum": 0, "maximum": 1}},
             "required": ["base", "overlay", "output", "start", "end", "x", "y", "width", "height"],
         },
         "cevra-speed": {
@@ -568,7 +703,7 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
             "required": ["input", "output", "factor"],
         },
         "cevra-transcode": {
-            "properties": {"input": path, "output": path, "container": {"type": "string", "enum": sorted(DELIVERY_CONTAINERS)}, "video_codec": {"type": "string", "enum": sorted(DELIVERY_VIDEO_CODECS)}, "audio_codec": {"type": "string", "enum": sorted(DELIVERY_AUDIO_CODECS)}, "width": positive_integer, "height": positive_integer, "fps": positive, "drop_video": {"type": "boolean"}},
+            "properties": {"input": path, "output": path, "container": {"type": "string", "enum": sorted(DELIVERY_CONTAINERS)}, "video_codec": {"type": "string", "enum": sorted(DELIVERY_VIDEO_CODECS)}, "audio_codec": {"type": "string", "enum": sorted(DELIVERY_AUDIO_CODECS)}, "width": {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_WIDTH}, "height": {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_HEIGHT}, "fps": {"type": "number", "exclusiveMinimum": 0, "maximum": MAX_MEDIA_FPS}, "drop_video": {"type": "boolean"}},
             "required": ["input", "output"],
         },
         "cevra-mux-audio": {
@@ -607,6 +742,8 @@ def _validate_schema_value(value: Any, schema: Dict[str, Any], location: str) ->
         raise ValueError(f"{location} is outside its allowed values")
     if isinstance(value, str) and len(value) < int(schema.get("minLength", 0)):
         raise ValueError(f"{location} must not be empty")
+    if isinstance(value, str) and "maxLength" in schema and len(value) > int(schema["maxLength"]):
+        raise ValueError(f"{location} exceeds its maximum length")
     if isinstance(value, str) and schema.get("cevraMediaPath"):
         if value.startswith("-") or "\x00" in value or "\r" in value or "\n" in value:
             raise ValueError(f"{location} contains an unsafe media path")
@@ -620,6 +757,8 @@ def _validate_schema_value(value: Any, schema: Dict[str, Any], location: str) ->
     if isinstance(value, list):
         if len(value) < int(schema.get("minItems", 0)):
             raise ValueError(f"{location} has too few items")
+        if "maxItems" in schema and len(value) > int(schema["maxItems"]):
+            raise ValueError(f"{location} has too many items")
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):
@@ -646,6 +785,9 @@ def _validate_tool_arguments(name: str, arguments: Dict[str, Any]) -> None:
     if _contains_non_finite_number(arguments):
         raise ValueError("tool arguments must contain only finite numbers")
     _validate_schema_value(arguments, _schema_for_tool(name), f"tool {name} arguments")
+    output = arguments.get("output")
+    if isinstance(output, str) and Path(output).absolute().is_symlink():
+        raise ValueError("media output path must not be a symlink")
 
 
 def _contains_raw_argv(value: Any) -> bool:
@@ -690,7 +832,7 @@ def handle(method: str, params: Dict[str, Any]) -> Any:
     if method == "initialize":
         return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "cevra-media-worker", "version": WORKER_VERSION}}
     if method == "ping":
-        return {}
+        return {"activeJobId": job_control.active_job_id()}
     if method == "cevra/info":
         return info()
     if method == "cevra/health":
@@ -761,7 +903,43 @@ def _start_job(request_id: Any, params: Dict[str, Any]) -> Optional[Dict[str, An
     job_control.begin_job(job_id)
     thread = threading.Thread(target=_job_response, args=(request_id, job_id, name, arguments), name=f"cevra-media-job-{job_id}")
     _JOB_THREAD = thread
-    thread.start()
+    try:
+        thread.start()
+    except BaseException:
+        _JOB_THREAD = None
+        job_control.finish_job(job_id)
+        raise
+    return None
+
+
+def _control_response(request_id: Any, control_id: str, method: str, params: Dict[str, Any]) -> None:
+    global _JOB_THREAD
+    try:
+        result = handle(method, params)
+        cancelled = job_control.finish_job(control_id)
+        response = {"jsonrpc": "2.0", "id": request_id, **({"error": {"code": -32800, "message": "control request cancelled"}} if cancelled else {"result": result})}
+    except BaseException as exc:
+        cancelled = job_control.finish_job(control_id)
+        response = {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32800 if cancelled else -32000, "message": "control request cancelled" if cancelled else str(exc)}}
+    finally:
+        _JOB_THREAD = None
+    _write_response(response)
+
+
+def _start_control(request_id: Any, method: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    global _JOB_THREAD
+    if _JOB_THREAD is not None or job_control.active_job_id() is not None:
+        return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32001, "message": "media worker is busy"}}
+    control_id = f"control:{request_id}"
+    job_control.begin_job(control_id)
+    thread = threading.Thread(target=_control_response, args=(request_id, control_id, method, params), name=f"cevra-media-control-{request_id}")
+    _JOB_THREAD = thread
+    try:
+        thread.start()
+    except BaseException:
+        _JOB_THREAD = None
+        job_control.finish_job(control_id)
+        raise
     return None
 
 
@@ -771,8 +949,9 @@ def main() -> int:
         print(json.dumps(info(), indent=2))
         return 0
     if "--health" in sys.argv:
-        print(json.dumps(health(), indent=2))
-        return 0
+        report = health()
+        print(json.dumps(report, indent=2))
+        return 0 if report.get("ok") else 1
     shutting_down = False
     try:
         for raw in sys.stdin.buffer:
@@ -795,6 +974,8 @@ def main() -> int:
                     raise ValueError("method must be a string")
                 if method == "tools/call":
                     response = _start_job(req["id"], params)
+                elif method in {"cevra/info", "cevra/health", "cevra/benchmark"}:
+                    response = _start_control(req["id"], method, params)
                 elif method == "cevra/cancel":
                     job_id = params.get("jobId")
                     if not isinstance(job_id, str) or not job_id:

@@ -70,6 +70,9 @@ def assemble(
     for source in ffmpeg_inputs:
         if not source.is_file():
             raise SystemExit(f"FFmpeg release input is incomplete: {source}")
+    ffmpeg_sources = ffmpeg_prefix / "sources" / "ffmpeg"
+    if not ffmpeg_sources.is_dir():
+        raise SystemExit("FFmpeg release input is missing exact source/compliance artifacts")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f".{output.name}-", dir=output.parent) as temp_name:
@@ -81,6 +84,7 @@ def assemble(
             raise SystemExit("copied private Python executable is invalid")
         for source, relative in ffmpeg_inputs.items():
             _copy_file(source, stage / relative, relative.as_posix())
+        shutil.copytree(ffmpeg_sources, stage / "sources" / "ffmpeg", symlinks=False)
 
         build_worker(stage, staged_python, vendor_source)
         manifest = generate(stage, staged_python)
@@ -89,6 +93,7 @@ def assemble(
         verify_release_bundle(
             stage,
             staged_python,
+            require_running_python=False,
             expected_python=VERSIONS["python"]["version"],
             expected_ffmpeg=VERSIONS["ffmpeg"]["version"],
             expected_ffmpeg_source=VERSIONS["ffmpeg"]["source"],

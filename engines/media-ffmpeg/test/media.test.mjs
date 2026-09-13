@@ -10,14 +10,37 @@ class FakeWorker {
     return { name: "cevra-media-worker", version: "0.1.0", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
   }
   async health() {
-    return { ok: true, checkedAt: "2026-09-11T18:00:00.000Z", checks: [{ id: "ffmpeg", status: "PASS" }], tools: { probe: { usable: "yes" }, cut: { usable: "yes" }, fit: { usable: "yes" }, silence: { usable: "yes" } } };
+    return {
+      ok: true, checkedAt: "2026-09-11T18:00:00.000Z", checks: [{ id: "ffmpeg", status: "PASS" }],
+      tools: { probe: { usable: "yes" }, cut: { usable: "yes" }, fit: { usable: "yes" }, silence: { usable: "yes" } },
+      effectiveDeliveries: [
+        { container: "mp4", audioOnly: false, videoCodec: "h264", audioCodec: "aac", videoEncoder: "h264_videotoolbox", audioEncoder: "aac" },
+        { container: "mp4", audioOnly: false, videoCodec: "copy", audioCodec: "aac", videoEncoder: "copy", audioEncoder: "aac" },
+        { container: "mov", audioOnly: false, videoCodec: "h264", audioCodec: "aac", videoEncoder: "h264_videotoolbox", audioEncoder: "aac" },
+        { container: "mkv", audioOnly: false, videoCodec: "h264", audioCodec: "aac", videoEncoder: "h264_videotoolbox", audioEncoder: "aac" },
+        { container: "mkv", audioOnly: false, videoCodec: "h264", audioCodec: "opus", videoEncoder: "h264_videotoolbox", audioEncoder: "opus" },
+        { container: "mkv", audioOnly: false, videoCodec: "copy", audioCodec: "opus", videoEncoder: "copy", audioEncoder: "opus" },
+        { container: "mkv", audioOnly: false, videoCodec: "copy", audioCodec: "copy", videoEncoder: "copy", audioEncoder: "copy" },
+        { container: "mkv", audioOnly: true, audioCodec: "opus", audioEncoder: "opus" },
+        { container: "wav", audioOnly: true, audioCodec: "pcm", audioEncoder: "pcm_s16le" },
+        { container: "m4a", audioOnly: true, audioCodec: "aac", audioEncoder: "aac" }
+      ]
+    };
   }
   async listTools() { return []; }
   async callTool(name, arguments_, jobId, signal) {
     this.calls.push({ name, arguments_, jobId, signal });
     if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: this.probeVideoCodec }, audio: { codec: this.probeAudioCodec, sample_rate: 48000, channels: 2 } } };
     if (name === "silence") return { structuredContent: { silences: [[1.2, 2.4], [5.0, null]] } };
-    return { structuredContent: { status: "completed", output: arguments_.output, probe: { file: arguments_.output, duration: 1.0 } } };
+    if (name === "cevra-extract-frame") return { structuredContent: { status: "completed", output: arguments_.output, probe: { file: arguments_.output, video: { codec: "png", width: 1920, height: 1080 } }, effectiveProfile: { container: "png", videoCodec: "png", videoEncoder: "png" } } };
+    const audioOnly = arguments_.drop_video === true;
+    const audioCodec = arguments_.audio_codec ?? "aac";
+    const videoCodec = arguments_.video_codec ?? "h264";
+    return { structuredContent: {
+      status: "completed", output: arguments_.output,
+      probe: { file: arguments_.output, duration: 1.0, ...(!audioOnly ? { video: { codec: videoCodec === "copy" ? this.probeVideoCodec : videoCodec, width: 1920, height: 1080, fps: 30 } } : {}), audio: { codec: audioCodec === "pcm" ? "pcm_s16le" : audioCodec } },
+      effectiveProfile: { container: arguments_.container ?? (String(arguments_.output).split(".").pop()), ...(!audioOnly ? { videoCodec: videoCodec === "copy" ? this.probeVideoCodec : videoCodec, videoEncoder: videoCodec === "copy" ? "copy" : "h264_videotoolbox" } : {}), audioCodec, audioEncoder: audioCodec === "copy" ? "copy" : audioCodec }
+    } };
   }
 }
 
@@ -57,7 +80,7 @@ test("silence detection normalizes seconds into milliseconds", async () => {
   assert.equal(result.type, "detect-silence");
   assert.deepEqual(result.ranges[0], { startMs: 1200, endMs: 2400 });
   assert.equal(result.ranges[1].startMs, 5000);
-  assert.equal(result.ranges[1].endMs, Number.MAX_SAFE_INTEGER);
+  assert.equal(result.ranges[1].endMs, null);
 });
 
 test("worker error propagates as engine failure", async () => {
@@ -124,22 +147,22 @@ test("incompatible delivery codec/container pairs are rejected before worker exe
   const engine = new FfmpegMediaEngine(worker);
   await assert.rejects(
     () => engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.webm", container: "webm", videoCodec: "h264", audioCodec: "opus" }, context),
-    /incompatible with WEBM/
+    /Invalid media container/
   );
   await assert.rejects(
     () => engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.mp4", container: "mp4", audioCodec: "mp3" }, context),
-    /incompatible with MP4/
+    /Invalid audio codec/
   );
   assert.equal(worker.calls.length, 0);
 });
 
-test("inferred containers dispatch compatible defaults instead of H.264/AAC everywhere", async () => {
+test("inferred MKV delivery dispatches only a currently supported default", async () => {
   const worker = new FakeWorker();
   const engine = new FfmpegMediaEngine(worker);
-  await engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.webm" }, context);
+  await engine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.mkv" }, context);
   assert.equal(worker.calls[0].name, "cevra-transcode");
   assert.deepEqual(worker.calls[0].arguments_, {
-    input: "in.mp4", output: "out.webm", container: "webm", video_codec: "vp9", audio_codec: "opus"
+    input: "in.mp4", output: "out.mkv", container: "mkv", video_codec: "h264", audio_codec: "aac"
   });
 });
 
@@ -161,18 +184,19 @@ test("audio-only transcode drops video explicitly and rejects video transforms",
 
 test("stream copy probes real input codecs before dispatch", async () => {
   const worker = new FakeWorker();
-  worker.probeVideoCodec = "vp9";
+  worker.probeVideoCodec = "h264";
   worker.probeAudioCodec = "opus";
   const engine = new FfmpegMediaEngine(worker);
-  await engine.execute({ type: "transcode", inputUri: "in.webm", outputUri: "out.webm", videoCodec: "copy", audioCodec: "copy" }, context);
+  await engine.execute({ type: "transcode", inputUri: "in.mkv", outputUri: "out.mkv", videoCodec: "copy", audioCodec: "copy" }, context);
   assert.deepEqual(worker.calls.map((call) => call.name), ["probe", "cevra-transcode"]);
   assert.equal(worker.calls[1].arguments_.video_codec, "copy");
   assert.equal(worker.calls[1].arguments_.audio_codec, "copy");
 
   const incompatible = new FakeWorker();
+  incompatible.probeVideoCodec = "vp9";
   const incompatibleEngine = new FfmpegMediaEngine(incompatible);
   await assert.rejects(
-    () => incompatibleEngine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.webm", videoCodec: "copy" }, context),
+    () => incompatibleEngine.execute({ type: "transcode", inputUri: "in.mp4", outputUri: "out.mkv", videoCodec: "copy", audioCodec: "opus" }, context),
     /video codec cannot be copied/
   );
   assert.deepEqual(incompatible.calls.map((call) => call.name), ["probe"]);
@@ -181,10 +205,10 @@ test("stream copy probes real input codecs before dispatch", async () => {
 test("extract-audio forwards its resolved codec through the typed transcode tool", async () => {
   const worker = new FakeWorker();
   const engine = new FfmpegMediaEngine(worker);
-  await engine.execute({ type: "extract-audio", inputUri: "in.mp4", outputUri: "out.webm", audioCodec: "opus" }, context);
+  await engine.execute({ type: "extract-audio", inputUri: "in.mp4", outputUri: "out.mkv", audioCodec: "opus" }, context);
   assert.equal(worker.calls[0].name, "cevra-transcode");
   assert.deepEqual(worker.calls[0].arguments_, {
-    input: "in.mp4", output: "out.webm", container: "webm", audio_codec: "opus", drop_video: true
+    input: "in.mp4", output: "out.mkv", container: "mkv", audio_codec: "opus", drop_video: true
   });
 });
 

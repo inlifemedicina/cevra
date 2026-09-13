@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import urllib.request
@@ -51,6 +52,29 @@ def signature_matches(status_output: str, expected_fingerprint: str) -> bool:
     return False
 
 
+def extract_verified_archive(archive: Path, destination: Path) -> None:
+    with tarfile.open(archive, "r:xz") as package:
+        destination_root = destination.resolve(strict=True)
+        for member in package.getmembers():
+            member_path = destination / member.name
+            try:
+                member_path.resolve(strict=False).relative_to(destination_root)
+            except ValueError as exc:
+                raise SystemExit(f"FFmpeg archive path escapes extraction root: {member.name}") from exc
+            if member.ischr() or member.isblk() or member.isfifo():
+                raise SystemExit(f"FFmpeg archive contains unsupported special file: {member.name}")
+            if member.issym() or member.islnk():
+                link_path = (member_path.parent if member.issym() else destination) / member.linkname
+                try:
+                    link_path.resolve(strict=False).relative_to(destination_root)
+                except ValueError as exc:
+                    raise SystemExit(f"FFmpeg archive link escapes extraction root: {member.name}") from exc
+        if sys.version_info >= (3, 12):
+            package.extractall(destination, filter="data")
+        else:
+            package.extractall(destination)
+
+
 def prepare(destination: Path) -> Path:
     if shutil.which("gpg") is None:
         raise SystemExit("gpg is required to verify the FFmpeg release signature")
@@ -63,6 +87,11 @@ def prepare(destination: Path) -> Path:
         download(PIN["source"], archive)
         download(PIN["signature"], signature)
         download(PIN["signingKey"], key)
+        digests = {"archive": sha256(archive), "signature": sha256(signature), "signingKey": sha256(key)}
+        expected_digests = {"archive": PIN["archiveSha256"], "signature": PIN["signatureSha256"], "signingKey": PIN["signingKeySha256"]}
+        for name, actual in digests.items():
+            if actual != expected_digests[name]:
+                raise SystemExit(f"FFmpeg {name} SHA-256 mismatch: {actual}")
 
         gnupg = temp / "gnupg"
         gnupg.mkdir(mode=0o700)
@@ -80,8 +109,7 @@ def prepare(destination: Path) -> Path:
 
         extract_root = temp / "extract"
         extract_root.mkdir()
-        with tarfile.open(archive, "r:xz") as tar:
-            tar.extractall(extract_root, filter="data")
+        extract_verified_archive(archive, extract_root)
         source = extract_root / f"ffmpeg-{PIN['version']}"
         if not (source / "configure").is_file():
             raise SystemExit("verified FFmpeg archive does not contain the expected source tree")
@@ -89,6 +117,9 @@ def prepare(destination: Path) -> Path:
         if target.exists():
             shutil.rmtree(target)
         shutil.copytree(source, target, symlinks=True)
+        shutil.copy2(archive, target / "CEVRA_SOURCE_ARCHIVE.tar.xz")
+        shutil.copy2(signature, target / "CEVRA_SOURCE_ARCHIVE.tar.xz.asc")
+        shutil.copy2(key, target / "CEVRA_SIGNING_KEY.asc")
         provenance = {
             "id": "ffmpeg-source",
             "version": PIN["version"],
@@ -96,9 +127,9 @@ def prepare(destination: Path) -> Path:
             "signature": PIN["signature"],
             "signingFingerprint": PIN["signingFingerprint"],
             "verifiedSignerFingerprint": expected,
-            "archiveSha256": sha256(archive),
-            "signatureSha256": sha256(signature),
-            "signingKeySha256": sha256(key),
+            "archiveSha256": digests["archive"],
+            "signatureSha256": digests["signature"],
+            "signingKeySha256": digests["signingKey"],
             "verified": True,
         }
         (target / "CEVRA_SOURCE_PROVENANCE.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")

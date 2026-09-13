@@ -11,11 +11,13 @@
   "scripts": {
     "build": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application && npm run build -w @cevra/project-store && npm run build -w @cevra/media-ffmpeg",
     "test": "npm run test -w @cevra/project-ir && npm run test -w @cevra/contracts && npm run test -w @cevra/i18n && npm run test -w @cevra/application && npm run test -w @cevra/project-store && npm run test -w @cevra/media-ffmpeg",
-    "test:ci": "node --test packages/project-ir/test/*.test.mjs packages/contracts/test/*.test.mjs packages/i18n/test/*.test.mjs packages/application/test/*.test.mjs packages/project-store/test/*.test.mjs engines/media-ffmpeg/test/*.test.mjs",
+    "test:ci": "npm run test --workspaces --if-present",
+    "test:python": "python3 -I -B -m unittest discover -s engines/media-ffmpeg/test_python -p 'test_*.py' -v",
     "ci": "npm run build && npm run test:ci",
     "doctor": "python3 scripts/doctor.py"
   },
   "devDependencies": {
+    "@types/node": "22.15.3",
     "typescript": "5.8.3"
   }
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MEDIA_DELIVERY_MATRIX } from "@cevra/contracts";
+import { MAX_MEDIA_DURATION_MS, MAX_MEDIA_FPS, MAX_MEDIA_HEIGHT, MAX_MEDIA_INPUTS, MAX_MEDIA_URI_LENGTH, MAX_MEDIA_WIDTH, MEDIA_DELIVERY_MATRIX } from "@cevra/contracts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = path.join(here, "fixtures", "native_tool_matrix.py");
@@ -17,6 +17,9 @@ function run(operation, arguments_, metadata = {}, encoders) {
 
 test("TypeScript and Python use the same delivery matrix", () => {
   const pythonMatrix = run("matrix", {}).matrix;
+  assert.deepEqual(Object.keys(pythonMatrix).sort(), Object.keys(MEDIA_DELIVERY_MATRIX).sort());
+  assert.equal(Object.hasOwn(pythonMatrix, "webm"), false);
+  assert.equal(Object.hasOwn(pythonMatrix, "mp3"), false);
   for (const [container, rule] of Object.entries(MEDIA_DELIVERY_MATRIX)) {
     assert.deepEqual(pythonMatrix[container], {
       videoCodecs: [...rule.videoCodecs].sort(),
@@ -28,27 +31,43 @@ test("TypeScript and Python use the same delivery matrix", () => {
   }
 });
 
-test("Python worker applies WebM defaults from its delivery matrix", () => {
-  const result = run("transcode", { input: "in.mp4", output: "out.webm" }, {
+test("TypeScript and Python expose semantically identical media resource limits", () => {
+  assert.deepEqual(run("limits", {}), {
+    width: MAX_MEDIA_WIDTH,
+    height: MAX_MEDIA_HEIGHT,
+    fps: MAX_MEDIA_FPS,
+    durationMs: MAX_MEDIA_DURATION_MS,
+    inputs: MAX_MEDIA_INPUTS,
+    uriLength: MAX_MEDIA_URI_LENGTH
+  });
+});
+
+test("Python worker applies the supported MKV defaults from its delivery matrix", () => {
+  const result = run("transcode", { input: "in.mp4", output: "out.mkv" }, {
     "in.mp4": { video: { codec: "h264" }, audio: { codec: "aac" } }
   });
   assert.equal(result.error, undefined);
-  assert.deepEqual(result.command.slice(-3), ["-f", "webm", "out.webm"]);
-  assert.equal(result.command.includes("libvpx-vp9"), true);
-  assert.equal(result.command.includes("libopus"), true);
-  assert.equal(result.command.includes("h264_test"), false);
+  assert.deepEqual(result.command.slice(-3), ["-f", "matroska", "out.mkv"]);
+  assert.equal(result.command.includes("h264_test"), true);
+  assert.equal(result.command.includes("aac"), true);
 });
 
 test("Python worker fails explicitly when a requested bundle encoder is unavailable", () => {
   const metadata = { "in.mp4": { video: { codec: "h264" }, audio: { codec: "aac" } } };
-  const missingVp9 = run("transcode", { input: "in.mp4", output: "out.webm" }, metadata, ["aac"]);
-  assert.match(missingVp9.error, /VP9 encoder is not available/);
-  const missingOpus = run("transcode", { input: "in.mp4", output: "out.webm", video_codec: "copy" }, {
-    "in.mp4": { video: { codec: "vp9" }, audio: { codec: "opus" } }
-  }, ["libvpx-vp9"]);
-  assert.match(missingOpus.error, /OPUS encoder libopus is not available/);
-  const missingMp3 = run("transcode", { input: "in.mp4", output: "out.mp3" }, metadata, ["aac"]);
-  assert.match(missingMp3.error, /MP3 encoder libmp3lame is not available/);
+  const missingOpus = run("transcode", { input: "in.mp4", output: "out.mkv", video_codec: "copy", audio_codec: "opus" }, metadata, ["aac"]);
+  assert.match(missingOpus.error, /OPUS encoder opus is not available/);
+  const removedWebm = run("transcode", { input: "in.mp4", output: "out.webm" }, metadata, ["aac"]);
+  assert.match(removedWebm.error, /container is required or must be inferable/);
+  const removedMp3 = run("transcode", { input: "in.mp4", output: "out.mp3" }, metadata, ["aac"]);
+  assert.match(removedMp3.error, /container is required or must be inferable/);
+});
+
+test("Python worker enables the bundled native Opus encoder explicitly", () => {
+  const result = run("transcode", { input: "in.mp4", output: "out.mkv", video_codec: "copy", audio_codec: "opus" }, {
+    "in.mp4": { video: { codec: "h264" }, audio: { codec: "aac" } }
+  }, ["aac", "opus"]);
+  assert.equal(result.error, undefined);
+  assert.equal(result.command.join(" ").includes("-c:a opus -strict -2 -b:a 160k"), true);
 });
 
 test("Python worker drops video explicitly for inferred audio-only containers", () => {
@@ -80,10 +99,10 @@ test("Python worker rejects non-scalar codecs and incompatible stream copy", () 
   });
   assert.match(nullWidth.error, /width must be greater than 0/);
 
-  const incompatible = run("transcode", { input: "in.mp4", output: "out.webm", video_codec: "copy" }, {
-    "in.mp4": { video: { codec: "h264" }, audio: { codec: "opus" } }
+  const incompatible = run("transcode", { input: "in.mp4", output: "out.mp4", video_codec: "copy" }, {
+    "in.mp4": { video: { codec: "vp9" }, audio: { codec: "aac" } }
   });
-  assert.match(incompatible.error, /video codec cannot be copied into webm/);
+  assert.match(incompatible.error, /video codec cannot be copied into mp4/);
 });
 
 test("Python numeric validators reject NaN, Infinity and fractional pixel values", () => {
@@ -102,7 +121,7 @@ test("Python mux keeps the existing audio stream only when replacement is disabl
   const replaced = run("mux", { video: "video.mp4", audio: "new.wav", output: "out.mp4", replace_existing: true }, metadata);
   assert.equal(preserved.error, undefined);
   assert.equal(replaced.error, undefined);
-  assert.equal(preserved.command.join(" ").includes("-map 0:a:0 -map 1:a:0"), true);
+  assert.equal(preserved.command.join(" ").includes("-map 1:a:0 -map 0:a:0"), true);
   assert.equal(replaced.command.join(" ").includes("0:a:0"), false);
   assert.equal(replaced.command.join(" ").includes("-map 1:a:0"), true);
 });

@@ -44,15 +44,24 @@ def register_artifacts(paths: Iterable[str]) -> None:
         for raw in paths:
             if not raw or raw == "-" or raw.startswith("pipe:") or raw.startswith("-"):
                 continue
-            path = Path(raw).resolve()
-            _ACTIVE.artifacts.setdefault(path, path.exists())
+            path = Path(raw).absolute()
+            try:
+                metadata = path.lstat()
+            except FileNotFoundError:
+                existed_before = False
+            else:
+                if path.is_symlink():
+                    raise RuntimeError(f"media output path must not be a symlink: {path}")
+                if not path.is_file():
+                    raise RuntimeError(f"media output path must be a regular file or absent: {path}")
+                existed_before = True
+            _ACTIVE.artifacts.setdefault(path, existed_before)
 
 
 def attach_process(process: subprocess.Popen[Any], artifact_paths: Iterable[str] = ()) -> None:
     with _LOCK:
         if _ACTIVE is None:
             raise RuntimeError("media subprocess started without an active job")
-        register_artifacts(artifact_paths)
         _ACTIVE.process = process
         cancelled = _ACTIVE.cancelled.is_set()
     if cancelled:
@@ -101,6 +110,8 @@ def run(
     artifact_paths: Iterable[str] = (),
     **kwargs: Any,
 ) -> subprocess.CompletedProcess[Any]:
+    register_artifacts(artifact_paths)
+    kwargs.setdefault("stdin", subprocess.DEVNULL)
     process = subprocess.Popen(list(args), stdout=stdout, stderr=stderr, text=text, **kwargs)
     attach_process(process, artifact_paths)
     try:
@@ -119,6 +130,8 @@ def run(
 
 
 def popen(args: Sequence[str], *, artifact_paths: Iterable[str] = (), **kwargs: Any) -> subprocess.Popen[Any]:
+    register_artifacts(artifact_paths)
+    kwargs.setdefault("stdin", subprocess.DEVNULL)
     process = subprocess.Popen(list(args), **kwargs)
     attach_process(process, artifact_paths)
     return process

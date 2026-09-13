@@ -59,6 +59,8 @@ jobs:
         run: |
           python -m json.tool engines/media-ffmpeg/runtime/versions.json >/dev/null
           python -m json.tool engines/media-ffmpeg/runtime/manifest.schema.json >/dev/null
+      - name: Run Media Runtime Python unit tests
+        run: python -I -B -m unittest discover -s engines/media-ffmpeg/test_python -p 'test_*.py' -v
       - name: Verify pinned FFmpeg release signature
         run: python engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "${RUNNER_TEMP}/ffmpeg-source"
       - name: Prepare and verify pinned ffmpeg-skill
@@ -74,3 +76,4 @@ jobs:
           python engines/media-ffmpeg/runtime/validate_bundle_pipeline.py
           --vendor "${RUNNER_TEMP}/ffmpeg-skill"
           --python-root "${RUNNER_TEMP}/cevra-python"
+          --ffmpeg-source "${RUNNER_TEMP}/ffmpeg-source/ffmpeg-9.0.1"

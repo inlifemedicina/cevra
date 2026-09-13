@@ -6,6 +6,12 @@
     "distribution": "astral-sh/python-build-standalone",
     "release": "20260901",
     "licenseSha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+    "componentNotices": [
+      { "id": "python-openssl-license", "component": "openssl", "version": "3.5.8", "source": "third_party/python-runtime/openssl-3.5.8-LICENSE.txt", "path": "licenses/python/components/openssl-3.5.8-LICENSE.txt", "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a" },
+      { "id": "python-liblzma-license", "component": "liblzma", "version": "5.4.3", "source": "third_party/python-runtime/xz-5.4.3-COPYING.txt", "path": "licenses/python/components/xz-5.4.3-COPYING.txt", "sha256": "72d7ef9c98be319fd34ce88b45203b36d5936f9c49e82bf3198ffee5e0c7d87e" },
+      { "id": "python-bzip2-license", "component": "bzip2", "version": "1.0.8", "source": "third_party/python-runtime/bzip2-1.0.8-LICENSE.txt", "path": "licenses/python/components/bzip2-1.0.8-LICENSE.txt", "sha256": "c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3" },
+      { "id": "python-libffi-license", "component": "libffi", "version": "3.4.8", "source": "third_party/python-runtime/libffi-3.4.8-LICENSE.txt", "path": "licenses/python/components/libffi-3.4.8-LICENSE.txt", "sha256": "67894089811f93fca47a76f85e017da6f8582d4ba0905963c6e0f1ad6df7a195" }
+    ],
     "artifacts": {
       "darwin-arm64": {
         "executable": "bin/python3.12",
@@ -37,8 +43,11 @@
   "ffmpeg": {
     "version": "9.0.1",
     "source": "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz",
+    "archiveSha256": "cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635",
     "signature": "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz.asc",
+    "signatureSha256": "b613a00005232a1245ace7080088781ac23a916119d3e5b0d6c042368eee0177",
     "signingKey": "https://ffmpeg.org/ffmpeg-devel.asc",
+    "signingKeySha256": "397b3becedcd5a98769967ff1ff8501ddc89f8368b8f766e4701377d7dbaabe5",
     "signingFingerprint": "FCF986EA15E6E293A5644F10B4322F04D67658D8"
   },
   "ffmpegSkill": {

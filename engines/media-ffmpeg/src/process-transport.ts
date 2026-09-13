@@ -9,11 +9,17 @@ export interface MediaWorkerProcessOptions {
   cwd?: string;
   env?: Record<string, string | undefined>;
   shutdownTimeoutMs?: number;
+  controlTimeoutMs?: number;
+  renderTimeoutMs?: number;
+  renderLivenessIntervalMs?: number;
 }
 
 interface RpcError { code: number; message: string }
 interface RpcResponse { id?: unknown; result?: unknown; error?: RpcError }
 interface PendingRequest {
+  method: string;
+  jobId?: string;
+  terminalError?: Error;
   resolve(value: unknown): void;
   reject(reason: Error): void;
   cleanup(): void;
@@ -35,12 +41,16 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   private stderrTail = "";
   private readonly pending = new Map<number, PendingRequest>();
 
-  constructor(private readonly options: MediaWorkerProcessOptions) {}
+  constructor(private readonly options: MediaWorkerProcessOptions) {
+    for (const [name, value] of [["controlTimeoutMs", options.controlTimeoutMs ?? 5000], ["shutdownTimeoutMs", options.shutdownTimeoutMs ?? 5000], ["renderLivenessIntervalMs", options.renderLivenessIntervalMs ?? 5000]] as const) {
+      if (!Number.isFinite(value) || value <= 0) throw new RangeError(`${name} must be a finite positive number.`);
+    }
+  }
 
   get workerPid(): number | undefined { return this.child?.pid; }
 
   async start(): Promise<void> {
-    if (this.child?.exitCode === null) return;
+    if (this.child?.exitCode === null && this.child.signalCode === null) return;
     if (this.stopping) await this.stopping;
     this.starting ??= this.spawnWorker().finally(() => { this.starting = undefined; });
     return this.starting;
@@ -49,7 +59,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   async stop(): Promise<void> {
     if (this.stopping) return this.stopping;
     const child = this.child;
-    if (!child || child.exitCode !== null) return;
+    if (!child || child.exitCode !== null || child.signalCode !== null) return;
     this.stopping = this.stopWorker(child).finally(() => { this.stopping = undefined; });
     return this.stopping;
   }
@@ -66,6 +76,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
     const env = { ...sourceEnv };
     env.PYTHONNOUSERSITE = "1";
     env.PYTHONDONTWRITEBYTECODE = "1";
+    delete env.FFMPEG_SKILL_TIMEOUT;
     if (releaseMode) {
       for (const name of PYTHON_PROCESS_OVERRIDES) delete env[name];
       for (const name of CEVRA_RELEASE_OVERRIDES) delete env[name];
@@ -73,6 +84,9 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       env.CEVRA_RELEASE_MODE = "1";
       env.PATH = join(runtimeRoot, "bin");
     }
+    const renderTimeoutMs = this.options.renderTimeoutMs ?? 0;
+    if (!Number.isFinite(renderTimeoutMs) || renderTimeoutMs < 0) throw new RangeError("renderTimeoutMs must be a finite non-negative number.");
+    env.CEVRA_MEDIA_RENDER_TIMEOUT_SECONDS = String(renderTimeoutMs / 1000);
     const child = spawn(this.options.pythonExecutable, ["-I", "-B", this.options.workerScript], {
       ...(this.options.cwd ? { cwd: this.options.cwd } : {}),
       env,
@@ -93,26 +107,94 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
         `CEVRA media worker exited (${code ?? signal ?? "unknown"})${detail ? `: ${detail}` : ""}`
       ));
     });
-    await this.send("ping");
+    try {
+      await this.send("ping");
+    } catch (error) {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      await waitForExit(child, 1000).catch(() => undefined);
+      this.failWorker(child, error instanceof Error ? error : new WorkerProcessExitedError("CEVRA media worker failed to start."));
+      throw error;
+    }
   }
 
   private send<T>(method: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     const child = this.child;
-    if (!child || child.exitCode !== null || !child.stdin.writable) {
+    if (!child || child.exitCode !== null || child.signalCode !== null || !child.stdin.writable) {
       return Promise.reject(new WorkerProcessExitedError("CEVRA media worker is not running."));
     }
     if (signal?.aborted) return Promise.reject(abortError());
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
-      const abort = () => {
-        const jobId = params?.jobId;
-        if (method === "tools/call" && typeof jobId === "string") {
-          void this.send("cevra/cancel", { jobId }).catch(() => undefined);
-        }
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let livenessTimer: ReturnType<typeof setTimeout> | undefined;
+      let inactiveLivenessChecks = 0;
+      const jobId = typeof params?.jobId === "string" ? params.jobId : undefined;
+      const settleError = (error: Error) => {
+        const pending = this.pending.get(id);
+        if (!pending) return;
+        this.pending.delete(id);
+        pending.cleanup();
+        pending.reject(error);
       };
-      const cleanup = () => signal?.removeEventListener("abort", abort);
-      this.pending.set(id, { resolve: (value) => resolve(value as T), reject, cleanup });
+      const requestTermination = (error: Error) => {
+        const pending = this.pending.get(id);
+        if (!pending || pending.terminalError) return;
+        pending.terminalError = error;
+        if (timer) {
+          clearTimeout(timer);
+          timer = undefined;
+        }
+        if (method === "tools/call" && typeof jobId === "string") {
+          void this.send("cevra/cancel", { jobId }).catch(() => settleError(error));
+          return;
+        }
+        settleError(error);
+      };
+      const abort = () => requestTermination(abortError());
+      const cleanup = () => {
+        signal?.removeEventListener("abort", abort);
+        if (timer) clearTimeout(timer);
+        if (livenessTimer) clearTimeout(livenessTimer);
+      };
+      this.pending.set(id, { method, ...(jobId ? { jobId } : {}), resolve: (value) => resolve(value as T), reject, cleanup });
       signal?.addEventListener("abort", abort, { once: true });
+      const checkLiveness = async () => {
+        if (!this.pending.has(id)) return;
+        try {
+          const status = await this.send<{ activeJobId?: string | null }>("ping");
+          if (status.activeJobId !== jobId) {
+            const current = this.pending.get(id);
+            if (current?.terminalError) {
+              settleError(current.terminalError);
+              return;
+            }
+            inactiveLivenessChecks += 1;
+            if (inactiveLivenessChecks >= 2) {
+              settleError(new WorkerProcessExitedError(`CEVRA media worker lost the response for job ${jobId ?? "unknown"}.`));
+              return;
+            }
+          } else {
+            inactiveLivenessChecks = 0;
+          }
+        } catch (error) {
+          const current = this.pending.get(id);
+          settleError(current?.terminalError ?? (error instanceof Error ? error : new WorkerProcessExitedError("CEVRA media worker stopped responding.")));
+          if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+          return;
+        }
+        if (this.pending.has(id)) livenessTimer = setTimeout(checkLiveness, this.options.renderLivenessIntervalMs ?? 5000);
+      };
+      const timeoutMs = method === "tools/call" ? (this.options.renderTimeoutMs ?? 0) : (this.options.controlTimeoutMs ?? 5000);
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => {
+          const error = new Error(`${method} timed out after ${timeoutMs} ms`);
+          error.name = "TimeoutError";
+          requestTermination(error);
+        }, timeoutMs);
+      }
+      if (method === "tools/call") {
+        livenessTimer = setTimeout(checkLiveness, this.options.renderLivenessIntervalMs ?? 5000);
+      }
       child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`, (error) => {
         if (!error) return;
         const pending = this.pending.get(id);
@@ -139,23 +221,30 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       if (!pending) continue;
       this.pending.delete(response.id);
       pending.cleanup();
-      if (response.error) pending.reject(Object.assign(new Error(response.error.message), { code: response.error.code }));
+      if (pending.terminalError) pending.reject(pending.terminalError);
+      else if (response.error) pending.reject(Object.assign(new Error(response.error.message), { code: response.error.code }));
       else pending.resolve(response.result);
     }
   }
 
   private async stopWorker(child: ChildProcessWithoutNullStreams): Promise<void> {
     const timeoutMs = this.options.shutdownTimeoutMs ?? 5000;
+    for (const [id, pending] of this.pending) {
+      if (pending.method !== "tools/call") continue;
+      this.pending.delete(id);
+      pending.cleanup();
+      pending.reject(abortError());
+    }
     try {
       await withTimeout(this.send("cevra/shutdown"), timeoutMs, "worker shutdown timed out");
     } catch {
-      if (child.exitCode === null) child.kill("SIGKILL");
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
     }
-    if (child.exitCode === null) {
+    if (child.exitCode === null && child.signalCode === null) {
       try {
         await waitForExit(child, timeoutMs);
       } catch {
-        if (child.exitCode === null) child.kill("SIGKILL");
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
         await waitForExit(child, 1000);
       }
     }
@@ -185,7 +274,7 @@ const CEVRA_RELEASE_OVERRIDES = [
   "CEVRA_ALLOW_GPL_DEV_ENCODERS", "CEVRA_DECODE_ACCELERATION", "CEVRA_FFMPEG_SKILL_ROOT",
   "CEVRA_MEDIA_BIN_DIR", "CEVRA_MEDIA_RUNTIME_ROOT", "CEVRA_VIDEO_ENCODER_AV1",
   "CEVRA_VIDEO_ENCODER_H264", "CEVRA_VIDEO_ENCODER_HEVC", "FFMPEG_SKILL_NO_OVERWRITE",
-  "FFMPEG_SKILL_TIMEOUT"
+  "FFMPEG_SKILL_TIMEOUT", "CEVRA_MEDIA_RENDER_TIMEOUT_SECONDS"
 ] as const;
 
 function abortError(): Error {
@@ -205,6 +294,6 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
 }
 
 function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<void> {
-  if (child.exitCode !== null) return Promise.resolve();
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
   return withTimeout(new Promise<void>((resolve) => child.once("exit", () => resolve())), timeoutMs, "worker exit timed out");
 }

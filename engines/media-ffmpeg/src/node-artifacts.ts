@@ -2,14 +2,20 @@ import { lstat, unlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 export class NodeMediaArtifactStore {
-  async exists(uri: string): Promise<boolean> {
+  async kind(uri: string): Promise<"missing" | "file" | "symlink" | "other"> {
     const path = localPath(uri);
     try {
-      return (await lstat(path)).isFile();
+      const metadata = await lstat(path);
+      if (metadata.isSymbolicLink()) return "symlink";
+      return metadata.isFile() ? "file" : "other";
     } catch (error) {
-      if (errorCode(error) === "ENOENT") return false;
+      if (errorCode(error) === "ENOENT") return "missing";
       throw error;
     }
+  }
+
+  async exists(uri: string): Promise<boolean> {
+    return (await this.kind(uri)) !== "missing";
   }
 
   async remove(uri: string): Promise<void> {

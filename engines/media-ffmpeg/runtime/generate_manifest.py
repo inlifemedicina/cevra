@@ -16,7 +16,7 @@ HERE = Path(__file__).resolve().parent
 ENGINE = HERE.parent
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ENGINE / "worker"))
-from runtime_integrity import CRITICAL_WORKER_FILES, REQUIRED_NOTICE_PATHS, RuntimeIntegrityError, sha256, tree_sha256
+from runtime_integrity import CRITICAL_WORKER_FILES, RuntimeIntegrityError, required_notice_paths, sha256, tree_sha256
 
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 
@@ -115,6 +115,8 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
         raise SystemExit("private Python executable must be a non-symlink file under runtime/python")
     python_binary = component(runtime, python_relative)
     python_root = component(runtime, "python", directory=True)
+    python_provenance_path = component(runtime, "python/CEVRA_PYTHON_PROVENANCE.json")
+    python_provenance = read_json(python_provenance_path, "managed Python provenance")
     ffmpeg = component(runtime, f"bin/ffmpeg{exe}")
     ffprobe = component(runtime, f"bin/ffprobe{exe}")
     worker_root = component(runtime, "worker", directory=True)
@@ -125,8 +127,21 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
     ffmpeg_provenance_path = component(runtime, "provenance/ffmpeg.json")
     for relative in CRITICAL_WORKER_FILES:
         component(runtime, relative)
-    for relative in REQUIRED_NOTICE_PATHS.values():
+    notices_required = required_notice_paths(sys_platform())
+    for relative in notices_required.values():
         component(runtime, relative)
+    component_notice_metadata: dict[str, dict[str, str]] = {}
+    if sys_platform() == "darwin":
+        components = {str(item.get("id")): item for item in (python_provenance.get("nativeComponents") or []) if isinstance(item, dict)}
+        for notice in VERSIONS["python"].get("componentNotices", []):
+            ident = str(notice.get("id") or "")
+            component_id = str(notice.get("component") or "")
+            version = str(notice.get("version") or "")
+            if notices_required.get(ident) != notice.get("path") or sha256(runtime / str(notice.get("path"))) != notice.get("sha256"):
+                raise SystemExit(f"managed Python component notice does not match its pin: {ident}")
+            if components.get(component_id, {}).get("version") != version:
+                raise SystemExit(f"managed Python component version does not match notice metadata: {component_id}")
+            component_notice_metadata[ident] = {"component": component_id, "version": version}
 
     actual_python = python_version(python_binary)
     if actual_python != VERSIONS["python"]["version"]:
@@ -170,17 +185,36 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
     }
     if any(ffmpeg_provenance.get(key) != value for key, value in expected_ffmpeg_provenance.items()):
         raise SystemExit("FFmpeg provenance does not describe the bundled binaries")
-    for field in ("sourceArchiveSha256", "sourceSignatureSha256", "signingKeySha256"):
-        if re.fullmatch(r"[0-9a-f]{64}", str(ffmpeg_provenance.get(field) or "")) is None:
-            raise SystemExit(f"FFmpeg provenance is missing {field}")
+    pinned_digests = {"sourceArchiveSha256": ffmpeg_pin["archiveSha256"], "sourceSignatureSha256": ffmpeg_pin["signatureSha256"], "signingKeySha256": ffmpeg_pin["signingKeySha256"]}
+    for field, digest in pinned_digests.items():
+        if ffmpeg_provenance.get(field) != digest:
+            raise SystemExit(f"FFmpeg provenance {field} does not match the pin")
+    source_paths = {
+        "sourceArchive": f"sources/ffmpeg/ffmpeg-{ffmpeg_pin['version']}.tar.xz",
+        "sourceSignatureFile": f"sources/ffmpeg/ffmpeg-{ffmpeg_pin['version']}.tar.xz.asc",
+        "signingKeyFile": "sources/ffmpeg/ffmpeg-devel.asc",
+        "buildInstructions": "sources/ffmpeg/BUILD.md",
+    }
+    for field, relative in source_paths.items():
+        if ffmpeg_provenance.get(field) != relative:
+            raise SystemExit(f"FFmpeg provenance {field} is invalid")
+        component(runtime, relative)
+    if sha256(runtime / source_paths["sourceArchive"]) != ffmpeg_pin["archiveSha256"] or sha256(runtime / source_paths["sourceSignatureFile"]) != ffmpeg_pin["signatureSha256"] or sha256(runtime / source_paths["signingKeyFile"]) != ffmpeg_pin["signingKeySha256"]:
+        raise SystemExit("FFmpeg compliance source artifact digest mismatch")
+    if not isinstance(ffmpeg_provenance.get("toolchain"), dict):
+        raise SystemExit("FFmpeg provenance is missing toolchain identification")
 
     return {
         "format": "cevra-media-runtime", "formatVersion": 1,
         "runtimeVersion": actual_worker, "workerVersion": actual_worker,
         "platform": sys_platform(), "arch": platform.machine() or "unknown",
+        "bundleTreeSha256": tree_sha256(runtime, frozenset({"manifest.json"})),
+        "binFiles": [f"bin/ffmpeg{exe}", f"bin/ffprobe{exe}"],
         "python": {
             "version": actual_python, "root": "python", "executable": python_relative,
             "executableSha256": sha256(python_binary), "treeSha256": tree_sha256(python_root),
+            "provenance": "python/CEVRA_PYTHON_PROVENANCE.json", "provenanceSha256": sha256(python_provenance_path),
+            "pruning": python_provenance.get("pruning"), "nativeComponents": python_provenance.get("nativeComponents"),
         },
         "worker": {
             "root": "worker", "entrypoint": "worker/cevra_media_worker.py",
@@ -204,10 +238,15 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
             "sourceArchiveSha256": ffmpeg_provenance["sourceArchiveSha256"],
             "sourceSignatureSha256": ffmpeg_provenance["sourceSignatureSha256"],
             "signingKeySha256": ffmpeg_provenance["signingKeySha256"],
+            "sourceArchive": ffmpeg_provenance["sourceArchive"],
+            "sourceSignatureFile": ffmpeg_provenance["sourceSignatureFile"],
+            "signingKeyFile": ffmpeg_provenance["signingKeyFile"],
+            "buildInstructions": ffmpeg_provenance["buildInstructions"],
+            "toolchain": ffmpeg_provenance["toolchain"],
         },
         "notices": [
-            {"id": ident, "path": relative, "sha256": sha256(runtime / relative)}
-            for ident, relative in REQUIRED_NOTICE_PATHS.items()
+            {"id": ident, "path": relative, "sha256": sha256(runtime / relative), **component_notice_metadata.get(ident, {})}
+            for ident, relative in notices_required.items()
         ],
     }
 

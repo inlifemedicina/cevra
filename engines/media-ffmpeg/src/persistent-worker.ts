@@ -17,7 +17,8 @@ export interface PersistentWorkerTransport {
 export class PersistentMediaWorkerClient implements MediaWorkerClient {
   private startPromise: Promise<void> | undefined;
   private jobQueue: Promise<void> = Promise.resolve();
-  private closed = false;
+  private state: "open" | "closing" | "closed" = "open";
+  private closePromise: Promise<void> | undefined;
 
   constructor(private readonly transport: PersistentWorkerTransport) {}
 
@@ -47,6 +48,7 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
     if (!jobId.trim()) throw new Error("Media jobId is required.");
     if (signal?.aborted) throw abortError();
     const run = this.jobQueue.then(async () => {
+      if (this.state !== "open") throw abortError();
       if (signal?.aborted) throw abortError();
       try {
         return await this.request<MediaWorkerToolResult>("tools/call", { name, arguments: arguments_, jobId }, signal);
@@ -60,18 +62,23 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
   }
 
   async close(): Promise<void> {
-    this.closed = true;
-    if (!this.startPromise) return;
-    try {
-      await this.startPromise;
-    } finally {
-      this.startPromise = undefined;
-      await this.transport.stop();
-    }
+    if (this.state === "closed") return;
+    if (this.closePromise) return this.closePromise;
+    this.state = "closing";
+    this.closePromise = (async () => {
+      try {
+        await this.startPromise?.catch(() => undefined);
+      } finally {
+        this.startPromise = undefined;
+        await this.transport.stop();
+        this.state = "closed";
+      }
+    })();
+    return this.closePromise;
   }
 
   private async request<T>(method: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
-    if (this.closed) throw new Error("CEVRA media worker client is closed.");
+    if (this.state !== "open") throw new Error("CEVRA media worker client is closed.");
     if (signal?.aborted) throw abortError();
     await this.ensureStarted();
     if (signal?.aborted) throw abortError();
@@ -79,6 +86,7 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
   }
 
   private ensureStarted(): Promise<void> {
+    if (this.state !== "open") return Promise.reject(abortError());
     this.startPromise ??= this.transport.start().catch((error) => {
       this.startPromise = undefined;
       throw error;
