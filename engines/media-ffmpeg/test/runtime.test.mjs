@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PersistentMediaWorkerClient, optimizeMediaRuntime, selectDecodeAcceleration, selectVideoEncoder } from "../dist/index.js";
+import { FfmpegMediaEngine, PersistentMediaWorkerClient, optimizeMediaRuntime, selectDecodeAcceleration, selectVideoEncoder } from "../dist/index.js";
 
 test("macOS chooses VideoToolbox when available", () => {
   const result = selectVideoEncoder({ platform: "darwin", arch: "arm64", encoders: ["h264_videotoolbox"], hwaccels: ["videotoolbox"] }, "h264");
@@ -117,6 +117,89 @@ test("persistent client serializes jobs and forwards stable job ids", async () =
   releaseFirst();
   await Promise.all([first, second]);
   assert.deepEqual(events, ["start:job-1", "end:job-1", "start:job-2", "end:job-2"]);
+  await client.close();
+});
+
+test("concurrent engine delivery checks serialize behind the active media job", async () => {
+  const events = [];
+  let activeJobId = null;
+  let releaseFirst;
+  let markFirstStarted;
+  const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+  const firstStarted = new Promise((resolve) => { markFirstStarted = resolve; });
+  const health = {
+    ok: true,
+    checkedAt: "2026-09-13T12:00:00Z",
+    checks: [],
+    tools: { cut: { usable: "yes" } },
+    effectiveDeliveries: [{
+      container: "mp4", audioOnly: false, videoCodec: "h264", audioCodec: "aac",
+      videoEncoder: "h264_videotoolbox", audioEncoder: "aac"
+    }]
+  };
+  const transport = {
+    async start() {},
+    async stop() {},
+    async request(method, params) {
+      if (method === "ping") return { activeJobId };
+      if (method === "cevra/health") {
+        if (activeJobId !== null) throw Object.assign(new Error("media worker is busy"), { code: -32001 });
+        events.push("health");
+        return health;
+      }
+      if (method !== "tools/call") return {};
+      if (activeJobId !== null) throw Object.assign(new Error("media worker is busy"), { code: -32001 });
+      activeJobId = params.jobId;
+      events.push(`start:${activeJobId}`);
+      if (activeJobId === "job-a") {
+        markFirstStarted();
+        await firstGate;
+      }
+      const completedJobId = activeJobId;
+      activeJobId = null;
+      events.push(`end:${completedJobId}`);
+      return {
+        structuredContent: {
+          status: "completed",
+          output: params.arguments.output,
+          probe: {
+            file: params.arguments.output,
+            duration: 1,
+            video: { codec: "h264", width: 1920, height: 1080, fps: 30 },
+            audio: { codec: "aac", sample_rate: 48000, channels: 2 }
+          },
+          effectiveProfile: {
+            container: "mp4", videoCodec: "h264", audioCodec: "aac",
+            videoEncoder: "h264_videotoolbox", audioEncoder: "aac"
+          }
+        }
+      };
+    }
+  };
+  const client = new PersistentMediaWorkerClient(transport);
+  const engine = new FfmpegMediaEngine(client);
+  const first = engine.execute(
+    { type: "trim", inputUri: "a.mp4", outputUri: "a-out.mp4", startMs: 0, endMs: 1000 },
+    { jobId: "job-a", locale: "en-US" }
+  );
+  await firstStarted;
+  const second = engine.execute(
+    { type: "trim", inputUri: "b.mp4", outputUri: "b-out.mp4", startMs: 0, endMs: 1000 },
+    { jobId: "job-b", locale: "en-US" }
+  );
+  let secondSettled = false;
+  void second.then(() => { secondSettled = true; }, () => { secondSettled = true; });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(secondSettled, false);
+  assert.deepEqual(events, ["health", "start:job-a"]);
+  assert.deepEqual(await transport.request("ping"), { activeJobId: "job-a" });
+
+  releaseFirst();
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+  assert.equal(firstResult.outputUri, "a-out.mp4");
+  assert.equal(secondResult.outputUri, "b-out.mp4");
+  assert.deepEqual(events, ["health", "start:job-a", "end:job-a", "health", "start:job-b", "end:job-b"]);
+  assert.deepEqual(await transport.request("ping"), { activeJobId: null });
   await client.close();
 });
 

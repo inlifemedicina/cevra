@@ -27,7 +27,7 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
   }
 
   async health(): Promise<MediaWorkerHealth> {
-    return this.request<MediaWorkerHealth>("cevra/health");
+    return this.enqueue(() => this.request<MediaWorkerHealth>("cevra/health"));
   }
 
   async configureRuntime(profile: MediaWorkerRuntimeProfile): Promise<void> {
@@ -47,7 +47,7 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
   async callTool(name: string, arguments_: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<MediaWorkerToolResult> {
     if (!jobId.trim()) throw new Error("Media jobId is required.");
     if (signal?.aborted) throw abortError();
-    const run = this.jobQueue.then(async () => {
+    return this.enqueue(async () => {
       if (this.state !== "open") throw abortError();
       if (signal?.aborted) throw abortError();
       try {
@@ -57,8 +57,6 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
         throw error;
       }
     });
-    this.jobQueue = run.then(() => undefined, () => undefined);
-    return run;
   }
 
   async close(): Promise<void> {
@@ -83,6 +81,12 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
     await this.ensureStarted();
     if (signal?.aborted) throw abortError();
     return this.transport.request<T>(method, params, signal);
+  }
+
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const run = this.jobQueue.then(operation);
+    this.jobQueue = run.then(() => undefined, () => undefined);
+    return run;
   }
 
   private ensureStarted(): Promise<void> {
