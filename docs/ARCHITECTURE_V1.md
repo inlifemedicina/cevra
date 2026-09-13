@@ -114,12 +114,14 @@ Assets imported by users, found automatically, generated automatically or obtain
 ### Composition Engine
 
 - All composition implementations remain behind `CompositionEngineAdapter`
-- HyperFrames and the proven EDVID-equivalent Remotion baseline must be benchmarked before a default engine is selected
+- HyperFrames and the Remotion-based composition behavior documented by the public [`fillrochaa/edvid` `SKILL.md`](https://github.com/fillrochaa/edvid/blob/main/SKILL.md) must be benchmarked before a default engine is selected
 - HyperFrames is the preferred candidate only if it demonstrates parity or superiority for the required visual and editorial matrix
-- Remotion is permitted; it is not prohibited or assumed to be the final choice
+- Remotion is an eligible candidate rather than a current CEVRA dependency; it is neither mandatory nor prohibited
 - Engine preference cannot override quality, automation, exact timing or editorial capability
 
-The benchmark covers karaoke, static and stacked captions; headlines; split-screen; cards; images; B-roll; dynamic camera; hard zoom; slow push-in; face tracking; motion graphics; SFX; transitions; exact timing; data-driven templates; and vertical and horizontal rendering. If HyperFrames is not equivalent or better, CEVRA retains Remotion or another demonstrably superior implementation behind the adapter.
+The EDVID evidence is functional and technical: its public `SKILL.md` describes Phase 2/3 Remotion visuals and audio, defines Phase 2 as Remotion-only, describes the default pipeline as FFmpeg/Remotion, includes a `remotion/` project directory and references `remotion-best-practices`. It does not establish license compatibility for CEVRA.
+
+The benchmark covers karaoke, static and stacked captions; headlines; split-screen; cards; images; B-roll; dynamic camera; hard zoom; slow push-in; face tracking; motion graphics; SFX; transitions; exact timing; data-driven templates; and vertical and horizontal rendering. If HyperFrames is not equivalent or better, CEVRA may select Remotion or another demonstrably suitable implementation behind the adapter. Remotion may be incorporated into commercial distribution only after review of the proposed version's then-current license and confirmation of compatibility with CEVRA's proprietary commercial model. The canon does not fix license terms, prices or thresholds.
 
 ### Transcription Engine
 

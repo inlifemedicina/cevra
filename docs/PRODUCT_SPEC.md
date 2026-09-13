@@ -111,9 +111,9 @@ Preset execution preserves Project IR, journal/history, cancellation, recovery, 
 
 ## Composition quality gate
 
-Composition implementations remain behind `CompositionEngineAdapter`. HyperFrames is a preferred candidate only if it reaches or exceeds the proven EDVID-equivalent Remotion baseline for captions, headlines, split-screen, cards, images, B-roll, camera movement, zooms, face tracking, motion graphics, SFX, transitions, exact timing, data-driven templates and horizontal and vertical rendering.
+Composition implementations remain behind `CompositionEngineAdapter`. HyperFrames is a preferred candidate only if it reaches or exceeds the Remotion-based behavior documented by the public [`fillrochaa/edvid` `SKILL.md`](https://github.com/fillrochaa/edvid/blob/main/SKILL.md) for captions, headlines, split-screen, cards, images, B-roll, camera movement, zooms, face tracking, motion graphics, SFX, transitions, exact timing, data-driven templates and horizontal and vertical rendering. EDVID's documented Phase 2/3 Remotion path, Phase 2 Remotion-only rule, FFmpeg/Remotion pipeline, `remotion/` layout and `remotion-best-practices` setup provide functional and technical evidence; they do not establish license compatibility for CEVRA.
 
-If it does not, Remotion or another demonstrably better engine remains behind the adapter. Remotion is not prohibited, and engine or license preference does not override quality, automation or editorial capability.
+If HyperFrames does not meet the benchmark, CEVRA may select Remotion or another demonstrably suitable engine behind the adapter. Remotion is neither mandatory nor prohibited and is not currently incorporated. Selection for commercial distribution requires review of the proposed version's then-current license and confirmation of compatibility with CEVRA's proprietary commercial model. The canon does not assume license terms, prices or thresholds, and engine preference does not override quality, automation or editorial capability.
 
 ## Generative assets
 
