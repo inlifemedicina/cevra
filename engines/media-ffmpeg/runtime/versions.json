@@ -1,0 +1,61 @@
+{
+  "mediaRuntime": "0.1.0",
+  "python": {
+    "version": "3.12.14",
+    "series": "3.12",
+    "distribution": "astral-sh/python-build-standalone",
+    "release": "20260901",
+    "licenseSha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+    "componentNotices": [
+      { "id": "python-openssl-license", "component": "openssl", "version": "3.5.8", "source": "third_party/python-runtime/openssl-3.5.8-LICENSE.txt", "path": "licenses/python/components/openssl-3.5.8-LICENSE.txt", "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a" },
+      { "id": "python-liblzma-license", "component": "liblzma", "version": "5.4.3", "source": "third_party/python-runtime/xz-5.4.3-COPYING.txt", "path": "licenses/python/components/xz-5.4.3-COPYING.txt", "sha256": "72d7ef9c98be319fd34ce88b45203b36d5936f9c49e82bf3198ffee5e0c7d87e" },
+      { "id": "python-bzip2-license", "component": "bzip2", "version": "1.0.8", "source": "third_party/python-runtime/bzip2-1.0.8-LICENSE.txt", "path": "licenses/python/components/bzip2-1.0.8-LICENSE.txt", "sha256": "c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3" },
+      { "id": "python-libffi-license", "component": "libffi", "version": "3.4.8", "source": "third_party/python-runtime/libffi-3.4.8-LICENSE.txt", "path": "licenses/python/components/libffi-3.4.8-LICENSE.txt", "sha256": "67894089811f93fca47a76f85e017da6f8582d4ba0905963c6e0f1ad6df7a195" }
+    ],
+    "artifacts": {
+      "darwin-arm64": {
+        "executable": "bin/python3.12",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-aarch64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "81a359f1cfadd4da11766534c5913791cea55f26e1bb902cacd2a531bb1e4b2b"
+      },
+      "darwin-x64": {
+        "executable": "bin/python3.12",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "65b195c9cedc1fef6767f044f9822069adbd1bd9204d424ece4628776fdc04bb"
+      },
+      "linux-arm64": {
+        "executable": "bin/python3.12",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "577b4bec0793ad1ff0cbff9adbd0df078eddde38a4c41bf5d83ad381a85ee39d"
+      },
+      "linux-x64": {
+        "executable": "bin/python3.12",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "72748da13197c1fb161e3afeef20a6a385ff24f2165e6e2758e47008e7faba4c"
+      },
+      "win32-x64": {
+        "executable": "python.exe",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "7c45c9622400d578709a9b2cddbe8124cc21d382409d9f13406d706d28e31b14"
+      }
+    }
+  },
+  "ffmpeg": {
+    "version": "9.0.1",
+    "source": "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz",
+    "archiveSha256": "cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635",
+    "signature": "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz.asc",
+    "signatureSha256": "b613a00005232a1245ace7080088781ac23a916119d3e5b0d6c042368eee0177",
+    "signingKey": "https://ffmpeg.org/ffmpeg-devel.asc",
+    "signingKeySha256": "397b3becedcd5a98769967ff1ff8501ddc89f8368b8f766e4701377d7dbaabe5",
+    "signingFingerprint": "FCF986EA15E6E293A5644F10B4322F04D67658D8"
+  },
+  "ffmpegSkill": {
+    "version": "1.4.2",
+    "repository": "https://github.com/kajisho5/ffmpeg-skill.git",
+    "commit": "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a",
+    "contractVersion": "1.0",
+    "license": "MIT",
+    "licenseSha256": "7522b29e4d6e90f2a8fab15f07d224b1064c70692a872be9996ac1a88cf474e9"
+  }
+}

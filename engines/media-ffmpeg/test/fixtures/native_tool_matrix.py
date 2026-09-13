@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, Dict
+
+WORKER = Path(__file__).resolve().parents[2] / "worker"
+sys.path.insert(0, str(WORKER))
+
+import cevra_native_tools as tools
+import cevra_media_worker as worker
+
+
+class FakeCommon:
+    def __init__(self, metadata: Dict[str, Any], encoders: list[str] | None = None) -> None:
+        self.metadata = metadata
+        self.command = []
+        self.encoders = encoders if encoders is not None else ["aac", "opus", "pcm_s16le"]
+
+    def probe(self, path: str, role: str = "input") -> Dict[str, Any]:
+        if role == "output":
+            return {"file": path, "duration": 1.0, "video": {"codec": "h264"}, "audio": {"codec": "aac"}}
+        return self.metadata[path]
+
+    def verify_output(self, path: str) -> Dict[str, Any]:
+        return self.probe(path, "output")
+
+    def ffmpeg_base(self) -> list[str]:
+        return ["ffmpeg"]
+
+    def require_tool(self, name: str) -> str:
+        return name
+
+    def run(self, command: list[str], **_: Any) -> Any:
+        if "-encoders" in command:
+            lines = [f" {'V' if name == 'libvpx-vp9' else 'A'}..... {name}" for name in self.encoders]
+            return SimpleNamespace(stdout="\n".join(lines), stderr="", returncode=0)
+        self.command = command
+        return SimpleNamespace(stdout="", stderr="", returncode=0)
+
+
+class FakeRuntime:
+    @staticmethod
+    def sdr_encoder_args(*_: Any) -> list[str]:
+        return ["-c:v", "h264_test"]
+
+    @staticmethod
+    def hevc_encoder_args(*_: Any) -> list[str]:
+        return ["-c:v", "h265_test"]
+
+    @staticmethod
+    def av1_encoder_args(*_: Any) -> list[str]:
+        return ["-c:v", "av1_test"]
+
+
+def main() -> int:
+    request = json.loads(sys.argv[1])
+    os.environ["CEVRA_VIDEO_ENCODER_H264"] = "h264_test"
+    os.environ["CEVRA_VIDEO_ENCODER_HEVC"] = "h265_test"
+    os.environ["CEVRA_VIDEO_ENCODER_AV1"] = "av1_test"
+    try:
+        if request["operation"] == "matrix":
+            matrix = {
+                container: {
+                    "videoCodecs": sorted(rule["video"]),
+                    "audioCodecs": sorted(rule["audio"]),
+                    "defaultVideoCodec": rule["default_video"],
+                    "defaultAudioCodec": rule["default_audio"],
+                    "audioOnly": rule["audio_only"],
+                }
+                for container, rule in tools.DELIVERY_MATRIX.items()
+            }
+            print(json.dumps({"matrix": matrix}))
+            return 0
+        if request["operation"] == "limits":
+            print(json.dumps({
+                "width": worker.MAX_MEDIA_WIDTH,
+                "height": worker.MAX_MEDIA_HEIGHT,
+                "fps": worker.MAX_MEDIA_FPS,
+                "durationMs": worker.MAX_MEDIA_DURATION_SECONDS * 1000,
+                "inputs": worker.MAX_MEDIA_INPUTS,
+                "uriLength": worker.MAX_MEDIA_PATH_LENGTH,
+            }))
+            return 0
+        if request["operation"] == "numbers":
+            failures = []
+            for value in (float("nan"), float("inf"), float("-inf")):
+                try:
+                    tools._positive_number({"value": value}, "value")
+                except ValueError as exc:
+                    failures.append(str(exc))
+            try:
+                tools._positive_integer({"value": 1.5}, "value")
+            except ValueError as exc:
+                failures.append(str(exc))
+            boundary_rejections = [worker._contains_non_finite_number(value) for value in (float("nan"), float("inf"), {"nested": [float("-inf")]})]
+            print(json.dumps({"failures": failures, "boundaryRejections": boundary_rejections}))
+            return 0
+
+        common = FakeCommon(request["metadata"], request.get("encoders"))
+        sys.modules["_common"] = common
+        if request["operation"] == "transcode":
+            tools._run_transcode(common, FakeRuntime(), request["arguments"])
+        elif request["operation"] == "mux":
+            tools._run_mux_audio(common, request["arguments"])
+        elif request["operation"] == "extract-frame":
+            tools._run_extract_frame(common, request["arguments"])
+        else:
+            raise ValueError("unknown fixture operation")
+        print(json.dumps({"command": common.command}))
+    except Exception as exc:
+        print(json.dumps({"error": f"{type(exc).__name__}: {exc}"}))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

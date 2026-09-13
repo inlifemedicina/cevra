@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  monorepo:
+    name: Monorepo build and tests (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run ci
+
+  media-runtime:
+    name: Media Runtime reproducibility checks (Ubuntu x64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: 3.12.14
+      - name: Compile Media Runtime Python sources
+        env:
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/cevra-pycache
+        run: >-
+          python -m py_compile
+          engines/media-ffmpeg/runtime/assemble_runtime.py
+          engines/media-ffmpeg/runtime/build_ffmpeg.py
+          engines/media-ffmpeg/runtime/build_worker.py
+          engines/media-ffmpeg/runtime/generate_manifest.py
+          engines/media-ffmpeg/runtime/patch_ffmpeg_skill.py
+          engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py
+          engines/media-ffmpeg/runtime/prepare_python_runtime.py
+          engines/media-ffmpeg/runtime/prepare_vendor.py
+          engines/media-ffmpeg/runtime/schema_validator.py
+          engines/media-ffmpeg/runtime/validate_bundle_pipeline.py
+          engines/media-ffmpeg/worker/cevra_job_control.py
+          engines/media-ffmpeg/worker/cevra_media_worker.py
+          engines/media-ffmpeg/worker/cevra_native_tools.py
+          engines/media-ffmpeg/worker/runtime_integrity.py
+          engines/media-ffmpeg/worker/runtime_profile.py
+      - name: Parse pinned versions and manifest schema
+        run: |
+          python -m json.tool engines/media-ffmpeg/runtime/versions.json >/dev/null
+          python -m json.tool engines/media-ffmpeg/runtime/manifest.schema.json >/dev/null
+      - name: Run Media Runtime Python unit tests
+        run: python -I -B -m unittest discover -s engines/media-ffmpeg/test_python -p 'test_*.py' -v
+      - name: Verify pinned FFmpeg release signature
+        run: python engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "${RUNNER_TEMP}/ffmpeg-source"
+      - name: Prepare and verify pinned ffmpeg-skill
+        run: |
+          python engines/media-ffmpeg/runtime/prepare_vendor.py "${RUNNER_TEMP}/ffmpeg-skill"
+          python engines/media-ffmpeg/runtime/prepare_vendor.py "${RUNNER_TEMP}/ffmpeg-skill" --verify-only
+      - name: Prepare and verify pinned private CPython
+        run: |
+          python engines/media-ffmpeg/runtime/prepare_python_runtime.py "${RUNNER_TEMP}/cevra-python"
+          python engines/media-ffmpeg/runtime/prepare_python_runtime.py "${RUNNER_TEMP}/cevra-python" --verify-only
+      - name: Assemble and validate a release-layout bundle
+        run: >-
+          python engines/media-ffmpeg/runtime/validate_bundle_pipeline.py
+          --vendor "${RUNNER_TEMP}/ffmpeg-skill"
+          --python-root "${RUNNER_TEMP}/cevra-python"
+          --ffmpeg-source "${RUNNER_TEMP}/ffmpeg-source/ffmpeg-9.0.1"

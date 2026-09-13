@@ -214,4 +214,5 @@ export type EditCommand =
   | { type: "clip.trim"; clipId: Id; timelineStartMs: Milliseconds; timelineEndMs: Milliseconds; sourceStartMs: Milliseconds; sourceEndMs: Milliseconds }
   | { type: "caption.upsert"; caption: CaptionCue }
   | { type: "caption.remove"; captionId: Id }
-  | { type: "style.patch"; patch: Partial<StyleState> };
+  | { type: "style.patch"; patch: Partial<StyleState> }
+  | { type: "export.add"; export: ExportRecord };
