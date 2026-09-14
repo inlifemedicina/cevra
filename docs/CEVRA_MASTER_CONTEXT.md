@@ -1126,7 +1126,7 @@ This is the Git-authoritative current `main` and the base for the active impleme
 
 | Branch | Status |
 |---|---|
-| `arch/project-ir-v2-transcript-proposal` | Bounded Project IR v2 transcript implementation proposal complete; awaiting review |
+| `arch/project-ir-v2-transcript-proposal` | Bounded Project IR v2 transcript implementation proposal finalized after review; implementation not started |
 
 No feature implementation branch is active. Project IR v2 implementation code has not started.
 
@@ -1162,7 +1162,7 @@ No feature implementation branch is active. Project IR v2 implementation code ha
 - **IMPLEMENTED/CLOSED:** PR #12 merged the post-transcription canon and ADR 0013 at `3098274f8a30a85e4b83e5524fc70664adaa412f`; both temporary documentation branches were removed after comparison and repository hygiene passed.
 - **ACCEPTED:** independent adversarial review of ADR 0014 completed without changing its central architecture. Deterministic migration, `transcriptDigest` identity, stale alignment/reference protection, `TranscriptState` compatibility, speaker-state predicates and typed migration quarantine are closed. No Project IR or persistence implementation has started.
 - **IMPLEMENTED/CLOSED:** PR #13 merged accepted ADR 0014 at `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9`; its temporary architecture branch was removed and repository hygiene passed.
-- **PROPOSAL COMPLETE / AWAITING REVIEW:** the bounded Project IR v2 transcript implementation plan closes the proposed type model, digest canonicalization, provenance, quarantine, deterministic v1-to-v2 migration, validation, command semantics, source-removal cascade and safe slice division. No implementation code has started.
+- **PROPOSAL FINALIZED / IMPLEMENTATION NOT STARTED:** review preserved the central Project IR v2 design and incorporated two final hardenings: the SHA-256 primitive is an exact pinned audited external dependency while CEVRA retains canonicalization/version authority; and the v1 migration validator freezes historical acceptance while incompatible raw legacy transcript JSON is preserved in quarantine. No implementation code has started.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1172,7 +1172,7 @@ No feature implementation branch is active. Project IR v2 implementation code ha
 Do not guess these in future chats:
 
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
-2. review and approval of the bounded Project IR v2 implementation plan before Slice A begins; the proposal resolves digest canonicalization and migration-quarantine semantics but is not implementation;
+2. merge the finalized bounded Project IR v2 implementation plan before Slice A begins; the proposal resolves digest canonicalization and exact historical-v1/raw-quarantine compatibility but is not implementation;
 3. WhisperX/forced-alignment adapter, model and integration details; provider-neutral alignment status semantics are closed by ADR 0014;
 4. final transcript cache schema, key and invalidation policy;
 5. final transcription model default for production quality;
@@ -1204,7 +1204,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Review the bounded Project IR v2 transcript implementation proposal against accepted ADR 0014.
+1. Review and merge the finalized bounded Project IR v2 transcript implementation proposal against accepted ADR 0014.
 2. Do not reopen the closed Local Transcription Engine V1.
 3. After proposal approval, implement only Slice A: Project IR v2 schema, digest, validation, deterministic migration, factory, source-removal cascade and package/history compatibility tests.
 4. Keep transcript commands/history as Slice B and complete them before an application persistence service.

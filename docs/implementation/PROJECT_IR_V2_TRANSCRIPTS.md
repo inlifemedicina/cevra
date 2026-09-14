@@ -41,6 +41,12 @@ export const CURRENT_SCHEMA_VERSION = 2 as const;
 export const TRANSCRIPT_DIGEST_VERSION = 1 as const;
 export const MAX_TRANSCRIPT_PROVENANCE_STAGES = 5 as const;
 
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+
 export type TranscriptDigest = `sha256-v1:${string}`;
 export type TranscriptWordTiming = "none" | "model" | "aligned" | "unknown";
 export type TranscriptSpeakerState = "none" | "partial" | "complete";
@@ -121,7 +127,7 @@ export interface V1UnassignedTranscriptQuarantine {
   schemaVersion: 1;
   originalSchemaVersion: 1;
   reason: V1TranscriptQuarantineReason;
-  payload: TranscriptState;
+  payload: JsonObject;
   eligibleSourceIdsAtMigration: Id[];
 }
 
@@ -188,7 +194,9 @@ export function createSourceTranscript(
 
 `createSourceTranscript` validates its input and calls `computeTranscriptDigest`. Engines/providers never supply a trusted digest. V2 validation always recalculates the digest and requires an exact match.
 
-The SHA-256 primitive must remain synchronous and platform-neutral because command application and Project IR validation are synchronous shared-domain operations. Slice A adds a small dependency-free TypeScript SHA-256 module implementing FIPS 180-4, verified against standard NIST vectors and independently cross-checked with Node `crypto` and Web Crypto in tests. Production Project IR code does not import `node:crypto`, depend on a host-global API or add a third-party dependency merely for hashing.
+The SHA-256 primitive must remain synchronous and platform-neutral because command application and Project IR validation are synchronous shared-domain operations. Slice A pins `@noble/hashes@2.4.0` as a production dependency of `@cevra/project-ir` and imports `sha256` from `@noble/hashes/sha2.js`. At proposal review, that exact release is published under MIT, exports the required ESM subpath, declares Node `>=20.19.0`, and has zero runtime dependencies; it is compatible with the repository's Node `>=22` baseline and browser/Tauri/shared TypeScript use. Its proposal-time npm integrity is `sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==`. The lockfile is authoritative and must freeze the implementation-time registry integrity. Implementation must recheck availability, exact license, exports, runtime-dependency count and platform compatibility before adding it.
+
+CEVRA owns the semantic projection, canonical serialization, digest version, compatibility vectors and digest verification. CEVRA does not implement SHA-256 compression, padding or rounds. Using the audited primitive reduces maintenance and incorrect-implementation risk without giving the dependency authority over Project IR semantics. The canonical `sha256-v1:<64 lowercase hex>` format remains entirely controlled by this specification.
 
 ### Semantic projection
 
@@ -252,7 +260,7 @@ PT-BR canonical text:
 sha256-v1:a5baceec7680861ed2ceb3eac117c9e2c8e6ddc804c5f0f01b2035e9d869597f
 ```
 
-Tests freeze the literal UTF-8 bytes and independently known `sha256-v1:<hex>` values. They also cover quote/control escaping, four-byte Unicode, order sensitivity and exclusion of confidence/provenance.
+Tests freeze the literal UTF-8 bytes and independently known `sha256-v1:<hex>` values. They also cover quote/control escaping, four-byte Unicode, order sensitivity and exclusion of confidence/provenance. Official SHA-256 vectors verify the imported primitive, CEVRA vectors verify the canonical format, and tests cross-check the same canonical bytes with Node `crypto` plus Web Crypto when available.
 
 ## Provenance
 
@@ -308,7 +316,7 @@ const V1_UNASSIGNED_TRANSCRIPT_EXTENSION =
   "cevra.migration.v1UnassignedTranscript" as const;
 ```
 
-Its value must exactly match `V1UnassignedTranscriptQuarantine`; additional envelope keys are rejected. `payload` is validated under v1 transcript rules, not normal v2 timing/provenance rules. `eligibleSourceIdsAtMigration` is a duplicate-free, lexicographically sorted list of audio/video source IDs present in that snapshot. It expresses neither ownership nor probability.
+Its value must exactly match `V1UnassignedTranscriptQuarantine`; additional envelope keys are rejected. `payload` is the deep-cloned raw JSON object from the legacy `transcript` field, not a coerced `TranscriptState`. This preserves historically accepted extra fields and under-validated values without granting them canonical meaning. Runtime validation requires a finite, serializable JSON tree and does not apply v2 transcript rules to the payload. `eligibleSourceIdsAtMigration` is a duplicate-free, lexicographically sorted list of audio/video source IDs present in that snapshot. It expresses neither ownership nor probability.
 
 Reasons are:
 
@@ -322,29 +330,49 @@ The quarantine is non-canonical, ignored by normal transcript automation, preser
 
 ## Deterministic v1 → v2 migration
 
-The migration first validates the document as v1 with a version-specific validator. It clones only input data, never reads a clock/RNG/environment/network/filesystem/process state, never mutates its input and never invents `createdAt`.
+**The v1 migration-input validator must preserve historical v1 acceptance semantics.** It is not an opportunity to apply an idealized or stricter v2 interpretation retroactively.
+
+Before refactoring version dispatch, Slice A freezes the behavior of the validator at the v1 baseline. For the legacy transcript specifically, historical acceptance means:
+
+- `transcript` is an object and `words`/`segments` are arrays;
+- each word/segment is an object with a non-empty string ID, string text and an integer non-negative interval where end is greater than start;
+- optional confidence is finite and between 0 and 1;
+- segment `wordIds` is an array of non-empty strings, and every referenced ID exists;
+- word and segment IDs are unique in their respective arrays;
+- `transcript.language`, word `speakerId` and segment `speakerId` were not runtime-validated;
+- extra properties on transcript, words and segments were not rejected;
+- duplicate IDs inside one segment's `wordIds` were not explicitly rejected.
+
+The extracted internal `assertValidProjectIRv1` preserves exactly those historical rules for schema-version-1 package input. It returns a JSON-domain migration document rather than pretending every under-validated field is a safe typed `TranscriptState`. It does not widen acceptance beyond the old validator, and it does not promise recovery of documents v1 already rejected.
+
+The migration deep-clones the raw legacy transcript before attempting any canonical conversion. It clones only JSON input data, never reads a clock/RNG/environment/network/filesystem/process state, never mutates its input and never invents `createdAt`. Formatting and object-key byte order are not part of Project Store semantics, but every JSON property, scalar and array value is preserved semantically.
 
 ```text
 migrateV1ToV2(v1):
   assertValidProjectIRv1(v1)
   fail if v1 already contains sourceTranscripts
   fail if v1.extensions already owns the reserved quarantine key
-  legacy = deepClone(v1.transcript)
+  rawLegacyTranscript = deepJsonClone(v1.transcript)
   sources = deepClone(v1.sources)
   eligible = sources where kind is audio or video
   output = deepClone(v1), with schemaVersion = 2
   delete output.transcript
   output.sourceTranscripts = []
 
-  if legacy words=[], segments=[], language absent:
+  if raw legacy words=[], segments=[], language absent,
+     and transcript has exactly the known keys words and segments:
     return assertValidProjectIRv2(output)
 
   if sources.length === 1 and eligible.length === 1:
+    attempt lossless conversion of rawLegacyTranscript to TranscriptState
+    if conversion fails any v2 canonical invariant:
+      quarantine reason = "incompatible-canonical-transcript"
+      skip to quarantine
     candidate = {
       sourceId: eligible[0].id,
-      wordTiming: legacy.words.length === 0 ? "none" : "unknown",
-      speakerState: deriveSpeakerState(legacy),
-      transcript: legacy,
+      wordTiming: converted words length === 0 ? "none" : "unknown",
+      speakerState: deriveSpeakerState(converted transcript),
+      transcript: converted transcript,
       provenance: {
         ...(eligible[0].checksum
           ? { sourceChecksum: eligible[0].checksum }
@@ -366,7 +394,7 @@ migrateV1ToV2(v1):
     schemaVersion: 1,
     originalSchemaVersion: 1,
     reason,
-    payload: legacy,
+    payload: rawLegacyTranscript,
     eligibleSourceIdsAtMigration: eligible ids sorted lexicographically
   }
   return assertValidProjectIRv2(output)
@@ -377,6 +405,7 @@ Case disposition:
 | V1 input | V2 result |
 |---|---|
 | Empty transcript + 0/1/N sources | No canonical transcript; no quarantine |
+| Empty known fields plus any unknown transcript property | Preserve raw object in quarantine; it is not discarded as the factory default |
 | Non-empty + sole video | Bind to video |
 | Non-empty + sole audio | Bind to audio |
 | Non-empty + sole image or 0 source | Quarantine: `no-eligible-source` |
@@ -385,17 +414,19 @@ Case disposition:
 | Language-only + sole eligible source | Canonical, `wordTiming: none` |
 | Segment-only + sole eligible source | Canonical, `wordTiming: none` |
 | Words + sole eligible source | Canonical, `wordTiming: unknown` |
-| Legacy speaker IDs | Derive state; quarantine only if assignments contradict v2 canonical invariants |
+| Legacy language/speaker values accepted by v1 but invalid in v2 | Preserve raw object in `incompatible-canonical-transcript` quarantine |
+| Legacy extra transcript/word/segment fields | Preserve the complete raw object in `incompatible-canonical-transcript` quarantine; canonical conversion would otherwise drop unmodeled data |
+| Valid legacy speaker IDs | Derive state; quarantine if assignments contradict v2 canonical invariants |
 | Source checksum present | Copy exact checksum into provenance |
 | Source checksum absent | Omit provenance checksum |
 
-All routes remove the legacy `transcript` field. `project.updatedAt`, history metadata and all unrelated fields remain exactly as supplied.
+All routes remove the legacy `transcript` field. The discardable empty case is only the exact historical factory shape with empty `words`, empty `segments`, absent `language` and no additional transcript properties. Canonical association occurs only when conversion is lossless and safe. No language, speaker ID, text, timing or extra field is silently coerced, normalized, removed or rewritten. If an otherwise historically accepted raw payload contains any value that cannot become canonical without loss, the project still opens with that complete raw payload in quarantine. `project.updatedAt`, history metadata and all unrelated fields remain exactly as supplied.
 
 Migration remains document-local and snapshot-by-snapshot. Consequently, one historical snapshot may bind a transcript while another quarantines the same legacy payload; undo/redo may cross that boundary. This is intentional and deterministic.
 
 ## V2 validation model
 
-`validateProjectIR` dispatches by exact schema version. `assertValidProjectIRv1` is retained for migration input; `assertValidProjectIR` returns current `ProjectIRv2`.
+`validateProjectIR` dispatches by exact schema version. Internal `assertValidProjectIRv1` preserves the frozen historical v1 acceptance set for migration input; it does not reuse v2 transcript rules. Public `assertValidProjectIR` returns current `ProjectIRv2`.
 
 V2 adds these checks:
 
@@ -411,7 +442,7 @@ V2 adds these checks:
 - `transcriptDigest` has exact syntax and equals recomputation.
 - Provenance has 1–5 correctly ordered, non-duplicate stages with exact per-kind fields.
 - Source checksum provenance obeys the source rule.
-- The reserved quarantine key, when present, is an exact valid envelope; no canonical automation reads it.
+- The reserved quarantine key, when present, is an exact valid envelope; its payload is recursively validated only as finite serializable JSON and is never reinterpreted as a v2 `TranscriptState`; no canonical automation reads it.
 
 V2 does not globally reject unrelated unknown top-level keys in this slice. Tightening the entire Project IR object would be an independent compatibility change because v1 accepted them. The legacy `transcript` key and the reserved quarantine envelope are checked explicitly. Domain extensions continue to belong under `extensions`.
 
@@ -533,9 +564,10 @@ Implement first:
 
 - v1/v2 types and `CURRENT_SCHEMA_VERSION = 2`;
 - nested `SourceTranscript`, timing/speaker/provenance/quarantine types;
-- canonical serializer, digest helper and compatibility vectors;
-- v1-specific input validation and v2 validation;
-- pure v1→v2 migration and migration registration;
+- exact production dependency `@noble/hashes@2.4.0`, lockfile integrity and license/provenance records;
+- CEVRA-owned canonical serializer, digest helper and compatibility vectors using the audited SHA-256 primitive;
+- historical v1-validator characterization, v1 migration-input validator extraction and separate v2 validation;
+- pure v1→v2 migration, raw quarantine and migration registration;
 - v2 factory with `sourceTranscripts: []`;
 - atomic `source.remove` transcript cascade, because migrated projects can already contain transcripts;
 - ProjectHistory characterization with v2 snapshots;
@@ -554,10 +586,12 @@ This separation isolates migration/package risk from mutation semantics without 
 | Slice | File | Change | Associated verification |
 |---|---|---|---|
 | A | `packages/project-ir/src/types.ts` | Add fixed v1 constant, v2 types, transcript semantic/provenance/quarantine types; make `ProjectIR` v2 | Compile-time v1/v2 fixtures; public `TranscriptState` import unchanged |
-| A | `packages/project-ir/src/sha256.ts` | Small synchronous platform-neutral FIPS 180-4 SHA-256 primitive | NIST vectors; Node/Web Crypto cross-checks in tests |
-| A | `packages/project-ir/src/transcript-digest.ts` | Fixed semantic projection, canonical UTF-8 writer, digest format, `createSourceTranscript` | Frozen vectors; Unicode, escaping, order, exclusion and tamper tests |
-| A | `packages/project-ir/src/validation.ts` | Version dispatch, v1 validator for migration and complete v2 invariants | Positive/negative invariant matrix |
-| A | `packages/project-ir/src/migrations.ts` | Register pure deterministic 1→2 migration and quarantine flow | Cases A–O, repeated equality, no clock/random/environment |
+| A | `packages/project-ir/package.json` | Add exact production dependency `@noble/hashes: 2.4.0` after implementation-time revalidation | Package metadata and runtime dependency audit |
+| A | `package-lock.json` | Freeze exact resolved version and registry integrity | Reproducible install/lock verification |
+| A | `THIRD_PARTY_LICENSES.md` and `NOTICE` | Record exact version, MIT license, copyright/attribution and use | Notice/provenance review |
+| A | `packages/project-ir/src/transcript-digest.ts` | Fixed CEVRA semantic projection and canonical UTF-8 writer; call `sha256` from `@noble/hashes/sha2.js`; format digest; `createSourceTranscript` | Official SHA vectors; frozen CEVRA vectors; Node/Web Crypto cross-checks; Unicode, escaping, order, exclusion and tamper tests |
+| A | `packages/project-ir/src/validation.ts` | Freeze v1 characterization, exact historical migration validator, version dispatch and complete v2 invariants | Historical acceptance plus v2 positive/negative matrices |
+| A | `packages/project-ir/src/migrations.ts` | Register pure deterministic 1→2 migration, lossless canonical conversion and raw quarantine | Cases A–O, under-validated legacy fields, repeated equality, no clock/random/environment |
 | A | `packages/project-ir/src/factory.ts` | Create v2 with `sourceTranscripts: []`; remove global empty transcript | Factory/schema tests |
 | A | `packages/project-ir/src/commands.ts` | Add only atomic transcript filtering to permitted `source.remove` | Cascade/undo/redo tests with migrated transcript |
 | A | `packages/project-ir/src/index.ts` | Export new public types/helpers without removing old exports | Consumer compile/import test |
@@ -577,24 +611,29 @@ No change is planned for `packages/contracts`, `engines/transcription`, Media Ru
 
 1. Factory returns v2, has empty `sourceTranscripts`, and has no legacy property.
 2. `ProjectIRv1` and unchanged `TranscriptState` remain importable; current `ProjectIR` is v2.
-3. Digest frozen vectors: empty, PT-BR, four-byte Unicode and escaping.
-4. Digest changes for each included semantic dimension and array order.
-5. Digest does not change for confidence/provenance/extensions-only changes.
-6. Digest rejects invalid Unicode, negative zero, unsafe/fractional times and malformed digest text.
-7. Valid source transcripts cover `none`, `model`, `aligned`, `unknown` migration and no-speech.
-8. Validation rejects unknown/image/duplicate source ownership, wrong digest and checksum mismatch.
-9. Validation rejects invalid/over-duration times, duplicate IDs, missing/duplicate word references and normal timing mapping failures.
-10. Validation covers every speaker predicate, conflicts, mixed-speaker segment and segment-without-words behavior.
-11. Provenance tests cover each stage kind, required/prohibited fields, order, duplicate kinds and 1–5 bound.
-12. Quarantine tests cover exact schema, reasons, sorted eligible IDs, reserved-key collision and persistence.
-13. Migration table A–O, including language-only, segment-only, words, speaker IDs and checksum present/absent.
-14. Multiple total sources with exactly one eligible remains quarantined.
-15. Every route removes own property `transcript`; empty routes invent no canonical record/quarantine.
-16. Same v1 input migrated twice produces deep equality and identical stable JSON, with no invented timestamp.
-17. A source-removal cascade removes source/transcript together only after existing blockers pass; undo/redo restores/removes both.
-18. Package migrates `project.json` and each historical snapshot independently; active migrated values remain identical.
-19. Package round trip preserves quarantine, mixed migrated snapshots, old journal entries and active undo/redo cursor.
-20. All existing Project IR/Project Store tests remain green.
+3. Imported SHA-256 primitive passes official known vectors and cross-checks with Node `crypto` and Web Crypto when available.
+4. CEVRA digest frozen vectors: empty, PT-BR, four-byte Unicode and escaping, with byte-identical canonical input.
+5. Digest changes for each included semantic dimension and array order.
+6. Digest does not change for confidence/provenance/extensions-only changes.
+7. Digest rejects invalid Unicode, negative zero, unsafe/fractional times and malformed digest text.
+8. Characterization freezes historical v1 handling of language, word/segment `speakerId`, extra transcript/word/segment properties, confidence, `wordIds`, duplicate references and other previously unclosed fields.
+9. Valid source transcripts cover `none`, `model`, `aligned`, `unknown` migration and no-speech.
+10. Validation rejects unknown/image/duplicate source ownership, wrong digest and checksum mismatch.
+11. Validation rejects invalid/over-duration times, duplicate IDs, missing/duplicate word references and normal timing mapping failures.
+12. Validation covers every speaker predicate, conflicts, mixed-speaker segment and segment-without-words behavior.
+13. Provenance tests cover each stage kind, required/prohibited fields, order, duplicate kinds and 1–5 bound.
+14. Quarantine tests cover exact schema, reasons, sorted eligible IDs, arbitrary finite JSON payload, reserved-key collision and persistence.
+15. Migration table A–O, including language-only, segment-only, words, speaker IDs and checksum present/absent.
+16. Historically accepted but v2-incompatible language or speaker values produce `incompatible-canonical-transcript` quarantine and the package still opens.
+17. Unknown extra transcript/word/segment fields are preserved JSON-semantically in quarantine; canonical association happens only when lossless and safe.
+18. Multiple total sources with exactly one eligible remains quarantined.
+19. Every route removes own property `transcript`; empty routes invent no canonical record/quarantine.
+20. Same v1 input migrated twice produces deep equality and identical stable JSON, with no invented timestamp.
+21. A source-removal cascade removes source/transcript together only after existing blockers pass; undo/redo restores/removes both.
+22. Package migrates `project.json` and each historical snapshot independently; active migrated values remain identical.
+23. A package containing an under-validated but historically accepted legacy transcript opens, and quarantine survives package round trip without payload loss.
+24. Package round trip preserves mixed migrated snapshots, old journal entries and active undo/redo cursor.
+25. All existing Project IR/Project Store tests remain green.
 
 ### Slice B
 
@@ -609,14 +648,14 @@ No change is planned for `packages/contracts`, `engines/transcription`, Media Ru
 
 ## Backward compatibility
 
-- Valid v1 projects continue opening through the registered deterministic migration.
+- Every project package accepted by the CEVRA schema/validator v1 before v2 continues opening through the registered deterministic migration. Legacy transcript data that cannot satisfy v2 canonical invariants is preserved as raw JSON in quarantine. Documents already rejected by v1 are not promised recovery.
 - `project.json` and every snapshot migrate independently under the same pure function; the active structural comparison remains valid.
 - Old journal entries remain readable because they are preserved rather than replayed, and existing command variants remain in the union.
 - `TranscriptState` name and structure remain public and unchanged; `TranscriptionResult.transcript` remains compatible.
 - The project package format stays at version 1; only `projectSchemaVersion` advances.
 - Media Runtime, Local Transcription Engine V1 and the closed EDVID parity specification do not change.
 
-Real risks are migration of malformed-but-previously-under-validated v1 language/speaker data, package growth from whole-transcript snapshots, accidental nondeterminism in canonical Unicode/JSON output, and redo loss if command failure occurs after history truncation. Quarantine, fixed vectors, per-version validation, package fixtures and the Slice B history reorder address these risks without a storage redesign.
+Real risks are accidental tightening of historical v1 acceptance, loss of under-validated legacy fields during conversion, package growth from whole-transcript snapshots, nondeterminism in canonical Unicode/JSON output, dependency drift, and redo loss if command failure occurs after history truncation. Frozen v1 characterization, raw quarantine, fixed dependency/version/integrity, compatibility vectors, package fixtures and the Slice B history reorder address these risks without a storage redesign.
 
 ## Non-goals
 
@@ -633,11 +672,11 @@ Real risks are migration of malformed-but-previously-under-validated v1 language
 
 ## Implementation-ready decisions and bounded remaining questions
 
-The type shape, digest v1, confidence exclusion, provenance union/bound, timing and speaker predicates, quarantine schema/reasons, migration cases, validation, commands, cascade, slice boundary and tests are closed by this plan.
+The type shape, audited SHA-256 primitive, CEVRA digest v1, confidence exclusion, provenance union/bound, historical v1 acceptance, raw quarantine, timing and speaker predicates, migration cases, validation, commands, cascade, slice boundary and tests are closed by this plan.
 
 No conceptual question blocks Slice A. Two implementation-local checks remain deliberately bounded:
 
-1. The compatibility-vector test must calculate and freeze the expected SHA-256 literals using an independent standard implementation before merging Slice A; the canonical input bytes are already fixed here.
+1. Slice A must revalidate `@noble/hashes@2.4.0` availability, MIT license, zero runtime dependencies, ESM export compatibility and registry integrity before changing the lockfile. A material upstream discrepancy blocks dependency addition rather than selecting another version silently.
 2. `packages/project-store/src/codec.ts` is expected to need no production change. Its migration tests decide whether a minimal version-dispatch correction is necessary; no package-format redesign is authorized.
 
 Storage thresholds remain evidence-driven. Whole-transcript snapshots are accepted initially; before long-form release, benchmark package size, snapshot growth, save/load and undo/redo latency. Any later optimization must preserve the exact domain/history/recovery semantics above.
