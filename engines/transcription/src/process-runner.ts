@@ -276,9 +276,13 @@ async function collectWorkerResult(
   signal: AbortSignal | undefined,
   stopTimeoutMs: number
 ): Promise<unknown> {
-  let stdout = "";
-  let stderr = "";
+  const stdoutChunks: Buffer[] = [];
+  const stderrChunks: Buffer[] = [];
+  let stdoutBytes = 0;
+  let stderrBytes = 0;
+  let outputLimitExceeded = false;
   let cancelled = false;
+  let settled = false;
   let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
   const abort = () => {
     cancelled = true;
@@ -289,24 +293,60 @@ async function collectWorkerResult(
       }, stopTimeoutMs);
     }
   };
-  signal?.addEventListener("abort", abort, { once: true });
-  if (signal?.aborted) abort();
-  child.stdout.on("data", (chunk) => {
-    stdout += chunk.toString("utf8");
-    if (Buffer.byteLength(stdout) > MAX_WORKER_OUTPUT_BYTES && child.exitCode === null) child.kill("SIGKILL");
-  });
-  child.stderr.on("data", (chunk) => { stderr = (stderr + chunk.toString("utf8")).slice(-8192); });
-  child.stdin.on("error", () => undefined);
-  child.stdin.end(`${JSON.stringify(payload)}\n`);
 
   return new Promise((resolvePromise, reject) => {
-    child.once("error", (cause) => {
+    const onStdout = (chunk: Buffer | string) => {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const available = Math.max(0, MAX_WORKER_OUTPUT_BYTES - stdoutBytes);
+      if (available > 0) stdoutChunks.push(bytes.subarray(0, available));
+      stdoutBytes += bytes.length;
+      if (stdoutBytes > MAX_WORKER_OUTPUT_BYTES && !outputLimitExceeded) {
+        outputLimitExceeded = true;
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      }
+    };
+    const onStderr = (chunk: Buffer | string) => {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      stderrChunks.push(bytes);
+      stderrBytes += bytes.length;
+      while (stderrBytes > 8192 && stderrChunks.length > 0) {
+        const overflow = stderrBytes - 8192;
+        const first = stderrChunks[0]!;
+        if (first.length <= overflow) {
+          stderrChunks.shift();
+          stderrBytes -= first.length;
+        } else {
+          stderrChunks[0] = first.subarray(overflow);
+          stderrBytes -= overflow;
+        }
+      }
+    };
+    const onStdinError = () => undefined;
+    const settle = (action: () => void): void => {
+      if (settled) return;
+      settled = true;
       cleanup();
-      reject(new LocalTranscriptionError("TRANSCRIPTION_WORKER_START_FAILED", "The transcription worker could not be started.", { cause }));
-    });
-    child.once("exit", (code, signalCode) => {
-      cleanup();
+      action();
+    };
+    const onChildError = (cause: Error) => {
+      settle(() => reject(new LocalTranscriptionError(
+        "TRANSCRIPTION_WORKER_START_FAILED",
+        "The transcription worker could not be started.",
+        { cause }
+      )));
+    };
+    const onClose = (code: number | null, signalCode: NodeJS.Signals | null) => {
+      settle(() => complete(code, signalCode));
+    };
+    const complete = (code: number | null, signalCode: NodeJS.Signals | null): void => {
       if (cancelled || signal?.aborted) return reject(cancellationError(signal?.reason));
+      const stderr = Buffer.concat(stderrChunks, stderrBytes).toString("utf8");
+      if (outputLimitExceeded) {
+        return reject(new LocalTranscriptionError(
+          "TRANSCRIPTION_FAILED",
+          `The transcription worker exceeded the ${MAX_WORKER_OUTPUT_BYTES}-byte output limit.`
+        ));
+      }
       if (code !== 0) {
         return reject(new LocalTranscriptionError(
           "TRANSCRIPTION_FAILED",
@@ -314,6 +354,7 @@ async function collectWorkerResult(
           stderr ? { cause: new Error(stderr) } : undefined
         ));
       }
+      const stdout = Buffer.concat(stdoutChunks, Math.min(stdoutBytes, MAX_WORKER_OUTPUT_BYTES)).toString("utf8");
       let response: unknown;
       try { response = JSON.parse(stdout.trim()); } catch (cause) {
         return reject(new LocalTranscriptionError("TRANSCRIPTION_MALFORMED_RESULT", "The transcription worker returned invalid JSON.", { cause }));
@@ -329,11 +370,25 @@ async function collectWorkerResult(
         return reject(new LocalTranscriptionError(code, detail));
       }
       reject(new LocalTranscriptionError("TRANSCRIPTION_MALFORMED_RESULT", "The transcription worker envelope is malformed."));
-    });
+    };
     function cleanup(): void {
       signal?.removeEventListener("abort", abort);
       if (forceKillTimer) clearTimeout(forceKillTimer);
+      child.removeListener("error", onChildError);
+      child.removeListener("close", onClose);
+      child.stdout.removeListener("data", onStdout);
+      child.stderr.removeListener("data", onStderr);
+      child.stdin.removeListener("error", onStdinError);
     }
+
+    signal?.addEventListener("abort", abort, { once: true });
+    child.stdout.on("data", onStdout);
+    child.stderr.on("data", onStderr);
+    child.stdin.on("error", onStdinError);
+    child.once("error", onChildError);
+    child.once("close", onClose);
+    if (signal?.aborted) abort();
+    child.stdin.end(`${JSON.stringify(payload)}\n`);
   });
 }
 

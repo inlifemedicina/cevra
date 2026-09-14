@@ -22,6 +22,7 @@ const python = pythonProbe.status === 0 ? pythonProbe.stdout.trim() : "/usr/bin/
 const localInput = path.join(os.tmpdir(), "cevra-transcription-input.wav");
 const runtime = { mode: "development", pythonExecutable: python };
 const profile = { modelCacheDir: path.join(os.tmpdir(), "cevra-model-cache") };
+const transportWorkerScript = path.join(here, "fixtures", "transport_worker.py");
 
 function validRaw(options = {}) {
   return {
@@ -49,6 +50,27 @@ function adapter(runner, overrides = {}) {
 
 function context(signal) {
   return { jobId: "job-1", locale: "pt-BR", ...(signal ? { signal } : {}) };
+}
+
+function transportRunner(runtimeOverride = {}) {
+  return new ProcessTranscriptionWorkerRunner({
+    runtime: { mode: "development", pythonExecutable: python, workerScript: transportWorkerScript, ...runtimeOverride },
+    stopTimeoutMs: 200
+  });
+}
+
+function transportRequest(modelId) {
+  return {
+    protocolVersion: TRANSCRIPTION_PROTOCOL_VERSION,
+    operation: "transcribe",
+    inputPath: localInput,
+    modelId,
+    modelCacheDir: profile.modelCacheDir,
+    device: "cpu",
+    computeType: "int8",
+    wordTimestamps: false,
+    allowModelDownload: false
+  };
 }
 
 function managedRuntimeFixture({ copyExecutable = true } = {}) {
@@ -321,6 +343,70 @@ test("cancellation terminates and reaps the process worker", async () => {
   await assert.rejects(job, (error) => error?.code === "TRANSCRIPTION_CANCELLED");
   assert.equal(processRunner.workerPid, undefined);
   assert.throws(() => process.kill(pid, 0));
+});
+
+test("process transport preserves PT-BR UTF-8 split across stdout chunks", async () => {
+  const result = await transportRunner().transcribe(transportRequest("split-utf8-ptbr"), context());
+  assert.deepEqual(result, { text: "Ação, saúde e coração" });
+});
+
+test("process transport preserves four-byte Unicode split across stdout chunks", async () => {
+  const result = await transportRunner().transcribe(transportRequest("split-utf8-four-byte"), context());
+  assert.deepEqual(result, { text: "CEVRA 😀 Orbit" });
+});
+
+test("process transport waits for stream close after worker exit before parsing JSON", async () => {
+  const runner = transportRunner();
+  let settled = false;
+  const job = runner.transcribe(transportRequest("exit-before-close"), context()).then((result) => {
+    settled = true;
+    return result;
+  });
+  const startDeadline = Date.now() + 2000;
+  while (!runner.workerPid && Date.now() < startDeadline) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(typeof runner.workerPid, "number");
+  const exitDeadline = Date.now() + 2000;
+  while (runner.workerPid && Date.now() < exitDeadline) await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(runner.workerPid, undefined, "the parent worker must exit before its inherited stdout closes");
+  assert.equal(settled, false, "the response must remain pending until stdout closes");
+  assert.deepEqual(await job, { text: "complete only after stream close" });
+});
+
+test("process transport fails closed for invalid JSON", async () => {
+  await assert.rejects(
+    transportRunner().transcribe(transportRequest("invalid-json"), context()),
+    (error) => error?.code === "TRANSCRIPTION_MALFORMED_RESULT"
+  );
+});
+
+test("process transport preserves typed abnormal-exit errors and stderr evidence", async () => {
+  await assert.rejects(
+    transportRunner().transcribe(transportRequest("abnormal-exit"), context()),
+    (error) => error?.code === "TRANSCRIPTION_FAILED" && error.cause?.message.includes("fixture failed")
+  );
+});
+
+test("process transport enforces the bounded worker output limit", async () => {
+  const runner = transportRunner();
+  await assert.rejects(
+    runner.transcribe(transportRequest("output-limit"), context()),
+    (error) => error?.code === "TRANSCRIPTION_FAILED" && error.message.includes("output limit")
+  );
+  assert.equal(runner.workerPid, undefined);
+});
+
+test("process transport preserves typed spawn errors", { skip: process.platform === "win32" }, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-transcription-spawn-error-"));
+  const invalidExecutable = path.join(root, "not-executable");
+  fs.writeFileSync(invalidExecutable, "not an executable");
+  fs.chmodSync(invalidExecutable, 0o644);
+  await assert.rejects(
+    transportRunner({ pythonExecutable: invalidExecutable, workerScript: transportWorkerScript }).transcribe(
+      transportRequest("split-utf8-ptbr"),
+      context()
+    ),
+    (error) => error?.code === "TRANSCRIPTION_WORKER_START_FAILED" && error.cause instanceof Error
+  );
 });
 
 test("healthcheck and capabilities never replace the active transcription PID", async () => {
