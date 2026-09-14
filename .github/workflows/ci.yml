@@ -77,3 +77,21 @@ jobs:
           --vendor "${RUNNER_TEMP}/ffmpeg-skill"
           --python-root "${RUNNER_TEMP}/cevra-python"
           --ffmpeg-source "${RUNNER_TEMP}/ffmpeg-source/ffmpeg-9.0.1"
+
+  transcription-worker:
+    name: Transcription worker contract tests (Python 3.12)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: 3.12.14
+      - name: Validate dependency audit data
+        run: python -m json.tool engines/transcription/runtime/dependency-audit.json >/dev/null
+      - name: Compile closed transcription worker
+        env:
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/cevra-transcription-pycache
+        run: python -m py_compile engines/transcription/python/cevra_transcription_worker.py
+      - name: Run transcription worker unit tests without model downloads
+        run: python -I -B -m unittest discover -s engines/transcription/test_python -p 'test_*.py' -v
