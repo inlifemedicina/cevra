@@ -19,7 +19,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [project, setProject] = useState<Readonly<ProjectIR> | null>(null);
   const [locale, setLocale] = useState<CevraLocale>("pt-BR");
   const [workspace, setWorkspace] = useState<Workspace>("edit");
-  const [selectedId, setSelectedId] = useState("source-main");
+  const [selectedProjectItemId, setSelectedProjectItemId] = useState<string | null>(null);
+  const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
   const [playheadMs, setPlayheadMs] = useState(24300);
   const [playing, setPlaying] = useState(false);
   const [timelineZoom, setTimelineZoom] = useState(100);
@@ -34,7 +35,13 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
 
   useEffect(() => {
     let current = true;
-    void backend.loadProjectProjection().then((value) => { if (current) setProject(value); });
+    void backend.loadProjectProjection().then((value) => {
+      if (!current) return;
+      const initialSourceId = resolveInitialSourceId(value);
+      setProject(value);
+      setSelectedProjectItemId(initialSourceId);
+      setActiveSourceId(initialSourceId);
+    });
     return () => { current = false; };
   }, [backend]);
 
@@ -64,24 +71,50 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     window.addEventListener("pointerup", stop);
   }
 
+  function selectProjectItem(id: string) {
+    if (!project) return;
+    const source = project.sources.find((item) => item.id === id);
+    if (source) {
+      setSelectedProjectItemId(source.id);
+      setActiveSourceId(source.id);
+      return;
+    }
+    const clip = project.timeline.clips.find((item) => item.id === id);
+    if (clip) {
+      setSelectedProjectItemId(clip.id);
+      setActiveSourceId(clip.sourceId);
+      return;
+    }
+    if (project.captions.some((item) => item.id === id) || project.graphics.some((item) => item.id === id)) {
+      setSelectedProjectItemId(id);
+    }
+  }
+
   if (!project) return <main className="loading-screen"><span className="brand-mark">C</span><p>{t("app.loadingProject")}</p></main>;
 
   const layoutStyle = { "--timeline-height": `${timelineHeight}px` } as CSSProperties;
   return (
-    <main className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${inspectorOpen ? " inspector-open" : " inspector-closed"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision}>
-      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} inspectorOpen={inspectorOpen} exportAvailable={backend.capability("project.export").available} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onInspectorToggle={() => setInspectorOpen((value) => !value)} />
+    <main className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${inspectorOpen ? " inspector-open" : " inspector-closed"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision} data-selected-project-item-id={selectedProjectItemId ?? undefined} data-active-source-id={activeSourceId ?? undefined}>
+      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} inspectorOpen={inspectorOpen} exportAvailable={backend.capability("project.export").available} presentationOnly={backend.presentationOnly} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onInspectorToggle={() => setInspectorOpen((value) => !value)} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={setActiveTool} />
-        {mediaOpen && <MediaPanel sources={project.sources} selectedId={selectedId} workspace={workspace} importAvailable={backend.capability("media.import").available} t={t} onSelect={setSelectedId} />}
+        {mediaOpen && <MediaPanel sources={project.sources} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backend.capability("media.import").available} t={t} onSelect={selectProjectItem} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
-            <WorkspaceStage workspace={workspace} project={project} selectedId={selectedId} playheadMs={playheadMs} playing={playing} t={t} onSelect={setSelectedId} onPlayingChange={setPlaying} />
+            <WorkspaceStage workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} />
           </div>
           {workspace === "edit" && <DirectorPanel draft={directorDraft} preset={preset} reviewing={reviewing} directorAvailable={backend.capability("director.execute").available} applyAvailable={backend.capability("changes.apply").available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} onReviewToggle={() => setReviewing((value) => !value)} />}
         </div>
-        {inspectorOpen && <Inspector project={project} selectedId={selectedId} workspace={workspace} t={t} />}
+        {inspectorOpen && <Inspector project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />}
       </div>
-      <Timeline project={project} selectedId={selectedId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={setSelectedId} onPlayheadChange={setPlayheadMs} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} />
+      <Timeline project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={setPlayheadMs} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} />
     </main>
   );
+}
+
+function resolveInitialSourceId(project: Readonly<ProjectIR>): string | null {
+  const mainTrack = project.timeline.tracks.find((track) => track.kind === "video");
+  const mainClip = mainTrack ? project.timeline.clips.find((clip) => clip.trackId === mainTrack.id) : undefined;
+  if (mainClip && project.sources.some((source) => source.id === mainClip.sourceId)) return mainClip.sourceId;
+  return project.sources.find((source) => source.kind === "video" || source.kind === "audio")?.id ?? null;
 }

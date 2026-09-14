@@ -17,7 +17,7 @@ const waveformBars = [4, 12, 7, 16, 9, 5, 14, 8, 17, 11, 6, 15, 9, 13, 5, 16, 8,
 
 interface TimelineProps {
   project: Readonly<ProjectIR>;
-  selectedId: string;
+  selectedId: string | null;
   playheadMs: number;
   zoom: number;
   t: Translate;
@@ -85,7 +85,7 @@ export function Timeline({ project, selectedId, playheadMs, zoom, t, onSelect, o
   );
 }
 
-function TimelineRow({ track, label, visuals, duration, zoom, playheadPercent, selectedId, t, onSelect }: { track: TimelineTrack; label: string; visuals: TimelineVisual[]; duration: number; zoom: number; playheadPercent: number; selectedId: string; t: Translate; onSelect(id: string): void }) {
+function TimelineRow({ track, label, visuals, duration, zoom, playheadPercent, selectedId, t, onSelect }: { track: TimelineTrack; label: string; visuals: TimelineVisual[]; duration: number; zoom: number; playheadPercent: number; selectedId: string | null; t: Translate; onSelect(id: string): void }) {
   const isAudio = track.kind === "audio";
   return <div className="timeline-row" data-testid={`timeline-track-${track.id}`}>
     <div className="track-head"><strong>{track.name}</strong><span>{label.replace(/^.. — /, "")}</span><div className="track-actions"><button type="button" disabled aria-label={t("timeline.lockTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="lock" size={12} /></button><button type="button" disabled aria-label={t("timeline.showTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="eye" size={12} /></button>{isAudio && <button type="button" disabled aria-label={t("timeline.muteTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="mute" size={12} /></button>}</div></div>
@@ -105,7 +105,8 @@ function visualsForTrack(project: Readonly<ProjectIR>, track: TimelineTrack): Ti
   return clips;
 }
 
-function selectedLabel(project: Readonly<ProjectIR>, selectedId: string): string {
+function selectedLabel(project: Readonly<ProjectIR>, selectedId: string | null): string {
+  if (!selectedId) return "—";
   const source = project.sources.find((item) => item.id === selectedId);
   const clip = project.timeline.clips.find((item) => item.id === selectedId);
   const caption = project.captions.find((item) => item.id === selectedId);

@@ -29,6 +29,7 @@ h1, h2, h3, p { margin: 0; }
 .icon-button:hover:not(:disabled), .icon-button.toggled { border-color: var(--cevra-border); background: var(--cevra-surface-2); color: var(--cevra-fg); }
 .save-status { display: flex; align-items: center; margin: 0 4px; gap: 6px; color: var(--cevra-fg-muted); font-size: 11px; white-space: nowrap; }
 .save-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--cevra-success); }
+.save-status.demo-status i { background: var(--cevra-warning); }
 .locale-button { width: 31px; height: 26px; padding: 0; border: 1px solid var(--cevra-border); border-radius: var(--cevra-radius-sm); background: transparent; color: var(--cevra-fg-muted); font-size: 10px; font-weight: 800; cursor: pointer; }
 .export-button { height: 32px; padding: 0 15px; border: 1px solid #558eea; border-radius: var(--cevra-radius-sm); background: var(--cevra-accent); color: var(--cevra-accent-contrast); font-size: 12px; font-weight: 800; opacity: .72 !important; }
 
@@ -132,6 +133,9 @@ h1, h2, h3, p { margin: 0; }
 .inspector { grid-area: inspector; min-width: 0; min-height: 0; padding: 13px 12px; overflow-y: auto; border-left: 1px solid var(--cevra-border); background: var(--cevra-surface-1); }
 .workspace-context { padding: 3px 6px; border-radius: 3px; background: var(--cevra-surface-3); color: var(--cevra-fg-muted); font-size: 8px; }
 .selection-label { margin: 10px 0; padding: 8px; overflow: hidden; border: 1px solid var(--cevra-border); border-radius: var(--cevra-radius-sm); background: #101318; color: var(--cevra-fg-soft); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-empty, .workspace-empty-state { display: grid; place-items: center; min-height: 92px; padding: 14px; color: var(--cevra-fg-muted); font-size: 9px; line-height: 1.45; text-align: center; }
+.inspector-empty span { margin-bottom: 5px; color: var(--cevra-border-strong); font-size: 20px; }
+.workspace-empty-state { min-height: 120px; border: 1px dashed var(--cevra-border); border-radius: var(--cevra-radius-sm); }
 .inspector-sections details { border-top: 1px solid var(--cevra-border); }
 .inspector-sections summary { display: flex; align-items: center; justify-content: space-between; padding: 11px 1px; color: var(--cevra-fg-soft); font-size: 10px; font-weight: 700; cursor: pointer; list-style: none; }
 .property-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding-bottom: 11px; }

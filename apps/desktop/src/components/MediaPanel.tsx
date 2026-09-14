@@ -12,7 +12,7 @@ const filters = [
   ["image", "media.filter.image"]
 ] as const;
 
-export function MediaPanel({ sources, selectedId, workspace, importAvailable, t, onSelect }: { sources: readonly SourceAsset[]; selectedId: string; workspace: Workspace; importAvailable: boolean; t: Translate; onSelect(id: string): void }) {
+export function MediaPanel({ sources, selectedId, workspace, importAvailable, t, onSelect }: { sources: readonly SourceAsset[]; selectedId: string | null; workspace: Workspace; importAvailable: boolean; t: Translate; onSelect(id: string): void }) {
   const [filter, setFilter] = useState<MediaFilter>("all");
   const [query, setQuery] = useState("");
   const visibleSources = useMemo(() => sources.filter((source) => {

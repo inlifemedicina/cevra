@@ -3,16 +3,20 @@ import { workspaceKeys, type Translate, type Workspace } from "../ui-model";
 
 const videoFields = [["inspector.position", "0, 0"], ["inspector.scale", "100%"], ["inspector.rotation", "0°"], ["inspector.opacity", "100%"]] as const;
 
-export function Inspector({ project, selectedId, workspace, t }: { project: Readonly<ProjectIR>; selectedId: string; workspace: Workspace; t: Translate }) {
-  const source = project.sources.find((item) => item.id === selectedId);
-  const clip = project.timeline.clips.find((item) => item.id === selectedId);
-  const caption = project.captions.find((item) => item.id === selectedId);
-  const selectedName = source?.displayName ?? caption?.text ?? clip?.id ?? selectedId;
+export function Inspector({ project, selectedProjectItemId, workspace, t }: { project: Readonly<ProjectIR>; selectedProjectItemId: string | null; workspace: Workspace; t: Translate }) {
+  const source = project.sources.find((item) => item.id === selectedProjectItemId);
+  const clip = project.timeline.clips.find((item) => item.id === selectedProjectItemId);
+  const clipSource = clip ? project.sources.find((item) => item.id === clip.sourceId) : undefined;
+  const clipTrack = clip ? project.timeline.tracks.find((item) => item.id === clip.trackId) : undefined;
+  const caption = project.captions.find((item) => item.id === selectedProjectItemId);
+  const graphic = project.graphics.find((item) => item.id === selectedProjectItemId);
+  const selectedName = source?.displayName ?? clipSource?.displayName ?? caption?.text ?? graphic?.text ?? graphic?.styleToken ?? null;
+  const isAudioSelection = source?.kind === "audio" || clipTrack?.kind === "audio";
   return (
     <aside className="inspector" aria-label={t("inspector.title")}>
       <div className="inspector-heading"><div><span className="eyebrow">{t("inspector.context")}</span><h2>{t("inspector.title")}</h2></div><span className="workspace-context">{t(workspaceKeys[workspace])}</span></div>
-      <p className="selection-label">{t("inspector.selected", { name: selectedName })}</p>
-      {workspace === "captions" ? <CaptionInspector t={t} /> : workspace === "audio" ? <AudioInspector t={t} /> : <VideoInspector t={t} />}
+      {selectedName ? <p className="selection-label" data-testid="inspector-selection">{t("inspector.selected", { name: selectedName })}</p> : <div className="inspector-empty" role="status"><span aria-hidden="true">◇</span><p>{t("inspector.emptySelection")}</p></div>}
+      {caption ? <CaptionInspector t={t} /> : isAudioSelection ? <AudioInspector t={t} /> : (source || clip || graphic) ? <VideoInspector t={t} /> : null}
     </aside>
   );
 }

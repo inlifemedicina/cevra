@@ -879,7 +879,7 @@ integration slice. No localhost server, sidecar, broad filesystem, network or
 shell capability is approved for the UI shell.
 
 Current active-branch validation preserves the 207-test Node/TypeScript baseline
-and adds 14 deterministic desktop shell tests for 221 total; the unchanged 22
+and adds 20 deterministic desktop shell tests for 227 total; the unchanged 22
 Python tests pass. Frontend production build and responsive visual checks at
 1440×900 and 1920×1080 pass. `cargo check --locked`, the optimized Tauri build
 without installer bundling, and a native-process launch smoke test pass with a
@@ -1232,6 +1232,7 @@ active only on the branch above.
 - **IMPLEMENTED/CLOSED:** Application Transcript Persistence / Orchestration V1 merged in PR #17 at `aaecd62647b49c1090f961a3f872dff0ebc9889c`. The application service authorizes a current Project IR source, invokes `TranscriptionEngineAdapter`, performs non-coercing runtime boundary checks, passes raw transcript values into canonical `createSourceTranscript` validation, and promotes only through guarded `transcript.set` and `ProjectHistory`. Defensive outcome cloning occurs only after canonical validation. No execution repository, cache, UI or engine change was introduced. Merge validation retained 207 Node/TypeScript and 22 Python tests.
 - **CANONICAL:** Desktop Visual V0.1 uses Adaptive Hybrid workspaces: Editar is preview-first; Transcrição, Composição, Legendas and Áudio specialize the center workspace while preserving one project, selection, playhead and layered timeline. Director CEVRA is integrated into the editor with Workflow Preset quick access and a reviewable AI Change Set model. The inspector is contextual. The visual language is dark graphite, neutral, compact and restrained with configurable-accent-ready tokens and no glass/neon/SaaS-dashboard trade dress.
 - **IN DEVELOPMENT:** Desktop UI Shell V0.1 started on `feat/desktop-ui-shell-v0-1` from exact base `aaecd62647b49c1090f961a3f872dff0ebc9889c`. It is the presentation foundation in a real least-privilege Tauri 2 window. Typed Tauri↔desktop-host integration and all real engine/application execution are intentionally deferred to the next slice.
+- **HARDENED ON ACTIVE BRANCH:** Desktop UI source context is explicitly source-scoped for Project IR v2 multi-source transcripts. Persistent Project IR selection and `activeSourceId` are separate from workspace-local transcript, composition and demo audio focus; unresolved selections produce a neutral inspector state. `DemoDesktopBackend` now truthfully reports that its presentation state is not persisted. The visual direction and empty Tauri capability set are unchanged.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
