@@ -19,6 +19,13 @@ Every incorporated dependency, model, copied permissive source component or redi
 | zlib | Runtime-discovered | Compression library used by the validated macOS arm64 private CPython runtime | zlib license; supplied by macOS in the validated bundle | The provenance marks this component as platform-provided. It is not represented as a bundled cross-platform component. |
 | @types/node | 22.15.3 | TypeScript development declarations for Node.js APIs | MIT | Pinned root devDependency; build-time only and not included in the Media Runtime bundle. |
 | undici-types | 6.21.0 | Transitive TypeScript declarations used by `@types/node` | MIT | Locked development-only transitive dependency; not included in the Media Runtime bundle. |
+| React / React DOM | 19.3.0 / 19.3.0 | Browser UI runtime for the CEVRA Vids desktop shell | MIT | Exact direct production dependencies, redistributed in the compiled WebView frontend; consumed unmodified from https://github.com/facebook/react. |
+| Tauri / tauri-build | 2.11.5 / 2.6.3 | Native desktop window/runtime and Rust build integration | Apache-2.0 OR MIT | Exact direct Rust dependencies for `apps/desktop`; `tauri` is redistributed in the native application and `tauri-build` is build-time only. No Tauri plugins are enabled in this slice. |
+| @tauri-apps/cli | 2.11.4 | Tauri development and native build command | Apache-2.0 OR MIT | Exact direct development dependency; build-time only and not redistributed as application code. |
+| Vite / @vitejs/plugin-react | 8.3.0 / 6.1.1 | Desktop frontend development server and production bundling | MIT / MIT | Exact direct development dependencies; build-time only. |
+| Vitest / jsdom | 5.0.0 / 30.0.1 | Deterministic desktop application-shell tests and DOM environment | MIT / MIT | Exact direct development dependencies; test-only and not redistributed. |
+| Testing Library React / user-event | 16.3.3 / 14.6.7 | User-centered React rendering and interaction test utilities | MIT / MIT | Exact direct development dependencies; test-only and not redistributed. |
+| @types/react / @types/react-dom | 19.3.0 / 19.3.0 | TypeScript declarations for the React UI | MIT / MIT | Exact direct development dependencies; build-time only and not redistributed. |
 | faster-whisper | 1.2.1 | Local speech transcription engine behind `TranscriptionEngineAdapter` | MIT | Pinned for the isolated Transcription Engine environment. No EDVID source is copied. |
 | CTranslate2 | 4.8.2 | CPU/CUDA inference backend used by faster-whisper | MIT | Pinned for CPython 3.12; wheel availability verified for macOS arm64/x64, Linux x64 and Windows x64 without declaring those CEVRA release targets. |
 | PyAV | 18.1.0 | Local media decoding for faster-whisper | BSD-3-Clause; linked FFmpeg retains its own license | Release policy requires a source build against a separate inventoried compatible FFmpeg 8.x LGPL-only library set. It does not reuse the sealed Media Runtime FFmpeg 9.0.1. Upstream PyPI binary wheels bundle GPL codec libraries and are not approved release inputs. |
@@ -42,7 +49,6 @@ Every incorporated dependency, model, copied permissive source component or redi
 | mcpCut | History/journal reference/selective reuse | MIT | No |
 | MaxAzure video-editing-skill | Editorial workflow/QA library | MIT | No |
 | OpenTimelineIO | Interchange adapter | Apache-2.0 | No |
-| Tauri | Desktop/mobile application shell | MIT / Apache-2.0 | No |
 | Auroq OS | Architecture/behavior reference only | UNLICENSED | No |
 
 ## Policy

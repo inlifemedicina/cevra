@@ -1,0 +1,42 @@
+:root {
+  color-scheme: dark;
+  --cevra-bg: #0d0f12;
+  --cevra-surface-1: #13161a;
+  --cevra-surface-2: #191d22;
+  --cevra-surface-3: #20252b;
+  --cevra-surface-raised: #262c34;
+  --cevra-border: #2c323a;
+  --cevra-border-strong: #3b444f;
+  --cevra-fg: #f2f5f8;
+  --cevra-fg-soft: #c4cbd3;
+  --cevra-fg-muted: #89939f;
+  --cevra-accent: #4c8dff;
+  --cevra-accent-strong: #70a5ff;
+  --cevra-accent-contrast: #071222;
+  --cevra-success: #48b78b;
+  --cevra-warning: #e2aa55;
+  --cevra-error: #e16f75;
+  --cevra-focus: #83b2ff;
+  --cevra-space-1: 4px;
+  --cevra-space-2: 8px;
+  --cevra-space-3: 12px;
+  --cevra-space-4: 16px;
+  --cevra-space-5: 20px;
+  --cevra-space-6: 24px;
+  --cevra-radius-sm: 4px;
+  --cevra-radius-md: 7px;
+  --cevra-radius-lg: 10px;
+  --cevra-font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cevra-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --cevra-text-xs: 11px;
+  --cevra-text-sm: 12px;
+  --cevra-text-md: 14px;
+  --cevra-text-lg: 16px;
+  --cevra-text-xl: 20px;
+  --cevra-shadow-raised: 0 12px 32px rgb(0 0 0 / 32%);
+}
+
+*:focus-visible {
+  outline: 2px solid var(--cevra-focus);
+  outline-offset: 2px;
+}

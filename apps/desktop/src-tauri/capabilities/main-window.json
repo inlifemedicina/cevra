@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-window",
+  "description": "Main CEVRA Vids presentation window with no host permissions.",
+  "windows": ["main"],
+  "permissions": []
+}

@@ -15,6 +15,57 @@
 - Context inspector
 - Editing modes: AI, Style, Captions, Media, Properties
 
+## CEVRA Vids Desktop Visual V0.1 — approved
+
+The approved desktop model is **Adaptive Hybrid**: one canonical project,
+selection, playhead and layered timeline persist while the central workspace
+adapts to the job at hand. Workspaces do not create alternate projects or
+alternate transcript sources of truth.
+
+- **Editar** is the default, preview-first workspace: compact media navigation
+  and library on the left, a visually dominant preview in the center, a
+  contextual inspector on the right, Director CEVRA directly below the preview,
+  and the shared layered timeline at the bottom.
+- **Transcrição** makes the source-linked Project IR transcript dominant while
+  retaining a synchronized preview and the same timeline, project, selection
+  and playhead.
+- **Composição** prioritizes assets, overlays, B-roll, graphics, preview and
+  relevant inspector controls.
+- **Legendas** prioritizes transcript-derived caption cues, style controls,
+  preview and the V2 timeline context.
+- **Áudio** prioritizes voice, music and SFX tracks, waveform hierarchy, mix
+  controls, preview and the same timeline context.
+
+Director CEVRA is a first-class editor surface rather than a chatbot panel. It
+combines an optional natural-language instruction with obvious one-click
+Workflow Preset access. The product model remains:
+
+```text
+preset + optional Director instruction
+→ typed orchestration
+→ reviewable changes
+```
+
+AI output is contextual and represented as an explicit Change Set (for example
+cuts, captions and pacing adjustments) with Review and Apply affordances. No
+project mutation may be implied before a real typed backend produces and commits
+reviewable Project IR changes through history/journal boundaries.
+
+The inspector is contextual rather than a permanently expanded properties
+form. The shell uses a dark graphite, neutral, restrained professional visual
+language with compact editor density, subtle radii, strong typography, an
+accent-ready token architecture initially set to blue, sufficient contrast and
+visible keyboard focus. It explicitly avoids glassmorphism, glow-heavy AI
+treatment, gratuitous gradients, SaaS-dashboard framing and other editors'
+trade dress.
+
+At narrower desktop widths the inspector and then the expanded media panel may
+collapse while preview and timeline remain usable. The primary verification
+viewports are 1440×900 and 1920×1080. This V0.1 direction is presentation-only:
+real ingest, preview rendering, Director execution, preset orchestration,
+Change Set application and export remain visibly unavailable until the typed
+desktop runtime is connected.
+
 ## Primary CEVRA Vids flow
 
 ```text
