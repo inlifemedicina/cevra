@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "auditedAt": "2026-09-14",
+  "python": "3.12",
+  "packages": [
+    { "name": "faster-whisper", "version": "1.2.1", "license": "MIT", "upstream": "https://github.com/SYSTRAN/faster-whisper", "wheelSha256": "79a66ad50688c0b794dd501dc340a736992a6342f7f95e5811be60b5224a26a7" },
+    { "name": "CTranslate2", "version": "4.8.2", "license": "MIT", "upstream": "https://github.com/OpenNMT/CTranslate2" },
+    {
+      "name": "PyAV",
+      "version": "18.1.0",
+      "license": "BSD-3-Clause",
+      "upstream": "https://github.com/PyAV-Org/PyAV",
+      "sourceArchiveSha256": "47bfc286e1bc9de7ab4681fc2b575cd2460a66919d31ffe1bd5aa54fae531a28",
+      "releasePolicy": "Build from source against a CEVRA-inventoried LGPL-only FFmpeg library set. Do not redistribute the upstream PyPI binary wheel, which bundles GPL codec libraries."
+    },
+    { "name": "tokenizers", "version": "0.23.2", "license": "Apache-2.0", "upstream": "https://github.com/huggingface/tokenizers" },
+    { "name": "huggingface-hub", "version": "1.31.0", "license": "Apache-2.0", "upstream": "https://github.com/huggingface/huggingface_hub" },
+    { "name": "ONNX Runtime", "version": "1.23.2", "license": "MIT", "upstream": "https://github.com/microsoft/onnxruntime" },
+    { "name": "tqdm", "version": "4.70.1", "license": "MPL-2.0 AND MIT", "upstream": "https://github.com/tqdm/tqdm" },
+    {
+      "name": "Systran/faster-whisper-base model",
+      "version": "resolved asset; not bundled in this slice",
+      "license": "MIT",
+      "upstream": "https://huggingface.co/Systran/faster-whisper-base"
+    }
+  ],
+  "verifiedWheelPlatformsForPython312": ["macOS arm64", "macOS x64", "Linux x64", "Windows x64"],
+  "lockedTransitiveLicenses": {
+    "numpy@2.5.3": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0; wheel component notices require release inventory",
+    "PyYAML@6.0.3": "MIT",
+    "flatbuffers@25.12.19": "Apache-2.0",
+    "packaging@26.3": "Apache-2.0 OR BSD-2-Clause",
+    "protobuf@7.36.1": "BSD-3-Clause",
+    "click@8.5.0": "BSD-3-Clause",
+    "filelock@3.32.6": "MIT",
+    "fsspec@2026.7.0": "BSD-3-Clause",
+    "hf-xet@1.6.0": "Apache-2.0",
+    "httpx@0.28.1": "BSD-3-Clause",
+    "httpcore@1.0.9": "BSD-3-Clause",
+    "h11@0.16.0": "MIT",
+    "anyio@4.15.1": "MIT",
+    "certifi@2026.7.22": "MPL-2.0",
+    "idna@3.19": "BSD-3-Clause",
+    "typing_extensions@4.16.0": "PSF-2.0",
+    "exceptiongroup@1.3.1": "MIT"
+  },
+  "releaseTargetsValidated": [],
+  "notes": [
+    "Wheel availability is dependency compatibility evidence, not a CEVRA release-platform claim.",
+    "The model cache is CEVRA-owned and explicit; media input is never uploaded to Hugging Face.",
+    "A platform release still requires an assembled managed environment, license payload, provenance, and real transcription validation."
+  ]
+}

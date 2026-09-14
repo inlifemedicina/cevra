@@ -9,10 +9,10 @@
   },
   "workspaces": ["apps/*", "packages/*", "engines/*"],
   "scripts": {
-    "build": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application && npm run build -w @cevra/project-store && npm run build -w @cevra/media-ffmpeg",
-    "test": "npm run test -w @cevra/project-ir && npm run test -w @cevra/contracts && npm run test -w @cevra/i18n && npm run test -w @cevra/application && npm run test -w @cevra/project-store && npm run test -w @cevra/media-ffmpeg",
+    "build": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application && npm run build -w @cevra/project-store && npm run build -w @cevra/media-ffmpeg && npm run build -w @cevra/transcription-faster-whisper",
+    "test": "npm run test -w @cevra/project-ir && npm run test -w @cevra/contracts && npm run test -w @cevra/i18n && npm run test -w @cevra/application && npm run test -w @cevra/project-store && npm run test -w @cevra/media-ffmpeg && npm run test -w @cevra/transcription-faster-whisper",
     "test:ci": "npm run test --workspaces --if-present",
-    "test:python": "python3 -I -B -m unittest discover -s engines/media-ffmpeg/test_python -p 'test_*.py' -v",
+    "test:python": "python3 -I -B -m unittest discover -s engines/media-ffmpeg/test_python -p 'test_*.py' -v && python3 -I -B -m unittest discover -s engines/transcription/test_python -p 'test_*.py' -v",
     "ci": "npm run build && npm run test:ci",
     "doctor": "python3 scripts/doctor.py"
   },

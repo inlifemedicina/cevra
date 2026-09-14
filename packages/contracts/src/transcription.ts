@@ -13,6 +13,8 @@ export interface TranscriptionResult {
   detectedLanguage?: string;
   modelId: string;
   durationMs?: number;
+  /** Native model timestamps. WhisperX forced alignment is a separate future capability. */
+  wordTiming?: "none" | "model";
 }
 
 export interface TranscriptionEngineAdapter extends EngineAdapter {

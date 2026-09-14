@@ -18,6 +18,14 @@ Every incorporated dependency, model, copied permissive source component or redi
 | zlib | Runtime-discovered | Compression library used by the validated macOS arm64 private CPython runtime | zlib license; supplied by macOS in the validated bundle | The provenance marks this component as platform-provided. It is not represented as a bundled cross-platform component. |
 | @types/node | 22.15.3 | TypeScript development declarations for Node.js APIs | MIT | Pinned root devDependency; build-time only and not included in the Media Runtime bundle. |
 | undici-types | 6.21.0 | Transitive TypeScript declarations used by `@types/node` | MIT | Locked development-only transitive dependency; not included in the Media Runtime bundle. |
+| faster-whisper | 1.2.1 | Local speech transcription engine behind `TranscriptionEngineAdapter` | MIT | Pinned for the isolated Transcription Engine environment. No EDVID source is copied. |
+| CTranslate2 | 4.8.2 | CPU/CUDA inference backend used by faster-whisper | MIT | Pinned for CPython 3.12; wheel availability verified for macOS arm64/x64, Linux x64 and Windows x64 without declaring those CEVRA release targets. |
+| PyAV | 18.1.0 | Local media decoding for faster-whisper | BSD-3-Clause; linked FFmpeg retains its own license | Release policy requires a source build against an inventoried LGPL-only FFmpeg library set. Upstream PyPI binary wheels bundle GPL codec libraries and are not approved release inputs. |
+| Hugging Face Hub | 1.31.0 | Optional model-asset acquisition into the explicit CEVRA cache | Apache-2.0 | Model download is profile-controlled and disabled by default; user media is never uploaded. |
+| tokenizers | 0.23.2 | Whisper tokenizer runtime | Apache-2.0 | Pinned in the isolated Transcription Engine environment. |
+| ONNX Runtime | 1.23.2 | Runtime dependency of faster-whisper | MIT | Pinned in the isolated Transcription Engine environment. |
+| tqdm | 4.70.1 | Progress/runtime dependency of faster-whisper | MPL-2.0 AND MIT | Pinned in the isolated Transcription Engine environment. |
+| Systran/faster-whisper-base model | resolved asset; not bundled in this slice | Temporary V1 default multilingual model | MIT | Model assets require their own recorded resolved revision/hash before release bundling. |
 
 ## Planned / under evaluation
 
