@@ -821,7 +821,7 @@ The transcription FFmpeg inventory must remain separate from the sealed Media Ru
 
 ---
 
-# 16. Transcript persistence and multi-source semantics — ARCHITECTURE DECISION IN DEVELOPMENT
+# 16. Transcript persistence and multi-source semantics — ACCEPTED / IMPLEMENTATION NOT STARTED
 
 Current Project IR has one global `TranscriptState` and no direct `sourceId` on the transcript object.
 
@@ -829,9 +829,9 @@ CEVRA Vids must support multiple source assets.
 
 Therefore the transcription-engine slice intentionally returns `TranscriptionResult` only and does **not** yet add a global `transcript.replace` command.
 
-ADR 0014 is **Proposed** on `arch/multi-source-transcript-semantics`. Its recommendation is one source-scoped canonical transcript per eligible audio/video source, with prior versions preserved by ProjectHistory and candidate results kept outside canonical state until promoted.
+ADR 0014 is **Accepted** after independent adversarial review and remediation. It defines one source-scoped canonical transcript per eligible audio/video source, with prior versions preserved by ProjectHistory and candidate results kept outside canonical state until promoted.
 
-No Project IR version, migration, command, persistence, cache or alignment implementation has started. The proposed ADR must be reviewed before acceptance or implementation.
+The central architecture remains unchanged. The accepted refinements require pure deterministic document-local migration, deterministic `transcriptDigest` state identity, digest-bound references and asynchronous promotion, continued public compatibility of `TranscriptState`, closed speaker-coverage semantics, and a typed bounded migration quarantine. No Project IR version, migration, command, persistence, cache or alignment implementation has started.
 
 ---
 
@@ -1125,7 +1125,7 @@ This is the Git-authoritative current `main` and the base for the active archite
 
 | Branch | Status |
 |---|---|
-| `arch/multi-source-transcript-semantics` | architecture decision in development; ADR 0014 Proposed |
+| `arch/multi-source-transcript-semantics` | ADR 0014 accepted after remediation; implementation not started |
 
 No feature implementation branch is active. The next implementation slice has not started.
 
@@ -1159,7 +1159,7 @@ No feature implementation branch is active. The next implementation slice has no
 - **CANONICAL:** generative AI assets are desired and part of the CEVRA direction; editorial AI and generative provider are separate roles, generated outputs become editable Project IR assets.
 - **RESEARCH:** the 2026-09-14 AI-editing demo was identified at profile/campaign level; its technical stack remains unverified, and its behavior is retained as a clean-room visual benchmark.
 - **IMPLEMENTED/CLOSED:** PR #12 merged the post-transcription canon and ADR 0013 at `3098274f8a30a85e4b83e5524fc70664adaa412f`; both temporary documentation branches were removed after comparison and repository hygiene passed.
-- **PROPOSED:** ADR 0014 defines source-scoped multi-source transcript semantics for review. No Project IR or persistence implementation has started.
+- **ACCEPTED:** independent adversarial review of ADR 0014 completed without changing its central architecture. Deterministic migration, `transcriptDigest` identity, stale alignment/reference protection, `TranscriptState` compatibility, speaker-state predicates and typed migration quarantine are closed. No Project IR or persistence implementation has started.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1169,8 +1169,8 @@ No feature implementation branch is active. The next implementation slice has no
 Do not guess these in future chats:
 
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
-2. acceptance and implementation details of the source-scoped multi-source transcript model proposed by ADR 0014;
-3. WhisperX/forced-alignment integration details and alignment status semantics;
+2. exact Project IR v2 implementation details for the source-scoped multi-source transcript model accepted in ADR 0014, including digest canonicalization and migration-quarantine resolution;
+3. WhisperX/forced-alignment adapter, model and integration details; provider-neutral alignment status semantics are closed by ADR 0014;
 4. final transcript cache schema, key and invalidation policy;
 5. final transcription model default for production quality;
 6. production transcription-runtime assembly/update mechanism;
@@ -1201,10 +1201,10 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Review ADR 0014 and resolve its bounded open questions before accepting or implementing it.
+1. Prepare a bounded implementation proposal for accepted ADR 0014 and resolve its remaining implementation-level questions before code.
 2. Do not reopen the closed Local Transcription Engine V1.
-3. Do not start transcript persistence before multi-source semantics are accepted.
-4. After the decision, select one small implementation slice from alignment, transcript cache or multi-source Project IR mapping.
+3. Do not start transcript persistence before the bounded Project IR v2 implementation proposal resolves digest canonicalization, deterministic migration and quarantine resolution.
+4. Select one small implementation slice from alignment, transcript cache or multi-source Project IR mapping after its own prerequisites are satisfied.
 5. Do not combine those three areas automatically into one branch or PR.
 6. Preserve the EDVID baseline and dependency-driven implementation order.
 7. Apply the quality/performance policy to future preview, render, composition and export work.
