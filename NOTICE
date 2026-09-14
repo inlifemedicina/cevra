@@ -6,6 +6,7 @@ CEVRA-owned source code is proprietary unless explicitly stated otherwise.
 Third-party software, source code, models, fonts, media and other dependencies retain their own licenses and notices. Required attribution, license texts, source-offer obligations and notices must be tracked in THIRD_PARTY_LICENSES.md and shipped with release artifacts where required.
 
 Current third-party attribution:
+- @noble/hashes 2.4.0 — Copyright (c) 2022 Paul Miller (https://paulmillr.com) — MIT License. Unmodified direct production dependency of `@cevra/project-ir`, used only for the SHA-256 primitive behind the CEVRA-owned transcript digest canonicalization; the package has zero runtime dependencies.
 - ffmpeg-skill — Copyright (c) 2026 kajisho5 — MIT License. Pinned source provenance and license text are recorded in the Media Runtime vendor tree and `THIRD_PARTY_LICENSES.md`.
 - FFmpeg 9.0.1 — LGPL-only CEVRA release build. The exact verified source tarball, detached signature, public key, build instructions, provenance and LGPL v2.1 text ship with the Media Runtime.
 - CPython 3.12.14 — Python Software Foundation License Version 2 and historical notices. The pruned private runtime ships the Python license text and component inventory.

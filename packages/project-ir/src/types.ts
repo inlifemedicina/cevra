@@ -1,10 +1,18 @@
-export const CURRENT_SCHEMA_VERSION = 1 as const;
+export const PROJECT_IR_SCHEMA_VERSION_V1 = 1 as const;
+export const CURRENT_SCHEMA_VERSION = 2 as const;
+export const TRANSCRIPT_DIGEST_VERSION = 1 as const;
+export const MAX_TRANSCRIPT_PROVENANCE_STAGES = 5 as const;
 
 export type CevraLocale = "pt-BR" | "en-US";
 export type Milliseconds = number;
 export type ISODateTime = string;
 export type Id = string;
 export type ExtensionMap = Record<string, unknown>;
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
 
 export interface ProjectMetadata {
   id: Id;
@@ -53,6 +61,83 @@ export interface TranscriptState {
   language?: string;
   words: TranscriptWord[];
   segments: TranscriptSegment[];
+}
+
+export type TranscriptDigest = `sha256-v1:${string}`;
+export type TranscriptWordTiming = "none" | "model" | "aligned" | "unknown";
+export type TranscriptSpeakerState = "none" | "partial" | "complete";
+
+export type OptionalModelIdentity =
+  | {
+      modelId: string;
+      modelRevision?: string;
+      modelDigest?: string;
+    }
+  | {
+      modelId?: never;
+      modelRevision?: never;
+      modelDigest?: never;
+    };
+
+export type ExecutedTranscriptStageBase = OptionalModelIdentity & {
+  executionId: Id;
+  engineId: string;
+  engineVersion: string;
+  engineApiVersion: string;
+  createdAt: ISODateTime;
+};
+
+export type TranscriptProvenanceStage =
+  | (ExecutedTranscriptStageBase & {
+      kind: "transcription";
+      modelId: string;
+    })
+  | (ExecutedTranscriptStageBase & {
+      kind: "alignment";
+      inputTranscriptDigest: TranscriptDigest;
+    })
+  | (ExecutedTranscriptStageBase & {
+      kind: "speaker-attribution";
+      inputTranscriptDigest: TranscriptDigest;
+    })
+  | {
+      kind: "manual-correction";
+      inputTranscriptDigest: TranscriptDigest;
+      createdAt: ISODateTime;
+      executionId?: Id;
+    }
+  | {
+      kind: "migration";
+      fromSchemaVersion: typeof PROJECT_IR_SCHEMA_VERSION_V1;
+      toSchemaVersion: typeof CURRENT_SCHEMA_VERSION;
+    };
+
+export interface SourceTranscriptProvenance {
+  sourceChecksum?: string;
+  stages: TranscriptProvenanceStage[];
+}
+
+export interface SourceTranscript {
+  sourceId: Id;
+  transcriptDigest: TranscriptDigest;
+  wordTiming: TranscriptWordTiming;
+  speakerState: TranscriptSpeakerState;
+  transcript: TranscriptState;
+  provenance: SourceTranscriptProvenance;
+  extensions?: ExtensionMap;
+}
+
+export type V1TranscriptQuarantineReason =
+  | "no-eligible-source"
+  | "ambiguous-multiple-sources"
+  | "incompatible-canonical-transcript";
+
+export interface V1UnassignedTranscriptQuarantine {
+  schemaVersion: typeof PROJECT_IR_SCHEMA_VERSION_V1;
+  originalSchemaVersion: typeof PROJECT_IR_SCHEMA_VERSION_V1;
+  reason: V1TranscriptQuarantineReason;
+  payload: JsonObject;
+  eligibleSourceIdsAtMigration: Id[];
 }
 
 export type TrackKind = "video" | "audio" | "overlay" | "caption";
@@ -183,11 +268,9 @@ export interface ExportRecord {
   errorCode?: string;
 }
 
-export interface ProjectIRv1 {
-  schemaVersion: typeof CURRENT_SCHEMA_VERSION;
+interface ProjectIRSharedState {
   project: ProjectMetadata;
   sources: SourceAsset[];
-  transcript: TranscriptState;
   timeline: TimelineState;
   captions: CaptionCue[];
   graphics: GraphicItem[];
@@ -201,7 +284,17 @@ export interface ProjectIRv1 {
   extensions: ExtensionMap;
 }
 
-export type ProjectIR = ProjectIRv1;
+export interface ProjectIRv1 extends ProjectIRSharedState {
+  schemaVersion: typeof PROJECT_IR_SCHEMA_VERSION_V1;
+  transcript: TranscriptState;
+}
+
+export interface ProjectIRv2 extends ProjectIRSharedState {
+  schemaVersion: typeof CURRENT_SCHEMA_VERSION;
+  sourceTranscripts: SourceTranscript[];
+}
+
+export type ProjectIR = ProjectIRv2;
 
 export type EditCommand =
   | { type: "project.rename"; name: string }
