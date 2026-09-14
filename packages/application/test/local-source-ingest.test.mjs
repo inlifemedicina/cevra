@@ -175,7 +175,7 @@ test("rejects media without video or audio streams without mutating Project IR",
   assert.equal(history.entries.length, 0);
 });
 
-test("rejects an expected media kind mismatch, including unsupported image intake", async () => {
+test("rejects a real video/audio expected media kind mismatch after probe", async () => {
   let history;
   const context = fixture(async (request) => successfulProbe(request, history, {
     uri: videoUri,
@@ -189,12 +189,23 @@ test("rejects an expected media kind mismatch, including unsupported image intak
     context.service.ingest({ uri: videoUri, displayName: "Camera.mov", expectedKind: "audio" }),
     (error) => error instanceof LocalSourceIngestError && error.code === "LOCAL_SOURCE_KIND_MISMATCH"
   );
-  await assert.rejects(
-    context.service.ingest({ uri: videoUri, displayName: "Still.png", expectedKind: "image" }),
-    (error) => error instanceof LocalSourceIngestError && error.code === "LOCAL_SOURCE_KIND_MISMATCH"
-  );
+  assert.equal(context.media.calls.length, 1);
   assert.equal(history.current.history.revision, 0);
   assert.equal(history.current.sources.length, 0);
+  assert.equal(history.entries.length, 0);
+});
+
+test("rejects image as an invalid V1 request before executing the media probe", async () => {
+  const context = fixture(async () => assert.fail("image request must be rejected before probe"));
+
+  await assert.rejects(
+    context.service.ingest({ uri: videoUri, displayName: "Still.png", expectedKind: "image" }),
+    (error) => error instanceof LocalSourceIngestError && error.code === "LOCAL_SOURCE_INVALID_REQUEST"
+  );
+  assert.equal(context.media.calls.length, 0);
+  assert.equal(context.history.current.history.revision, 0);
+  assert.equal(context.history.current.sources.length, 0);
+  assert.equal(context.history.entries.length, 0);
 });
 
 test("detects a concurrent Project IR revision after probe and does not ingest a source", async () => {

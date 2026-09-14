@@ -1,6 +1,6 @@
 import type { MediaProbeResult } from "@cevra/contracts";
 import { translate, type CevraLocale, type TranslationKey } from "@cevra/i18n";
-import type { ExtensionMap, JournalActor, ProjectHistory, ProjectIR, SourceAsset, SourceKind } from "@cevra/project-ir";
+import type { ExtensionMap, JournalActor, ProjectHistory, ProjectIR, SourceAsset } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
 import type { MediaApplicationService } from "./media-service.js";
 import type { MediaExecutionOutcome, MediaExecutionRecord } from "./types.js";
@@ -12,6 +12,10 @@ export type LocalSourceIngestErrorCode =
   | "LOCAL_SOURCE_PROJECT_CONFLICT"
   | "LOCAL_SOURCE_PROBE_FAILED"
   | "LOCAL_SOURCE_COMMIT_FAILED";
+
+// Local Source Ingest V1 supports video and audio. Still-image ingest requires a
+// future capability with reliable media-kind detection.
+export type LocalSourceKind = "video" | "audio";
 
 const ERROR_KEYS: Readonly<Record<LocalSourceIngestErrorCode, TranslationKey>> = {
   LOCAL_SOURCE_INVALID_REQUEST: "ingest.error.invalidRequest",
@@ -41,7 +45,7 @@ export interface LocalSourceIngestRequest {
   uri: string;
   displayName: string;
   sourceId?: string;
-  expectedKind?: SourceKind;
+  expectedKind?: LocalSourceKind;
   checksum?: string;
   extensions?: ExtensionMap;
   locale?: CevraLocale;
@@ -138,7 +142,7 @@ function validateRequest(
   locale: CevraLocale,
   probeExecutionId: string
 ): void {
-  const expectedKinds: readonly SourceKind[] = ["video", "audio", "image"];
+  const expectedKinds: readonly LocalSourceKind[] = ["video", "audio"];
   const valid = typeof request.uri === "string"
     && request.uri.trim().length > 0
     && typeof request.displayName === "string"
