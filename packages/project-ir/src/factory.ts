@@ -24,7 +24,7 @@ export function createEmptyProject(options: CreateProjectOptions = {}): ProjectI
       defaultLocale: options.locale ?? "pt-BR"
     },
     sources: [],
-    transcript: { words: [], segments: [] },
+    sourceTranscripts: [],
     timeline: { durationMs: 0, tracks: [], clips: [] },
     captions: [],
     graphics: [],

@@ -821,7 +821,7 @@ The transcription FFmpeg inventory must remain separate from the sealed Media Ru
 
 ---
 
-# 16. Transcript persistence and multi-source semantics — ACCEPTED / IMPLEMENTATION NOT STARTED
+# 16. Transcript persistence and multi-source semantics — ACCEPTED / SLICE A IN DEVELOPMENT
 
 Current Project IR has one global `TranscriptState` and no direct `sourceId` on the transcript object.
 
@@ -831,7 +831,22 @@ Therefore the transcription-engine slice intentionally returns `TranscriptionRes
 
 ADR 0014 is **Accepted** after independent adversarial review and remediation. It defines one source-scoped canonical transcript per eligible audio/video source, with prior versions preserved by ProjectHistory and candidate results kept outside canonical state until promoted.
 
-The central architecture remains unchanged. The accepted refinements require pure deterministic document-local migration, deterministic `transcriptDigest` state identity, digest-bound references and asynchronous promotion, continued public compatibility of `TranscriptState`, closed speaker-coverage semantics, and a typed bounded migration quarantine. No Project IR version, migration, command, persistence, cache or alignment implementation has started.
+The central architecture remains unchanged. The accepted refinements require pure deterministic document-local migration, deterministic `transcriptDigest` state identity, digest-bound references and asynchronous promotion, continued public compatibility of `TranscriptState`, closed speaker-coverage semantics, and a typed bounded migration quarantine.
+
+PR #14 merged the bounded implementation proposal at `525add125d040f7d0071c70d09fd2ab392fc0b8b`; the proposal is **CLOSED** and its temporary branch was removed. Slice A is **IN DEVELOPMENT** on `feat/project-ir-v2-transcript-core`, created from that exact `main`.
+
+Implemented on the active Slice A branch:
+
+- Project IR schema v2 with explicit v1 types and unchanged public `TranscriptState`;
+- source-scoped composed `SourceTranscript` aggregates;
+- CEVRA-owned canonical transcript serialization and `sha256-v1` digest using exact `@noble/hashes@2.4.0` only as the SHA-256 primitive;
+- frozen historical v1 validation, separate v2 validation and pure deterministic v1→v2 migration;
+- raw legacy transcript quarantine for ambiguous or incompatible ownership/content, validated as immutable migration-time evidence rather than reinterpreted against later source changes;
+- v2 factory and atomic `source.remove` transcript cascade;
+- ProjectHistory and Project Store v1-package/snapshot/cursor/round-trip compatibility without changing package format or `packages/project-store/src/codec.ts`;
+- `NOTICE` and `THIRD_PARTY_LICENSES.md` provenance/licensing for the direct MIT dependency.
+
+Current active-branch validation: package-lock/install verification passed; all workspace builds passed; 180 Node/TypeScript tests passed, including 31 Project IR and 4 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites. Slice B (`transcript.set`, `transcript.remove`, typed transcript command errors and general failed-command redo preservation) has **not** started.
 
 ---
 
@@ -1104,11 +1119,11 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After the accepted multi-source transcript semantics merge:
+After the Project IR v2 transcript implementation proposal merge:
 
-`3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9`
+`525add125d040f7d0071c70d09fd2ab392fc0b8b`
 
-This is the Git-authoritative current `main` and the base for the active implementation-proposal branch.
+This is the Git-authoritative `main` immediately before Slice A and the exact base of `feat/project-ir-v2-transcript-core`.
 
 ## 24.2 Important merged milestones
 
@@ -1121,14 +1136,15 @@ This is the Git-authoritative current `main` and the base for the active impleme
 | Local Transcription Engine V1 | #11 | `d780de370b6a32fa010dedeeb5344bfe12666157` | CLOSED |
 | Post-transcription canon / ADR 0013 | #12 | `3098274f8a30a85e4b83e5524fc70664adaa412f` | CLOSED |
 | Multi-source transcript semantics / ADR 0014 | #13 | `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9` | CLOSED |
+| Project IR v2 transcript implementation proposal | #14 | `525add125d040f7d0071c70d09fd2ab392fc0b8b` | CLOSED |
 
 ## 24.3 Active work
 
 | Branch | Status |
 |---|---|
-| `arch/project-ir-v2-transcript-proposal` | Bounded Project IR v2 transcript implementation proposal finalized after review; implementation not started |
+| `feat/project-ir-v2-transcript-core` | Slice A — Project IR v2 schema, digest, validation, deterministic migration, source-removal cascade and package/history compatibility; IN DEVELOPMENT |
 
-No feature implementation branch is active. Project IR v2 implementation code has not started.
+The proposal branch `arch/project-ir-v2-transcript-proposal` was removed after PR #14 merged. Slice B has not started.
 
 ---
 
@@ -1163,6 +1179,8 @@ No feature implementation branch is active. Project IR v2 implementation code ha
 - **ACCEPTED:** independent adversarial review of ADR 0014 completed without changing its central architecture. Deterministic migration, `transcriptDigest` identity, stale alignment/reference protection, `TranscriptState` compatibility, speaker-state predicates and typed migration quarantine are closed. No Project IR or persistence implementation has started.
 - **IMPLEMENTED/CLOSED:** PR #13 merged accepted ADR 0014 at `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9`; its temporary architecture branch was removed and repository hygiene passed.
 - **PROPOSAL FINALIZED / IMPLEMENTATION NOT STARTED:** review preserved the central Project IR v2 design and incorporated two final hardenings: the SHA-256 primitive is an exact pinned audited external dependency while CEVRA retains canonicalization/version authority; and the v1 migration validator freezes historical acceptance while incompatible raw legacy transcript JSON is preserved in quarantine. No implementation code has started.
+- **IMPLEMENTED/CLOSED:** PR #14 merged the bounded Project IR v2 transcript implementation proposal at `525add125d040f7d0071c70d09fd2ab392fc0b8b`; `arch/project-ir-v2-transcript-proposal` was removed.
+- **IN DEVELOPMENT:** Slice A started on `feat/project-ir-v2-transcript-core` from exact base `525add125d040f7d0071c70d09fd2ab392fc0b8b`. The active branch implements schema v2, explicit v1 compatibility, source-scoped transcript digest/validation/migration/quarantine, factory, source-removal cascade and package/history compatibility. Quarantine evidence is preserved historically across later source changes without becoming canonical ownership. `@noble/hashes@2.4.0` is exact, MIT, zero-runtime-dependency and limited to the SHA-256 primitive; provenance files are updated. Full workspace build, 180 Node tests and 22 Python tests pass. Slice B is not started.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1172,7 +1190,7 @@ No feature implementation branch is active. Project IR v2 implementation code ha
 Do not guess these in future chats:
 
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
-2. merge the finalized bounded Project IR v2 implementation plan before Slice A begins; the proposal resolves digest canonicalization and exact historical-v1/raw-quarantine compatibility but is not implementation;
+2. **SUPERSEDED / RESOLVED by PR #14:** the finalized bounded Project IR v2 implementation plan merged before Slice A began;
 3. WhisperX/forced-alignment adapter, model and integration details; provider-neutral alignment status semantics are closed by ADR 0014;
 4. final transcript cache schema, key and invalidation policy;
 5. final transcription model default for production quality;
@@ -1204,10 +1222,10 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Review and merge the finalized bounded Project IR v2 transcript implementation proposal against accepted ADR 0014.
+1. Complete, review and merge Slice A from `feat/project-ir-v2-transcript-core` without expanding into Slice B.
 2. Do not reopen the closed Local Transcription Engine V1.
-3. After proposal approval, implement only Slice A: Project IR v2 schema, digest, validation, deterministic migration, factory, source-removal cascade and package/history compatibility tests.
-4. Keep transcript commands/history as Slice B and complete them before an application persistence service.
+3. Preserve the implemented Slice A boundary: Project IR v2 schema, digest, validation, deterministic migration, factory, source-removal cascade and package/history compatibility tests.
+4. After Slice A closes, implement transcript commands/history as Slice B and complete them before an application persistence service.
 5. Do not combine those three areas automatically into one branch or PR.
 6. Preserve the EDVID baseline and dependency-driven implementation order.
 7. Apply the quality/performance policy to future preview, render, composition and export work.

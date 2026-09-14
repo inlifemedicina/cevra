@@ -14,10 +14,12 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
       next.sources.push(clone(command.source));
       break;
     case "source.remove": {
+      if (!next.sources.some((source) => source.id === command.sourceId)) throw new Error(`Unknown source ${command.sourceId}.`);
       if (next.timeline.clips.some((clip) => clip.sourceId === command.sourceId)) throw new Error("Cannot remove a source used by timeline clips.");
       if (next.graphics.some((graphic) => graphic.sourceId === command.sourceId)) throw new Error("Cannot remove a source used by graphics.");
       if (next.generation.some((record) => record.outputSourceIds.includes(command.sourceId))) throw new Error("Cannot remove a source referenced by generation history.");
       next.sources = next.sources.filter((source) => source.id !== command.sourceId);
+      next.sourceTranscripts = next.sourceTranscripts.filter((transcript) => transcript.sourceId !== command.sourceId);
       break;
     }
     case "track.add":
