@@ -126,7 +126,7 @@ test("ingests a local video through the media application probe and commits one 
   assert.equal(history.entries[0].command.type, "source.add");
   assert.deepEqual(history.entries[0].actor, { type: "user", id: "editor-1" });
   assert.equal(context.media.calls.length, 1);
-  assert.deepEqual(context.media.calls[0].request.operation, { type: "probe", inputUri: videoUri });
+  assert.deepEqual(context.media.calls[0].request.operation, { type: "probe", inputUri: "/Users/editor/Original Camera File.mov" });
   assert.deepEqual(context.media.calls[0].request.mutation, { type: "none" });
   assert.equal("outputUri" in context.media.calls[0].request.operation, false);
 });
@@ -156,6 +156,50 @@ test("ingests audio-only media as an audio source", async () => {
   assert.equal(history.current.sources.length, 1);
 });
 
+test("rejects a remote URI before probe without mutating history", async () => {
+  const context = fixture(async () => assert.fail("remote URI must be rejected before probe"));
+
+  await assert.rejects(
+    context.service.ingest({ uri: "https://example.com/video.mp4", displayName: "video.mp4" }),
+    (error) => error instanceof LocalSourceIngestError && error.code === "LOCAL_SOURCE_INVALID_REQUEST"
+  );
+  assert.equal(context.media.calls.length, 0);
+  assert.equal(context.history.current.history.revision, 0);
+  assert.equal(context.history.current.sources.length, 0);
+  assert.equal(context.history.entries.length, 0);
+});
+
+test("rejects PNG and JPEG probe results without expectedKind instead of registering video", async () => {
+  const stills = [
+    { uri: "/Users/editor/still.png", videoCodec: "png" },
+    { uri: "/Users/editor/still.jpg", videoCodec: "mjpeg", durationMs: 40 }
+  ];
+
+  for (const still of stills) {
+    let history;
+    const context = fixture(async (request) => successfulProbe(request, history, {
+      uri: still.uri,
+      ...(still.durationMs !== undefined ? { durationMs: still.durationMs } : {}),
+      width: 640,
+      height: 360,
+      frameRate: 25,
+      hasVideo: true,
+      hasAudio: false,
+      videoCodec: still.videoCodec
+    }));
+    history = context.history;
+
+    await assert.rejects(
+      context.service.ingest({ uri: still.uri, displayName: still.uri.split("/").at(-1) }),
+      (error) => error instanceof LocalSourceIngestError && error.code === "LOCAL_SOURCE_UNSUPPORTED_MEDIA"
+    );
+    assert.equal(context.media.calls.length, 1);
+    assert.equal(history.current.history.revision, 0);
+    assert.equal(history.current.sources.length, 0);
+    assert.equal(history.entries.length, 0);
+  }
+});
+
 test("rejects a non-serializable request before probe with a typed error and preserved cause", async () => {
   const context = fixture(async () => assert.fail("non-serializable request must be rejected before probe"));
 
@@ -180,7 +224,8 @@ test("replaces caller-supplied cevra.ingest data with authoritative probe proven
   const context = fixture(async (request) => successfulProbe(request, history, {
     uri: videoUri,
     hasVideo: true,
-    hasAudio: false
+    hasAudio: false,
+    videoCodec: "h264"
   }));
   history = context.history;
 
@@ -208,10 +253,11 @@ test("replaces caller-supplied cevra.ingest data with authoritative probe proven
     engineVersion: "1.0.0",
     engineApiVersion: 1,
     hasVideo: true,
-    hasAudio: false
+    hasAudio: false,
+    videoCodec: "h264"
   });
   assert.equal("verified" in result.source.extensions["cevra.ingest"], false);
-  assert.equal("videoCodec" in result.source.extensions["cevra.ingest"], false);
+  assert.equal(result.source.extensions["cevra.ingest"].videoCodec, "h264");
 });
 
 test("rejects media without video or audio streams without mutating Project IR", async () => {
@@ -298,16 +344,15 @@ test("maps probe failure without adding a source", async () => {
   assert.equal(context.history.current.sources.length, 0);
 });
 
-test("maps a rejected media probe request to the typed ingest invalid-request error", async () => {
-  const mediaError = new MediaApplicationError("MEDIA_INVALID_REQUEST", "en-US", "probe-generated");
-  const context = fixture(async () => { throw mediaError; });
+test("rejects a malformed local URI before the media probe", async () => {
+  const context = fixture(async () => assert.fail("invalid local URI must be rejected before probe"));
 
   await assert.rejects(
     context.service.ingest({ uri: "unsafe\nuri.mov", displayName: "Camera.mov", locale: "en-US" }),
     (error) => error instanceof LocalSourceIngestError
       && error.code === "LOCAL_SOURCE_INVALID_REQUEST"
-      && error.cause === mediaError
   );
+  assert.equal(context.media.calls.length, 0);
   assert.equal(context.history.current.history.revision, 0);
   assert.equal(context.history.entries.length, 0);
 });

@@ -1,6 +1,7 @@
 import type { MediaProbeResult } from "@cevra/contracts";
 import { translate, type CevraLocale, type TranslationKey } from "@cevra/i18n";
 import type { ExtensionMap, JournalActor, ProjectHistory, ProjectIR, SourceAsset } from "@cevra/project-ir";
+import { fileURLToPath } from "node:url";
 import { MediaApplicationError } from "./errors.js";
 import type { MediaApplicationService } from "./media-service.js";
 import type { MediaExecutionOutcome, MediaExecutionRecord } from "./types.js";
@@ -16,6 +17,20 @@ export type LocalSourceIngestErrorCode =
 // Local Source Ingest V1 supports video and audio. Still-image ingest requires a
 // future capability with reliable media-kind detection.
 export type LocalSourceKind = "video" | "audio";
+
+const STILL_IMAGE_VIDEO_CODECS = new Set([
+  "bmp",
+  "dpx",
+  "exr",
+  "gif",
+  "jpeg",
+  "jpeg2000",
+  "jpegls",
+  "mjpeg",
+  "png",
+  "tiff",
+  "webp"
+]);
 
 const ERROR_KEYS: Readonly<Record<LocalSourceIngestErrorCode, TranslationKey>> = {
   LOCAL_SOURCE_INVALID_REQUEST: "ingest.error.invalidRequest",
@@ -80,7 +95,7 @@ export class LocalSourceIngestService {
     const locale = request.locale ?? before.project.defaultLocale;
     const sourceId = request.sourceId ?? this.idGenerator();
     const probeExecutionId = this.idGenerator();
-    validateRequest(request, sourceId, locale, probeExecutionId);
+    const probeInputUri = validateRequest(request, sourceId, locale, probeExecutionId);
     let stableRequest: LocalSourceIngestRequest;
     try {
       stableRequest = clone(request);
@@ -96,7 +111,7 @@ export class LocalSourceIngestService {
       probeOutcome = await this.media.execute({
         id: probeExecutionId,
         locale,
-        operation: { type: "probe", inputUri: stableRequest.uri },
+        operation: { type: "probe", inputUri: probeInputUri },
         mutation: { type: "none" },
         actor: stableRequest.actor ?? { type: "user" }
       }, signal);
@@ -149,10 +164,12 @@ function validateRequest(
   sourceId: string,
   locale: CevraLocale,
   probeExecutionId: string
-): void {
+): string {
   const expectedKinds: readonly LocalSourceKind[] = ["video", "audio"];
+  const probeInputUri = typeof request.uri === "string" ? localProbeInput(request.uri) : undefined;
   const valid = typeof request.uri === "string"
     && request.uri.trim().length > 0
+    && probeInputUri !== undefined
     && typeof request.displayName === "string"
     && request.displayName.trim().length > 0
     && typeof sourceId === "string"
@@ -161,6 +178,32 @@ function validateRequest(
     && (request.expectedKind === undefined || expectedKinds.includes(request.expectedKind))
     && (request.extensions === undefined || isRecord(request.extensions));
   if (!valid) throw new LocalSourceIngestError("LOCAL_SOURCE_INVALID_REQUEST", locale, probeExecutionId);
+  return probeInputUri;
+}
+
+// Local Source Ingest V1 accepts local file URLs and absolute filesystem paths
+// already understood by the media runtime. Network/provider URIs and UNC paths
+// belong to future source-specific ingest services.
+function localProbeInput(uri: string): string | undefined {
+  if (uri !== uri.trim() || /[\0\r\n]/u.test(uri)) return undefined;
+  if (/^[A-Za-z]:[\\/]/u.test(uri)) return uri;
+  if (uri.startsWith("/") && !uri.startsWith("//")) return uri;
+  if (!uri.startsWith("file://")) return undefined;
+  try {
+    const parsed = new URL(uri);
+    const local = parsed.protocol === "file:"
+      && (parsed.hostname === "" || parsed.hostname === "localhost")
+      && parsed.username === ""
+      && parsed.password === ""
+      && parsed.port === ""
+      && parsed.search === ""
+      && parsed.hash === ""
+      && parsed.pathname.startsWith("/")
+      && !parsed.pathname.startsWith("//");
+    return local ? fileURLToPath(parsed) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function completedProbe(
@@ -176,7 +219,16 @@ function completedProbe(
 }
 
 function sourceKind(probe: MediaProbeResult, locale: CevraLocale, probeExecutionId: string): "video" | "audio" {
-  if (probe.hasVideo === true) return "video";
+  if (probe.hasVideo === true) {
+    const codec = probe.videoCodec?.trim().toLowerCase();
+    // The managed probe exposes common still images as video streams (PNG as
+    // `png`, JPEG as `mjpeg`). V1 rejects image codecs, and missing codec
+    // evidence, rather than persisting an unsupported still as canonical video.
+    if (!codec || STILL_IMAGE_VIDEO_CODECS.has(codec)) {
+      throw new LocalSourceIngestError("LOCAL_SOURCE_UNSUPPORTED_MEDIA", locale, probeExecutionId);
+    }
+    return "video";
+  }
   if (probe.hasAudio === true) return "audio";
   throw new LocalSourceIngestError("LOCAL_SOURCE_UNSUPPORTED_MEDIA", locale, probeExecutionId);
 }
