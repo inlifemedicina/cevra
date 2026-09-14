@@ -14,10 +14,19 @@ This document is the operational map for reaching the proven public EDVID baseli
 
 Evidence priority is executable code and tests, followed by the pinned `SKILL.md`, reference documents, and README. When prose and code differ, this audit records the implemented behavior. CEVRA credit requires executable code in the audited baseline. A type, interface, README, ADR, or planned package alone is not `EXISTENTE`.
 
-The classification has two independent axes:
+The classification has two independent axes: current executable state and target disposition.
 
-- **Estado atual CEVRA:** `EXISTENTE`, `PARCIAL`, or `AUSENTE`.
-- **Tratamento alvo:** `PORTAR`, `MELHORAR`, or `NÃO APLICÁVEL`.
+### Current CEVRA state
+
+- **`EXISTENTE`:** the capability described by that matrix row is implemented as an executable path in the audited CEVRA baseline at sufficient functional depth. The mere presence of a primitive, type, interface, adapter, contract, README, stub, or lower-level operation does not make the complete capability `EXISTENTE`.
+- **`PARCIAL`:** useful infrastructure, a primitive, or an executable subset exists, but the capability described by the row is not available end to end.
+- **`AUSENTE`:** the audited baseline has no sufficient executable path for the described capability.
+
+### Target disposition
+
+- **`PORTAR`:** introduce useful behavior proven by EDVID but still missing from CEVRA, adapting it to CEVRA boundaries. It does not necessarily mean copying source code.
+- **`MELHORAR`:** preserve every stable CEVRA capability, contract, guarantee, and test already in place, then add equivalent or superior behavior, preferably as an additive extension. `MELHORAR` does not authorize rewriting or replacing a stable component, removing a stable API, bypassing Project IR or the Media Runtime, creating a second source of truth, duplicating FFmpeg/runtime execution, exposing raw filtergraphs or arbitrary shell/code, losing history/undo/redo/recovery, or breaking existing projects.
+- **`NÃO APLICÁVEL`:** do not reproduce the EDVID behavior for parity. Every such classification requires an explicit justification in its row.
 
 Reuse labels are planning classifications only. No EDVID source is copied by this audit:
 
@@ -25,6 +34,77 @@ Reuse labels are planning classifications only. No EDVID source is copied by thi
 - `BEHAVIOR PORT`: preserve the observed behavior or heuristic while implementing it through CEVRA boundaries.
 - `CEVRA NATIVE`: use existing CEVRA infrastructure or a native implementation that is at least equivalent.
 - `N/A`: do not bring the behavior or artifact into CEVRA.
+
+## Non-regression implementation policy
+
+The mandatory implementation order is:
+
+```text
+PRESERVE
+→ EXTEND
+→ VERIFY
+→ MIGRATE ONLY IF NECESSARY
+```
+
+### PRESERVE
+
+Before changing an existing area, identify and characterize its contracts, executable behavior, tests, guarantees, persisted formats, compatibility rules, lifecycle, and security boundaries.
+
+### EXTEND
+
+Prefer new application orchestration, typed commands, adapters, policies, projections, and strictly typed operations when necessary. Extend stable infrastructure instead of replacing it.
+
+### VERIFY
+
+Every extension must prove that existing tests remain green, new tests cover the new behavior, no prior capability was lost, Project IR/history/recovery remain correct, and Media Runtime lifecycle/cancellation/integrity guarantees remain correct.
+
+### MIGRATE ONLY IF NECESSARY
+
+Change the structure or replace a stable component only when the current architecture demonstrably prevents the requirement. Before replacement, provide:
+
+1. an explicit technical reason;
+2. evaluated alternatives;
+3. characterization tests for existing behavior;
+4. a compatibility and migration plan;
+5. a rollback plan;
+6. evidence that no capability or guarantee is lost.
+
+EDVID parity alone never justifies a broad rewrite.
+
+### Backward-compatibility invariants
+
+- Existing CEVRA projects must continue to open.
+- Persisted Project IR follows its normal versioning and migration process; supported migrations must be backward-safe.
+- Stable APIs are not removed merely to obtain EDVID parity.
+- New persisted fields require safe defaults and migrations when applicable.
+- Derived files never replace Project IR as the source of truth.
+- New commands must preserve journal, history, snapshots, undo, redo, and recovery validity.
+
+### Project IR source-of-truth freeze
+
+Project IR remains the sole canonical audiovisual model. Parity work must express durable editorial changes through its versioned types and typed command API, with normal schema review and backward-safe migrations when a new persisted concept is truly required. UI state, transcripts, EDL projections, render plans, preview caches, provider results, and generated files remain derived inputs or artifacts. They cannot bypass Project IR, duplicate its journal, or become an alternate recovery path.
+
+### Media Runtime V1 guarantee freeze
+
+Media Runtime V1 is a completed and reviewed foundation. EDVID parity does not generically reopen its design. Implementations must preserve its managed private runtime, packaged FFmpeg/ffprobe, typed allow-listed operations, one-active-job-per-worker rule, responsive control and cancellation, process reaping, timeout behavior, integrity validation, delivery matrix, capability reporting, artifact cleanup, and failure/retry behavior.
+
+New editorial needs should follow this path:
+
+```text
+editorial/application policy
+        ↓
+typed operation/compiler
+        ↓
+existing MediaEngineAdapter
+        ↓
+existing Media Runtime
+```
+
+Add a Media Runtime operation only when no existing primitive can correctly represent the requirement. Such an operation requires a closed schema, a typed contract, tests, no raw filtergraph, no arbitrary command, and no second worker or runtime.
+
+### Incremental delivery rule
+
+The P0 rows are not one implementation unit. Future work must use small vertical slices. Each branch or PR must address one capability or coherent block, keep `main` green, include meaningful tests, preserve existing behavior, use feature/capability gating where appropriate, work without a promised future refactor, retain the old path until equivalence is proven when a path is being replaced, and allow simple rollback. A single big-bang “EDVID parity implementation” branch is prohibited.
 
 ## Baseline facts and important discrepancies
 
@@ -90,7 +170,7 @@ Each row is independently implementable and testable. A destination names the ex
 | EDV-TXI-002 | transcript intelligence | Phrase grouping | Groups adjacent words into readable phrases. | `helpers/pack_transcripts.py` | AUSENTE | No phrase model | PORTAR | editorial transcript model | BEHAVIOR PORT | word timestamps | P0 | Phrase boundaries are stable for the same transcript and preserve every word. | Record algorithm/version. |
 | EDV-TXI-003 | transcript intelligence | Silence-based boundaries | Starts a phrase after a gap of at least about 0.5 seconds. | `helpers/pack_transcripts.py` | AUSENTE | Silence primitive only | MELHORAR | transcript segmentation service | BEHAVIOR PORT | transcript, detect-silence | P0 | Boundaries combine aligned timing and measured silence with tested tolerances. | Threshold should be configurable/profiled. |
 | EDV-TXI-004 | transcript intelligence | Speaker boundaries | Separates phrases on speaker changes when speaker labels exist. | `helpers/pack_transcripts.py` | AUSENTE | Transcript types can carry segments but no diarization | PORTAR | transcript segmentation service | BEHAVIOR PORT | diarized transcript | P1 | Speaker change always creates a distinct reasoning unit without losing timing. | Capability-gated until diarization exists. |
-| EDV-TXI-005 | transcript intelligence | Token-efficient agent interface | Hard rule forbids loading raw transcript JSON into agent context. | `SKILL.md`; `helpers/pack_transcripts.py` | AUSENTE | Agent Gateway not implemented | MELHORAR | Agent Gateway context API | CEVRA NATIVE | Project IR projections, permissions | P0 | Typed/projected context stays bounded, traceable, and sufficient to cite source ranges. | Stronger than filesystem Markdown handoff. |
+| EDV-TXI-005 | transcript intelligence | Bounded editorial reasoning projection | Hard rule forbids loading raw transcript JSON into reasoning context. | `SKILL.md`; `helpers/pack_transcripts.py` | AUSENTE | No host-independent editorial projection implementation | MELHORAR | editorial reasoning projection service | CEVRA NATIVE | Project IR-derived transcript model, permissions | P0 | A host-independent typed projection stays bounded, traceable, and sufficient to cite source ranges without raw machine JSON. | Core service does not depend on Agent Gateway; future agents consume the same projection. |
 
 ### D. Speech and audio analysis
 
@@ -120,7 +200,7 @@ Each row is independently implementable and testable. A destination names the ex
 
 | ID | Área | Capability EDVID | Comportamento observado | Evidência EDVID | Estado atual CEVRA | Evidência CEVRA | Tratamento alvo | Destino CEVRA | Estratégia de reuse | Dependências | Prioridade | Critério de paridade | Observações |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| EDV-EDT-001 | editorial reasoning | Material analysis before edit | Requires transcripts and visual/audio inspection before proposing an edit. | `SKILL.md` | AUSENTE | Agent Gateway/editorial intelligence not implemented | PORTAR | Editorial Director workflow | BEHAVIOR PORT | ingest, transcript, analysis | P0 | Plan cites analyzed sources and cannot skip required evidence silently. | Rules become typed workflow gates. |
+| EDV-EDT-001 | editorial reasoning | Material analysis before edit | Requires transcripts and visual/audio inspection before proposing an edit. | `SKILL.md` | AUSENTE | Editorial analysis workflow not implemented | PORTAR | Editorial Director workflow | BEHAVIOR PORT | ingest, transcript, analysis | P0 | Plan cites analyzed sources and cannot skip required evidence silently. | Rules become typed host-independent workflow gates. |
 | EDV-EDT-002 | editorial reasoning | Strategy proposal | Produces an editorial strategy before timeline mutation. | `SKILL.md`; `references/shortform.md`; `references/longform.md` | AUSENTE | Workflow docs only | PORTAR | Editorial Director | BEHAVIOR PORT | context projection, commands | P0 | Strategy records goal, audience, format, constraints, and selected evidence. | Persist as operation intent/provenance. |
 | EDV-EDT-003 | editorial reasoning | User confirmation gate | Requires confirmation of strategy before the first edit by default. | `SKILL.md` Hard Rules 1 and 8 | AUSENTE | Product canon describes approval; no UI/service | MELHORAR | approval workflow | CEVRA NATIVE | UI, journal, agent | P0 | Configurable policy defaults to approval and logs approval/bypass reason. | Must also support user-configured autonomy. |
 | EDV-EDT-004 | editorial reasoning | Take selection | Selects strongest deliveries based on meaning, delivery, and visual quality. | `SKILL.md`; preview take controls | AUSENTE | No editorial selector | PORTAR | Editorial Director | BEHAVIOR PORT | transcript, visual/audio analysis | P0 | Selected takes cite source intervals and score/reason; user can override. | No opaque destructive deletion. |
@@ -146,9 +226,9 @@ Each row is independently implementable and testable. A destination names the ex
 
 | ID | Área | Capability EDVID | Comportamento observado | Evidência EDVID | Estado atual CEVRA | Evidência CEVRA | Tratamento alvo | Destino CEVRA | Estratégia de reuse | Dependências | Prioridade | Critério de paridade | Observações |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| EDV-RND-001 | render | Per-segment extraction | Extracts each EDL segment before assembly, up to four in parallel. | `helpers/render.py`; Hard Rule 2 | EXISTENTE | Typed trim and concat in Media Runtime | MELHORAR | cut compiler over MediaEngineAdapter | CEVRA NATIVE | Media Runtime, job orchestration | P0 | Compiled Project IR clips produce verified segment artifacts without bypassing worker policy. | Keep one job per worker; concurrency belongs above it. |
+| EDV-RND-001 | render | Per-segment extraction | Extracts each EDL segment before assembly, up to four in parallel. | `helpers/render.py`; Hard Rule 2 | PARCIAL | Typed trim and concat primitives exist; cut compiler/orchestration does not | MELHORAR | cut compiler over MediaEngineAdapter | CEVRA NATIVE | Media Runtime, job orchestration | P0 | Compiled Project IR clips produce verified segment artifacts without bypassing worker policy. | Extend above existing primitives; keep one job per worker and place any concurrency above it. |
 | EDV-RND-002 | render | Lossless concat | Concatenates normalized extracted segments with stream copy when no J-cut requires mixing. | `helpers/render.py`; Hard Rule 2 | EXISTENTE | `concat` and copy compatibility validation | MELHORAR | existing Media Runtime | CEVRA NATIVE | delivery capabilities | P0 | Compatible segments concatenate via explicit copy; incompatible inputs fail or transcode explicitly. | CEVRA matrix is stronger. |
-| EDV-RND-003 | render | Boundary fades | Applies about 30 ms audio fades to extracted boundaries. | `helpers/render.py`; Hard Rule 3 | EXISTENTE | `audio-fade` typed operation | MELHORAR | cut compiler | CEVRA NATIVE | Media Runtime | P0 | Planner applies fades to required cut boundaries and QA detects residual pops. | Existing primitive needs workflow integration. |
+| EDV-RND-003 | render | Boundary fades | Applies about 30 ms audio fades to extracted boundaries. | `helpers/render.py`; Hard Rule 3 | PARCIAL | Typed `audio-fade` primitive exists; automatic boundary policy does not | MELHORAR | editorial cut policy and cut compiler | CEVRA NATIVE | existing Media Runtime operation, QA | P0 | Planner applies fades to required cut boundaries and QA detects residual pops. | Add orchestration over the existing operation; do not presume worker redesign. |
 | EDV-RND-004 | render | J-cut assembly | Splits video/audio, trims tail, delays next audio at sample precision, and mixes overlap. | `helpers/render.py` | PARCIAL | Mux/audio primitives exist; no J-cut compiler | PORTAR | cut compiler and composition/audio timeline | BEHAVIOR PORT | multitrack render, QA | P1 | Output overlap duration matches Project IR and remains lip-synchronized within tolerance. | Avoid arbitrary filtergraph exposure. |
 | EDV-RND-005 | render | Shortform fps rule | Uses 30 fps when source is at least 29.5 fps, otherwise 24 fps. | `helpers/render.py` | PARCIAL | Transcode supports fps; no editorial rule | MELHORAR | delivery profile | CEVRA NATIVE | probe, export profile | P1 | Explicit profile chooses supported fps and records conversion; no hidden threshold. | Preserve source cadence where better. |
 | EDV-RND-006 | render | Longform source format | Keeps source resolution/fps unless a delivery profile says otherwise. | `helpers/render.py`; `references/longform.md` | PARCIAL | Typed fit/transcode and export model exist | PORTAR | export planner | CEVRA NATIVE | Project IR export, capabilities | P0 | Default longform export preserves source format within a documented delivery profile. | Capability-gated. |
@@ -163,7 +243,7 @@ Each row is independently implementable and testable. A destination names the ex
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | EDV-AFN-001 | audio finishing | Voice mastering chain | Applies high-pass, low-mid reduction, compression, presence/air EQ, de-essing, and limiting. | `helpers/render.py`; `references/shortform.md` | PARCIAL | Volume/loudness/fade primitives exist; no approved mastering profile | PORTAR | audio finishing planner | BEHAVIOR PORT | Media Runtime typed DSP surface | P1 | A versioned typed profile meets objective speech level/clarity fixtures without clipping. | Do not expose raw filter strings. |
 | EDV-AFN-002 | audio finishing | Per-range gain | Applies planned gain only to selected EDL ranges. | `helpers/render.py`; `helpers/voice_levels.py` | PARCIAL | Volume operation exists; no range planner/compiler | MELHORAR | audio timeline compiler | CEVRA NATIVE | Project IR audio automation | P1 | Gain automation is editable, journaled, and sample/time aligned to selected clips. | Use canonical automation data. |
-| EDV-AFN-003 | audio finishing | Two-pass loudness normalization | Measures then applies EBU-style loudnorm near -14 LUFS, -1 dBTP, LRA 11. | `helpers/render.py` | EXISTENTE | Typed `loudness-normalize` operation | MELHORAR | Media Runtime/application service | CEVRA NATIVE | runtime capability, QA | P0 | Output loudness and true peak meet profile tolerance and measured values enter provenance. | Confirm whether runtime implementation is one/two pass per profile. |
+| EDV-AFN-003 | audio finishing | Two-pass loudness normalization | Measures then applies EBU-style loudnorm near -14 LUFS, -1 dBTP, LRA 11. | `helpers/render.py` | PARCIAL | Typed `loudness-normalize` primitive exists; equivalent measurement-plus-application two-pass behavior is not implemented end to end | MELHORAR | audio finishing policy/application orchestration | CEVRA NATIVE | existing MediaEngineAdapter operations, QA | P0 | Output loudness and true peak meet profile tolerance, and measured/apply values enter attempt provenance. | Build two-pass parity preferentially as policy/orchestration over existing primitives; no worker change is presumed. |
 | EDV-AFN-004 | audio finishing | Loudnorm fallback | Falls back to a one-pass chain when measurement/apply fails. | `helpers/render.py` | AUSENTE | Runtime fails explicitly; no fallback policy | MELHORAR | audio finishing policy | CEVRA NATIVE | capability/error policy | P1 | Any fallback is explicit, capability-gated, recorded, and reverified; no silent quality downgrade. | Intentional CEVRA improvement. |
 | EDV-AFN-005 | audio finishing | Music mixing | Mixes a chosen soundtrack with voice and applies fades/volume. | `assets/shortform/src/Main.tsx`; `references/shortform.md` | PARCIAL | Mux/volume/fade primitives and audio tracks exist | PORTAR | audio timeline/composition | CEVRA NATIVE | asset provider, Project IR, render | P1 | Music is an editable A2 asset with timing, level, fades, and verified final mix. | Preserve voice intelligibility. |
 | EDV-AFN-006 | audio finishing | Sound-effect placement | Places packaged or generated SFX at editorial events. | template `public/sfx/**`; `generate_sfx.py` | PARCIAL | A3 conceptual track; no placement/render workflow | PORTAR | audio timeline/composition | BEHAVIOR PORT | asset registry, composition | P1 | SFX are normal licensed assets with editable cues and deterministic timing. | Do not copy EDVID brand assets by default. |
@@ -209,9 +289,10 @@ Each row is independently implementable and testable. A destination names the ex
 | EDV-PRV-009 | preview | Phase tabs and gate | Separates Phase 1 cut, style approval, and Phase 2 result. | `assets/preview/app.js`; `SKILL.md` | AUSENTE | Workflow docs only | MELHORAR | approval workflow UI | CEVRA NATIVE | application service, journal | P0 | Configurable gates prevent downstream render before required approval and record transitions. | Avoid rigid filesystem phase coupling. |
 | EDV-PRV-010 | preview | Style controls | Chooses layout, headline, caption style, accent, tracking, zooms, flash cut, and music. | `assets/preview/app.js`; `preview_style.json` | PARCIAL | Project IR style/caption/layout/audio fields exist; no UI/compiler | PORTAR | style inspector and composition plan | CEVRA NATIVE | Project IR, composition | P1 | Controls mutate typed project state and preview deterministically. | Localized labels and accessible controls. |
 | EDV-PRV-011 | preview | Insert track editing | Drags, trims, removes, and positions hook/image/video insert items. | `assets/preview/app.js` | PARCIAL | Layered clips/assets model exists; no UI | MELHORAR | layered timeline UI | CEVRA NATIVE | Project IR commands, providers | P1 | Inserts are ordinary editable timeline items with source provenance and undo/redo. | CEVRA should provide true layered timeline. |
-| EDV-PRV-012 | preview | Save/host notification | Atomically writes preview JSON; polling watcher tells Claude immediately while Codex notices on the next turn. | `helpers/preview_server.py`; `helpers/watch_edits.py`; `SKILL.md` | AUSENTE | Agent Gateway absent | MELHORAR | application events and Agent Gateway | CEVRA NATIVE | event stream, host adapters | P0 | Save commits typed commands transactionally and emits a host-neutral event with recovery. | No polling file protocol as primary integration. |
+| EDV-PRV-012 | preview | Transactional preview/editor save | Atomically persists preview edits submitted by the local editor. | `helpers/preview_server.py`; `assets/preview/app.js` | AUSENTE | Typed commands/history exist, but no preview/editor save path | MELHORAR | application command transaction | CEVRA NATIVE | Project IR command API, journal/history, project store | P0 | A user action becomes a typed command; commit is transactional; journal/history updates; stale revision conflicts are handled; recovery remains valid. | Independent of Agent Gateway and never writes a parallel source of truth. |
 | EDV-PRV-013 | preview | Project refresh | Rebuilds browser state and cached thumbnails/waveform when project artifacts change. | `helpers/preview_server.py`; `assets/preview/app.js` | AUSENTE | No UI | MELHORAR | reactive Project IR projection | CEVRA NATIVE | project store/eventing | P0 | UI reflects committed revision and rejects stale mutations with user-visible recovery. | One canonical revision. |
 | EDV-PRV-014 | preview | EDVID visual identity | Ships EDVID logos, styling, copy, and product-specific trade dress. | `assets/preview/**` | AUSENTE | CEVRA has its own product identity | NÃO APLICÁVEL | none | N/A | none | P2 | No EDVID logo, branded copy, or trade dress is copied. | Functional interaction may be behavior-ported. |
+| EDV-PRV-015 | preview | Host-neutral edit notification | A polling watcher reports saved edits immediately to Claude, while Codex checks them on a later turn. | `helpers/watch_edits.py`; `SKILL.md` | AUSENTE | Agent Gateway and host event adapters are not implemented | MELHORAR | application event stream and Agent Gateway host adapters | CEVRA NATIVE | typed event/cursor, application service | P1 | A host-neutral typed event or cursor reports committed revisions without changing edit semantics by host. | No polling-file protocol or notification artifact becomes a source of truth. |
 
 ### M. Shortform composition
 
@@ -302,7 +383,7 @@ Each row is independently implementable and testable. A destination names the ex
 | EDV-AGT-002 | agent hosts | External Codex skill | Supplies `agents/openai.yaml` metadata and installs into a Codex skill directory. | `agents/openai.yaml`; `edvid_install.py` | AUSENTE | Agent Gateway scaffold | PORTAR | external Codex adapter/CEVRA Skill | CEVRA NATIVE | Agent Gateway, skill manager | P1 | External Codex can inspect and mutate through the same typed/audited API as other hosts. | This is not Codex App Server. |
 | EDV-AGT-003 | agent hosts | Gemini/Antigravity skill | Detects known local directories and installs the same skill payload. | `edvid_install.py`; `install.md` | AUSENTE | No host adapter | PORTAR | optional external host adapter | CEVRA NATIVE | Agent Gateway, skill manager | P2 | Supported host is capability-detected and isolated behind the same contract. | Confirm current host conventions before shipping. |
 | EDV-AGT-004 | agent hosts | Host-specific notification | Claude can be notified by watcher output; Codex checks saved edits on a later user turn. | `helpers/watch_edits.py`; `SKILL.md` | AUSENTE | No Agent Gateway implementation | MELHORAR | host-neutral application events | CEVRA NATIVE | event API, host adapters | P1 | All hosts receive typed state-change events or deterministic polling cursors without divergent project semantics. | Avoid host behavior in core editing. |
-| EDV-AGT-005 | agent hosts | Reasoning via skill instructions | A long skill prompt orchestrates tools, phase gates, and editorial heuristics. | `SKILL.md` | AUSENTE | Creative Intelligence canon only | MELHORAR | Editorial Director plus progressive skills | CEVRA NATIVE | Agent Gateway, workflows | P0 | Core workflow rules are enforceable services/contracts; selected playbooks add bounded guidance. | Do not rely solely on prompt compliance. |
+| EDV-AGT-005 | agent hosts | Reasoning via skill instructions | A long skill prompt orchestrates tools, phase gates, and editorial heuristics. | `SKILL.md` | AUSENTE | Creative Intelligence canon only | MELHORAR | progressive CEVRA skills consuming core editorial services | CEVRA NATIVE | core editorial policies first; Agent Gateway and workflows later | P1 | A skill can consume the same typed rules, gates, policies, commands, and projections as other clients. | Core editorial enforcement is P0 and host-independent; prompt compliance is never the only enforcement layer. |
 | EDV-AGT-006 | agent hosts | Embedded agent | No embedded EDVID agent or App Server integration exists. | full tree; `agents/openai.yaml` | AUSENTE | Canon permits future embedded Codex; no implementation | NÃO APLICÁVEL | future Agent Gateway adapter | N/A | official/commercial host mechanism | P2 | Parity makes no claim; CEVRA may later improve through an official embedded path. | Do not attribute this capability to EDVID. |
 
 ### U. Installer and skill management
@@ -348,7 +429,7 @@ Each row is independently implementable and testable. A destination names the ex
 | EDV-TST-003 | tests | Media lifecycle/integrity tests | EDVID has no managed worker, cancellation, release integrity, or orphan-process suite. | full tree | EXISTENTE | `engines/media-ffmpeg/test/**`; `test_python/**` | MELHORAR | existing Media Runtime tests | CEVRA NATIVE | CI/native runners | P0 | Existing guarantees remain green under all new editorial workflows. | Do not duplicate runtime helpers. |
 | EDV-TST-004 | tests | Project/history consistency tests | EDVID has no canonical project journal/undo/redo test suite. | full tree | EXISTENTE | `packages/project-ir/test/**`; `packages/application/test/**`; `packages/project-store/test/**` | MELHORAR | existing Project IR/application tests | CEVRA NATIVE | new commands/workflows | P0 | Each added editing mutation proves journal, snapshot, undo, redo, recovery, and conflict behavior. | Mandatory CEVRA invariant. |
 
-Matrix totals: **173 capabilities**. Current CEVRA state: **11 EXISTENTE**, **50 PARCIAL**, **112 AUSENTE**. Target disposition: **100 PORTAR**, **67 MELHORAR**, **6 NÃO APLICÁVEL**. Priority: **68 P0**, **78 P1**, **27 P2**.
+Matrix totals: **174 capabilities**. Current CEVRA state: **8 EXISTENTE**, **53 PARCIAL**, **113 AUSENTE**. Target disposition: **100 PORTAR**, **68 MELHORAR**, **6 NÃO APLICÁVEL**. Priority: **67 P0**, **80 P1**, **27 P2**.
 
 ## EDVID hard rules → CEVRA disposition
 
@@ -397,6 +478,25 @@ The matrix presently marks only the procedural SFX generator as a `DIRECT MIT` c
 
 Remotion is present in EDVID Phase 2/3 and pinned in the template package manifests. It is not incorporated by CEVRA at this baseline. Any future selection requires the composition benchmark plus review of the exact proposed Remotion version's then-current license and compatibility with CEVRA's proprietary commercial distribution.
 
+## First usable CEVRA Vids vertical slice
+
+The first usable product path is:
+
+```text
+ingest
+→ local transcription/alignment
+→ editorial transcript/analysis
+→ strategy + take selection + cut planning
+→ Project IR typed commands
+→ existing Media Runtime
+→ numeric QA
+→ native preview/layered timeline
+→ approve/refine
+→ export
+```
+
+This path preserves the AI-first product experience while keeping core editorial services, commands, projections, gates, and policies independent of any external host. It does not require Marketplace, non-essential Orbit services, Marketplace packages, mobile, Premiere, a stock provider, a generative provider, external Claude, external Codex, the full Agent Gateway, Remotion, HyperFrames, or a final composition-engine choice. Optional integrations can consume the same core capabilities later.
+
 ## Dependency-driven implementation sequence
 
 ```text
@@ -429,7 +529,7 @@ Remotion is present in EDVID Phase 2/3 and pinned in the template package manife
 14. Future skill/package management and NLE interchange
 ```
 
-Steps 1–7 form the automated clean-edit core. Step 8 completes the first usable vertical flow. Steps 9–12 close the strong EDVID P1 baseline. Provider, agent-host, packaging, and Premiere work must not delay a self-contained CEVRA Vids when their capabilities are optional.
+Steps 1–7 form the host-independent automated clean-edit core. Step 8 completes the first usable vertical flow. Steps 9–12 close the strong EDVID P1 baseline. Provider, agent-host, packaging, and Premiere work must not delay a self-contained CEVRA Vids when their capabilities are optional.
 
 ## Definition of EDVID baseline parity
 
