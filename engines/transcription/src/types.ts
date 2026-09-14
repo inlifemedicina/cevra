@@ -16,6 +16,8 @@ export interface ManagedTranscriptionRuntime {
   privatePythonRoot: string;
   /** Transcription-only venv; it must not overlap privatePythonRoot or the Media Runtime. */
   environmentRoot: string;
+  /** Other immutable roots, such as the Media Runtime bundle, that model cache paths must not overlap. */
+  protectedRoots?: readonly string[];
 }
 
 export interface DevelopmentTranscriptionRuntime {

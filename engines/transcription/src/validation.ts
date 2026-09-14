@@ -12,6 +12,9 @@ import {
 
 const MAX_INPUT_URI_LENGTH = 4096;
 const WINDOWS_ABSOLUTE_PATH = /^[A-Za-z]:[\\/]/;
+/** faster-whisper timestamp tokens have 20 ms precision; only boundary drift within one token is clamped. */
+export const MODEL_TIMESTAMP_TOLERANCE_MS = 20;
+const FLOAT_COMPARISON_EPSILON_MS = 1e-6;
 type TranscriptWord = TranscriptionResult["transcript"]["words"][number];
 type TranscriptSegment = TranscriptionResult["transcript"]["segments"][number];
 
@@ -77,9 +80,8 @@ export function normalizeWorkerResult(raw: unknown, request: TranscriptionWorker
   rawSegments.forEach((candidate, segmentIndex) => {
     const segment = objectValue(candidate, `segment ${segmentIndex}`) as unknown as RawWorkerSegment;
     exactKeys(segment as unknown as Record<string, unknown>, ["startSeconds", "endSeconds", "text", "words"], `segment ${segmentIndex}`);
-    const startMs = secondsToMilliseconds(segment.startSeconds, `segment ${segmentIndex} start`);
-    const endMs = secondsToMilliseconds(segment.endSeconds, `segment ${segmentIndex} end`);
-    if (endMs <= startMs) malformed(`Segment ${segmentIndex} must end after it starts.`);
+    const interval = normalizeInterval(segment.startSeconds, segment.endSeconds, `segment ${segmentIndex}`);
+    const { startMs, endMs } = interval;
     if (typeof segment.text !== "string") malformed(`Segment ${segmentIndex} text must be a string.`);
     const segmentId = `segment-${String(segmentIndex + 1).padStart(6, "0")}`;
     const wordIds: string[] = [];
@@ -89,14 +91,22 @@ export function normalizeWorkerResult(raw: unknown, request: TranscriptionWorker
       segment.words.forEach((candidateWord, wordIndex) => {
         const word = objectValue(candidateWord, `segment ${segmentIndex} word ${wordIndex}`) as unknown as RawWorkerWord;
         exactKeys(word as unknown as Record<string, unknown>, ["startSeconds", "endSeconds", "text", "confidence"], `segment ${segmentIndex} word ${wordIndex}`);
-        const wordStartMs = secondsToMilliseconds(word.startSeconds, `segment ${segmentIndex} word ${wordIndex} start`);
-        const wordEndMs = secondsToMilliseconds(word.endSeconds, `segment ${segmentIndex} word ${wordIndex} end`);
-        if (wordEndMs <= wordStartMs) malformed(`Word ${wordIndex} in segment ${segmentIndex} must end after it starts.`);
-        if (wordStartMs < startMs || wordEndMs > endMs) malformed(`Word ${wordIndex} is outside segment ${segmentIndex}.`);
+        const wordInterval = normalizeInterval(
+          word.startSeconds,
+          word.endSeconds,
+          `segment ${segmentIndex} word ${wordIndex}`
+        );
+        const normalizedWord = clampWordToSegment(wordInterval, interval, segmentIndex, wordIndex);
         if (typeof word.text !== "string") malformed(`Word ${wordIndex} in segment ${segmentIndex} text must be a string.`);
         const wordId = `${segmentId}-word-${String(wordIndex + 1).padStart(6, "0")}`;
         const confidence = optionalConfidence(word.confidence, segmentIndex, wordIndex);
-        words.push({ id: wordId, text: word.text, startMs: wordStartMs, endMs: wordEndMs, ...(confidence === undefined ? {} : { confidence }) });
+        words.push({
+          id: wordId,
+          text: word.text,
+          startMs: normalizedWord.startMs,
+          endMs: normalizedWord.endMs,
+          ...(confidence === undefined ? {} : { confidence })
+        });
         wordIds.push(wordId);
       });
     }
@@ -145,10 +155,58 @@ function localPath(inputUri: string): string {
 }
 
 function secondsToMilliseconds(value: unknown, field: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) malformed(`${field} must be a finite non-negative number.`);
-  const milliseconds = Math.round(value * 1000);
+  const seconds = finiteNonNegativeSeconds(value, field);
+  const milliseconds = Math.round(seconds * 1000);
   if (!Number.isSafeInteger(milliseconds)) malformed(`${field} exceeds the supported timestamp range.`);
   return milliseconds;
+}
+
+interface NormalizedInterval {
+  rawStartSeconds: number;
+  rawEndSeconds: number;
+  startMs: number;
+  endMs: number;
+}
+
+function normalizeInterval(rawStart: unknown, rawEnd: unknown, field: string): NormalizedInterval {
+  const rawStartSeconds = finiteNonNegativeSeconds(rawStart, `${field} start`);
+  const rawEndSeconds = finiteNonNegativeSeconds(rawEnd, `${field} end`);
+  if (rawEndSeconds < rawStartSeconds) malformed(`${field} end must not precede its start.`);
+  const startMs = secondsToMilliseconds(rawStartSeconds, `${field} start`);
+  let endMs = secondsToMilliseconds(rawEndSeconds, `${field} end`);
+  if (endMs <= startMs) endMs = startMs + 1;
+  if (!Number.isSafeInteger(endMs)) malformed(`${field} exceeds the supported timestamp range.`);
+  return { rawStartSeconds, rawEndSeconds, startMs, endMs };
+}
+
+function clampWordToSegment(
+  word: NormalizedInterval,
+  segment: NormalizedInterval,
+  segmentIndex: number,
+  wordIndex: number
+): Pick<NormalizedInterval, "startMs" | "endMs"> {
+  const earlyDriftMs = Math.max(0, (segment.rawStartSeconds - word.rawStartSeconds) * 1000);
+  const lateDriftMs = Math.max(0, (word.rawEndSeconds - segment.rawEndSeconds) * 1000);
+  if (
+    earlyDriftMs > MODEL_TIMESTAMP_TOLERANCE_MS + FLOAT_COMPARISON_EPSILON_MS ||
+    lateDriftMs > MODEL_TIMESTAMP_TOLERANCE_MS + FLOAT_COMPARISON_EPSILON_MS
+  ) {
+    malformed(`Word ${wordIndex} is outside segment ${segmentIndex} by more than ${MODEL_TIMESTAMP_TOLERANCE_MS} ms.`);
+  }
+  let startMs = Math.max(segment.startMs, word.startMs);
+  let endMs = Math.min(segment.endMs, word.endMs);
+  if (endMs <= startMs) {
+    startMs = Math.min(Math.max(startMs, segment.startMs), segment.endMs - 1);
+    endMs = startMs + 1;
+  }
+  return { startMs, endMs };
+}
+
+function finiteNonNegativeSeconds(value: unknown, field: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    malformed(`${field} must be a finite non-negative number.`);
+  }
+  return value;
 }
 
 function optionalConfidence(value: unknown, segmentIndex: number, wordIndex: number): number | undefined {

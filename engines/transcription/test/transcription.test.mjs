@@ -8,8 +8,11 @@ import { fileURLToPath } from "node:url";
 import {
   FasterWhisperTranscriptionAdapter,
   LocalTranscriptionError,
+  MODEL_TIMESTAMP_TOLERANCE_MS,
   ProcessTranscriptionWorkerRunner,
-  TRANSCRIPTION_PROTOCOL_VERSION
+  TRANSCRIPTION_PROTOCOL_VERSION,
+  assertModelCacheIsolated,
+  resolveRuntimePaths
 } from "../dist/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -46,6 +49,47 @@ function adapter(runner, overrides = {}) {
 
 function context(signal) {
   return { jobId: "job-1", locale: "pt-BR", ...(signal ? { signal } : {}) };
+}
+
+function managedRuntimeFixture({ copyExecutable = true } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-transcription-managed-"));
+  const privatePythonRoot = path.join(root, "private-python");
+  const privateBin = path.join(privatePythonRoot, "bin");
+  const baseExecutable = path.join(privateBin, "python3.12");
+  const environmentRoot = path.join(root, "transcription-env");
+  const environmentBin = path.join(environmentRoot, "bin");
+  const pythonExecutable = path.join(environmentBin, "python3.12");
+  const mediaRuntimeRoot = path.join(root, "media-runtime");
+  fs.mkdirSync(privateBin, { recursive: true });
+  fs.mkdirSync(environmentBin, { recursive: true });
+  fs.mkdirSync(mediaRuntimeRoot, { recursive: true });
+  fs.writeFileSync(baseExecutable, "authorized-private-python");
+  if (copyExecutable) fs.copyFileSync(baseExecutable, pythonExecutable);
+  else fs.symlinkSync(baseExecutable, pythonExecutable);
+  fs.writeFileSync(path.join(environmentRoot, "pyvenv.cfg"), [
+    `home = ${privateBin}`,
+    "include-system-site-packages = false",
+    "version = 3.12.14",
+    `executable = ${baseExecutable}`,
+    `base-executable = ${baseExecutable}`,
+    ""
+  ].join("\n"));
+  return {
+    root,
+    privatePythonRoot,
+    privateBin,
+    baseExecutable,
+    environmentRoot,
+    pythonExecutable,
+    mediaRuntimeRoot,
+    runtime: {
+      mode: "managed",
+      pythonExecutable,
+      privatePythonRoot,
+      environmentRoot,
+      protectedRoots: [mediaRuntimeRoot]
+    }
+  };
 }
 
 test("accepts an absolute local path and returns validated segments without words", async () => {
@@ -134,7 +178,8 @@ test("fails closed on malformed worker envelopes and timestamps", async () => {
     { protocolVersion: 999, modelId: "base", segments: [] },
     validRaw({ durationSeconds: Number.NaN }),
     validRaw({ segments: [{ startSeconds: -1, endSeconds: 1, text: "bad" }] }),
-    validRaw({ segments: [{ startSeconds: 1, endSeconds: 1, text: "bad" }] })
+    validRaw({ segments: [{ startSeconds: Number.NaN, endSeconds: 1, text: "bad" }] }),
+    validRaw({ segments: [{ startSeconds: 1, endSeconds: 0.999, text: "bad" }] })
   ]) {
     await assert.rejects(
       adapter(fakeRunner(raw)).transcribe({ inputUri: localInput, language: "auto", wordTimestamps: false }, context()),
@@ -143,19 +188,84 @@ test("fails closed on malformed worker envelopes and timestamps", async () => {
   }
 });
 
-test("fails closed when requested words are missing or outside their segment", async () => {
+test("normalizes collapsed and zero-duration model intervals to one millisecond", async () => {
+  const result = await adapter(fakeRunner(validRaw({
+    segments: [
+      { startSeconds: 0.0003, endSeconds: 0.0004, text: "quantized" },
+      { startSeconds: 0.5, endSeconds: 0.5, text: "zero" }
+    ]
+  }))).transcribe({ inputUri: localInput, language: "auto", wordTimestamps: false }, context());
+  assert.deepEqual(
+    result.transcript.segments.map(({ startMs, endMs }) => ({ startMs, endMs })),
+    [{ startMs: 0, endMs: 1 }, { startMs: 500, endMs: 501 }]
+  );
+});
+
+test("clamps model word boundary drift within the explicit 20 ms precision", async () => {
+  assert.equal(MODEL_TIMESTAMP_TOLERANCE_MS, 20);
+  const result = await adapter(fakeRunner(validRaw({
+    segments: [
+      {
+        startSeconds: 1,
+        endSeconds: 2,
+        text: "near",
+        words: [{ startSeconds: 0.995, endSeconds: 2.005, text: "near" }]
+      },
+      {
+        startSeconds: 3,
+        endSeconds: 4,
+        text: "boundary",
+        words: [{ startSeconds: 2.98, endSeconds: 4.02, text: "boundary" }]
+      }
+    ]
+  }))).transcribe({ inputUri: localInput, language: "auto", wordTimestamps: true }, context());
+  assert.deepEqual(
+    result.transcript.words.map(({ startMs, endMs }) => ({ startMs, endMs })),
+    [{ startMs: 1000, endMs: 2000 }, { startMs: 3000, endMs: 4000 }]
+  );
+  for (const segment of result.transcript.segments) {
+    assert.ok(segment.endMs > segment.startMs);
+    for (const wordId of segment.wordIds) {
+      const word = result.transcript.words.find(({ id }) => id === wordId);
+      assert.ok(word);
+      assert.ok(word.endMs > word.startMs);
+      assert.ok(word.startMs >= segment.startMs);
+      assert.ok(word.endMs <= segment.endMs);
+    }
+  }
+});
+
+test("rejects model word boundary drift beyond 20 ms", async () => {
+  const runner = fakeRunner(validRaw({ segments: [{
+    startSeconds: 1,
+    endSeconds: 2,
+    text: "far",
+    words: [{ startSeconds: 0.979, endSeconds: 2, text: "far" }]
+  }] }));
+  await assert.rejects(
+    adapter(runner).transcribe({ inputUri: localInput, language: "auto", wordTimestamps: true }, context()),
+    (error) => error?.code === "TRANSCRIPTION_MALFORMED_RESULT"
+  );
+});
+
+test("fails closed when requested words are missing, reversed, invalid, or materially outside their segment", async () => {
   const missing = fakeRunner(validRaw());
   await assert.rejects(
     adapter(missing).transcribe({ inputUri: localInput, language: "auto", wordTimestamps: true }, context()),
     (error) => error?.code === "TRANSCRIPTION_MALFORMED_RESULT"
   );
-  const outside = fakeRunner(validRaw({ segments: [{
-    startSeconds: 1, endSeconds: 2, text: "bad", words: [{ startSeconds: 0, endSeconds: 1.5, text: "bad" }]
-  }] }));
-  await assert.rejects(
-    adapter(outside).transcribe({ inputUri: localInput, language: "auto", wordTimestamps: true }, context()),
-    (error) => error?.code === "TRANSCRIPTION_MALFORMED_RESULT"
-  );
+  for (const word of [
+    { startSeconds: 0, endSeconds: 1.5, text: "outside" },
+    { startSeconds: 1.5, endSeconds: 1.4, text: "reversed" },
+    { startSeconds: -0.001, endSeconds: 1.5, text: "negative" },
+    { startSeconds: Number.NaN, endSeconds: 1.5, text: "nan" }
+  ]) {
+    const runner = fakeRunner(validRaw({ segments: [{ startSeconds: 1, endSeconds: 2, text: "bad", words: [word] }] }));
+    await assert.rejects(
+      adapter(runner).transcribe({ inputUri: localInput, language: "auto", wordTimestamps: true }, context()),
+      (error) => error?.code === "TRANSCRIPTION_MALFORMED_RESULT"
+    );
+  }
 });
 
 test("rejects backend IDs and generates unique deterministic IDs from closed indexes", async () => {
@@ -213,31 +323,134 @@ test("cancellation terminates and reaps the process worker", async () => {
   assert.throws(() => process.kill(pid, 0));
 });
 
-test("managed mode never falls back to system Python when runtime is unavailable", async () => {
-  const missing = path.join(os.tmpdir(), "cevra-missing-runtime", "env", "bin", "python3");
-  const engine = new FasterWhisperTranscriptionAdapter({
-    runtime: {
-      mode: "managed",
-      pythonExecutable: missing,
-      privatePythonRoot: path.join(os.tmpdir(), "cevra-missing-runtime", "python"),
-      environmentRoot: path.join(os.tmpdir(), "cevra-missing-runtime", "env")
-    },
-    profile
+test("healthcheck and capabilities never replace the active transcription PID", async () => {
+  const workerScript = path.join(here, "fixtures", "sleep_worker.py");
+  const processRunner = new ProcessTranscriptionWorkerRunner({
+    runtime: { mode: "development", pythonExecutable: python, workerScript },
+    stopTimeoutMs: 200
   });
-  await assert.rejects(
-    engine.transcribe({ inputUri: localInput, wordTimestamps: false }, context()),
+  const engine = new FasterWhisperTranscriptionAdapter({ runtime, profile, runner: processRunner });
+  const controller = new AbortController();
+  const job = engine.transcribe({ inputUri: localInput, wordTimestamps: false }, context(controller.signal));
+  const deadline = Date.now() + 2000;
+  while (!processRunner.workerPid && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5));
+  const transcriptionPid = processRunner.workerPid;
+  assert.equal(typeof transcriptionPid, "number");
+
+  assert.equal((await engine.healthcheck()).status, "ready");
+  const capabilities = await engine.capabilities();
+  assert.equal(capabilities.find(({ id }) => id === "transcription.local.faster-whisper").available, true);
+  assert.equal(processRunner.workerPid, transcriptionPid);
+  assert.doesNotThrow(() => process.kill(transcriptionPid, 0));
+
+  controller.abort();
+  await assert.rejects(job, (error) => error?.code === "TRANSCRIPTION_CANCELLED");
+  assert.equal(processRunner.workerPid, undefined);
+  assert.throws(() => process.kill(transcriptionPid, 0));
+});
+
+test("managed mode accepts copy-style and symlink venvs only when pyvenv.cfg proves the private base", () => {
+  for (const copyExecutable of [true, false]) {
+    const fixture = managedRuntimeFixture({ copyExecutable });
+    const resolved = resolveRuntimePaths(fixture.runtime);
+    assert.equal(resolved.environmentRoot, fs.realpathSync(fixture.environmentRoot));
+    assert.equal(resolved.pythonExecutable, fixture.pythonExecutable);
+  }
+
+  const unrelated = managedRuntimeFixture();
+  const systemRoot = path.join(unrelated.root, "unrelated-system-python");
+  const systemBin = path.join(systemRoot, "bin");
+  const systemPython = path.join(systemBin, "python3.12");
+  fs.mkdirSync(systemBin, { recursive: true });
+  fs.writeFileSync(systemPython, "unrelated-python");
+  fs.copyFileSync(systemPython, unrelated.pythonExecutable);
+  fs.writeFileSync(path.join(unrelated.environmentRoot, "pyvenv.cfg"), [
+    `home = ${systemBin}`,
+    "include-system-site-packages = false",
+    `executable = ${systemPython}`,
+    ""
+  ].join("\n"));
+  assert.throws(
+    () => resolveRuntimePaths(unrelated.runtime),
     (error) => error?.code === "TRANSCRIPTION_RUNTIME_UNAVAILABLE"
   );
 });
 
-test("transcription configuration leaves a protected Media Runtime tree untouched", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-transcription-isolation-"));
-  const mediaManifest = path.join(root, "media", "manifest.json");
-  fs.mkdirSync(path.dirname(mediaManifest), { recursive: true });
-  fs.writeFileSync(mediaManifest, "sealed-media-runtime");
-  const runner = fakeRunner();
-  await adapter(runner).transcribe({ inputUri: localInput, wordTimestamps: false }, context());
-  assert.equal(fs.readFileSync(mediaManifest, "utf8"), "sealed-media-runtime");
+test("managed mode fails closed for absent, malformed, contradictory, or system-enabled pyvenv.cfg", () => {
+  const cases = [
+    { name: "absent", contents: undefined },
+    { name: "malformed", contents: "this is not configuration\n" },
+    { name: "missing provenance", contents: "include-system-site-packages = false\n" },
+    { name: "system packages", contents: "home = /tmp\ninclude-system-site-packages = true\n" }
+  ];
+  for (const candidate of cases) {
+    const fixture = managedRuntimeFixture();
+    const config = path.join(fixture.environmentRoot, "pyvenv.cfg");
+    if (candidate.contents === undefined) fs.unlinkSync(config);
+    else fs.writeFileSync(config, candidate.contents);
+    assert.throws(
+      () => resolveRuntimePaths(fixture.runtime),
+      (error) => error?.code === "TRANSCRIPTION_RUNTIME_UNAVAILABLE",
+      candidate.name
+    );
+  }
+
+  const contradiction = managedRuntimeFixture();
+  fs.writeFileSync(path.join(contradiction.environmentRoot, "pyvenv.cfg"), [
+    `home = ${contradiction.privateBin}`,
+    "include-system-site-packages = false",
+    "executable = /usr/bin/python3",
+    ""
+  ].join("\n"));
+  assert.throws(
+    () => resolveRuntimePaths(contradiction.runtime),
+    (error) => error?.code === "TRANSCRIPTION_RUNTIME_UNAVAILABLE"
+  );
+});
+
+test("managed mode never searches PATH when its explicit interpreter is unavailable", () => {
+  const fixture = managedRuntimeFixture();
+  const previousPath = process.env.PATH;
+  process.env.PATH = path.dirname(python);
+  try {
+    assert.throws(
+      () => resolveRuntimePaths({ ...fixture.runtime, pythonExecutable: path.join(fixture.environmentRoot, "bin", "missing-python") }),
+      (error) => error?.code === "TRANSCRIPTION_RUNTIME_UNAVAILABLE"
+    );
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+  }
+});
+
+test("managed model cache accepts an independent sibling and rejects every protected overlap", () => {
+  const fixture = managedRuntimeFixture();
+  const { protectedRoots } = resolveRuntimePaths(fixture.runtime);
+  assert.doesNotThrow(() => assertModelCacheIsolated(path.join(fixture.root, "model-cache"), protectedRoots));
+
+  for (const rejected of [
+    fixture.privatePythonRoot,
+    path.join(fixture.privatePythonRoot, "models"),
+    path.join(fixture.environmentRoot, "models"),
+    path.join(fixture.mediaRuntimeRoot, "models"),
+    fixture.root
+  ]) {
+    assert.throws(
+      () => assertModelCacheIsolated(rejected, protectedRoots),
+      (error) => error?.code === "TRANSCRIPTION_RUNTIME_UNAVAILABLE"
+    );
+  }
+});
+
+test("managed model cache canonicalizes symlink ancestors and rejects protected targets", () => {
+  const fixture = managedRuntimeFixture();
+  const { protectedRoots } = resolveRuntimePaths(fixture.runtime);
+  const link = path.join(fixture.root, "model-cache-link");
+  fs.symlinkSync(fixture.privatePythonRoot, link);
+  assert.throws(
+    () => assertModelCacheIsolated(path.join(link, "future-cache"), protectedRoots),
+    (error) => error?.code === "TRANSCRIPTION_RUNTIME_UNAVAILABLE"
+  );
 });
 
 test("health and capabilities distinguish native timing from unavailable forced alignment", async () => {

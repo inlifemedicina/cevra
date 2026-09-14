@@ -2,6 +2,7 @@ import importlib.util
 import math
 import os
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -123,6 +124,15 @@ class WorkerTests(unittest.TestCase):
         transcribe_call = self.calls[1]
         self.assertEqual(transcribe_call[2]["language"], "pt")
         self.assertEqual(transcribe_call[2]["task"], "transcribe")
+
+    def test_prepopulated_model_directory_avoids_hub_lookup(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            for name in ("config.json", "model.bin", "tokenizer.json", "vocabulary.txt"):
+                Path(model_dir, name).write_bytes(b"fixture")
+            response = worker.process_message(self.request(modelCacheDir=model_dir))
+        self.assertTrue(response["ok"])
+        self.assertEqual(self.calls[0][1], model_dir)
+        self.assertTrue(self.calls[0][2]["local_files_only"])
 
     def test_native_word_timestamps_are_returned_when_requested(self):
         response = worker.process_message(self.request(wordTimestamps=True))

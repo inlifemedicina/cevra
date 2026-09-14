@@ -68,12 +68,17 @@ def _health() -> dict[str, object]:
 def _transcribe(request: Mapping[str, object]) -> dict[str, object]:
     faster_whisper = _load_faster_whisper()
     model_id = str(request["modelId"])
+    model_cache_dir = str(request["modelCacheDir"])
+    model_source = model_id
+    if not bool(request["allowModelDownload"]) and _is_prepopulated_model(model_cache_dir):
+        # Passing the verified local directory avoids a Hugging Face lookup entirely.
+        model_source = model_cache_dir
     try:
         model = faster_whisper.WhisperModel(
-            model_id,
+            model_source,
             device=str(request["device"]),
             compute_type=str(request["computeType"]),
-            download_root=str(request["modelCacheDir"]),
+            download_root=model_cache_dir,
             local_files_only=not bool(request["allowModelDownload"]),
         )
     except Exception as error:
@@ -103,6 +108,14 @@ def _transcribe(request: Mapping[str, object]) -> dict[str, object]:
     if duration is not None:
         result["durationSeconds"] = _finite_non_negative(duration, "duration")
     return result
+
+
+def _is_prepopulated_model(model_cache_dir: str) -> bool:
+    required = ("config.json", "model.bin", "tokenizer.json")
+    vocabulary = ("vocabulary.txt", "vocabulary.json")
+    return all(os.path.isfile(os.path.join(model_cache_dir, name)) for name in required) and any(
+        os.path.isfile(os.path.join(model_cache_dir, name)) for name in vocabulary
+    )
 
 
 def _segment_payload(segment: object, include_words: bool) -> dict[str, object]:

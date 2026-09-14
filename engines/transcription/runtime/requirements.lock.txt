@@ -1,6 +1,9 @@
 # CEVRA Transcription Engine V1 dependency set for CPython 3.12.
-# Release assembly must build PyAV from source against a separately inventoried
-# LGPL-only FFmpeg library set. PyPI PyAV binary wheels are not release inputs.
+# This pins versions but is not yet a cryptographic artifact lock. Release assembly
+# must add --require-hashes (or equivalent verified artifact hashes) for every input.
+# Release assembly must build PyAV from source against a separate, inventoried,
+# compatible FFmpeg 8.x LGPL-only library set. The sealed Media Runtime FFmpeg 9.0.1
+# is not a transcription dependency. PyPI PyAV binary wheels are not release inputs.
 --no-binary=av
 faster-whisper==1.2.1
 ctranslate2==4.8.2
@@ -26,3 +29,7 @@ certifi==2026.7.22
 idna==3.19
 typing_extensions==4.16.0
 exceptiongroup==1.3.1
+coloredlogs==15.0.1
+humanfriendly==10.0
+sympy==1.14.0
+mpmath==1.3.0
