@@ -3,7 +3,7 @@
 `@cevra/application` is the application-layer boundary for real media operations.
 UI and agent surfaces call this service with a typed `MediaOperation` and a typed
 Project IR effect. The service invokes a `MediaEngineAdapter`; it does not depend
-on FFmpeg, the Python worker, desktop paths, Workflow Presets or Content OS.
+on FFmpeg, the Python worker, desktop paths, Workflow Presets or Content Intelligence.
 
 ## Transaction boundary
 
