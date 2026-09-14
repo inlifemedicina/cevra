@@ -38,5 +38,13 @@
   "ingest.error.kindMismatch": "O arquivo selecionado não corresponde ao tipo de mídia esperado.",
   "ingest.error.projectConflict": "O projeto mudou enquanto a fonte de mídia era inspecionada. Tente importá-la novamente.",
   "ingest.error.probeFailed": "Não foi possível inspecionar o arquivo de mídia selecionado.",
-  "ingest.error.commitFailed": "Não foi possível adicionar a fonte de mídia ao projeto."
+  "ingest.error.commitFailed": "Não foi possível adicionar a fonte de mídia ao projeto.",
+  "transcription.error.invalidRequest": "A solicitação de transcrição é inválida.",
+  "transcription.error.sourceUnknown": "A fonte selecionada não foi encontrada no projeto.",
+  "transcription.error.sourceIneligible": "A fonte selecionada não pode ser transcrita.",
+  "transcription.error.projectConflict": "O projeto mudou durante a transcrição. Transcreva a fonte novamente.",
+  "transcription.error.engineFailed": "O mecanismo de transcrição não conseguiu concluir a operação.",
+  "transcription.error.resultInvalid": "O resultado da transcrição é inválido e não foi adicionado ao projeto.",
+  "transcription.error.commitFailed": "Não foi possível adicionar a transcrição ao projeto.",
+  "transcription.error.cancelled": "A operação de transcrição foi cancelada."
 }

@@ -38,5 +38,13 @@
   "ingest.error.kindMismatch": "The selected file does not match the expected media type.",
   "ingest.error.projectConflict": "The project changed while the media source was being inspected. Try importing it again.",
   "ingest.error.probeFailed": "The selected media file could not be inspected.",
-  "ingest.error.commitFailed": "The media source could not be added to the project."
+  "ingest.error.commitFailed": "The media source could not be added to the project.",
+  "transcription.error.invalidRequest": "The transcription request is invalid.",
+  "transcription.error.sourceUnknown": "The selected project source could not be found.",
+  "transcription.error.sourceIneligible": "The selected project source cannot be transcribed.",
+  "transcription.error.projectConflict": "The project changed while transcription was running. Transcribe the source again.",
+  "transcription.error.engineFailed": "The transcription engine could not complete the operation.",
+  "transcription.error.resultInvalid": "The transcription result is invalid and was not added to the project.",
+  "transcription.error.commitFailed": "The transcript could not be added to the project.",
+  "transcription.error.cancelled": "The transcription operation was cancelled."
 }

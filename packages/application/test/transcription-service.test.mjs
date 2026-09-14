@@ -1,0 +1,540 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { CEVRA_ENGINE_API_VERSION } from "@cevra/contracts";
+import {
+  ProjectCommandError,
+  ProjectHistory,
+  V1_UNASSIGNED_TRANSCRIPT_EXTENSION,
+  computeTranscriptDigest,
+  createEmptyProject,
+  createSourceTranscript
+} from "@cevra/project-ir";
+import {
+  InMemoryMediaExecutionRepository,
+  LocalSourceIngestService,
+  MediaApplicationService,
+  TranscriptionApplicationError,
+  TranscriptionApplicationService
+} from "../dist/index.js";
+
+const now = "2026-09-14T18:00:00.000Z";
+
+function source(id = "source-1", kind = "video", overrides = {}) {
+  return {
+    id,
+    kind,
+    uri: `file:///media/${id}.mp4`,
+    displayName: `${id}.mp4`,
+    durationMs: 5_000,
+    ...overrides
+  };
+}
+
+function transcript(text = "olá") {
+  return {
+    language: "pt",
+    words: [{ id: "word-1", text, startMs: 0, endMs: 500 }],
+    segments: [{ id: "segment-1", text, startMs: 0, endMs: 500, wordIds: ["word-1"] }]
+  };
+}
+
+function result(text = "olá", overrides = {}) {
+  return {
+    transcript: transcript(text),
+    detectedLanguage: "pt",
+    modelId: "base",
+    durationMs: 5_000,
+    wordTiming: "model",
+    ...overrides
+  };
+}
+
+function canonicalTranscript(text = "anterior", overrides = {}) {
+  return createSourceTranscript({
+    sourceId: "source-1",
+    wordTiming: "model",
+    speakerState: "none",
+    transcript: transcript(text),
+    provenance: {
+      stages: [{
+        kind: "transcription",
+        executionId: "previous-execution",
+        engineId: "test.transcription",
+        engineVersion: "1.2.3",
+        engineApiVersion: "1",
+        modelId: "base",
+        createdAt: "2026-09-14T17:00:00.000Z"
+      }]
+    },
+    ...overrides
+  });
+}
+
+class FakeTranscriptionEngine {
+  calls = [];
+  identityCalls = 0;
+
+  constructor(transcribe, identity = undefined) {
+    this.transcribeImpl = transcribe;
+    this.identityImpl = identity;
+  }
+
+  async identity() {
+    this.identityCalls += 1;
+    if (this.identityImpl) return this.identityImpl();
+    return {
+      id: "test.transcription",
+      kind: "transcription",
+      displayName: "Test Transcription",
+      version: "1.2.3",
+      apiVersion: CEVRA_ENGINE_API_VERSION
+    };
+  }
+
+  async healthcheck() { return { status: "ready", checkedAt: now, checks: [] }; }
+  async capabilities() { return []; }
+
+  async transcribe(request, context) {
+    this.calls.push({ request, context });
+    return this.transcribeImpl(request, context);
+  }
+}
+
+function projectWith(sources = [source()], transcripts = []) {
+  const project = createEmptyProject({ id: "project-1", name: "Project", locale: "pt-BR", now });
+  project.sources.push(...sources);
+  project.sourceTranscripts.push(...transcripts);
+  return project;
+}
+
+function fixture(engine, project = projectWith()) {
+  let historyId = 0;
+  const history = new ProjectHistory(project, {
+    clock: () => now,
+    idGenerator: () => `history-${++historyId}`
+  });
+  const service = new TranscriptionApplicationService({
+    engine,
+    history,
+    clock: () => now,
+    idGenerator: () => "generated-transcription"
+  });
+  return { service, history };
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+test("first transcription authorizes the canonical source and commits a complete SourceTranscript", async () => {
+  const checksum = "sha256:source-content";
+  const engineResult = result();
+  const engine = new FakeTranscriptionEngine(async () => engineResult);
+  const { service, history } = fixture(engine, projectWith([source("source-1", "video", { checksum })]));
+
+  const outcome = await service.transcribeSource({
+    sourceId: "source-1",
+    id: "transcription-1",
+    actor: { type: "agent", id: "editor-agent" }
+  });
+
+  assert.equal(engine.identityCalls, 1);
+  assert.equal(engine.calls.length, 1);
+  assert.deepEqual(engine.calls[0].request, {
+    inputUri: "file:///media/source-1.mp4",
+    language: "auto",
+    wordTimestamps: true
+  });
+  assert.deepEqual(engine.calls[0].context, { jobId: "transcription-1", locale: "pt-BR" });
+  assert.equal(outcome.executionId, "transcription-1");
+  assert.equal(outcome.sourceId, "source-1");
+  assert.deepEqual(outcome.result, engineResult);
+  assert.equal(outcome.sourceTranscript.sourceId, "source-1");
+  assert.equal(outcome.sourceTranscript.wordTiming, "model");
+  assert.equal(outcome.sourceTranscript.speakerState, "none");
+  assert.equal(outcome.sourceTranscript.transcript.language, "pt");
+  assert.equal(outcome.sourceTranscript.transcriptDigest, computeTranscriptDigest(outcome.sourceTranscript));
+  assert.equal(outcome.sourceTranscript.provenance.sourceChecksum, checksum);
+  assert.deepEqual(outcome.sourceTranscript.provenance.stages, [{
+    kind: "transcription",
+    executionId: "transcription-1",
+    engineId: "test.transcription",
+    engineVersion: "1.2.3",
+    engineApiVersion: "1",
+    modelId: "base",
+    createdAt: now
+  }]);
+  assert.equal(outcome.project.history.revision, 1);
+  assert.deepEqual(outcome.sourceTranscript, outcome.project.sourceTranscripts[0]);
+  assert.deepEqual(outcome.sourceTranscript, history.current.sourceTranscripts[0]);
+  assert.equal(history.entries.length, 1);
+  assert.equal(history.entries[0].command.type, "transcript.set");
+  assert.deepEqual(history.entries[0].actor, { type: "agent", id: "editor-agent" });
+});
+
+test("no-speech transcription normalizes model metadata to canonical none timing", async () => {
+  const engine = new FakeTranscriptionEngine(async () => ({
+    transcript: { words: [], segments: [] },
+    modelId: "base",
+    wordTiming: "model"
+  }));
+  const { service, history } = fixture(engine);
+
+  const outcome = await service.transcribeSource({ sourceId: "source-1" });
+
+  assert.equal(outcome.executionId, "generated-transcription");
+  assert.equal(outcome.sourceTranscript.wordTiming, "none");
+  assert.equal(outcome.sourceTranscript.speakerState, "none");
+  assert.deepEqual(outcome.sourceTranscript.transcript, { words: [], segments: [] });
+  assert.equal(Object.hasOwn(outcome.sourceTranscript.provenance, "sourceChecksum"), false);
+  assert.equal(history.current.history.revision, 1);
+  assert.deepEqual(history.entries[0].actor, { type: "user" });
+});
+
+test("retranscription uses the captured digest and undo redo cross the replacement", async () => {
+  const previous = canonicalTranscript();
+  const engine = new FakeTranscriptionEngine(async () => result("novo"));
+  const { service, history } = fixture(engine, projectWith([source()], [previous]));
+
+  const outcome = await service.transcribeSource({ sourceId: "source-1", id: "retranscription" });
+
+  assert.notEqual(outcome.sourceTranscript.transcriptDigest, previous.transcriptDigest);
+  assert.equal(history.entries[0].command.type, "transcript.set");
+  assert.equal(history.entries[0].command.expectedCurrentTranscriptDigest, previous.transcriptDigest);
+  assert.equal(history.current.history.revision, 1);
+  assert.deepEqual(history.undo().sourceTranscripts, [previous]);
+  assert.deepEqual(history.redo().sourceTranscripts, [outcome.sourceTranscript]);
+});
+
+test("same-semantic retranscription journals new provenance without changing digest identity", async () => {
+  const previous = canonicalTranscript("igual");
+  const engine = new FakeTranscriptionEngine(async () => result("igual"));
+  const { service, history } = fixture(engine, projectWith([source()], [previous]));
+
+  const outcome = await service.transcribeSource({ sourceId: "source-1", id: "new-execution" });
+
+  assert.equal(outcome.sourceTranscript.transcriptDigest, previous.transcriptDigest);
+  assert.notDeepEqual(outcome.sourceTranscript.provenance, previous.provenance);
+  assert.equal(outcome.sourceTranscript.provenance.stages[0].executionId, "new-execution");
+  assert.equal(history.current.history.revision, 1);
+  assert.equal(history.entries.length, 1);
+});
+
+test("an exact command no-op maps to a stable commit failure without history mutation", async () => {
+  const current = canonicalTranscript("igual", {
+    provenance: { stages: [{
+      kind: "transcription",
+      executionId: "same-execution",
+      engineId: "test.transcription",
+      engineVersion: "1.2.3",
+      engineApiVersion: "1",
+      modelId: "base",
+      createdAt: now
+    }] }
+  });
+  const engine = new FakeTranscriptionEngine(async () => result("igual"));
+  const { service, history } = fixture(engine, projectWith([source()], [current]));
+
+  await assert.rejects(
+    service.transcribeSource({ sourceId: "source-1", id: "same-execution" }),
+    (error) => error instanceof TranscriptionApplicationError
+      && error.code === "TRANSCRIPTION_APP_COMMIT_FAILED"
+      && error.cause instanceof ProjectCommandError
+      && error.cause.code === "PROJECT_TRANSCRIPT_NO_OP"
+  );
+  assert.equal(history.current.history.revision, 0);
+  assert.equal(history.entries.length, 0);
+  assert.deepEqual(history.current.sourceTranscripts, [current]);
+});
+
+test("command concurrency and generic commit failures map to stable application boundaries", async () => {
+  const cases = [
+    [new ProjectCommandError("PROJECT_TRANSCRIPT_STALE", "stale command"), "TRANSCRIPTION_APP_PROJECT_CONFLICT"],
+    [new Error("journal storage failed"), "TRANSCRIPTION_APP_COMMIT_FAILED"]
+  ];
+
+  for (const [cause, code] of cases) {
+    const engine = new FakeTranscriptionEngine(async () => result());
+    const { service, history } = fixture(engine);
+    history.commit = () => { throw cause; };
+
+    await assert.rejects(
+      service.transcribeSource({ sourceId: "source-1" }),
+      (error) => error instanceof TranscriptionApplicationError
+        && error.code === code
+        && error.cause === cause
+    );
+    assert.equal(history.current.history.revision, 0);
+    assert.deepEqual(history.current.sourceTranscripts, []);
+  }
+});
+
+test("a concurrent project change wins and prevents candidate promotion", async () => {
+  const pending = deferred();
+  let started;
+  const didStart = new Promise((resolve) => { started = resolve; });
+  const engine = new FakeTranscriptionEngine(async () => {
+    started();
+    return pending.promise;
+  });
+  const { service, history } = fixture(engine);
+  const transcription = service.transcribeSource({ sourceId: "source-1", id: "concurrent" });
+  await didStart;
+  history.commit({ type: "project.rename", name: "Concurrent edit" });
+  pending.resolve(result());
+
+  await assert.rejects(transcription, (error) => error instanceof TranscriptionApplicationError
+    && error.code === "TRANSCRIPTION_APP_PROJECT_CONFLICT");
+  assert.equal(history.current.project.name, "Concurrent edit");
+  assert.deepEqual(history.current.sourceTranscripts, []);
+  assert.equal(history.current.history.revision, 1);
+  assert.equal(history.entries.length, 1);
+});
+
+test("source removal during transcription remains canonical and prevents promotion", async () => {
+  const pending = deferred();
+  let started;
+  const didStart = new Promise((resolve) => { started = resolve; });
+  const engine = new FakeTranscriptionEngine(async () => {
+    started();
+    return pending.promise;
+  });
+  const { service, history } = fixture(engine);
+  const transcription = service.transcribeSource({ sourceId: "source-1", id: "removed-source" });
+  await didStart;
+  history.commit({ type: "source.remove", sourceId: "source-1" });
+  pending.resolve(result());
+
+  await assert.rejects(transcription, (error) => error instanceof TranscriptionApplicationError
+    && error.code === "TRANSCRIPTION_APP_PROJECT_CONFLICT");
+  assert.deepEqual(history.current.sources, []);
+  assert.deepEqual(history.current.sourceTranscripts, []);
+  assert.equal(history.current.history.revision, 1);
+});
+
+test("invalid, unknown, ineligible and URI-injecting requests never reach the engine", async () => {
+  const cases = [
+    [{ sourceId: " " }, projectWith(), "TRANSCRIPTION_APP_INVALID_REQUEST"],
+    [{ sourceId: "missing" }, projectWith(), "TRANSCRIPTION_APP_SOURCE_UNKNOWN"],
+    [{ sourceId: "image" }, projectWith([source("image", "image")]), "TRANSCRIPTION_APP_SOURCE_INELIGIBLE"],
+    [{ sourceId: "source-1", inputUri: "file:///attacker.mp4" }, projectWith(), "TRANSCRIPTION_APP_INVALID_REQUEST"]
+  ];
+
+  for (const [request, project, code] of cases) {
+    const engine = new FakeTranscriptionEngine(async () => assert.fail("invalid source must not be transcribed"));
+    const { service, history } = fixture(engine, project);
+    await assert.rejects(service.transcribeSource(request), (error) => error instanceof TranscriptionApplicationError && error.code === code);
+    assert.equal(engine.identityCalls, 0, code);
+    assert.equal(engine.calls.length, 0, code);
+    assert.equal(history.current.history.revision, 0, code);
+  }
+});
+
+test("words require model timing metadata and no invalid timing value is inferred", async () => {
+  const invalidResults = [
+    (() => { const value = result(); delete value.wordTiming; return value; })(),
+    result("olá", { wordTiming: "none" }),
+    result("olá", { wordTiming: "aligned" })
+  ];
+
+  for (const invalidResult of invalidResults) {
+    const engine = new FakeTranscriptionEngine(async () => invalidResult);
+    const { service, history } = fixture(engine);
+    await assert.rejects(service.transcribeSource({ sourceId: "source-1" }), (error) => error instanceof TranscriptionApplicationError
+      && error.code === "TRANSCRIPTION_APP_RESULT_INVALID");
+    assert.equal(history.current.history.revision, 0);
+    assert.deepEqual(history.current.sourceTranscripts, []);
+  }
+});
+
+test("malformed transcript timing, references and source duration fail closed", async () => {
+  const invalidResults = [
+    result("timing", { transcript: {
+      language: "pt",
+      words: [{ id: "word-1", text: "timing", startMs: 0, endMs: 0 }],
+      segments: [{ id: "segment-1", text: "timing", startMs: 0, endMs: 500, wordIds: ["word-1"] }]
+    } }),
+    result("reference", { transcript: {
+      language: "pt",
+      words: [{ id: "word-1", text: "reference", startMs: 0, endMs: 500 }],
+      segments: [{ id: "segment-1", text: "reference", startMs: 0, endMs: 500, wordIds: ["missing"] }]
+    } }),
+    result("duration", { transcript: {
+      language: "pt",
+      words: [{ id: "word-1", text: "duration", startMs: 0, endMs: 1_000 }],
+      segments: [{ id: "segment-1", text: "duration", startMs: 0, endMs: 1_000, wordIds: ["word-1"] }]
+    } })
+  ];
+
+  for (const invalidResult of invalidResults) {
+    const engine = new FakeTranscriptionEngine(async () => invalidResult);
+    const { service, history } = fixture(engine, projectWith([source("source-1", "video", { durationMs: 500 })]));
+    await assert.rejects(service.transcribeSource({ sourceId: "source-1" }), (error) => error instanceof TranscriptionApplicationError
+      && error.code === "TRANSCRIPTION_APP_RESULT_INVALID");
+    assert.equal(history.current.history.revision, 0);
+    assert.deepEqual(history.current.sourceTranscripts, []);
+  }
+});
+
+test("cancellation before or during transcription never mutates Project IR", async () => {
+  const beforeEngine = new FakeTranscriptionEngine(async () => assert.fail("pre-aborted request must not run"));
+  const before = fixture(beforeEngine);
+  const preAborted = new AbortController();
+  preAborted.abort(new Error("cancel before start"));
+  await assert.rejects(
+    before.service.transcribeSource({ sourceId: "source-1" }, preAborted.signal),
+    (error) => error instanceof TranscriptionApplicationError
+      && error.code === "TRANSCRIPTION_APP_CANCELLED"
+      && error.message === "A operação de transcrição foi cancelada."
+  );
+  assert.equal(beforeEngine.identityCalls, 0);
+  assert.equal(beforeEngine.calls.length, 0);
+  assert.equal(before.history.current.history.revision, 0);
+
+  let started;
+  const didStart = new Promise((resolve) => { started = resolve; });
+  const duringEngine = new FakeTranscriptionEngine(async (_request, context) => {
+    started();
+    return new Promise((_resolve, reject) => context.signal.addEventListener("abort", () => {
+      const error = new Error("engine cancelled");
+      error.name = "AbortError";
+      reject(error);
+    }, { once: true }));
+  });
+  const during = fixture(duringEngine);
+  const controller = new AbortController();
+  const operation = during.service.transcribeSource({ sourceId: "source-1" }, controller.signal);
+  await didStart;
+  controller.abort();
+  await assert.rejects(operation, (error) => error instanceof TranscriptionApplicationError
+    && error.code === "TRANSCRIPTION_APP_CANCELLED");
+  assert.equal(duringEngine.calls[0].context.signal, controller.signal);
+  assert.equal(during.history.current.history.revision, 0);
+});
+
+test("engine failures and malformed identities expose only application errors with causes", async () => {
+  const technical = new Error("private faster-whisper detail");
+  const failingEngine = new FakeTranscriptionEngine(async () => { throw technical; });
+  const failing = fixture(failingEngine);
+  await assert.rejects(
+    failing.service.transcribeSource({ sourceId: "source-1", locale: "en-US" }),
+    (error) => error instanceof TranscriptionApplicationError
+      && error.code === "TRANSCRIPTION_APP_ENGINE_FAILED"
+      && error.message === "The transcription engine could not complete the operation."
+      && error.cause === technical
+  );
+  assert.equal(failing.history.current.history.revision, 0);
+
+  const malformedIdentity = new FakeTranscriptionEngine(
+    async () => assert.fail("malformed identity must stop before transcription"),
+    async () => ({ id: "", kind: "media", version: "", apiVersion: 999 })
+  );
+  const malformed = fixture(malformedIdentity);
+  await assert.rejects(
+    malformed.service.transcribeSource({ sourceId: "source-1" }),
+    (error) => error instanceof TranscriptionApplicationError && error.code === "TRANSCRIPTION_APP_ENGINE_FAILED"
+  );
+  assert.equal(malformedIdentity.calls.length, 0);
+  assert.equal(malformed.history.current.history.revision, 0);
+});
+
+test("explicit transcription coexists with immutable historical migration quarantine", async () => {
+  const evidence = {
+    schemaVersion: 1,
+    originalSchemaVersion: 1,
+    reason: "no-eligible-source",
+    payload: { language: "pt", words: [], segments: [], legacyEvidence: { retain: true } },
+    eligibleSourceIdsAtMigration: []
+  };
+  const project = projectWith();
+  project.extensions[V1_UNASSIGNED_TRANSCRIPT_EXTENSION] = structuredClone(evidence);
+  const engine = new FakeTranscriptionEngine(async () => result());
+  const { service, history } = fixture(engine, project);
+
+  const outcome = await service.transcribeSource({ sourceId: "source-1", id: "explicit-transcription" });
+
+  assert.equal(outcome.project.sourceTranscripts.length, 1);
+  assert.deepStrictEqual(outcome.project.extensions[V1_UNASSIGNED_TRANSCRIPT_EXTENSION], evidence);
+  assert.deepStrictEqual(history.current.extensions[V1_UNASSIGNED_TRANSCRIPT_EXTENSION], evidence);
+});
+
+test("real application services integrate ingest to canonical transcription with undo and redo", async () => {
+  let historyId = 0;
+  const history = new ProjectHistory(
+    createEmptyProject({ id: "vertical-project", name: "Vertical", locale: "pt-BR", now }),
+    { clock: () => now, idGenerator: () => `vertical-history-${++historyId}` }
+  );
+  const originalUri = "file:///Users/editor/Original.mov";
+  const mediaEngine = {
+    async identity() {
+      return { id: "test.media", kind: "media", displayName: "Test Media", version: "1.0.0", apiVersion: CEVRA_ENGINE_API_VERSION };
+    },
+    async healthcheck() { return { status: "ready", checkedAt: now, checks: [] }; },
+    async capabilities() { return []; },
+    async execute(operation) {
+      assert.deepEqual(operation, { type: "probe", inputUri: "/Users/editor/Original.mov" });
+      return {
+        type: "probe",
+        probe: {
+          uri: originalUri,
+          durationMs: 5_000,
+          width: 1920,
+          height: 1080,
+          frameRate: 30,
+          hasVideo: true,
+          hasAudio: true,
+          videoCodec: "h264",
+          audioCodec: "aac"
+        }
+      };
+    }
+  };
+  const artifacts = {
+    async kind() { return "missing"; },
+    async exists() { return false; },
+    async remove() {}
+  };
+  const media = new MediaApplicationService({
+    engine: mediaEngine,
+    history,
+    executions: new InMemoryMediaExecutionRepository(),
+    artifacts,
+    clock: () => now,
+    idGenerator: () => "unused-media-id"
+  });
+  const generatedIngestIds = ["ingested-source", "probe-execution"];
+  const ingest = new LocalSourceIngestService({
+    media,
+    history,
+    idGenerator: () => generatedIngestIds.shift() ?? "unexpected-ingest-id"
+  });
+  const transcriptionEngine = new FakeTranscriptionEngine(async () => result("vertical"));
+  const transcriptionService = new TranscriptionApplicationService({
+    engine: transcriptionEngine,
+    history,
+    clock: () => now,
+    idGenerator: () => "vertical-transcription"
+  });
+
+  const ingested = await ingest.ingest({ uri: originalUri, displayName: "Original.mov" });
+  const transcribed = await transcriptionService.transcribeSource({ sourceId: ingested.source.id });
+
+  assert.equal(history.current.sources.length, 1);
+  assert.equal(history.current.sourceTranscripts.length, 1);
+  assert.equal(history.current.sources[0].uri, originalUri);
+  assert.equal(history.current.sourceTranscripts[0].sourceId, "ingested-source");
+  assert.equal(transcriptionEngine.calls[0].request.inputUri, originalUri);
+  assert.equal(history.current.history.revision, 2);
+  assert.deepEqual(history.entries.map((entry) => entry.command.type), ["source.add", "transcript.set"]);
+  const withoutTranscript = history.undo();
+  assert.equal(withoutTranscript.sources.length, 1);
+  assert.deepEqual(withoutTranscript.sourceTranscripts, []);
+  assert.deepEqual(history.redo().sourceTranscripts, [transcribed.sourceTranscript]);
+});
