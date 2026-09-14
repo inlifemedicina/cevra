@@ -63,6 +63,28 @@ function alignmentStage(inputTranscriptDigest, overrides = {}) {
   };
 }
 
+function speakerAttributionStage(inputTranscriptDigest, overrides = {}) {
+  return {
+    kind: "speaker-attribution",
+    executionId: "speaker-attribution-1",
+    engineId: "speaker-engine",
+    engineVersion: "1.0.0",
+    engineApiVersion: "1",
+    inputTranscriptDigest,
+    createdAt: fixedTime,
+    ...overrides
+  };
+}
+
+function manualCorrectionStage(inputTranscriptDigest, overrides = {}) {
+  return {
+    kind: "manual-correction",
+    inputTranscriptDigest,
+    createdAt: fixedTime,
+    ...overrides
+  };
+}
+
 function wordTranscript(overrides = {}) {
   return {
     language: "pt",
@@ -587,7 +609,9 @@ test("transcript.set creates, replaces semantics, updates same-digest metadata, 
     expectedCurrentTranscriptDigest: metadataUpdate.transcriptDigest
   });
   assert.equal(promoted.history.revision, 4);
+  assert.notEqual(aligned.transcriptDigest, metadataUpdate.transcriptDigest);
   assert.equal(promoted.sourceTranscripts[0].wordTiming, "aligned");
+  assert.equal(promoted.sourceTranscripts[0].provenance.stages.at(-1).inputTranscriptDigest, metadataUpdate.transcriptDigest);
 
   const multiStageMetadata = clone(aligned);
   multiStageMetadata.provenance.stages = [
@@ -605,6 +629,46 @@ test("transcript.set creates, replaces semantics, updates same-digest metadata, 
   assert.equal(multiStageUpdated.sourceTranscripts[0].provenance.stages[1].inputTranscriptDigest, dummyDigest);
   assert.equal(multiStageUpdated.sourceTranscripts[0].provenance.stages[2].inputTranscriptDigest, aligned.transcriptDigest);
   assert.equal(history.entries.length, 5);
+});
+
+test("same-digest metadata updates preserve historical consumer inputs for every consumer stage", () => {
+  const consumers = [
+    ["alignment", createSourceTranscript({
+      sourceId: "source-1",
+      wordTiming: "aligned",
+      speakerState: "none",
+      transcript: wordTranscript(),
+      provenance: { stages: [transcriptionStage(), alignmentStage(dummyDigest)] }
+    })],
+    ["speaker-attribution", sourceTranscript({
+      provenance: { stages: [transcriptionStage(), speakerAttributionStage(dummyDigest)] }
+    })],
+    ["manual-correction", sourceTranscript({
+      provenance: { stages: [transcriptionStage(), manualCorrectionStage(dummyDigest)] }
+    })]
+  ];
+
+  for (const [kind, current] of consumers) {
+    let sequence = 0;
+    const history = new ProjectHistory(v2ProjectWith(current), {
+      idGenerator: () => `${kind}-${++sequence}`,
+      clock: () => fixedTime
+    });
+    const candidate = clone(current);
+    candidate.extensions = { review: `updated-${kind}` };
+
+    const updated = history.commit({
+      type: "transcript.set",
+      transcript: candidate,
+      expectedCurrentTranscriptDigest: current.transcriptDigest
+    });
+
+    assert.equal(updated.history.revision, 1, kind);
+    assert.equal(updated.sourceTranscripts[0].transcriptDigest, current.transcriptDigest, kind);
+    assert.equal(updated.sourceTranscripts[0].provenance.stages.at(-1).inputTranscriptDigest, dummyDigest, kind);
+    assert.deepEqual(updated.sourceTranscripts[0].extensions, candidate.extensions, kind);
+    assert.equal(history.entries.length, 1, kind);
+  }
 });
 
 test("transcript.remove keeps its source while source.remove still cascades, with history round-trip", () => {
@@ -674,6 +738,12 @@ test("every failed transcript command has a stable code and preserves an existin
     transcript: wordTranscript(),
     provenance: { stages: [transcriptionStage(), alignmentStage(dummyDigest)] }
   });
+  const initialSpeakerConsumer = sourceTranscript({
+    provenance: { stages: [transcriptionStage(), speakerAttributionStage(dummyDigest)] }
+  });
+  const initialManualConsumer = sourceTranscript({
+    provenance: { stages: [transcriptionStage(), manualCorrectionStage(dummyDigest)] }
+  });
   const imageProject = () => {
     const project = createEmptyProject({ id: "image-project", now: fixedTime });
     project.sources.push(source("image", "image"));
@@ -691,6 +761,9 @@ test("every failed transcript command has a stable code and preserves an existin
     ["unconditional replacement", projectWithTranscript, { type: "transcript.set", transcript: changed }, "PROJECT_TRANSCRIPT_ALREADY_EXISTS"],
     ["stale replacement guard", projectWithTranscript, { type: "transcript.set", transcript: changed, expectedCurrentTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_STALE"],
     ["stale create guard", projectWithoutTranscript, { type: "transcript.set", transcript: sourceTranscript(), expectedCurrentTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_STALE"],
+    ["initial alignment consumer", projectWithoutTranscript, { type: "transcript.set", transcript: staleConsumer }, "PROJECT_TRANSCRIPT_STALE"],
+    ["initial speaker consumer", projectWithoutTranscript, { type: "transcript.set", transcript: initialSpeakerConsumer }, "PROJECT_TRANSCRIPT_STALE"],
+    ["initial manual consumer", projectWithoutTranscript, { type: "transcript.set", transcript: initialManualConsumer }, "PROJECT_TRANSCRIPT_STALE"],
     ["stale final consumer", projectWithTranscript, { type: "transcript.set", transcript: staleConsumer, expectedCurrentTranscriptDigest: current.transcriptDigest }, "PROJECT_TRANSCRIPT_STALE"],
     ["exact no-op", projectWithTranscript, { type: "transcript.set", transcript: reorderedNoOp, expectedCurrentTranscriptDigest: current.transcriptDigest }, "PROJECT_TRANSCRIPT_NO_OP"],
     ["unknown remove source", projectWithoutTranscript, { type: "transcript.remove", sourceId: "missing", expectedTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_SOURCE_UNKNOWN"],

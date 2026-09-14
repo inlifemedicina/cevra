@@ -1,4 +1,4 @@
-import type { CaptionCue, EditCommand, ProjectIR, SourceTranscript, StyleState, TimelineClip } from "./types.js";
+import type { CaptionCue, EditCommand, ProjectIR, SourceTranscript, StyleState, TimelineClip, TranscriptProvenanceStage } from "./types.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
 import { assertValidProjectIR, validateProjectIR } from "./validation.js";
 
@@ -134,9 +134,13 @@ function applyTranscriptSet(project: ProjectIR, command: Extract<EditCommand, { 
     throwTranscriptError("PROJECT_TRANSCRIPT_INVALID", `Transcript candidate is invalid:\n${detail}`);
   }
 
+  const finalStage = candidate.provenance.stages[candidate.provenance.stages.length - 1];
   if (!current) {
     if (command.expectedCurrentTranscriptDigest !== undefined) {
       throwTranscriptError("PROJECT_TRANSCRIPT_STALE", "Expected transcript no longer exists.");
+    }
+    if (isConsumingTranscriptStage(finalStage)) {
+      throwTranscriptError("PROJECT_TRANSCRIPT_STALE", "Transcript candidate has no current canonical input to consume.");
     }
     project.sourceTranscripts = candidateTranscripts;
     return;
@@ -152,8 +156,9 @@ function applyTranscriptSet(project: ProjectIR, command: Extract<EditCommand, { 
     throwTranscriptError("PROJECT_TRANSCRIPT_NO_OP", "Transcript candidate is identical to the current aggregate.");
   }
 
-  const finalStage = candidate.provenance.stages[candidate.provenance.stages.length - 1];
-  if (finalStage && finalStage.kind !== "transcription" && finalStage.kind !== "migration" && finalStage.inputTranscriptDigest !== current.transcriptDigest) {
+  if (candidate.transcriptDigest !== current.transcriptDigest
+    && isConsumingTranscriptStage(finalStage)
+    && finalStage.inputTranscriptDigest !== current.transcriptDigest) {
     throwTranscriptError("PROJECT_TRANSCRIPT_STALE", "Transcript candidate was produced from a stale canonical transcript.");
   }
   project.sourceTranscripts = candidateTranscripts;
@@ -175,6 +180,10 @@ function applyTranscriptRemove(project: ProjectIR, command: Extract<EditCommand,
 
 function throwTranscriptError(code: ProjectCommandErrorCode, message: string): never {
   throw new ProjectCommandError(code, message);
+}
+
+function isConsumingTranscriptStage(stage: TranscriptProvenanceStage | undefined): stage is Extract<TranscriptProvenanceStage, { inputTranscriptDigest: string }> {
+  return stage?.kind === "alignment" || stage?.kind === "speaker-attribution" || stage?.kind === "manual-correction";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
