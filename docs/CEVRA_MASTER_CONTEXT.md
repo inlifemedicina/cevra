@@ -1104,11 +1104,11 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After the post-transcription canon merge:
+After the accepted multi-source transcript semantics merge:
 
-`3098274f8a30a85e4b83e5524fc70664adaa412f`
+`3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9`
 
-This is the Git-authoritative current `main` and the base for the active architecture-design branch.
+This is the Git-authoritative current `main` and the base for the active implementation-proposal branch.
 
 ## 24.2 Important merged milestones
 
@@ -1120,14 +1120,15 @@ This is the Git-authoritative current `main` and the base for the active archite
 | Local Source Ingest V1 | #10 | `aa92402cf49cc45f55c961508f66c262a02ce075` | CLOSED |
 | Local Transcription Engine V1 | #11 | `d780de370b6a32fa010dedeeb5344bfe12666157` | CLOSED |
 | Post-transcription canon / ADR 0013 | #12 | `3098274f8a30a85e4b83e5524fc70664adaa412f` | CLOSED |
+| Multi-source transcript semantics / ADR 0014 | #13 | `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9` | CLOSED |
 
 ## 24.3 Active work
 
 | Branch | Status |
 |---|---|
-| `arch/multi-source-transcript-semantics` | ADR 0014 accepted after remediation; implementation not started |
+| `arch/project-ir-v2-transcript-proposal` | Bounded Project IR v2 transcript implementation proposal complete; awaiting review |
 
-No feature implementation branch is active. The next implementation slice has not started.
+No feature implementation branch is active. Project IR v2 implementation code has not started.
 
 ---
 
@@ -1160,6 +1161,8 @@ No feature implementation branch is active. The next implementation slice has no
 - **RESEARCH:** the 2026-09-14 AI-editing demo was identified at profile/campaign level; its technical stack remains unverified, and its behavior is retained as a clean-room visual benchmark.
 - **IMPLEMENTED/CLOSED:** PR #12 merged the post-transcription canon and ADR 0013 at `3098274f8a30a85e4b83e5524fc70664adaa412f`; both temporary documentation branches were removed after comparison and repository hygiene passed.
 - **ACCEPTED:** independent adversarial review of ADR 0014 completed without changing its central architecture. Deterministic migration, `transcriptDigest` identity, stale alignment/reference protection, `TranscriptState` compatibility, speaker-state predicates and typed migration quarantine are closed. No Project IR or persistence implementation has started.
+- **IMPLEMENTED/CLOSED:** PR #13 merged accepted ADR 0014 at `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9`; its temporary architecture branch was removed and repository hygiene passed.
+- **PROPOSAL COMPLETE / AWAITING REVIEW:** the bounded Project IR v2 transcript implementation plan closes the proposed type model, digest canonicalization, provenance, quarantine, deterministic v1-to-v2 migration, validation, command semantics, source-removal cascade and safe slice division. No implementation code has started.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1169,7 +1172,7 @@ No feature implementation branch is active. The next implementation slice has no
 Do not guess these in future chats:
 
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
-2. exact Project IR v2 implementation details for the source-scoped multi-source transcript model accepted in ADR 0014, including digest canonicalization and migration-quarantine resolution;
+2. review and approval of the bounded Project IR v2 implementation plan before Slice A begins; the proposal resolves digest canonicalization and migration-quarantine semantics but is not implementation;
 3. WhisperX/forced-alignment adapter, model and integration details; provider-neutral alignment status semantics are closed by ADR 0014;
 4. final transcript cache schema, key and invalidation policy;
 5. final transcription model default for production quality;
@@ -1201,10 +1204,10 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Prepare a bounded implementation proposal for accepted ADR 0014 and resolve its remaining implementation-level questions before code.
+1. Review the bounded Project IR v2 transcript implementation proposal against accepted ADR 0014.
 2. Do not reopen the closed Local Transcription Engine V1.
-3. Do not start transcript persistence before the bounded Project IR v2 implementation proposal resolves digest canonicalization, deterministic migration and quarantine resolution.
-4. Select one small implementation slice from alignment, transcript cache or multi-source Project IR mapping after its own prerequisites are satisfied.
+3. After proposal approval, implement only Slice A: Project IR v2 schema, digest, validation, deterministic migration, factory, source-removal cascade and package/history compatibility tests.
+4. Keep transcript commands/history as Slice B and complete them before an application persistence service.
 5. Do not combine those three areas automatically into one branch or PR.
 6. Preserve the EDVID baseline and dependency-driven implementation order.
 7. Apply the quality/performance policy to future preview, render, composition and export work.
