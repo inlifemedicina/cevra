@@ -821,7 +821,7 @@ The transcription FFmpeg inventory must remain separate from the sealed Media Ru
 
 ---
 
-# 16. Transcript persistence and multi-source semantics — ACCEPTED / SLICE A CLOSED / SLICE B IN DEVELOPMENT
+# 16. Transcript persistence and multi-source semantics — SLICES A/B CLOSED / APPLICATION PERSISTENCE V1 IN DEVELOPMENT
 
 Project IR v2 stores zero or one canonical source-scoped `SourceTranscript` per eligible audio/video source. The public `TranscriptState` remains structurally unchanged as the nested transcript payload and as the Local Transcription Engine V1 result contract.
 
@@ -846,9 +846,11 @@ Implemented and closed in Slice A:
 - ProjectHistory and Project Store v1-package/snapshot/cursor/round-trip compatibility without changing package format or `packages/project-store/src/codec.ts`;
 - `NOTICE` and `THIRD_PARTY_LICENSES.md` provenance/licensing for the direct MIT dependency.
 
-Slice B is **IN DEVELOPMENT** on `feat/project-ir-v2-transcript-commands`, created from exact base `edb98184c144ea1f8b7b834ebd6a427198e5a68f`. It implements whole-aggregate `transcript.set`, guarded `transcript.remove`, optimistic digest concurrency, final consuming-stage provenance guards, eight stable `ProjectCommandError` codes and transactional `ProjectHistory.commit` ordering that preserves redo and all observable history state after any failed command. The consuming-stage guard rejects an initial consumer without a canonical predecessor and, for an existing transcript, checks `inputTranscriptDigest` only when semantic identity changes; same-digest metadata updates preserve historical predecessor provenance. Characterization covers successful create/replace/remove, all three consumer kinds, same-digest metadata changes, exact no-op, migration-only timing, quarantine separation, old/new command failures, clock/ID failures and the accepted quarantine→canonical→quarantine snapshot boundary.
+Slice B merged in PR #16 at `900112f88e85a59ae57541a2f2faf5997ad8f908`, is **CLOSED**, and `feat/project-ir-v2-transcript-commands` was removed locally and remotely. It implements whole-aggregate `transcript.set`, guarded `transcript.remove`, optimistic digest concurrency, final consuming-stage provenance guards, eight stable `ProjectCommandError` codes and transactional `ProjectHistory.commit` ordering that preserves redo and all observable history state after any failed command. The consuming-stage guard rejects an initial consumer without a canonical predecessor and, for an existing transcript, checks `inputTranscriptDigest` only when semantic identity changes; same-digest metadata updates preserve historical predecessor provenance.
 
-Current active-branch validation: clean lockfile install and all workspace builds passed; 190 Node/TypeScript tests passed, including 40 Project IR and 5 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites. Application transcript persistence/orchestration has **not** started.
+Application Transcript Persistence / Orchestration V1 is **IN DEVELOPMENT** on `feat/application-transcript-persistence`, created from exact main `900112f88e85a59ae57541a2f2faf5997ad8f908`. Its provider-neutral application flow is `authorized source → TranscriptionEngineAdapter → validated TranscriptionResult → createSourceTranscript → transcript.set → ProjectHistory`. It adds no transcription execution repository or cache: failed/cancelled candidate generation leaves Project IR unchanged, while promoted provenance retains execution, engine, model and optional source-checksum identity. The application rejects project changes during execution, supports first transcription and guarded retranscription, normalizes no-speech timing to `none`, and maps exact transcript no-op to `TRANSCRIPTION_APP_COMMIT_FAILED` without history mutation.
+
+Boundary hardening on the current branch tip preserves raw engine numeric values through canonical `createSourceTranscript` validation (including rejection of negative zero), while application language normalization accepts only the literal runtime strings `auto`, `pt` and `en` without coercion. Defensive cloning remains after canonical validation for the returned outcome. Current active-branch validation: all workspace builds passed; 207 Node/TypeScript tests passed, including 48 Application, 40 Project IR and 5 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites. The next objective after this slice is the first user-facing desktop vertical flow over the programmatic ingest→transcribe→canonical-project foundation.
 
 ---
 
@@ -1121,11 +1123,11 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After Project IR v2 transcript Slice A merged in PR #15:
+After Project IR v2 transcript Slice B merged in PR #16:
 
-`edb98184c144ea1f8b7b834ebd6a427198e5a68f`
+`900112f88e85a59ae57541a2f2faf5997ad8f908`
 
-This is the Git-authoritative `main` immediately before Slice B and the exact base of `feat/project-ir-v2-transcript-commands`.
+This is the Git-authoritative `main` immediately before Application Transcript Persistence / Orchestration V1 and the exact base of `feat/application-transcript-persistence`.
 
 ## 24.2 Important merged milestones
 
@@ -1140,14 +1142,15 @@ This is the Git-authoritative `main` immediately before Slice B and the exact ba
 | Multi-source transcript semantics / ADR 0014 | #13 | `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9` | CLOSED |
 | Project IR v2 transcript implementation proposal | #14 | `525add125d040f7d0071c70d09fd2ab392fc0b8b` | CLOSED |
 | Project IR v2 transcript core — Slice A | #15 | `edb98184c144ea1f8b7b834ebd6a427198e5a68f` | CLOSED |
+| Project IR v2 transcript commands — Slice B | #16 | `900112f88e85a59ae57541a2f2faf5997ad8f908` | CLOSED |
 
 ## 24.3 Active work
 
 | Branch | Status |
 |---|---|
-| `feat/project-ir-v2-transcript-commands` | Slice B — transcript set/remove commands, stable command errors, optimistic digest guards and failed-command redo preservation; IN DEVELOPMENT |
+| `feat/application-transcript-persistence` | Application Transcript Persistence / Orchestration V1 — authorized source transcription through the provider-neutral engine contract into canonical Project IR/history; IN DEVELOPMENT |
 
-The proposal branch `arch/project-ir-v2-transcript-proposal` and Slice A branch `feat/project-ir-v2-transcript-core` were removed after their merges. Application transcript persistence has not started.
+The proposal branch and both Project IR v2 Slice A/B branches were removed after their merges. Application transcript persistence is active only on the branch above.
 
 ---
 
@@ -1184,7 +1187,8 @@ The proposal branch `arch/project-ir-v2-transcript-proposal` and Slice A branch 
 - **PROPOSAL FINALIZED / IMPLEMENTATION NOT STARTED:** review preserved the central Project IR v2 design and incorporated two final hardenings: the SHA-256 primitive is an exact pinned audited external dependency while CEVRA retains canonicalization/version authority; and the v1 migration validator freezes historical acceptance while incompatible raw legacy transcript JSON is preserved in quarantine. No implementation code has started.
 - **IMPLEMENTED/CLOSED:** PR #14 merged the bounded Project IR v2 transcript implementation proposal at `525add125d040f7d0071c70d09fd2ab392fc0b8b`; `arch/project-ir-v2-transcript-proposal` was removed.
 - **IMPLEMENTED/CLOSED:** Project IR v2 transcript core Slice A merged in PR #15 at `edb98184c144ea1f8b7b834ebd6a427198e5a68f`. Schema v2, explicit v1 compatibility, source-scoped transcript digest/validation/migration/quarantine, factory, source-removal cascade and package/history compatibility are implemented. Quarantine evidence remains historical across later source changes. `feat/project-ir-v2-transcript-core` was removed locally and remotely.
-- **IN DEVELOPMENT:** Slice B started on `feat/project-ir-v2-transcript-commands` from exact base `edb98184c144ea1f8b7b834ebd6a427198e5a68f`. Whole-aggregate set/remove commands, stable transcript command errors, digest/provenance concurrency guards and failure-safe redo preservation are implemented. Consumer-promotion hardening rejects consumer-first creation, protects semantic-changing promotion against stale inputs and permits same-digest metadata updates to retain historical consumer inputs. Validation has 40 Project IR tests, 5 Project Store tests, 190 total Node/TypeScript tests and 22 Python tests passing. Application persistence/orchestration remains unstarted.
+- **IMPLEMENTED/CLOSED:** Project IR v2 transcript command Slice B merged in PR #16 at `900112f88e85a59ae57541a2f2faf5997ad8f908`. Whole-aggregate set/remove commands, stable transcript command errors, digest/provenance concurrency guards, consumer-promotion hardening and failure-safe redo preservation are implemented. `feat/project-ir-v2-transcript-commands` was removed locally and remotely.
+- **IN DEVELOPMENT:** Application Transcript Persistence / Orchestration V1 started on `feat/application-transcript-persistence` from exact base `900112f88e85a59ae57541a2f2faf5997ad8f908`; boundary hardening on the current branch tip succeeds pre-hardening HEAD `d92b5df07f3a3abdb5f027d6bdb07d1faad7ef40`. The application service authorizes a current Project IR source, invokes `TranscriptionEngineAdapter`, performs non-coercing runtime boundary checks, passes raw transcript values into canonical `createSourceTranscript` validation, and promotes only through guarded `transcript.set` and `ProjectHistory`. Defensive outcome cloning occurs only after canonical validation. No execution repository, cache, UI or engine change is introduced. Validation has 48 Application tests, 40 Project IR tests, 5 Project Store tests, 207 total Node/TypeScript tests and 22 Python tests passing.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1226,14 +1230,13 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete and independently review Slice B on `feat/project-ir-v2-transcript-commands` without expanding into application persistence.
-2. Do not reopen the closed Local Transcription Engine V1.
-3. Preserve the closed Slice A boundary: Project IR v2 schema, digest, validation, deterministic migration, factory, source-removal cascade and package/history compatibility tests.
-4. Close Slice B before beginning an application transcript persistence service.
-5. Do not combine those three areas automatically into one branch or PR.
-6. Preserve the EDVID baseline and dependency-driven implementation order.
-7. Apply the quality/performance policy to future preview, render, composition and export work.
-8. Keep this document updated after every material decision, merge or completed research finding.
+1. Complete and independently review Application Transcript Persistence / Orchestration V1 on `feat/application-transcript-persistence` without adding cache, alignment, UI or an execution repository.
+2. Do not reopen the closed Local Transcription Engine V1 or Project IR v2 Slices A/B.
+3. Preserve the provider-neutral flow from authorized source through `TranscriptionEngineAdapter` and guarded Project History promotion.
+4. After this slice closes, implement the first user-facing desktop vertical slice over ingest and canonical transcription.
+5. Preserve the EDVID baseline and dependency-driven implementation order.
+6. Apply the quality/performance policy to future preview, render, composition and export work.
+7. Keep this document updated after every material decision, merge or completed research finding.
 
 ---
 
