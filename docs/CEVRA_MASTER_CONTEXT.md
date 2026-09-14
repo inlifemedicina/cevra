@@ -821,9 +821,9 @@ The transcription FFmpeg inventory must remain separate from the sealed Media Ru
 
 ---
 
-# 16. Transcript persistence and multi-source semantics — ACCEPTED / SLICE A IN DEVELOPMENT
+# 16. Transcript persistence and multi-source semantics — ACCEPTED / SLICE A CLOSED / SLICE B IN DEVELOPMENT
 
-Current Project IR has one global `TranscriptState` and no direct `sourceId` on the transcript object.
+Project IR v2 stores zero or one canonical source-scoped `SourceTranscript` per eligible audio/video source. The public `TranscriptState` remains structurally unchanged as the nested transcript payload and as the Local Transcription Engine V1 result contract.
 
 CEVRA Vids must support multiple source assets.
 
@@ -833,9 +833,9 @@ ADR 0014 is **Accepted** after independent adversarial review and remediation. I
 
 The central architecture remains unchanged. The accepted refinements require pure deterministic document-local migration, deterministic `transcriptDigest` state identity, digest-bound references and asynchronous promotion, continued public compatibility of `TranscriptState`, closed speaker-coverage semantics, and a typed bounded migration quarantine.
 
-PR #14 merged the bounded implementation proposal at `525add125d040f7d0071c70d09fd2ab392fc0b8b`; the proposal is **CLOSED** and its temporary branch was removed. Slice A is **IN DEVELOPMENT** on `feat/project-ir-v2-transcript-core`, created from that exact `main`.
+PR #14 merged the bounded implementation proposal at `525add125d040f7d0071c70d09fd2ab392fc0b8b`; the proposal is **CLOSED** and its temporary branch was removed. Slice A merged in PR #15 at `edb98184c144ea1f8b7b834ebd6a427198e5a68f`, is **CLOSED**, and `feat/project-ir-v2-transcript-core` was removed locally and remotely. That merge SHA is the exact `main` base before Slice B.
 
-Implemented on the active Slice A branch:
+Implemented and closed in Slice A:
 
 - Project IR schema v2 with explicit v1 types and unchanged public `TranscriptState`;
 - source-scoped composed `SourceTranscript` aggregates;
@@ -846,7 +846,9 @@ Implemented on the active Slice A branch:
 - ProjectHistory and Project Store v1-package/snapshot/cursor/round-trip compatibility without changing package format or `packages/project-store/src/codec.ts`;
 - `NOTICE` and `THIRD_PARTY_LICENSES.md` provenance/licensing for the direct MIT dependency.
 
-Current active-branch validation: package-lock/install verification passed; all workspace builds passed; 180 Node/TypeScript tests passed, including 31 Project IR and 4 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites. Slice B (`transcript.set`, `transcript.remove`, typed transcript command errors and general failed-command redo preservation) has **not** started.
+Slice B is **IN DEVELOPMENT** on `feat/project-ir-v2-transcript-commands`, created from exact base `edb98184c144ea1f8b7b834ebd6a427198e5a68f`. It implements whole-aggregate `transcript.set`, guarded `transcript.remove`, optimistic digest concurrency, final consuming-stage provenance guards, eight stable `ProjectCommandError` codes and transactional `ProjectHistory.commit` ordering that preserves redo and all observable history state after any failed command. Characterization covers successful create/replace/remove, same-digest metadata changes, exact no-op, migration-only timing, quarantine separation, old/new command failures, clock/ID failures and the accepted quarantine→canonical→quarantine snapshot boundary.
+
+Current active-branch validation: clean lockfile install and all workspace builds passed; 189 Node/TypeScript tests passed, including 39 Project IR and 5 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites. Application transcript persistence/orchestration has **not** started.
 
 ---
 
@@ -1119,11 +1121,11 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After the Project IR v2 transcript implementation proposal merge:
+After Project IR v2 transcript Slice A merged in PR #15:
 
-`525add125d040f7d0071c70d09fd2ab392fc0b8b`
+`edb98184c144ea1f8b7b834ebd6a427198e5a68f`
 
-This is the Git-authoritative `main` immediately before Slice A and the exact base of `feat/project-ir-v2-transcript-core`.
+This is the Git-authoritative `main` immediately before Slice B and the exact base of `feat/project-ir-v2-transcript-commands`.
 
 ## 24.2 Important merged milestones
 
@@ -1137,14 +1139,15 @@ This is the Git-authoritative `main` immediately before Slice A and the exact ba
 | Post-transcription canon / ADR 0013 | #12 | `3098274f8a30a85e4b83e5524fc70664adaa412f` | CLOSED |
 | Multi-source transcript semantics / ADR 0014 | #13 | `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9` | CLOSED |
 | Project IR v2 transcript implementation proposal | #14 | `525add125d040f7d0071c70d09fd2ab392fc0b8b` | CLOSED |
+| Project IR v2 transcript core — Slice A | #15 | `edb98184c144ea1f8b7b834ebd6a427198e5a68f` | CLOSED |
 
 ## 24.3 Active work
 
 | Branch | Status |
 |---|---|
-| `feat/project-ir-v2-transcript-core` | Slice A — Project IR v2 schema, digest, validation, deterministic migration, source-removal cascade and package/history compatibility; IN DEVELOPMENT |
+| `feat/project-ir-v2-transcript-commands` | Slice B — transcript set/remove commands, stable command errors, optimistic digest guards and failed-command redo preservation; IN DEVELOPMENT |
 
-The proposal branch `arch/project-ir-v2-transcript-proposal` was removed after PR #14 merged. Slice B has not started.
+The proposal branch `arch/project-ir-v2-transcript-proposal` and Slice A branch `feat/project-ir-v2-transcript-core` were removed after their merges. Application transcript persistence has not started.
 
 ---
 
@@ -1180,7 +1183,8 @@ The proposal branch `arch/project-ir-v2-transcript-proposal` was removed after P
 - **IMPLEMENTED/CLOSED:** PR #13 merged accepted ADR 0014 at `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9`; its temporary architecture branch was removed and repository hygiene passed.
 - **PROPOSAL FINALIZED / IMPLEMENTATION NOT STARTED:** review preserved the central Project IR v2 design and incorporated two final hardenings: the SHA-256 primitive is an exact pinned audited external dependency while CEVRA retains canonicalization/version authority; and the v1 migration validator freezes historical acceptance while incompatible raw legacy transcript JSON is preserved in quarantine. No implementation code has started.
 - **IMPLEMENTED/CLOSED:** PR #14 merged the bounded Project IR v2 transcript implementation proposal at `525add125d040f7d0071c70d09fd2ab392fc0b8b`; `arch/project-ir-v2-transcript-proposal` was removed.
-- **IN DEVELOPMENT:** Slice A started on `feat/project-ir-v2-transcript-core` from exact base `525add125d040f7d0071c70d09fd2ab392fc0b8b`. The active branch implements schema v2, explicit v1 compatibility, source-scoped transcript digest/validation/migration/quarantine, factory, source-removal cascade and package/history compatibility. Quarantine evidence is preserved historically across later source changes without becoming canonical ownership. `@noble/hashes@2.4.0` is exact, MIT, zero-runtime-dependency and limited to the SHA-256 primitive; provenance files are updated. Full workspace build, 180 Node tests and 22 Python tests pass. Slice B is not started.
+- **IMPLEMENTED/CLOSED:** Project IR v2 transcript core Slice A merged in PR #15 at `edb98184c144ea1f8b7b834ebd6a427198e5a68f`. Schema v2, explicit v1 compatibility, source-scoped transcript digest/validation/migration/quarantine, factory, source-removal cascade and package/history compatibility are implemented. Quarantine evidence remains historical across later source changes. `feat/project-ir-v2-transcript-core` was removed locally and remotely.
+- **IN DEVELOPMENT:** Slice B started on `feat/project-ir-v2-transcript-commands` from exact base `edb98184c144ea1f8b7b834ebd6a427198e5a68f`. Whole-aggregate set/remove commands, stable transcript command errors, digest/provenance concurrency guards and failure-safe redo preservation are implemented with 39 Project IR tests, 5 Project Store tests, 189 total Node/TypeScript tests and 22 Python tests passing. Application persistence/orchestration remains unstarted.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1222,10 +1226,10 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete, review and merge Slice A from `feat/project-ir-v2-transcript-core` without expanding into Slice B.
+1. Complete and independently review Slice B on `feat/project-ir-v2-transcript-commands` without expanding into application persistence.
 2. Do not reopen the closed Local Transcription Engine V1.
-3. Preserve the implemented Slice A boundary: Project IR v2 schema, digest, validation, deterministic migration, factory, source-removal cascade and package/history compatibility tests.
-4. After Slice A closes, implement transcript commands/history as Slice B and complete them before an application persistence service.
+3. Preserve the closed Slice A boundary: Project IR v2 schema, digest, validation, deterministic migration, factory, source-removal cascade and package/history compatibility tests.
+4. Close Slice B before beginning an application transcript persistence service.
 5. Do not combine those three areas automatically into one branch or PR.
 6. Preserve the EDVID baseline and dependency-driven implementation order.
 7. Apply the quality/performance policy to future preview, render, composition and export work.

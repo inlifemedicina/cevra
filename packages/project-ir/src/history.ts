@@ -97,12 +97,6 @@ export class ProjectHistory {
   }
 
   commit(command: EditCommand, actor: JournalActor = { type: "user" }): ProjectIR {
-    if (this.canRedo) {
-      this.snapshotsInternal = this.snapshotsInternal.slice(0, this.cursor + 1);
-      const maxRevision = this.snapshotsInternal[this.snapshotsInternal.length - 1]!.revision;
-      this.entriesInternal = this.entriesInternal.filter((entry) => entry.revision <= maxRevision);
-    }
-
     const before = this.current;
     const now = this.clock();
     const next = applyCommand(before, command, now);
@@ -122,9 +116,17 @@ export class ProjectHistory {
       createdAt: now,
       snapshotId
     };
-    this.entriesInternal.push(entry);
-    this.snapshotsInternal.push({ id: snapshotId, revision, createdAt: now, project: clone(validated) });
-    this.cursor = this.snapshotsInternal.length - 1;
+    const snapshot: ProjectSnapshot = { id: snapshotId, revision, createdAt: now, project: clone(validated) };
+    const retainedSnapshots = this.canRedo ? this.snapshotsInternal.slice(0, this.cursor + 1) : [...this.snapshotsInternal];
+    const retainedEntries = this.canRedo
+      ? this.entriesInternal.filter((item) => item.revision <= retainedSnapshots[retainedSnapshots.length - 1]!.revision)
+      : [...this.entriesInternal];
+    const committedEntries = [...retainedEntries, entry];
+    const committedSnapshots = [...retainedSnapshots, snapshot];
+
+    this.entriesInternal = committedEntries;
+    this.snapshotsInternal = committedSnapshots;
+    this.cursor = committedSnapshots.length - 1;
     return this.current;
   }
 

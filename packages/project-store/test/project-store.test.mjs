@@ -181,3 +181,82 @@ test("v1 quarantine evidence survives a v2 source mutation and package round-tri
   assert.deepEqual(reopened.current.extensions["cevra.migration.v1UnassignedTranscript"], historicalQuarantine);
   assert.deepEqual(reopened.current.extensions["cevra.migration.v1UnassignedTranscript"].payload, rawLegacy);
 });
+
+test("v1 snapshots preserve the accepted quarantine canonical quarantine history boundary", () => {
+  const rawLegacy = {
+    language: "pt",
+    words: [{ id: "w1", text: "fronteira", startMs: 0, endMs: 100 }],
+    segments: [{ id: "s1", text: "fronteira", startMs: 0, endMs: 100, wordIds: ["w1"] }]
+  };
+  const noSourceSnapshot = legacyProject({
+    name: "No source",
+    revision: 0,
+    sources: [],
+    transcript: rawLegacy,
+    headSnapshotId: "snapshot-0"
+  });
+  const canonicalSnapshot = legacyProject({
+    name: "One source",
+    revision: 1,
+    sources: [legacySource("source-a")],
+    transcript: rawLegacy,
+    headEntryId: "entry-1",
+    headSnapshotId: "snapshot-1"
+  });
+  const ambiguousSnapshot = legacyProject({
+    name: "Two sources",
+    revision: 2,
+    sources: [legacySource("source-b"), legacySource("source-a")],
+    transcript: rawLegacy,
+    headEntryId: "entry-2",
+    headSnapshotId: "snapshot-2"
+  });
+  const manifest = {
+    format: "cevra-project",
+    formatVersion: 1,
+    projectId: "legacy-project",
+    projectSchemaVersion: 1,
+    activeSnapshotId: "snapshot-1",
+    createdAt: fixedTime,
+    savedAt: fixedTime,
+    defaultLocale: "pt-BR"
+  };
+  const entries = [
+    { id: "entry-1", revision: 1, command: { type: "project.rename", name: "One source" }, actor: { type: "user" }, createdAt: fixedTime, snapshotId: "snapshot-1" },
+    { id: "entry-2", revision: 2, parentEntryId: "entry-1", command: { type: "project.rename", name: "Two sources" }, actor: { type: "user" }, createdAt: fixedTime, snapshotId: "snapshot-2" }
+  ];
+  const serialized = { files: {
+    "manifest.json": JSON.stringify(manifest),
+    "project.json": JSON.stringify(canonicalSnapshot),
+    "history/journal.jsonl": entries.map((entry) => JSON.stringify(entry)).join("\n"),
+    "history/snapshots/snapshot-0.json": JSON.stringify({ id: "snapshot-0", revision: 0, createdAt: fixedTime, project: noSourceSnapshot }),
+    "history/snapshots/snapshot-1.json": JSON.stringify({ id: "snapshot-1", revision: 1, createdAt: fixedTime, project: canonicalSnapshot }),
+    "history/snapshots/snapshot-2.json": JSON.stringify({ id: "snapshot-2", revision: 2, createdAt: fixedTime, project: ambiguousSnapshot })
+  }};
+
+  const history = deserializeProjectPackage(serialized);
+  assert.equal(history.current.sourceTranscripts.length, 1);
+  assert.equal(history.current.extensions["cevra.migration.v1UnassignedTranscript"], undefined);
+
+  const earlier = history.undo();
+  assert.deepStrictEqual(earlier.sourceTranscripts, []);
+  assert.equal(earlier.extensions["cevra.migration.v1UnassignedTranscript"].reason, "no-eligible-source");
+  assert.deepStrictEqual(earlier.extensions["cevra.migration.v1UnassignedTranscript"].payload, rawLegacy);
+
+  const middle = history.redo();
+  assert.equal(middle.sourceTranscripts.length, 1);
+  assert.equal(middle.extensions["cevra.migration.v1UnassignedTranscript"], undefined);
+
+  const later = history.redo();
+  assert.deepStrictEqual(later.sourceTranscripts, []);
+  assert.equal(later.extensions["cevra.migration.v1UnassignedTranscript"].reason, "ambiguous-multiple-sources");
+  assert.deepStrictEqual(later.extensions["cevra.migration.v1UnassignedTranscript"].eligibleSourceIdsAtMigration, ["source-a", "source-b"]);
+  assert.deepStrictEqual(later.extensions["cevra.migration.v1UnassignedTranscript"].payload, rawLegacy);
+
+  history.undo();
+  const reopened = deserializeProjectPackage(serializeProjectPackage(history, fixedTime));
+  assert.equal(reopened.current.sourceTranscripts.length, 1);
+  assert.deepStrictEqual(reopened.undo().extensions["cevra.migration.v1UnassignedTranscript"].payload, rawLegacy);
+  assert.equal(reopened.redo().sourceTranscripts.length, 1);
+  assert.deepStrictEqual(reopened.redo().extensions["cevra.migration.v1UnassignedTranscript"].payload, rawLegacy);
+});

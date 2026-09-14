@@ -5,6 +5,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import {
   CURRENT_SCHEMA_VERSION,
   PROJECT_IR_SCHEMA_VERSION_V1,
+  ProjectCommandError,
   ProjectHistory,
   V1_UNASSIGNED_TRANSCRIPT_EXTENSION,
   computeTranscriptDigest,
@@ -49,6 +50,19 @@ function transcriptionStage(overrides = {}) {
   };
 }
 
+function alignmentStage(inputTranscriptDigest, overrides = {}) {
+  return {
+    kind: "alignment",
+    executionId: "alignment-1",
+    engineId: "alignment-engine",
+    engineVersion: "1.0.0",
+    engineApiVersion: "1",
+    inputTranscriptDigest,
+    createdAt: fixedTime,
+    ...overrides
+  };
+}
+
 function wordTranscript(overrides = {}) {
   return {
     language: "pt",
@@ -83,6 +97,46 @@ function clone(value) {
 
 function quarantine(project) {
   return project.extensions[V1_UNASSIGNED_TRANSCRIPT_EXTENSION];
+}
+
+function historyWithRedo(project, prefix = "redo") {
+  let sequence = 0;
+  const history = new ProjectHistory(project, {
+    idGenerator: () => `${prefix}-${++sequence}`,
+    clock: () => fixedTime
+  });
+  history.commit({ type: "project.rename", name: "B" });
+  history.commit({ type: "project.rename", name: "C" });
+  history.undo();
+  return history;
+}
+
+function historyState(history) {
+  return {
+    current: history.current,
+    entries: history.entries,
+    snapshots: history.snapshots,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo
+  };
+}
+
+function captureError(action) {
+  let caught;
+  try {
+    action();
+  } catch (error) {
+    caught = error;
+  }
+  assert.ok(caught instanceof Error, "Expected the command to throw.");
+  return caught;
+}
+
+function assertProjectCommandError(action, code) {
+  const error = captureError(action);
+  assert.equal(error instanceof ProjectCommandError, true);
+  assert.equal(error.name, "ProjectCommandError");
+  assert.equal(error.code, code);
 }
 
 test("factory creates schema v2 with source-scoped transcripts and no legacy transcript", () => {
@@ -477,6 +531,307 @@ test("history archive round-trips v2 snapshots and an active redo cursor", () =>
   assert.equal(restored.canRedo, true);
   assert.equal(restored.redo().project.name, "C");
   assert.equal(restored.restoreSnapshot(restored.snapshots[0].id).project.name, "A");
+});
+
+test("transcript.set creates, replaces semantics, updates same-digest metadata, and accepts a current consumer", () => {
+  let sequence = 0;
+  const project = createEmptyProject({ id: "project-1", now: fixedTime });
+  project.sources.push(source());
+  const history = new ProjectHistory(project, { idGenerator: () => `set-${++sequence}`, clock: () => fixedTime });
+
+  const initial = sourceTranscript({ extensions: { review: "initial" } });
+  const created = history.commit({ type: "transcript.set", transcript: initial });
+  assert.equal(created.history.revision, 1);
+  assert.deepEqual(created.sourceTranscripts, [initial]);
+  assert.equal(history.entries.length, 1);
+  assert.deepEqual(history.undo().sourceTranscripts, []);
+  assert.deepEqual(history.redo().sourceTranscripts, [initial]);
+
+  const semanticReplacement = sourceTranscript({
+    transcript: wordTranscript({
+      words: [{ id: "w1", text: "mudança", startMs: 0, endMs: 500 }],
+      segments: [{ id: "s1", text: "mudança", startMs: 0, endMs: 500, wordIds: ["w1"] }]
+    })
+  });
+  const replaced = history.commit({
+    type: "transcript.set",
+    transcript: semanticReplacement,
+    expectedCurrentTranscriptDigest: initial.transcriptDigest
+  });
+  assert.equal(replaced.history.revision, 2);
+  assert.notEqual(semanticReplacement.transcriptDigest, initial.transcriptDigest);
+  assert.deepEqual(replaced.sourceTranscripts, [semanticReplacement]);
+
+  const metadataUpdate = clone(semanticReplacement);
+  metadataUpdate.provenance.stages[0].executionId = "metadata-refresh";
+  metadataUpdate.extensions = { review: "updated" };
+  const metadataUpdated = history.commit({
+    type: "transcript.set",
+    transcript: metadataUpdate,
+    expectedCurrentTranscriptDigest: semanticReplacement.transcriptDigest
+  });
+  assert.equal(metadataUpdated.history.revision, 3);
+  assert.equal(metadataUpdate.transcriptDigest, semanticReplacement.transcriptDigest);
+  assert.deepEqual(metadataUpdated.sourceTranscripts, [metadataUpdate]);
+
+  const aligned = createSourceTranscript({
+    sourceId: "source-1",
+    wordTiming: "aligned",
+    speakerState: "none",
+    transcript: clone(metadataUpdate.transcript),
+    provenance: { stages: [transcriptionStage(), alignmentStage(metadataUpdate.transcriptDigest)] }
+  });
+  const promoted = history.commit({
+    type: "transcript.set",
+    transcript: aligned,
+    expectedCurrentTranscriptDigest: metadataUpdate.transcriptDigest
+  });
+  assert.equal(promoted.history.revision, 4);
+  assert.equal(promoted.sourceTranscripts[0].wordTiming, "aligned");
+
+  const multiStageMetadata = clone(aligned);
+  multiStageMetadata.provenance.stages = [
+    transcriptionStage(),
+    alignmentStage(dummyDigest),
+    { kind: "manual-correction", inputTranscriptDigest: aligned.transcriptDigest, createdAt: fixedTime }
+  ];
+  const multiStageUpdated = history.commit({
+    type: "transcript.set",
+    transcript: multiStageMetadata,
+    expectedCurrentTranscriptDigest: aligned.transcriptDigest
+  });
+  assert.equal(multiStageUpdated.history.revision, 5);
+  assert.equal(multiStageMetadata.transcriptDigest, aligned.transcriptDigest);
+  assert.equal(multiStageUpdated.sourceTranscripts[0].provenance.stages[1].inputTranscriptDigest, dummyDigest);
+  assert.equal(multiStageUpdated.sourceTranscripts[0].provenance.stages[2].inputTranscriptDigest, aligned.transcriptDigest);
+  assert.equal(history.entries.length, 5);
+});
+
+test("transcript.remove keeps its source while source.remove still cascades, with history round-trip", () => {
+  let sequence = 0;
+  const currentTranscript = sourceTranscript();
+  const project = v2ProjectWith(currentTranscript);
+  const history = new ProjectHistory(project, { idGenerator: () => `remove-transcript-${++sequence}`, clock: () => fixedTime });
+
+  const removedTranscript = history.commit({
+    type: "transcript.remove",
+    sourceId: "source-1",
+    expectedTranscriptDigest: currentTranscript.transcriptDigest
+  });
+  assert.equal(removedTranscript.history.revision, 1);
+  assert.deepEqual(removedTranscript.sources.map(({ id }) => id), ["source-1"]);
+  assert.deepEqual(removedTranscript.sourceTranscripts, []);
+  assert.deepEqual(history.undo().sourceTranscripts, [currentTranscript]);
+  assert.deepEqual(history.redo().sourceTranscripts, []);
+  history.undo();
+
+  const restored = ProjectHistory.fromArchive(history.toArchive(), {
+    idGenerator: () => `restored-${++sequence}`,
+    clock: () => fixedTime
+  });
+  assert.deepEqual(restored.current.sourceTranscripts, [currentTranscript]);
+  assert.equal(restored.canRedo, true);
+  assert.deepEqual(restored.redo().sourceTranscripts, []);
+  assert.deepEqual(restored.current.sources.map(({ id }) => id), ["source-1"]);
+
+  const cascade = new ProjectHistory(project, { idGenerator: () => `cascade-${++sequence}`, clock: () => fixedTime });
+  const removedSource = cascade.commit({ type: "source.remove", sourceId: "source-1" });
+  assert.deepEqual(removedSource.sources, []);
+  assert.deepEqual(removedSource.sourceTranscripts, []);
+});
+
+test("every failed transcript command has a stable code and preserves an existing redo branch", () => {
+  const projectWithoutTranscript = () => {
+    const project = createEmptyProject({ id: "project-1", now: fixedTime });
+    project.sources.push(source());
+    return project;
+  };
+  const projectWithTranscript = () => v2ProjectWith(sourceTranscript({ extensions: { a: 1, b: 2 } }));
+  const changed = sourceTranscript({ transcript: wordTranscript({ words: [{ id: "w1", text: "new", startMs: 0, endMs: 500 }], segments: [{ id: "s1", text: "new", startMs: 0, endMs: 500, wordIds: ["w1"] }] }) });
+  const malformed = clone(sourceTranscript()); malformed.transcript.words = "not-an-array";
+  const digestMismatch = clone(sourceTranscript()); digestMismatch.transcriptDigest = dummyDigest;
+  const unserializable = clone(sourceTranscript()); unserializable.extensions = {}; unserializable.extensions.self = unserializable.extensions;
+  const checksumProject = () => {
+    const project = createEmptyProject({ id: "checksum-project", now: fixedTime });
+    project.sources.push(source("source-1", "video", { checksum: "sha256:source" }));
+    return project;
+  };
+  const checksumMismatch = sourceTranscript({ provenance: { sourceChecksum: "sha256:wrong", stages: [transcriptionStage()] } });
+  const current = sourceTranscript({ extensions: { a: 1, b: 2 } });
+  const reorderedNoOp = {
+    extensions: { b: 2, a: 1 },
+    provenance: clone(current.provenance),
+    transcript: clone(current.transcript),
+    speakerState: current.speakerState,
+    wordTiming: current.wordTiming,
+    transcriptDigest: current.transcriptDigest,
+    sourceId: current.sourceId
+  };
+  const staleConsumer = createSourceTranscript({
+    sourceId: "source-1",
+    wordTiming: "aligned",
+    speakerState: "none",
+    transcript: wordTranscript(),
+    provenance: { stages: [transcriptionStage(), alignmentStage(dummyDigest)] }
+  });
+  const imageProject = () => {
+    const project = createEmptyProject({ id: "image-project", now: fixedTime });
+    project.sources.push(source("image", "image"));
+    return project;
+  };
+  const unknownCandidate = sourceTranscript({ sourceId: "missing" });
+  const imageCandidate = sourceTranscript({ sourceId: "image" });
+  const cases = [
+    ["unknown set source", projectWithoutTranscript, { type: "transcript.set", transcript: unknownCandidate }, "PROJECT_TRANSCRIPT_SOURCE_UNKNOWN"],
+    ["ineligible set source", imageProject, { type: "transcript.set", transcript: imageCandidate }, "PROJECT_TRANSCRIPT_SOURCE_INELIGIBLE"],
+    ["malformed candidate", projectWithoutTranscript, { type: "transcript.set", transcript: malformed }, "PROJECT_TRANSCRIPT_INVALID"],
+    ["unserializable candidate", projectWithoutTranscript, { type: "transcript.set", transcript: unserializable }, "PROJECT_TRANSCRIPT_INVALID"],
+    ["candidate checksum mismatch", checksumProject, { type: "transcript.set", transcript: checksumMismatch }, "PROJECT_TRANSCRIPT_INVALID"],
+    ["candidate digest mismatch", projectWithoutTranscript, { type: "transcript.set", transcript: digestMismatch }, "PROJECT_TRANSCRIPT_DIGEST_MISMATCH"],
+    ["unconditional replacement", projectWithTranscript, { type: "transcript.set", transcript: changed }, "PROJECT_TRANSCRIPT_ALREADY_EXISTS"],
+    ["stale replacement guard", projectWithTranscript, { type: "transcript.set", transcript: changed, expectedCurrentTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_STALE"],
+    ["stale create guard", projectWithoutTranscript, { type: "transcript.set", transcript: sourceTranscript(), expectedCurrentTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_STALE"],
+    ["stale final consumer", projectWithTranscript, { type: "transcript.set", transcript: staleConsumer, expectedCurrentTranscriptDigest: current.transcriptDigest }, "PROJECT_TRANSCRIPT_STALE"],
+    ["exact no-op", projectWithTranscript, { type: "transcript.set", transcript: reorderedNoOp, expectedCurrentTranscriptDigest: current.transcriptDigest }, "PROJECT_TRANSCRIPT_NO_OP"],
+    ["unknown remove source", projectWithoutTranscript, { type: "transcript.remove", sourceId: "missing", expectedTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_SOURCE_UNKNOWN"],
+    ["ineligible remove source", imageProject, { type: "transcript.remove", sourceId: "image", expectedTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_SOURCE_INELIGIBLE"],
+    ["missing transcript", projectWithoutTranscript, { type: "transcript.remove", sourceId: "source-1", expectedTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_MISSING"],
+    ["stale remove", projectWithTranscript, { type: "transcript.remove", sourceId: "source-1", expectedTranscriptDigest: dummyDigest }, "PROJECT_TRANSCRIPT_STALE"]
+  ];
+
+  for (const [label, makeProject, command, code] of cases) {
+    const history = historyWithRedo(makeProject(), `transcript-${label.replaceAll(" ", "-")}`);
+    const before = historyState(history);
+    assertProjectCommandError(() => history.commit(command), code);
+    assert.deepStrictEqual(historyState(history), before, label);
+    assert.equal(history.redo().project.name, "C", label);
+  }
+});
+
+test("migration-only unknown remains readable but transcript.set rejects it without losing redo", () => {
+  const migrated = migrateProject(v1Project({ sources: [source()], transcript: wordTranscript() }));
+  assert.equal(migrated.sourceTranscripts[0].wordTiming, "unknown");
+  assert.equal(validateProjectIR(migrated).ok, true);
+  const history = historyWithRedo(migrated, "unknown");
+  const before = historyState(history);
+  const candidate = clone(history.current.sourceTranscripts[0]);
+  assertProjectCommandError(() => history.commit({
+    type: "transcript.set",
+    transcript: candidate,
+    expectedCurrentTranscriptDigest: candidate.transcriptDigest
+  }), "PROJECT_TRANSCRIPT_INVALID");
+  assert.deepStrictEqual(historyState(history), before);
+  assert.equal(history.redo().project.name, "C");
+});
+
+test("transcript commands treat quarantine as noncanonical historical evidence", () => {
+  let sequence = 0;
+  const raw = wordTranscript({ legacyEvidence: { preserve: [true, null] } });
+  const migrated = migrateProject(v1Project({ transcript: raw }));
+  const historicalQuarantine = clone(quarantine(migrated));
+  const history = new ProjectHistory(migrated, { idGenerator: () => `quarantine-${++sequence}`, clock: () => fixedTime });
+  history.commit({ type: "source.add", source: source() });
+
+  const candidate = sourceTranscript({ transcript: wordTranscript({ words: [{ id: "w1", text: "new", startMs: 0, endMs: 500 }], segments: [{ id: "s1", text: "new", startMs: 0, endMs: 500, wordIds: ["w1"] }] }) });
+  const created = history.commit({ type: "transcript.set", transcript: candidate });
+  assert.deepStrictEqual(quarantine(created), historicalQuarantine);
+  assert.deepStrictEqual(quarantine(created).payload, raw);
+  assert.deepEqual(created.sourceTranscripts, [candidate]);
+
+  const removed = history.commit({ type: "transcript.remove", sourceId: "source-1", expectedTranscriptDigest: candidate.transcriptDigest });
+  assert.deepStrictEqual(quarantine(removed), historicalQuarantine);
+  assert.deepEqual(removed.sourceTranscripts, []);
+  assert.deepEqual(removed.sources.map(({ id }) => id), ["source-1"]);
+});
+
+test("representative failed legacy commands preserve redo, entries, snapshots, and cursor", () => {
+  const makeProject = () => {
+    const project = createEmptyProject({ id: "legacy-command-project", now: fixedTime });
+    project.sources.push(source());
+    project.timeline.tracks.push({ id: "track-1", kind: "video", name: "Video", locked: false, hidden: false, muted: false });
+    project.timeline.clips.push({ id: "clip-1", trackId: "track-1", sourceId: "source-1", timelineStartMs: 0, timelineEndMs: 100, sourceStartMs: 0, sourceEndMs: 100, speed: 1, volume: 1, opacity: 1 });
+    project.timeline.durationMs = 100;
+    project.exports.push({ id: "export-1", presetId: "preset", status: "pending", createdAt: fixedTime });
+    return project;
+  };
+  const duplicateClip = { id: "clip-1", trackId: "track-1", sourceId: "source-1", timelineStartMs: 100, timelineEndMs: 200, sourceStartMs: 100, sourceEndMs: 200, speed: 1, volume: 1, opacity: 1 };
+  const invalidReferenceClip = { ...duplicateClip, id: "clip-2", sourceId: "missing" };
+  const cases = [
+    ["empty rename", { type: "project.rename", name: " " }],
+    ["duplicate source", { type: "source.add", source: source() }],
+    ["unknown source removal", { type: "source.remove", sourceId: "missing" }],
+    ["blocked source removal", { type: "source.remove", sourceId: "source-1" }],
+    ["duplicate track", { type: "track.add", track: { id: "track-1", kind: "video", name: "Other", locked: false, hidden: false, muted: false } }],
+    ["blocked track removal", { type: "track.remove", trackId: "track-1" }],
+    ["duplicate clip", { type: "clip.add", clip: duplicateClip }],
+    ["invalid clip reference", { type: "clip.add", clip: invalidReferenceClip }],
+    ["unknown clip trim", { type: "clip.trim", clipId: "missing", timelineStartMs: 0, timelineEndMs: 10, sourceStartMs: 0, sourceEndMs: 10 }],
+    ["invalid clip trim", { type: "clip.trim", clipId: "clip-1", timelineStartMs: 100, timelineEndMs: 0, sourceStartMs: 0, sourceEndMs: 100 }],
+    ["duplicate export", { type: "export.add", export: { id: "export-1", presetId: "preset", status: "pending", createdAt: fixedTime } }]
+  ];
+
+  for (const [label, command] of cases) {
+    const history = historyWithRedo(makeProject(), `legacy-${label.replaceAll(" ", "-")}`);
+    const before = historyState(history);
+    captureError(() => history.commit(command));
+    assert.deepStrictEqual(historyState(history), before, label);
+    assert.equal(history.redo().project.name, "C", label);
+  }
+});
+
+test("clock and id generator failures preserve the complete observable history state", () => {
+  let clockFails = false;
+  let clockSequence = 0;
+  const clockHistory = new ProjectHistory(createEmptyProject({ id: "clock-project", now: fixedTime }), {
+    idGenerator: () => `clock-${++clockSequence}`,
+    clock: () => {
+      if (clockFails) throw new Error("clock failed");
+      return fixedTime;
+    }
+  });
+  clockHistory.commit({ type: "project.rename", name: "B" });
+  clockHistory.commit({ type: "project.rename", name: "C" });
+  clockHistory.undo();
+  const beforeClockFailure = historyState(clockHistory);
+  clockFails = true;
+  assert.throws(() => clockHistory.commit({ type: "project.rename", name: "D" }), /clock failed/);
+  assert.deepStrictEqual(historyState(clockHistory), beforeClockFailure);
+  clockFails = false;
+  assert.equal(clockHistory.redo().project.name, "C");
+
+  let idFails = false;
+  let failingIdCalls = 0;
+  let idSequence = 0;
+  const idHistory = new ProjectHistory(createEmptyProject({ id: "id-project", now: fixedTime }), {
+    idGenerator: () => {
+      if (idFails) {
+        failingIdCalls += 1;
+        if (failingIdCalls === 2) throw new Error("id failed");
+        return "uncommitted-entry-id";
+      }
+      return `generated-${++idSequence}`;
+    },
+    clock: () => fixedTime
+  });
+  idHistory.commit({ type: "project.rename", name: "B" });
+  idHistory.commit({ type: "project.rename", name: "C" });
+  idHistory.undo();
+  const beforeIdFailure = historyState(idHistory);
+  idFails = true;
+  assert.throws(() => idHistory.commit({ type: "project.rename", name: "D" }), /id failed/);
+  assert.deepStrictEqual(historyState(idHistory), beforeIdFailure);
+  idFails = false;
+  assert.equal(idHistory.redo().project.name, "C");
+});
+
+test("a successful commit truncates redo only when the replacement branch is ready", () => {
+  const history = historyWithRedo(createEmptyProject({ id: "branch-project", name: "A", now: fixedTime }), "branch");
+  const committed = history.commit({ type: "project.rename", name: "D" });
+  assert.equal(committed.project.name, "D");
+  assert.equal(committed.history.revision, 2);
+  assert.equal(history.canRedo, false);
+  assert.deepEqual(history.entries.map((entry) => entry.command.name), ["B", "D"]);
+  assert.deepEqual(history.snapshots.map((snapshot) => snapshot.project.project.name), ["A", "B", "D"]);
 });
 
 test("migration rejects unknown future schema", () => {
