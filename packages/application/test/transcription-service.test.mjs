@@ -177,6 +177,12 @@ test("first transcription authorizes the canonical source and commits a complete
   assert.equal(history.entries.length, 1);
   assert.equal(history.entries[0].command.type, "transcript.set");
   assert.deepEqual(history.entries[0].actor, { type: "agent", id: "editor-agent" });
+
+  engineResult.transcript.words[0].text = "mutated engine result";
+  assert.equal(history.current.sourceTranscripts[0].transcript.words[0].text, "olá");
+  outcome.result.transcript.words[0].text = "mutated outcome result";
+  assert.equal(outcome.sourceTranscript.transcript.words[0].text, "olá");
+  assert.equal(history.current.sourceTranscripts[0].transcript.words[0].text, "olá");
 });
 
 test("no-speech transcription normalizes model metadata to canonical none timing", async () => {
@@ -352,6 +358,61 @@ test("words require model timing metadata and no invalid timing value is inferre
     assert.equal(history.current.history.revision, 0);
     assert.deepEqual(history.current.sourceTranscripts, []);
   }
+});
+
+test("canonical validation rejects negative zero before any JSON normalization", async () => {
+  const invalidResults = [
+    result("word-negative-zero", { transcript: {
+      language: "pt",
+      words: [{ id: "word-1", text: "word-negative-zero", startMs: -0, endMs: 500 }],
+      segments: [{ id: "segment-1", text: "word-negative-zero", startMs: 0, endMs: 500, wordIds: ["word-1"] }]
+    } }),
+    result("segment-negative-zero", { transcript: {
+      language: "pt",
+      words: [{ id: "word-1", text: "segment-negative-zero", startMs: 0, endMs: 500 }],
+      segments: [{ id: "segment-1", text: "segment-negative-zero", startMs: -0, endMs: 500, wordIds: ["word-1"] }]
+    } })
+  ];
+
+  for (const invalidResult of invalidResults) {
+    const engine = new FakeTranscriptionEngine(async () => invalidResult);
+    const { service, history } = fixture(engine);
+    await assert.rejects(service.transcribeSource({ sourceId: "source-1" }), (error) => error instanceof TranscriptionApplicationError
+      && error.code === "TRANSCRIPTION_APP_RESULT_INVALID");
+    assert.equal(Object.is(invalidResult.transcript.words[0].startMs, -0)
+      || Object.is(invalidResult.transcript.segments[0].startMs, -0), true);
+    assert.equal(history.current.history.revision, 0);
+    assert.equal(history.entries.length, 0);
+    assert.deepEqual(history.current.sourceTranscripts, []);
+  }
+});
+
+test("language accepts only supported runtime string literals without coercion", async () => {
+  for (const language of ["auto", "pt", "en"]) {
+    const engine = new FakeTranscriptionEngine(async () => result());
+    const { service } = fixture(engine);
+    await service.transcribeSource({ sourceId: "source-1", language });
+    assert.equal(engine.calls[0].request.language, language);
+  }
+
+  let coercionCalls = 0;
+  const invalidLanguages = [
+    "es",
+    { toString() { coercionCalls += 1; return "pt"; } }
+  ];
+  for (const language of invalidLanguages) {
+    const engine = new FakeTranscriptionEngine(async () => assert.fail("invalid language must not be transcribed"));
+    const { service, history } = fixture(engine);
+    await assert.rejects(
+      service.transcribeSource({ sourceId: "source-1", language }),
+      (error) => error instanceof TranscriptionApplicationError && error.code === "TRANSCRIPTION_APP_INVALID_REQUEST"
+    );
+    assert.equal(engine.identityCalls, 0);
+    assert.equal(engine.calls.length, 0);
+    assert.equal(history.current.history.revision, 0);
+    assert.equal(history.entries.length, 0);
+  }
+  assert.equal(coercionCalls, 0);
 });
 
 test("malformed transcript timing, references and source duration fail closed", async () => {

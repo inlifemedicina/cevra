@@ -145,17 +145,18 @@ export class TranscriptionApplicationService {
     }
     if (signal?.aborted) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, signal.reason);
 
-    let stableResult: TranscriptionResult;
+    let validatedResult: TranscriptionResult;
+    let outcomeResult: TranscriptionResult;
     let candidate: SourceTranscript;
     try {
-      stableResult = validateResult(result, normalized.wordTimestamps);
-      const wordTiming = normalizeWordTiming(stableResult);
-      const speakerState = deriveTranscriptSpeakerState(stableResult.transcript);
+      validatedResult = validateResult(result, normalized.wordTimestamps);
+      const wordTiming = normalizeWordTiming(validatedResult);
+      const speakerState = deriveTranscriptSpeakerState(validatedResult.transcript);
       candidate = createSourceTranscript({
         sourceId: source.id,
         wordTiming,
         speakerState,
-        transcript: stableResult.transcript,
+        transcript: validatedResult.transcript,
         provenance: {
           ...(source.checksum !== undefined ? { sourceChecksum: source.checksum } : {}),
           stages: [{
@@ -164,11 +165,12 @@ export class TranscriptionApplicationService {
             engineId: identity.id,
             engineVersion: identity.version,
             engineApiVersion: String(identity.apiVersion),
-            modelId: stableResult.modelId,
+            modelId: validatedResult.modelId,
             createdAt: this.clock()
           }]
         }
       });
+      outcomeResult = clone(validatedResult);
     } catch (cause) {
       throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId, cause);
     }
@@ -197,7 +199,7 @@ export class TranscriptionApplicationService {
     return {
       executionId,
       sourceId: source.id,
-      result: clone(stableResult),
+      result: outcomeResult,
       sourceTranscript: clone(registered),
       project
     };
@@ -229,9 +231,7 @@ function validateRequest(
     }
     if (request.id !== undefined && request.id !== executionId) throw new Error("Execution ID is invalid.");
     if (request.locale !== undefined && !isLocale(request.locale)) throw new Error("locale is unsupported.");
-    if (request.language !== undefined && !["auto", "pt", "en"].includes(String(request.language))) {
-      throw new Error("language is unsupported.");
-    }
+    const language = normalizeLanguage(request.language);
     if (request.wordTimestamps !== undefined && typeof request.wordTimestamps !== "boolean") {
       throw new Error("wordTimestamps must be a boolean.");
     }
@@ -239,7 +239,7 @@ function validateRequest(
     return {
       sourceId: request.sourceId,
       locale,
-      language: (request.language ?? "auto") as NormalizedTranscribeSourceRequest["language"],
+      language,
       wordTimestamps: request.wordTimestamps ?? true,
       actor
     };
@@ -298,7 +298,7 @@ function validateResult(value: unknown, wordTimestampsRequested: boolean): Trans
   if (value.transcript.words.length > 0 && value.wordTiming !== "model") {
     throw new Error("Transcription words require model timing metadata.");
   }
-  return clone(value) as unknown as TranscriptionResult;
+  return value as unknown as TranscriptionResult;
 }
 
 function normalizeWordTiming(result: TranscriptionResult): TranscriptWordTiming {
@@ -328,6 +328,12 @@ function rejectUnexpectedKeys(value: Record<string, unknown>, allowed: readonly 
 
 function isLocale(value: unknown): value is CevraLocale {
   return value === "pt-BR" || value === "en-US";
+}
+
+function normalizeLanguage(value: unknown): NormalizedTranscribeSourceRequest["language"] {
+  if (value === undefined) return "auto";
+  if (value === "auto" || value === "pt" || value === "en") return value;
+  throw new Error("language is unsupported.");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
