@@ -223,6 +223,8 @@ test("replaces caller-supplied cevra.ingest data with authoritative probe proven
   let history;
   const context = fixture(async (request) => successfulProbe(request, history, {
     uri: videoUri,
+    durationMs: 1_000,
+    frameRate: 30,
     hasVideo: true,
     hasAudio: false,
     videoCodec: "h264"
@@ -282,6 +284,8 @@ test("rejects a real video/audio expected media kind mismatch after probe", asyn
   let history;
   const context = fixture(async (request) => successfulProbe(request, history, {
     uri: videoUri,
+    durationMs: 1_000,
+    frameRate: 30,
     hasVideo: true,
     hasAudio: true,
     videoCodec: "h264"
@@ -315,7 +319,14 @@ test("detects a concurrent Project IR revision after probe and does not ingest a
   let history;
   const context = fixture(async (request) => {
     history.commit({ type: "project.rename", name: "Concurrent edit" }, { type: "user" });
-    return successfulProbe(request, history, { uri: videoUri, hasVideo: true, hasAudio: false, videoCodec: "h264" });
+    return successfulProbe(request, history, {
+      uri: videoUri,
+      durationMs: 1_000,
+      frameRate: 30,
+      hasVideo: true,
+      hasAudio: false,
+      videoCodec: "h264"
+    });
   });
   history = context.history;
 
@@ -425,6 +436,8 @@ test("reports a typed commit failure and keeps the previous project revision", a
   let history;
   const context = fixture(async (request) => successfulProbe(request, history, {
     uri: videoUri,
+    durationMs: 1_000,
+    frameRate: 30,
     hasVideo: true,
     hasAudio: false,
     videoCodec: "h264"

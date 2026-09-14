@@ -222,9 +222,17 @@ function sourceKind(probe: MediaProbeResult, locale: CevraLocale, probeExecution
   if (probe.hasVideo === true) {
     const codec = probe.videoCodec?.trim().toLowerCase();
     // The managed probe exposes common still images as video streams (PNG as
-    // `png`, JPEG as `mjpeg`). V1 rejects image codecs, and missing codec
-    // evidence, rather than persisting an unsupported still as canonical video.
-    if (!codec || STILL_IMAGE_VIDEO_CODECS.has(codec)) {
+    // `png`, JPEG as `mjpeg`) with zero/one nominal frame. V1 requires temporal
+    // video evidence and rejects image codecs instead of persisting a still as
+    // canonical video.
+    const hasTemporalEvidence = probe.durationMs !== undefined
+      && Number.isFinite(probe.durationMs)
+      && probe.durationMs > 0
+      && probe.frameRate !== undefined
+      && Number.isFinite(probe.frameRate)
+      && probe.frameRate > 0
+      && probe.durationMs * probe.frameRate > 1000;
+    if (!codec || STILL_IMAGE_VIDEO_CODECS.has(codec) || !hasTemporalEvidence) {
       throw new LocalSourceIngestError("LOCAL_SOURCE_UNSUPPORTED_MEDIA", locale, probeExecutionId);
     }
     return "video";
