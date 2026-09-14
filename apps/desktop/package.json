@@ -1,0 +1,38 @@
+{
+  "name": "@cevra/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "dependencies": {
+    "@cevra/i18n": "0.1.0",
+    "@cevra/project-ir": "0.1.0",
+    "@cevra/ui": "0.1.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "jsdom": "30.0.1",
+    "vite": "8.3.0",
+    "vitest": "5.0.0"
+  },
+  "scripts": {
+    "predev": "npm run build -w @cevra/project-ir && npm run build -w @cevra/i18n",
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "prebuild": "npm run build -w @cevra/project-ir && npm run build -w @cevra/i18n",
+    "build": "tsc -p tsconfig.json && vite build",
+    "pretest": "npm run build -w @cevra/project-ir && npm run build -w @cevra/i18n",
+    "test": "vitest run",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  }
+}

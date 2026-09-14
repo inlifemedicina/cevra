@@ -821,7 +821,7 @@ The transcription FFmpeg inventory must remain separate from the sealed Media Ru
 
 ---
 
-# 16. Transcript persistence and multi-source semantics — SLICES A/B CLOSED / APPLICATION PERSISTENCE V1 IN DEVELOPMENT
+# 16. Transcript persistence and multi-source semantics — IMPLEMENTED / CLOSED
 
 Project IR v2 stores zero or one canonical source-scoped `SourceTranscript` per eligible audio/video source. The public `TranscriptState` remains structurally unchanged as the nested transcript payload and as the Local Transcription Engine V1 result contract.
 
@@ -848,9 +848,43 @@ Implemented and closed in Slice A:
 
 Slice B merged in PR #16 at `900112f88e85a59ae57541a2f2faf5997ad8f908`, is **CLOSED**, and `feat/project-ir-v2-transcript-commands` was removed locally and remotely. It implements whole-aggregate `transcript.set`, guarded `transcript.remove`, optimistic digest concurrency, final consuming-stage provenance guards, eight stable `ProjectCommandError` codes and transactional `ProjectHistory.commit` ordering that preserves redo and all observable history state after any failed command. The consuming-stage guard rejects an initial consumer without a canonical predecessor and, for an existing transcript, checks `inputTranscriptDigest` only when semantic identity changes; same-digest metadata updates preserve historical predecessor provenance.
 
-Application Transcript Persistence / Orchestration V1 is **IN DEVELOPMENT** on `feat/application-transcript-persistence`, created from exact main `900112f88e85a59ae57541a2f2faf5997ad8f908`. Its provider-neutral application flow is `authorized source → TranscriptionEngineAdapter → validated TranscriptionResult → createSourceTranscript → transcript.set → ProjectHistory`. It adds no transcription execution repository or cache: failed/cancelled candidate generation leaves Project IR unchanged, while promoted provenance retains execution, engine, model and optional source-checksum identity. The application rejects project changes during execution, supports first transcription and guarded retranscription, normalizes no-speech timing to `none`, and maps exact transcript no-op to `TRANSCRIPTION_APP_COMMIT_FAILED` without history mutation.
+Application Transcript Persistence / Orchestration V1 merged in PR #17 at `aaecd62647b49c1090f961a3f872dff0ebc9889c`, is **CLOSED**, and `feat/application-transcript-persistence` was removed locally and remotely. Its provider-neutral application flow is `authorized source → TranscriptionEngineAdapter → validated TranscriptionResult → createSourceTranscript → transcript.set → ProjectHistory`. It adds no transcription execution repository or cache: failed/cancelled candidate generation leaves Project IR unchanged, while promoted provenance retains execution, engine, model and optional source-checksum identity. The application rejects project changes during execution, supports first transcription and guarded retranscription, normalizes no-speech timing to `none`, and maps exact transcript no-op to `TRANSCRIPTION_APP_COMMIT_FAILED` without history mutation.
 
-Boundary hardening on the current branch tip preserves raw engine numeric values through canonical `createSourceTranscript` validation (including rejection of negative zero), while application language normalization accepts only the literal runtime strings `auto`, `pt` and `en` without coercion. Defensive cloning remains after canonical validation for the returned outcome. Current active-branch validation: all workspace builds passed; 207 Node/TypeScript tests passed, including 48 Application, 40 Project IR and 5 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites. The next objective after this slice is the first user-facing desktop vertical flow over the programmatic ingest→transcribe→canonical-project foundation.
+Boundary hardening preserves raw engine numeric values through canonical `createSourceTranscript` validation (including rejection of negative zero), while application language normalization accepts only the literal runtime strings `auto`, `pt` and `en` without coercion. Defensive cloning remains after canonical validation for the returned outcome. Merge validation passed 207 Node/TypeScript tests, including 48 Application, 40 Project IR and 5 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites.
+
+---
+
+# 16A. CEVRA Vids Desktop Visual V0.1 — APPROVED / UI SHELL IN DEVELOPMENT
+
+The approved visual/product direction is **Adaptive Hybrid**, with **Editar as
+preview-first**, Director CEVRA integrated directly into the workspace,
+one-click Workflow Preset access, the canonical layered timeline and a
+contextual inspector. The specialized workspaces are Editar, Transcrição,
+Composição, Legendas and Áudio. They retain one demo/canonical project context,
+selection, playhead and timeline rather than creating workspace-specific
+sources of truth.
+
+Desktop UI Shell V0.1 is **IN DEVELOPMENT** on
+`feat/desktop-ui-shell-v0-1`, created from exact `main`
+`aaecd62647b49c1090f961a3f872dff0ebc9889c`. The slice establishes the real
+Tauri 2 + React + TypeScript window, reusable visual tokens, PT-BR/EN-US UI,
+adaptive presentation workspaces, isolated Project IR-shaped demo projection,
+typed `DesktopBackend` presentation boundary and deterministic UI tests.
+
+This slice intentionally does **not** connect the WebView to Node-only engines
+or application services. Media ingest, transcript execution, preview rendering,
+Director execution, Workflow Preset orchestration, real Change Set application,
+timeline mutation and export remain deferred to the next typed desktop-runtime
+integration slice. No localhost server, sidecar, broad filesystem, network or
+shell capability is approved for the UI shell.
+
+Current active-branch validation preserves the 207-test Node/TypeScript baseline
+and adds 14 deterministic desktop shell tests for 221 total; the unchanged 22
+Python tests pass. Frontend production build and responsive visual checks at
+1440×900 and 1920×1080 pass. `cargo check --locked`, the optimized Tauri build
+without installer bundling, and a native-process launch smoke test pass with a
+checksum-verified isolated Rust toolchain; the host profile remains unchanged.
+The Linux CI job independently compiles the same Tauri shell.
 
 ---
 
@@ -1089,6 +1123,9 @@ Foundation / Media Runtime       [CLOSED]
 → EDVID parity specification     [CLOSED]
 → Local Source Ingest V1         [CLOSED]
 → Local Transcription Engine V1  [CLOSED]
+→ Project IR v2 transcripts      [CLOSED]
+→ App transcript persistence     [CLOSED]
+→ Desktop UI Shell V0.1          [IN DEVELOPMENT]
 → alignment / transcript cache / Project IR multi-source mapping as separate small slices
 → editorial transcript / analysis
 → strategy / take selection / cut planning
@@ -1123,11 +1160,12 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After Project IR v2 transcript Slice B merged in PR #16:
+After Application Transcript Persistence / Orchestration V1 merged in PR #17:
 
-`900112f88e85a59ae57541a2f2faf5997ad8f908`
+`aaecd62647b49c1090f961a3f872dff0ebc9889c`
 
-This is the Git-authoritative `main` immediately before Application Transcript Persistence / Orchestration V1 and the exact base of `feat/application-transcript-persistence`.
+This is the Git-authoritative `main` immediately before Desktop UI Shell V0.1
+and the exact base of `feat/desktop-ui-shell-v0-1`.
 
 ## 24.2 Important merged milestones
 
@@ -1143,14 +1181,17 @@ This is the Git-authoritative `main` immediately before Application Transcript P
 | Project IR v2 transcript implementation proposal | #14 | `525add125d040f7d0071c70d09fd2ab392fc0b8b` | CLOSED |
 | Project IR v2 transcript core — Slice A | #15 | `edb98184c144ea1f8b7b834ebd6a427198e5a68f` | CLOSED |
 | Project IR v2 transcript commands — Slice B | #16 | `900112f88e85a59ae57541a2f2faf5997ad8f908` | CLOSED |
+| Application Transcript Persistence / Orchestration V1 | #17 | `aaecd62647b49c1090f961a3f872dff0ebc9889c` | CLOSED |
 
 ## 24.3 Active work
 
 | Branch | Status |
 |---|---|
-| `feat/application-transcript-persistence` | Application Transcript Persistence / Orchestration V1 — authorized source transcription through the provider-neutral engine contract into canonical Project IR/history; IN DEVELOPMENT |
+| `feat/desktop-ui-shell-v0-1` | CEVRA Vids Desktop UI Shell V0.1 — approved Adaptive Hybrid presentation foundation in a real Tauri window; IN DEVELOPMENT |
 
-The proposal branch and both Project IR v2 Slice A/B branches were removed after their merges. Application transcript persistence is active only on the branch above.
+The proposal, both Project IR v2 Slice A/B, and Application Transcript
+Persistence branches were removed after their merges. Desktop UI Shell V0.1 is
+active only on the branch above.
 
 ---
 
@@ -1188,7 +1229,9 @@ The proposal branch and both Project IR v2 Slice A/B branches were removed after
 - **IMPLEMENTED/CLOSED:** PR #14 merged the bounded Project IR v2 transcript implementation proposal at `525add125d040f7d0071c70d09fd2ab392fc0b8b`; `arch/project-ir-v2-transcript-proposal` was removed.
 - **IMPLEMENTED/CLOSED:** Project IR v2 transcript core Slice A merged in PR #15 at `edb98184c144ea1f8b7b834ebd6a427198e5a68f`. Schema v2, explicit v1 compatibility, source-scoped transcript digest/validation/migration/quarantine, factory, source-removal cascade and package/history compatibility are implemented. Quarantine evidence remains historical across later source changes. `feat/project-ir-v2-transcript-core` was removed locally and remotely.
 - **IMPLEMENTED/CLOSED:** Project IR v2 transcript command Slice B merged in PR #16 at `900112f88e85a59ae57541a2f2faf5997ad8f908`. Whole-aggregate set/remove commands, stable transcript command errors, digest/provenance concurrency guards, consumer-promotion hardening and failure-safe redo preservation are implemented. `feat/project-ir-v2-transcript-commands` was removed locally and remotely.
-- **IN DEVELOPMENT:** Application Transcript Persistence / Orchestration V1 started on `feat/application-transcript-persistence` from exact base `900112f88e85a59ae57541a2f2faf5997ad8f908`; boundary hardening on the current branch tip succeeds pre-hardening HEAD `d92b5df07f3a3abdb5f027d6bdb07d1faad7ef40`. The application service authorizes a current Project IR source, invokes `TranscriptionEngineAdapter`, performs non-coercing runtime boundary checks, passes raw transcript values into canonical `createSourceTranscript` validation, and promotes only through guarded `transcript.set` and `ProjectHistory`. Defensive outcome cloning occurs only after canonical validation. No execution repository, cache, UI or engine change is introduced. Validation has 48 Application tests, 40 Project IR tests, 5 Project Store tests, 207 total Node/TypeScript tests and 22 Python tests passing.
+- **IMPLEMENTED/CLOSED:** Application Transcript Persistence / Orchestration V1 merged in PR #17 at `aaecd62647b49c1090f961a3f872dff0ebc9889c`. The application service authorizes a current Project IR source, invokes `TranscriptionEngineAdapter`, performs non-coercing runtime boundary checks, passes raw transcript values into canonical `createSourceTranscript` validation, and promotes only through guarded `transcript.set` and `ProjectHistory`. Defensive outcome cloning occurs only after canonical validation. No execution repository, cache, UI or engine change was introduced. Merge validation retained 207 Node/TypeScript and 22 Python tests.
+- **CANONICAL:** Desktop Visual V0.1 uses Adaptive Hybrid workspaces: Editar is preview-first; Transcrição, Composição, Legendas and Áudio specialize the center workspace while preserving one project, selection, playhead and layered timeline. Director CEVRA is integrated into the editor with Workflow Preset quick access and a reviewable AI Change Set model. The inspector is contextual. The visual language is dark graphite, neutral, compact and restrained with configurable-accent-ready tokens and no glass/neon/SaaS-dashboard trade dress.
+- **IN DEVELOPMENT:** Desktop UI Shell V0.1 started on `feat/desktop-ui-shell-v0-1` from exact base `aaecd62647b49c1090f961a3f872dff0ebc9889c`. It is the presentation foundation in a real least-privilege Tauri 2 window. Typed Tauri↔desktop-host integration and all real engine/application execution are intentionally deferred to the next slice.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1230,10 +1273,10 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete and independently review Application Transcript Persistence / Orchestration V1 on `feat/application-transcript-persistence` without adding cache, alignment, UI or an execution repository.
-2. Do not reopen the closed Local Transcription Engine V1 or Project IR v2 Slices A/B.
+1. Complete and independently review Desktop UI Shell V0.1 on `feat/desktop-ui-shell-v0-1` without adding a sidecar, localhost server, broad Tauri capability or engine integration.
+2. Do not reopen the closed Application Transcript Persistence, Local Transcription Engine V1 or Project IR v2 Slices A/B.
 3. Preserve the provider-neutral flow from authorized source through `TranscriptionEngineAdapter` and guarded Project History promotion.
-4. After this slice closes, implement the first user-facing desktop vertical slice over ingest and canonical transcription.
+4. After the UI shell closes, design the typed Tauri↔desktop-host integration slice that replaces `DemoDesktopBackend` without redesigning UI components or importing Node-only implementations into the WebView.
 5. Preserve the EDVID baseline and dependency-driven implementation order.
 6. Apply the quality/performance policy to future preview, render, composition and export work.
 7. Keep this document updated after every material decision, merge or completed research finding.

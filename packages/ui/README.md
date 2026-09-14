@@ -1,3 +1,6 @@
 # CEVRA UI System
 
-Shared design tokens and reusable components for desktop/mobile live here. User-facing text must use translation keys. Visual direction is flat, modern, neutral and professional.
+Shared, browser-safe design tokens and reusable primitives for desktop/mobile
+live here. Product-specific composition stays in its owning application. User-facing
+text must use translation keys. Visual direction is flat, modern, neutral and
+professional.

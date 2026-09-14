@@ -1,0 +1,9 @@
+{
+  "name": "@cevra/ui",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "exports": {
+    "./tokens.css": "./src/tokens.css"
+  }
+}
