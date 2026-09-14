@@ -821,7 +821,7 @@ The transcription FFmpeg inventory must remain separate from the sealed Media Ru
 
 ---
 
-# 16. Transcript persistence and multi-source semantics — PENDING DECISION
+# 16. Transcript persistence and multi-source semantics — ACCEPTED / IMPLEMENTATION NOT STARTED
 
 Current Project IR has one global `TranscriptState` and no direct `sourceId` on the transcript object.
 
@@ -829,9 +829,9 @@ CEVRA Vids must support multiple source assets.
 
 Therefore the transcription-engine slice intentionally returns `TranscriptionResult` only and does **not** yet add a global `transcript.replace` command.
 
-Before persistence, explicitly design multi-source transcript semantics so CEVRA does not lock itself into an incorrect global model.
+ADR 0014 is **Accepted** after independent adversarial review and remediation. It defines one source-scoped canonical transcript per eligible audio/video source, with prior versions preserved by ProjectHistory and candidate results kept outside canonical state until promoted.
 
-This is a near-term architectural decision after the transcription engine is validated.
+The central architecture remains unchanged. The accepted refinements require pure deterministic document-local migration, deterministic `transcriptDigest` state identity, digest-bound references and asynchronous promotion, continued public compatibility of `TranscriptState`, closed speaker-coverage semantics, and a typed bounded migration quarantine. No Project IR version, migration, command, persistence, cache or alignment implementation has started.
 
 ---
 
@@ -1027,7 +1027,7 @@ Repository housekeeping follows **CLEAN + TRACEABLE + MINIMAL + NO DUPLICATE SOU
 - Remove temporary branches locally and remotely after merge or closeout unless retention has an explicit purpose. A historical branch fully incorporated by a successor is a deletion candidate only after confirming that it contains no useful unique material.
 - Do not perform opportunistic destructive cleanup inside an unrelated feature.
 
-`docs/master-context` is a temporary historical branch. Its useful context is being succeeded by `docs/post-transcription-canon`; after the new master context is merged into `main` and confirmed, compare the historical branch one final time and delete its local and remote refs if no useful unique content remains. Do not keep both documentation branches as competing records without need. This note is repository housekeeping, not a product or architecture decision.
+PR #12 closeout completed this housekeeping policy: `docs/post-transcription-canon` was removed after merge, and the historical `docs/master-context` branch was removed locally and remotely after a final comparison confirmed that it contained no useful exclusive content. Repository hygiene passed without deleting unrelated refs or evidence.
 
 ---
 
@@ -1104,11 +1104,11 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After Local Transcription Engine V1 merge:
+After the post-transcription canon merge:
 
-`d780de370b6a32fa010dedeeb5344bfe12666157`
+`3098274f8a30a85e4b83e5524fc70664adaa412f`
 
-This is the canonical current `main` for this documentation consolidation.
+This is the Git-authoritative current `main` and the base for the active architecture-design branch.
 
 ## 24.2 Important merged milestones
 
@@ -1119,10 +1119,15 @@ This is the canonical current `main` for this documentation consolidation.
 | EDVID parity specification | #9 | `6502afa9092f2be0ebd1d7b259f83dedf3f672d3` | CLOSED |
 | Local Source Ingest V1 | #10 | `aa92402cf49cc45f55c961508f66c262a02ce075` | CLOSED |
 | Local Transcription Engine V1 | #11 | `d780de370b6a32fa010dedeeb5344bfe12666157` | CLOSED |
+| Post-transcription canon / ADR 0013 | #12 | `3098274f8a30a85e4b83e5524fc70664adaa412f` | CLOSED |
 
 ## 24.3 Active work
 
-No feature implementation branch is active after PR #11. The temporary documentation branch used to consolidate this ledger does not select or start the next implementation slice.
+| Branch | Status |
+|---|---|
+| `arch/multi-source-transcript-semantics` | ADR 0014 accepted after remediation; implementation not started |
+
+No feature implementation branch is active. The next implementation slice has not started.
 
 ---
 
@@ -1153,6 +1158,8 @@ No feature implementation branch is active after PR #11. The temporary documenta
 - **CANONICAL:** development-model selection should optimize problem-solving quality per quota/token cost rather than defaulting to maximum reasoning.
 - **CANONICAL:** generative AI assets are desired and part of the CEVRA direction; editorial AI and generative provider are separate roles, generated outputs become editable Project IR assets.
 - **RESEARCH:** the 2026-09-14 AI-editing demo was identified at profile/campaign level; its technical stack remains unverified, and its behavior is retained as a clean-room visual benchmark.
+- **IMPLEMENTED/CLOSED:** PR #12 merged the post-transcription canon and ADR 0013 at `3098274f8a30a85e4b83e5524fc70664adaa412f`; both temporary documentation branches were removed after comparison and repository hygiene passed.
+- **ACCEPTED:** independent adversarial review of ADR 0014 completed without changing its central architecture. Deterministic migration, `transcriptDigest` identity, stale alignment/reference protection, `TranscriptState` compatibility, speaker-state predicates and typed migration quarantine are closed. No Project IR or persistence implementation has started.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1162,8 +1169,8 @@ No feature implementation branch is active after PR #11. The temporary documenta
 Do not guess these in future chats:
 
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
-2. exact multi-source transcript persistence model in Project IR;
-3. WhisperX/forced-alignment integration details and alignment status semantics;
+2. exact Project IR v2 implementation details for the source-scoped multi-source transcript model accepted in ADR 0014, including digest canonicalization and migration-quarantine resolution;
+3. WhisperX/forced-alignment adapter, model and integration details; provider-neutral alignment status semantics are closed by ADR 0014;
 4. final transcript cache schema, key and invalidation policy;
 5. final transcription model default for production quality;
 6. production transcription-runtime assembly/update mechanism;
@@ -1194,10 +1201,10 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Merge this documentation/canon update after review.
+1. Prepare a bounded implementation proposal for accepted ADR 0014 and resolve its remaining implementation-level questions before code.
 2. Do not reopen the closed Local Transcription Engine V1.
-3. Resolve multi-source transcript semantics explicitly before transcript persistence.
-4. Select the next small implementation slice from alignment, transcript cache or multi-source Project IR mapping.
+3. Do not start transcript persistence before the bounded Project IR v2 implementation proposal resolves digest canonicalization, deterministic migration and quarantine resolution.
+4. Select one small implementation slice from alignment, transcript cache or multi-source Project IR mapping after its own prerequisites are satisfied.
 5. Do not combine those three areas automatically into one branch or PR.
 6. Preserve the EDVID baseline and dependency-driven implementation order.
 7. Apply the quality/performance policy to future preview, render, composition and export work.
