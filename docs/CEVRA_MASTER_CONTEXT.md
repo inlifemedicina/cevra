@@ -1015,6 +1015,20 @@ Prompts may explicitly pre-authorize listed Git/GitHub mutations to reduce conve
 
 When Codex requires an environment approval, request the minimum approval once and continue through the authorized steps.
 
+## 21.3 Repository hygiene
+
+Repository housekeeping follows **CLEAN + TRACEABLE + MINIMAL + NO DUPLICATE SOURCE OF TRUTH** without encouraging aggressive deletion.
+
+- Keep the tracked tree intentional. Do not commit scratch files, dumps, logs, temporary exports, local caches, generated comparison files, backups or investigation artifacts without an explicit canonical reason.
+- Keep heavy research files, videos, screenshots, scratch assets and exports outside the repository unless they are necessary versioned inputs.
+- Avoid duplicate documents or artifacts that can become competing sources of truth. Do not retain obsolete tracked files merely “for safety” when Git already preserves their history.
+- Before removing a tracked file, verify references, provenance, license/legal obligations, compatibility and architectural or historical value. Accepted ADRs, required provenance, relevant audits, notices/licenses and necessary evidence are not removed merely because they are old.
+- When older material has historical value but does not belong in the active tree, evaluate an archive or external storage.
+- Remove temporary branches locally and remotely after merge or closeout unless retention has an explicit purpose. A historical branch fully incorporated by a successor is a deletion candidate only after confirming that it contains no useful unique material.
+- Do not perform opportunistic destructive cleanup inside an unrelated feature.
+
+`docs/master-context` is a temporary historical branch. Its useful context is being succeeded by `docs/post-transcription-canon`; after the new master context is merged into `main` and confirmed, compare the historical branch one final time and delete its local and remote refs if no useful unique content remains. Do not keep both documentation branches as competing records without need. This note is repository housekeeping, not a product or architecture decision.
+
 ---
 
 # 22. 30-day execution objective (from 2026-09-14)

@@ -93,7 +93,7 @@ User imports, automatically found assets, generated assets and provider results 
 
 CEVRA Vids targets a non-destructive editing experience. Users must be able to make aggressive editorial changes without progressively degrading or replacing their original media. The timeline represents editable instructions, while original sources remain immutable.
 
-Preview must remain fast and responsive, so proxies, caches and intermediate renders may use lower-cost derived representations. These artifacts never become Project IR state or the final-quality source. Final export must render from original sources, original assets and the best available generated assets whenever technically applicable, avoiding unnecessary cascades of lossy re-encoding.
+Preview must remain fast and responsive, so proxies, caches and intermediate renders may use lower-cost derived representations. These artifacts may have appropriate derived metadata or project references, but they never become canonical editable audiovisual state, an alternate source of truth, or the final-quality source. Final export must render from original sources, original assets and the best available generated assets whenever technically applicable, avoiding unnecessary cascades of lossy re-encoding.
 
 Quality and productivity are co-equal product requirements. Higher quality must not make the editor needlessly slow when the perceptual gain is irrelevant, and faster execution must not introduce a silent material downgrade. Future export profiles reserve **Balanced / Equilibrado** as the intended default, with **Maximum Quality / Máxima Qualidade** and **Fast / Rápido** as explicit alternatives. These profiles are a target and are not implemented by this specification update.
 
