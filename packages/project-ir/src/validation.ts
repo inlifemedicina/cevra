@@ -302,7 +302,7 @@ function validateProjectIRv2(value: unknown): ValidationResult<ProjectIRv2> {
       if (seenSources.has(item.sourceId)) push(issues, `sourceTranscripts[${index}].sourceId`, "duplicate", `Duplicate source transcript for ${item.sourceId}.`);
       seenSources.add(item.sourceId);
     });
-    validateQuarantine((value.extensions as Record<string, unknown>)[V1_UNASSIGNED_TRANSCRIPT_EXTENSION], sourceById, issues);
+    validateQuarantine((value.extensions as Record<string, unknown>)[V1_UNASSIGNED_TRANSCRIPT_EXTENSION], issues);
   }
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: value as unknown as ProjectIRv2 };
 }
@@ -524,7 +524,7 @@ function validateProvenanceStage(stage: Record<string, unknown>, path: string, i
   }
 }
 
-function validateQuarantine(value: unknown, sourceById: Map<string, SourceLike>, issues: ValidationIssue[]): void {
+function validateQuarantine(value: unknown, issues: ValidationIssue[]): void {
   if (value === undefined) return;
   const path = `extensions.${V1_UNASSIGNED_TRANSCRIPT_EXTENSION}`;
   if (!isRecord(value)) return push(issues, path, "type", "Migration quarantine must be an object.");
@@ -532,15 +532,13 @@ function validateQuarantine(value: unknown, sourceById: Map<string, SourceLike>,
   if (value.schemaVersion !== 1 || value.originalSchemaVersion !== 1) push(issues, path, "schema", "Migration quarantine schema versions must both be 1.");
   if (!["no-eligible-source", "ambiguous-multiple-sources", "incompatible-canonical-transcript"].includes(String(value.reason))) push(issues, `${path}.reason`, "enum", "Migration quarantine reason is invalid.");
   if (!isRecord(value.payload) || !isFiniteJson(value.payload, new Set())) push(issues, `${path}.payload`, "json", "Migration quarantine payload must be a finite serializable JSON object.");
-  const expected = [...sourceById.values()].filter((source) => source.kind === "audio" || source.kind === "video").map((source) => source.id).sort();
-  const expectedReason = expected.length === 0
-    ? "no-eligible-source"
-    : sourceById.size > 1
-      ? "ambiguous-multiple-sources"
-      : "incompatible-canonical-transcript";
-  if (value.reason !== expectedReason) push(issues, `${path}.reason`, "evidence", `Migration quarantine reason must be ${expectedReason} for the current sources.`);
   if (!Array.isArray(value.eligibleSourceIdsAtMigration) || value.eligibleSourceIdsAtMigration.some((id) => !isNonEmptyString(id))) push(issues, `${path}.eligibleSourceIdsAtMigration`, "type", "eligibleSourceIdsAtMigration must contain source IDs.");
-  else if (new Set(value.eligibleSourceIdsAtMigration).size !== value.eligibleSourceIdsAtMigration.length || value.eligibleSourceIdsAtMigration.some((id, index) => id !== expected[index]) || value.eligibleSourceIdsAtMigration.length !== expected.length) push(issues, `${path}.eligibleSourceIdsAtMigration`, "evidence", "Eligible source IDs must exactly match the sorted eligible sources.");
+  else {
+    const historicalSourceIds = value.eligibleSourceIdsAtMigration as string[];
+    if (new Set(historicalSourceIds).size !== historicalSourceIds.length) push(issues, `${path}.eligibleSourceIdsAtMigration`, "duplicate", "Historical eligible source IDs must be duplicate-free.");
+    const sortedSourceIds = [...historicalSourceIds].sort();
+    if (historicalSourceIds.some((id, index) => id !== sortedSourceIds[index])) push(issues, `${path}.eligibleSourceIdsAtMigration`, "order", "Historical eligible source IDs must use canonical lexical order.");
+  }
 }
 
 function isFiniteJson(value: unknown, ancestors: Set<object>): boolean {

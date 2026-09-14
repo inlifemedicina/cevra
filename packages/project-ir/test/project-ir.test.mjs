@@ -347,16 +347,82 @@ test("migration is pure, repeated deterministic, and protects the reserved names
   assert.throws(() => migrateProject(collision), /reserved transcript quarantine/);
 });
 
-test("quarantine envelope rejects extra keys, non-finite payloads, and unsorted evidence", () => {
+test("quarantine envelope rejects invalid intrinsic evidence", () => {
   const migrated = migrateProject(v1Project({ sources: [source("b"), source("a")], transcript: wordTranscript() }));
   const extra = clone(migrated); quarantine(extra).extra = true;
   assert.equal(validateProjectIR(extra).ok, false);
   const unsorted = clone(migrated); quarantine(unsorted).eligibleSourceIdsAtMigration.reverse();
   assert.equal(validateProjectIR(unsorted).ok, false);
+  const duplicate = clone(migrated); quarantine(duplicate).eligibleSourceIdsAtMigration = ["a", "a"];
+  assert.equal(validateProjectIR(duplicate).ok, false);
+  const invalidEvidenceType = clone(migrated); quarantine(invalidEvidenceType).eligibleSourceIdsAtMigration = [42];
+  assert.equal(validateProjectIR(invalidEvidenceType).ok, false);
   const nonFinite = clone(migrated); quarantine(nonFinite).payload.bad = Infinity;
   assert.equal(validateProjectIR(nonFinite).ok, false);
-  const wrongReason = clone(migrated); quarantine(wrongReason).reason = "no-eligible-source";
-  assert.equal(validateProjectIR(wrongReason).ok, false);
+  const invalidReason = clone(migrated); quarantine(invalidReason).reason = "invalid-reason";
+  assert.equal(validateProjectIR(invalidReason).ok, false);
+});
+
+test("source.add preserves no-source quarantine evidence through undo and redo", () => {
+  let sequence = 0;
+  const raw = wordTranscript({ legacyEvidence: { keep: [true, null, "raw"] } });
+  const migrated = migrateProject(v1Project({ transcript: raw }));
+  const historicalQuarantine = clone(quarantine(migrated));
+  assert.equal(historicalQuarantine.reason, "no-eligible-source");
+  assert.deepEqual(historicalQuarantine.eligibleSourceIdsAtMigration, []);
+
+  const history = new ProjectHistory(migrated, { idGenerator: () => `add-${++sequence}`, clock: () => fixedTime });
+  const added = history.commit({ type: "source.add", source: source("later", "audio") });
+  assert.deepEqual(added.sources.map(({ id }) => id), ["later"]);
+  assert.deepEqual(added.sourceTranscripts, []);
+  assert.deepEqual(quarantine(added), historicalQuarantine);
+  assert.deepEqual(quarantine(added).payload, raw);
+  assert.equal(validateProjectIR(added).ok, true);
+
+  const undone = history.undo();
+  assert.deepEqual(undone.sources, []);
+  assert.deepEqual(quarantine(undone), historicalQuarantine);
+  assert.equal(validateProjectIR(undone).ok, true);
+
+  const redone = history.redo();
+  assert.deepEqual(redone.sources.map(({ id }) => id), ["later"]);
+  assert.deepEqual(redone.sourceTranscripts, []);
+  assert.deepEqual(quarantine(redone), historicalQuarantine);
+  assert.equal(validateProjectIR(redone).ok, true);
+});
+
+test("source.remove preserves ambiguous quarantine evidence through zero sources and undo redo", () => {
+  let sequence = 0;
+  const raw = wordTranscript({ legacyEvidence: { keep: "verbatim" } });
+  const migrated = migrateProject(v1Project({ sources: [source("b"), source("a", "audio")], transcript: raw }));
+  const historicalQuarantine = clone(quarantine(migrated));
+  assert.equal(historicalQuarantine.reason, "ambiguous-multiple-sources");
+  assert.deepEqual(historicalQuarantine.eligibleSourceIdsAtMigration, ["a", "b"]);
+
+  const history = new ProjectHistory(migrated, { idGenerator: () => `remove-${++sequence}`, clock: () => fixedTime });
+  const removedA = history.commit({ type: "source.remove", sourceId: "a" });
+  assert.deepEqual(removedA.sources.map(({ id }) => id), ["b"]);
+  assert.deepEqual(removedA.sourceTranscripts, []);
+  assert.deepEqual(quarantine(removedA), historicalQuarantine);
+  assert.deepEqual(quarantine(removedA).payload, raw);
+  assert.equal(validateProjectIR(removedA).ok, true);
+
+  const undone = history.undo();
+  assert.deepEqual(undone.sources.map(({ id }) => id), ["b", "a"]);
+  assert.deepEqual(quarantine(undone), historicalQuarantine);
+  assert.equal(validateProjectIR(undone).ok, true);
+
+  const redone = history.redo();
+  assert.deepEqual(redone.sources.map(({ id }) => id), ["b"]);
+  assert.deepEqual(quarantine(redone), historicalQuarantine);
+  assert.equal(validateProjectIR(redone).ok, true);
+
+  const removedAll = history.commit({ type: "source.remove", sourceId: "b" });
+  assert.deepEqual(removedAll.sources, []);
+  assert.deepEqual(removedAll.sourceTranscripts, []);
+  assert.deepEqual(quarantine(removedAll), historicalQuarantine);
+  assert.deepEqual(quarantine(removedAll).eligibleSourceIdsAtMigration, ["a", "b"]);
+  assert.equal(validateProjectIR(removedAll).ok, true);
 });
 
 test("source.remove cascades its transcript atomically and undo redo restore both", () => {

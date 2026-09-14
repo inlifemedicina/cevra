@@ -129,3 +129,55 @@ test("v1 package migrates active project and every snapshot independently withou
   assert.deepEqual(reopened.redo().extensions["cevra.migration.v1UnassignedTranscript"].payload, rawLegacy);
   assert.equal(reopened.undo().sourceTranscripts.length, 1);
 });
+
+test("v1 quarantine evidence survives a v2 source mutation and package round-trip", () => {
+  let sequence = 0;
+  const rawLegacy = {
+    language: "pt",
+    words: [{ id: "w1", text: "histórico", startMs: 0, endMs: 100, legacy: { keep: true } }],
+    segments: [{ id: "s1", text: "histórico", startMs: 0, endMs: 100, wordIds: ["w1"] }],
+    rawExtension: [true, null, "preserve"]
+  };
+  const legacy = legacyProject({
+    name: "Historical quarantine",
+    revision: 0,
+    sources: [],
+    transcript: rawLegacy,
+    headSnapshotId: "snapshot-0"
+  });
+  const manifest = {
+    format: "cevra-project",
+    formatVersion: 1,
+    projectId: "legacy-project",
+    projectSchemaVersion: 1,
+    activeSnapshotId: "snapshot-0",
+    createdAt: fixedTime,
+    savedAt: fixedTime,
+    defaultLocale: "pt-BR"
+  };
+  const legacyPackage = { files: {
+    "manifest.json": JSON.stringify(manifest),
+    "project.json": JSON.stringify(legacy),
+    "history/journal.jsonl": "",
+    "history/snapshots/snapshot-0.json": JSON.stringify({ id: "snapshot-0", revision: 0, createdAt: fixedTime, project: legacy })
+  }};
+
+  const history = deserializeProjectPackage(legacyPackage, {
+    idGenerator: () => `roundtrip-${++sequence}`,
+    clock: () => fixedTime
+  });
+  const historicalQuarantine = JSON.parse(JSON.stringify(history.current.extensions["cevra.migration.v1UnassignedTranscript"]));
+  assert.equal(historicalQuarantine.reason, "no-eligible-source");
+  assert.deepEqual(historicalQuarantine.eligibleSourceIdsAtMigration, []);
+  assert.deepEqual(historicalQuarantine.payload, rawLegacy);
+
+  const mutated = history.commit({ type: "source.add", source: legacySource("source-after-migration") });
+  assert.deepEqual(mutated.sourceTranscripts, []);
+  assert.deepEqual(mutated.extensions["cevra.migration.v1UnassignedTranscript"], historicalQuarantine);
+
+  const reopened = deserializeProjectPackage(serializeProjectPackage(history, fixedTime));
+  assert.deepEqual(reopened.current.sources.map(({ id }) => id), ["source-after-migration"]);
+  assert.deepEqual(reopened.current.sourceTranscripts, []);
+  assert.deepEqual(reopened.current.extensions["cevra.migration.v1UnassignedTranscript"], historicalQuarantine);
+  assert.deepEqual(reopened.current.extensions["cevra.migration.v1UnassignedTranscript"].payload, rawLegacy);
+});

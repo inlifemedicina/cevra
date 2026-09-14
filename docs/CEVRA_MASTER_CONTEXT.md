@@ -841,12 +841,12 @@ Implemented on the active Slice A branch:
 - source-scoped composed `SourceTranscript` aggregates;
 - CEVRA-owned canonical transcript serialization and `sha256-v1` digest using exact `@noble/hashes@2.4.0` only as the SHA-256 primitive;
 - frozen historical v1 validation, separate v2 validation and pure deterministic v1→v2 migration;
-- raw legacy transcript quarantine for ambiguous or incompatible ownership/content;
+- raw legacy transcript quarantine for ambiguous or incompatible ownership/content, validated as immutable migration-time evidence rather than reinterpreted against later source changes;
 - v2 factory and atomic `source.remove` transcript cascade;
 - ProjectHistory and Project Store v1-package/snapshot/cursor/round-trip compatibility without changing package format or `packages/project-store/src/codec.ts`;
 - `NOTICE` and `THIRD_PARTY_LICENSES.md` provenance/licensing for the direct MIT dependency.
 
-Current active-branch validation: package-lock/install verification passed; all workspace builds passed; 177 Node/TypeScript tests passed, including 29 Project IR and 3 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites. Slice B (`transcript.set`, `transcript.remove`, typed transcript command errors and general failed-command redo preservation) has **not** started.
+Current active-branch validation: package-lock/install verification passed; all workspace builds passed; 180 Node/TypeScript tests passed, including 31 Project IR and 4 Project Store tests; 22 Python tests passed, including the unchanged Media Runtime V1 and Local Transcription Engine V1 suites. Slice B (`transcript.set`, `transcript.remove`, typed transcript command errors and general failed-command redo preservation) has **not** started.
 
 ---
 
@@ -1180,7 +1180,7 @@ The proposal branch `arch/project-ir-v2-transcript-proposal` was removed after P
 - **IMPLEMENTED/CLOSED:** PR #13 merged accepted ADR 0014 at `3be19a4caa7e40d2dbcc878e1f7fdb663247f2e9`; its temporary architecture branch was removed and repository hygiene passed.
 - **PROPOSAL FINALIZED / IMPLEMENTATION NOT STARTED:** review preserved the central Project IR v2 design and incorporated two final hardenings: the SHA-256 primitive is an exact pinned audited external dependency while CEVRA retains canonicalization/version authority; and the v1 migration validator freezes historical acceptance while incompatible raw legacy transcript JSON is preserved in quarantine. No implementation code has started.
 - **IMPLEMENTED/CLOSED:** PR #14 merged the bounded Project IR v2 transcript implementation proposal at `525add125d040f7d0071c70d09fd2ab392fc0b8b`; `arch/project-ir-v2-transcript-proposal` was removed.
-- **IN DEVELOPMENT:** Slice A started on `feat/project-ir-v2-transcript-core` from exact base `525add125d040f7d0071c70d09fd2ab392fc0b8b`. The active branch implements schema v2, explicit v1 compatibility, source-scoped transcript digest/validation/migration/quarantine, factory, source-removal cascade and package/history compatibility. `@noble/hashes@2.4.0` is exact, MIT, zero-runtime-dependency and limited to the SHA-256 primitive; provenance files are updated. Full workspace build, 177 Node tests and 22 Python tests pass. Slice B is not started.
+- **IN DEVELOPMENT:** Slice A started on `feat/project-ir-v2-transcript-core` from exact base `525add125d040f7d0071c70d09fd2ab392fc0b8b`. The active branch implements schema v2, explicit v1 compatibility, source-scoped transcript digest/validation/migration/quarantine, factory, source-removal cascade and package/history compatibility. Quarantine evidence is preserved historically across later source changes without becoming canonical ownership. `@noble/hashes@2.4.0` is exact, MIT, zero-runtime-dependency and limited to the SHA-256 primitive; provenance files are updated. Full workspace build, 180 Node tests and 22 Python tests pass. Slice B is not started.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
