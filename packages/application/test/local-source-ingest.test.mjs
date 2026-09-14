@@ -95,7 +95,7 @@ test("ingests a local video through the media application probe and commits one 
     uri: videoUri,
     displayName: "Original Camera File.mov",
     checksum: "sha256:caller-supplied",
-    extensions: { caller: { retained: true }, "cevra.ingest": { requestTag: "take-1" } },
+    extensions: { caller: { retained: true } },
     actor: { type: "user", id: "editor-1" }
   });
 
@@ -110,7 +110,6 @@ test("ingests a local video through the media application probe and commits one 
   assert.equal(result.source.checksum, "sha256:caller-supplied");
   assert.deepEqual(result.source.extensions.caller, { retained: true });
   assert.deepEqual(result.source.extensions["cevra.ingest"], {
-    requestTag: "take-1",
     method: "local",
     probeExecutionId: "probe-generated",
     probeAttempt: 1,
@@ -155,6 +154,64 @@ test("ingests audio-only media as an audio source", async () => {
   assert.equal(result.source.sampleRate, 48_000);
   assert.equal(result.source.channels, 1);
   assert.equal(history.current.sources.length, 1);
+});
+
+test("rejects a non-serializable request before probe with a typed error and preserved cause", async () => {
+  const context = fixture(async () => assert.fail("non-serializable request must be rejected before probe"));
+
+  await assert.rejects(
+    context.service.ingest({
+      uri: videoUri,
+      displayName: "Camera.mov",
+      extensions: { value: 1n }
+    }),
+    (error) => error instanceof LocalSourceIngestError
+      && error.code === "LOCAL_SOURCE_INVALID_REQUEST"
+      && error.cause instanceof TypeError
+  );
+  assert.equal(context.media.calls.length, 0);
+  assert.equal(context.history.current.history.revision, 0);
+  assert.equal(context.history.current.sources.length, 0);
+  assert.equal(context.history.entries.length, 0);
+});
+
+test("replaces caller-supplied cevra.ingest data with authoritative probe provenance", async () => {
+  let history;
+  const context = fixture(async (request) => successfulProbe(request, history, {
+    uri: videoUri,
+    hasVideo: true,
+    hasAudio: false
+  }));
+  history = context.history;
+
+  const result = await context.service.ingest({
+    uri: videoUri,
+    displayName: "Camera.mov",
+    extensions: {
+      caller: { retained: true },
+      "cevra.ingest": {
+        method: "fake",
+        probeExecutionId: "fake",
+        engineId: "fake",
+        verified: true,
+        videoCodec: "fake-codec"
+      }
+    }
+  });
+
+  assert.deepEqual(result.source.extensions.caller, { retained: true });
+  assert.deepEqual(result.source.extensions["cevra.ingest"], {
+    method: "local",
+    probeExecutionId: "probe-generated",
+    probeAttempt: 1,
+    engineId: "cevra.media.ffmpeg",
+    engineVersion: "1.0.0",
+    engineApiVersion: 1,
+    hasVideo: true,
+    hasAudio: false
+  });
+  assert.equal("verified" in result.source.extensions["cevra.ingest"], false);
+  assert.equal("videoCodec" in result.source.extensions["cevra.ingest"], false);
 });
 
 test("rejects media without video or audio streams without mutating Project IR", async () => {
@@ -296,6 +353,29 @@ test("undo removes the ingested source and redo restores the exact source", asyn
   assert.deepEqual(history.redo().sources[0], result.source);
 });
 
+test("rejects a duplicate source id before probe without truncating the redo stack", async () => {
+  const context = fixture(async () => assert.fail("duplicate source id must be rejected before probe"));
+  context.history.commit({
+    type: "source.add",
+    source: { id: "duplicate-source", kind: "video", uri: "file:///existing.mov", displayName: "Existing" }
+  });
+  context.history.commit({ type: "project.rename", name: "Future name" });
+  context.history.undo();
+  const before = context.history.current;
+  assert.equal(context.history.canRedo, true);
+
+  await assert.rejects(
+    context.service.ingest({ uri: videoUri, displayName: "Camera.mov", sourceId: "duplicate-source" }),
+    (error) => error instanceof LocalSourceIngestError && error.code === "LOCAL_SOURCE_INVALID_REQUEST"
+  );
+  assert.equal(context.media.calls.length, 0);
+  assert.deepEqual(context.history.current, before);
+  assert.equal(context.history.canRedo, true);
+  const redone = context.history.redo();
+  assert.equal(redone.project.name, "Future name");
+  assert.equal(redone.sources[0].id, "duplicate-source");
+});
+
 test("reports a typed commit failure and keeps the previous project revision", async () => {
   let history;
   const context = fixture(async (request) => successfulProbe(request, history, {
@@ -305,16 +385,13 @@ test("reports a typed commit failure and keeps the previous project revision", a
     videoCodec: "h264"
   }));
   history = context.history;
-  history.commit({
-    type: "source.add",
-    source: { id: "duplicate-source", kind: "video", uri: "file:///existing.mov", displayName: "Existing" }
-  });
+  history.commit = () => { throw new Error("commit storage failed"); };
   const revisionBefore = history.current.history.revision;
 
   await assert.rejects(
-    context.service.ingest({ uri: videoUri, displayName: "Camera.mov", sourceId: "duplicate-source" }),
+    context.service.ingest({ uri: videoUri, displayName: "Camera.mov", sourceId: "new-source" }),
     (error) => error instanceof LocalSourceIngestError && error.code === "LOCAL_SOURCE_COMMIT_FAILED"
   );
   assert.equal(history.current.history.revision, revisionBefore);
-  assert.equal(history.current.sources.length, 1);
+  assert.equal(history.current.sources.length, 0);
 });

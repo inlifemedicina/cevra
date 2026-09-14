@@ -81,7 +81,15 @@ export class LocalSourceIngestService {
     const sourceId = request.sourceId ?? this.idGenerator();
     const probeExecutionId = this.idGenerator();
     validateRequest(request, sourceId, locale, probeExecutionId);
-    const stableRequest = clone(request);
+    let stableRequest: LocalSourceIngestRequest;
+    try {
+      stableRequest = clone(request);
+    } catch (cause) {
+      throw new LocalSourceIngestError("LOCAL_SOURCE_INVALID_REQUEST", locale, probeExecutionId, cause);
+    }
+    if (before.sources.some((source) => source.id === sourceId)) {
+      throw new LocalSourceIngestError("LOCAL_SOURCE_INVALID_REQUEST", locale, probeExecutionId);
+    }
 
     let probeOutcome: MediaExecutionOutcome;
     try {
@@ -185,7 +193,6 @@ function sourceFromProbe(
   const attempt = record.attempts.at(-1);
   if (!attempt) throw new LocalSourceIngestError("LOCAL_SOURCE_PROBE_FAILED", locale, probeExecutionId);
   const callerExtensions = clone(request.extensions ?? {});
-  const callerIngest = isRecord(callerExtensions["cevra.ingest"]) ? callerExtensions["cevra.ingest"] : {};
   return {
     id: sourceId,
     kind,
@@ -196,7 +203,6 @@ function sourceFromProbe(
     extensions: {
       ...callerExtensions,
       "cevra.ingest": {
-        ...callerIngest,
         method: "local",
         probeExecutionId: record.id,
         probeAttempt: attempt.number,
