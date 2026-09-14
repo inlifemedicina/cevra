@@ -1,5 +1,26 @@
-import type { CaptionCue, EditCommand, ProjectIR, StyleState, TimelineClip } from "./types.js";
-import { assertValidProjectIR } from "./validation.js";
+import type { CaptionCue, EditCommand, ProjectIR, SourceTranscript, StyleState, TimelineClip, TranscriptProvenanceStage } from "./types.js";
+import { computeTranscriptDigest } from "./transcript-digest.js";
+import { assertValidProjectIR, validateProjectIR } from "./validation.js";
+
+export type ProjectCommandErrorCode =
+  | "PROJECT_TRANSCRIPT_INVALID"
+  | "PROJECT_TRANSCRIPT_SOURCE_UNKNOWN"
+  | "PROJECT_TRANSCRIPT_SOURCE_INELIGIBLE"
+  | "PROJECT_TRANSCRIPT_ALREADY_EXISTS"
+  | "PROJECT_TRANSCRIPT_MISSING"
+  | "PROJECT_TRANSCRIPT_DIGEST_MISMATCH"
+  | "PROJECT_TRANSCRIPT_STALE"
+  | "PROJECT_TRANSCRIPT_NO_OP";
+
+export class ProjectCommandError extends Error {
+  readonly code: ProjectCommandErrorCode;
+
+  constructor(code: ProjectCommandErrorCode, message: string) {
+    super(message);
+    this.name = "ProjectCommandError";
+    this.code = code;
+  }
+}
 
 export function applyCommand(project: ProjectIR, command: EditCommand, now = new Date().toISOString()): ProjectIR {
   const next = clone(project);
@@ -22,6 +43,12 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
       next.sourceTranscripts = next.sourceTranscripts.filter((transcript) => transcript.sourceId !== command.sourceId);
       break;
     }
+    case "transcript.set":
+      applyTranscriptSet(next, command);
+      break;
+    case "transcript.remove":
+      applyTranscriptRemove(next, command);
+      break;
     case "track.add":
       rejectDuplicate(next.timeline.tracks, command.track.id, "track");
       next.timeline.tracks.push(clone(command.track));
@@ -62,6 +89,119 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
   next.project.updatedAt = now;
   next.timeline.durationMs = calculateTimelineDuration(next.timeline.clips);
   return assertValidProjectIR(next);
+}
+
+function applyTranscriptSet(project: ProjectIR, command: Extract<EditCommand, { type: "transcript.set" }>): void {
+  const rawCandidate: unknown = command.transcript;
+  if (!isRecord(rawCandidate) || typeof rawCandidate.sourceId !== "string" || rawCandidate.sourceId.trim().length === 0) {
+    throwTranscriptError("PROJECT_TRANSCRIPT_INVALID", "Transcript candidate must identify a valid source.");
+  }
+
+  const source = project.sources.find((item) => item.id === rawCandidate.sourceId);
+  if (!source) throwTranscriptError("PROJECT_TRANSCRIPT_SOURCE_UNKNOWN", `Unknown transcript source ${rawCandidate.sourceId}.`);
+  if (source.kind !== "audio" && source.kind !== "video") {
+    throwTranscriptError("PROJECT_TRANSCRIPT_SOURCE_INELIGIBLE", `Source ${source.id} cannot own a transcript.`);
+  }
+
+  const candidate = rawCandidate as unknown as SourceTranscript;
+  let recomputedDigest: SourceTranscript["transcriptDigest"];
+  try {
+    recomputedDigest = computeTranscriptDigest(candidate);
+  } catch {
+    throwTranscriptError("PROJECT_TRANSCRIPT_INVALID", "Transcript candidate semantic content is invalid.");
+  }
+  if (candidate.transcriptDigest !== recomputedDigest) {
+    throwTranscriptError("PROJECT_TRANSCRIPT_DIGEST_MISMATCH", "Transcript candidate digest does not match its semantic content.");
+  }
+  if (candidate.wordTiming === "unknown") {
+    throwTranscriptError("PROJECT_TRANSCRIPT_INVALID", "Migration-only unknown word timing cannot be set by a command.");
+  }
+
+  const currentIndex = project.sourceTranscripts.findIndex((item) => item.sourceId === candidate.sourceId);
+  const current = currentIndex === -1 ? undefined : project.sourceTranscripts[currentIndex];
+  let candidateCopy: SourceTranscript;
+  try {
+    candidateCopy = clone(candidate);
+  } catch {
+    throwTranscriptError("PROJECT_TRANSCRIPT_INVALID", "Transcript candidate must be serializable Project IR data.");
+  }
+  const candidateTranscripts = [...project.sourceTranscripts];
+  if (currentIndex === -1) candidateTranscripts.push(candidateCopy);
+  else candidateTranscripts[currentIndex] = candidateCopy;
+  const validation = validateProjectIR({ ...project, sourceTranscripts: candidateTranscripts });
+  if (!validation.ok) {
+    const detail = validation.issues.map((issue) => `${issue.path}: ${issue.message}`).join("\n");
+    throwTranscriptError("PROJECT_TRANSCRIPT_INVALID", `Transcript candidate is invalid:\n${detail}`);
+  }
+
+  const finalStage = candidate.provenance.stages[candidate.provenance.stages.length - 1];
+  if (!current) {
+    if (command.expectedCurrentTranscriptDigest !== undefined) {
+      throwTranscriptError("PROJECT_TRANSCRIPT_STALE", "Expected transcript no longer exists.");
+    }
+    if (isConsumingTranscriptStage(finalStage)) {
+      throwTranscriptError("PROJECT_TRANSCRIPT_STALE", "Transcript candidate has no current canonical input to consume.");
+    }
+    project.sourceTranscripts = candidateTranscripts;
+    return;
+  }
+
+  if (command.expectedCurrentTranscriptDigest === undefined) {
+    throwTranscriptError("PROJECT_TRANSCRIPT_ALREADY_EXISTS", `Source ${source.id} already owns a canonical transcript.`);
+  }
+  if (command.expectedCurrentTranscriptDigest !== current.transcriptDigest) {
+    throwTranscriptError("PROJECT_TRANSCRIPT_STALE", "Expected transcript digest is not current.");
+  }
+  if (deepEqual(candidateCopy, current)) {
+    throwTranscriptError("PROJECT_TRANSCRIPT_NO_OP", "Transcript candidate is identical to the current aggregate.");
+  }
+
+  if (candidate.transcriptDigest !== current.transcriptDigest
+    && isConsumingTranscriptStage(finalStage)
+    && finalStage.inputTranscriptDigest !== current.transcriptDigest) {
+    throwTranscriptError("PROJECT_TRANSCRIPT_STALE", "Transcript candidate was produced from a stale canonical transcript.");
+  }
+  project.sourceTranscripts = candidateTranscripts;
+}
+
+function applyTranscriptRemove(project: ProjectIR, command: Extract<EditCommand, { type: "transcript.remove" }>): void {
+  const source = project.sources.find((item) => item.id === command.sourceId);
+  if (!source) throwTranscriptError("PROJECT_TRANSCRIPT_SOURCE_UNKNOWN", `Unknown transcript source ${command.sourceId}.`);
+  if (source.kind !== "audio" && source.kind !== "video") {
+    throwTranscriptError("PROJECT_TRANSCRIPT_SOURCE_INELIGIBLE", `Source ${source.id} cannot own a transcript.`);
+  }
+  const current = project.sourceTranscripts.find((item) => item.sourceId === source.id);
+  if (!current) throwTranscriptError("PROJECT_TRANSCRIPT_MISSING", `Source ${source.id} has no canonical transcript.`);
+  if (command.expectedTranscriptDigest !== current.transcriptDigest) {
+    throwTranscriptError("PROJECT_TRANSCRIPT_STALE", "Expected transcript digest is not current.");
+  }
+  project.sourceTranscripts = project.sourceTranscripts.filter((item) => item.sourceId !== source.id);
+}
+
+function throwTranscriptError(code: ProjectCommandErrorCode, message: string): never {
+  throw new ProjectCommandError(code, message);
+}
+
+function isConsumingTranscriptStage(stage: TranscriptProvenanceStage | undefined): stage is Extract<TranscriptProvenanceStage, { inputTranscriptDigest: string }> {
+  return stage?.kind === "alignment" || stage?.kind === "speaker-attribution" || stage?.kind === "manual-correction";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function deepEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right)
+      && left.length === right.length
+      && left.every((value, index) => deepEqual(value, right[index]));
+  }
+  if (!isRecord(left) || !isRecord(right)) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && deepEqual(left[key], right[key]));
 }
 
 function applyTrim(clip: TimelineClip, command: Extract<EditCommand, { type: "clip.trim" }>): void {

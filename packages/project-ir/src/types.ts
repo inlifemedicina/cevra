@@ -300,6 +300,8 @@ export type EditCommand =
   | { type: "project.rename"; name: string }
   | { type: "source.add"; source: SourceAsset }
   | { type: "source.remove"; sourceId: Id }
+  | { type: "transcript.set"; transcript: SourceTranscript; expectedCurrentTranscriptDigest?: TranscriptDigest }
+  | { type: "transcript.remove"; sourceId: Id; expectedTranscriptDigest: TranscriptDigest }
   | { type: "track.add"; track: TimelineTrack }
   | { type: "track.remove"; trackId: Id }
   | { type: "clip.add"; clip: TimelineClip }
