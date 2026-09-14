@@ -36,6 +36,7 @@ CEVRA Vids is the first and highest-priority Orbit product: an AI-first video ed
 16. Workflow / Production Presets are versioned declarative application orchestration. They resolve only to typed validated CEVRA commands and providers and never become an arbitrary scripting, shell or filtergraph mechanism or an alternate source of truth.
 17. Orbit platform services and domain products communicate through stable contracts. Vids and future products retain independent domain boundaries and release paths.
 18. Semantic versions use `x.x.x`, but version numbers are displayed discreetly in About, Settings, diagnostics, logs and support surfaces rather than as primary branding.
+19. CEVRA editing is non-destructive: original media remains immutable; proxies, previews, caches and intermediate renders are derived artifacts rather than canonical sources. Final-quality exports use original sources and assets whenever technically applicable, while render policy balances perceptual quality, throughput, file size and target-delivery constraints.
 
 ## 3. CEVRA Vids experience target
 
@@ -110,6 +111,10 @@ Assets imported by users, found automatically, generated automatically or obtain
 - Compatible MIT capabilities may be evaluated or imported from `ffmpeg-skill`
 - No arbitrary agent-authored filtergraph in the stable execution path
 - Python helpers execute inside the CEVRA-managed runtime
+
+### Rendering and derived artifacts
+
+Preview and proxy paths may use fast disposable derivatives to preserve responsiveness. Final-quality export must not use a proxy as its master source when the original source or best available original asset can be read. Render planning avoids cascaded generational re-encoding and will use a quality/performance-balanced default policy in a future export-profile slice. Quality, throughput, file size and target constraints are co-equal inputs; no future optimization may silently violate the selected quality contract. [ADR 0013](adr/0013-nondestructive-editing-quality-performance.md) is the specific authority for this policy.
 
 ### Composition Engine
 

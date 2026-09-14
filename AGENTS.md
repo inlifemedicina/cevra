@@ -2,6 +2,8 @@
 
 These rules are authoritative for Codex, Claude Code, and any other coding agent working in this repository.
 
+Before substantial implementation, architecture work, review, or product research, read `docs/CEVRA_MASTER_CONTEXT.md` in full. `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the specific architectural authorities; the master context connects their decisions and records current milestones without replacing them. Update the master context after a material merge, accepted decision, active-work transition, or completed research finding, preferably in a dedicated documentation change. Keep verified facts separate from inferences, and never rely on a chat thread as the only record of an agreed direction.
+
 1. Read `docs/ARCHITECTURE_V1.md` before making architectural changes.
 2. `packages/project-ir` is the canonical editable audiovisual project model. UI and engines are never sources of truth.
 3. Do not add or replace a framework, engine, database, persistence model, update mechanism, or architectural pattern without an ADR and explicit product-owner approval.
@@ -31,3 +33,4 @@ These rules are authoritative for Codex, Claude Code, and any other coding agent
 27. The public MIT EDVID project is the initial Vids functional baseline. Reuse requires exact provenance and attribution; branding and trade dress must not be copied. Intentional behavior changes are documented as `DIVERGÊNCIA EDVID` with parity or superiority evidence.
 28. HyperFrames, Remotion and future composition engines remain behind `CompositionEngineAdapter`. A default requires the benchmark defined by ADR 0012; no engine is mandatory before parity evidence exists.
 29. Future packages are signed, versioned and capability-limited. Third-party packages receive no arbitrary shell, network or filesystem access by default.
+30. Editing and rendering work must preserve the non-destructive policy in ADR 0013. Original sources are immutable; proxies, previews, caches and intermediates never become final-quality sources or Project IR sources of truth. Final export uses original sources and assets whenever technically applicable. Quality and productivity are co-equal constraints: avoid unnecessary generational re-encoding and silent quality downgrade, and preserve EDVID parity unless a documented `DIVERGÊNCIA EDVID` proves equal or better behavior.
