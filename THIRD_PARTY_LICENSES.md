@@ -43,6 +43,34 @@ Every incorporated dependency, model, copied permissive source component or redi
 | SymPy | 1.14.0 | ONNX Runtime symbolic-math dependency | BSD-3-Clause | Pinned transitive dependency of the isolated Transcription Engine environment. |
 | mpmath | 1.3.0 | SymPy arbitrary-precision arithmetic dependency | BSD-3-Clause | Pinned transitive dependency of the isolated Transcription Engine environment. |
 | Systran/faster-whisper-base model | resolved asset; not bundled in this slice | Temporary V1 default multilingual model | MIT | Model assets require their own recorded resolved revision/hash before release bundling. |
+| WhisperX | 3.8.6 / `3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0` | Algorithm/protocol behavior baseline for local CTC forced alignment | BSD-2-Clause; Copyright (c) 2024 Max Bain | CEVRA adapts only the trellis, backtracking and word-boundary alignment behavior from `whisperx/alignment.py`, with rewritten closed worker/runtime integration. The WhisperX package, faster-whisper, pyannote, torchvision and torchcodec are not installed in the Alignment Runtime. |
+| PyTorch / Transformers / NumPy | 2.8.0 / 4.57.6 / 2.2.6 | Isolated local CTC inference, processor/model loading and numeric runtime | BSD-3-Clause / Apache-2.0 / BSD-3-Clause with bundled permissive component notices | Exact direct Alignment Runtime pins. Release assembly must select and hash official platform CPU artifacts and ship their complete notices. Not bundled by this slice. |
+| Portuguese Wav2Vec2 model | `jonatasgrosman/wav2vec2-large-xlsr-53-portuguese` / `634ac655299bcdc46c83bc01da9bab52d2987e4f` | Portuguese 16 kHz CTC forced alignment | Apache-2.0 | Weight `pytorch_model.bin` SHA-256 `c244caf8395a0c333bdc877e7b62ce5efea12ad8cfec0851c0fe6efb844b834e`; model and configuration artifacts are pinned in `engines/alignment/runtime/models.json`. Not committed or bundled. |
+| English Wav2Vec2 model | `facebook/wav2vec2-base-960h` / `22aad52d435eb6dbaf354bdad9b0da84ce7d6156` | English 16 kHz CTC forced alignment | Apache-2.0 | Weight `model.safetensors` SHA-256 `8aa76ab2243c81747a1f832954586bc566090c83a0ac167df6f31f0fa917d74a`; model and configuration artifacts are pinned in `engines/alignment/runtime/models.json`. Not committed or bundled. |
+
+### WhisperX BSD-2-Clause notice
+
+Copyright (c) 2024, Max Bain
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Planned / under evaluation
 

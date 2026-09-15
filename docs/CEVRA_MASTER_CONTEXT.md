@@ -974,6 +974,27 @@ false-unsaved possibility; F7 retry after runtime corruption; F8 checkpoint
 validation cost proportional to project size; and F9 future Windows filesystem
 semantics.
 
+## 16A.3 Local Forced Alignment V1 — IN DEVELOPMENT
+
+Branch `feat/local-forced-alignment-v1` starts from canonical main
+`95df49a9788e509be19e8dfe63d2a7ca668258a5`. ADR 0017 selects a
+provider-neutral alignment engine contract and an isolated managed CPython 3.12
+CTC environment. The application prepares a disposable PCM WAV through the
+existing Media Runtime `extract-audio` operation, treats the engine output only
+as an untrusted candidate, and promotes a complete aligned source transcript
+through the existing digest-guarded `transcript.set` and `ProjectHistory` path.
+
+The behavior baseline is WhisperX v3.8.6 exact commit
+`3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0` under BSD-2-Clause. CEVRA adapts
+only its forced-alignment trellis/backtracking/word-boundary behavior and does
+not install the full WhisperX application, faster-whisper, pyannote,
+torchvision or torchcodec in the Alignment Runtime. PT and EN CTC model
+snapshots are exact revision/hash pins under Apache-2.0. Model download remains
+disabled, weights remain outside Git, and packaged capability remains gated on
+future audited runtime/model assembly. No transcript cache, diarization,
+Project IR schema change, Media Runtime surface change or Tauri/WebView command
+is part of this slice.
+
 ---
 
 # 17. Competitive/product research register
@@ -1216,7 +1237,7 @@ Foundation / Media Runtime       [CLOSED]
 → Desktop UI Shell V0.1          [CLOSED]
 → Desktop Runtime Integration V1 [CLOSED]
 → Project Persistence V1         [CLOSED]
-→ Local Forced Alignment V1
+→ Local Forced Alignment V1      [IN DEVELOPMENT]
 → Transcript Cache V1
 → editorial transcript / analysis
 → strategy / take selection / cut planning
@@ -1251,12 +1272,12 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After Project Persistence V1 merged in PR #20:
+At the start of Local Forced Alignment V1:
 
-`a36c5c56d5b0791cf4732550aac7f6adffed2bfa`
+`95df49a9788e509be19e8dfe63d2a7ca668258a5`
 
-This is the implementation-bearing canonical `main` for the completed Project
-Persistence V1 milestone, before its documentation-only closeout.
+This is the exact canonical `main` base after the Project Persistence V1
+documentation closeout.
 
 ## 24.2 Important merged milestones
 
@@ -1281,12 +1302,12 @@ Persistence V1 milestone, before its documentation-only closeout.
 
 | Branch | Status |
 |---|---|
-| None | No material feature slice is active; Local Forced Alignment V1 is the next dependency-correct implementation slice and has not started. |
+| `feat/local-forced-alignment-v1` | Local Forced Alignment V1 IN DEVELOPMENT from exact base `95df49a9788e509be19e8dfe63d2a7ca668258a5`. |
 
 The proposal, both Project IR v2 Slice A/B, Application Transcript Persistence
 and Desktop UI Shell branches were removed after their merges. Desktop Runtime
 Integration V1 was removed after merge. Project Persistence V1 was also removed
-after merge. No successor feature branch has been created.
+after merge. The Local Forced Alignment V1 branch is now active.
 
 ---
 
@@ -1329,6 +1350,7 @@ after merge. No successor feature branch has been created.
 - **IMPLEMENTED/CLOSED:** Desktop UI Shell V0.1 merged in PR #18 at `6c6d0bd64590daffed962ecf64f84405e39f9606`. The approved Adaptive Hybrid shell, source-scoped transcript presentation, separated project/workspace selection, truthful demo status and least-privilege Tauri window are implemented; `feat/desktop-ui-shell-v0-1` was removed locally and remotely.
 - **IMPLEMENTED/CLOSED:** Desktop Runtime Integration V1 merged in PR #19 at `1c6e512e54e49bbec18b8b1afee6f96afc544d7c`. ADR 0015, the narrow Tauri ACL, supervised private Node host, native ingest, configured local transcription, cancellation and real ProjectHistory undo/redo are closed; the feature branch was removed.
 - **IMPLEMENTED/CLOSED:** Project Persistence V1 merged in PR #20 at `a36c5c56d5b0791cf4732550aac7f6adffed2bfa`. ADR 0016 is implemented through trusted app-data ownership, one exclusive live PID/token writer, canonical Project Store current/previous checkpoints, strict I/O-versus-corruption classification, bounded quarantine/fail-closed recovery and one bounded host-process restart without operation replay. Original media is not copied, the WebView privilege boundary is unchanged, post-merge CI run `34980502753` passed 4/4 jobs, and `feat/project-persistence-v1` was removed. Non-blocking findings F5–F9 remain explicit post-V1 backlog.
+- **IN DEVELOPMENT:** Local Forced Alignment V1 on `feat/local-forced-alignment-v1` from exact base `95df49a9788e509be19e8dfe63d2a7ca668258a5`. ADR 0017 adds a provider-neutral `AlignmentEngineAdapter`, isolated CTC runtime and application-owned stale-digest promotion through existing `transcript.set`/`ProjectHistory`. It adapts only forced-alignment behavior from BSD-2-Clause WhisperX v3.8.6 commit `3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0`, pins Apache-2.0 PT/EN model revisions and hashes, keeps downloads disabled, and adds no cache, diarization, Project IR migration, Media Runtime operation or UI/Tauri permission. Runtime/model packaging remains a later gate.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1339,7 +1361,7 @@ Do not guess these in future chats:
 
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
 2. **SUPERSEDED / RESOLVED by PR #14:** the finalized bounded Project IR v2 implementation plan merged before Slice A began;
-3. WhisperX/forced-alignment adapter, model and integration details; provider-neutral alignment status semantics are closed by ADR 0014;
+3. **RESOLVED IN DEVELOPMENT by ADR 0017:** provider-neutral local CTC forced-alignment adapter, PT/EN model pins and stale-digest application integration; packaging/model-manager distribution remains unresolved;
 4. final transcript cache schema, key and invalidation policy;
 5. final transcription model default for production quality;
 6. production transcription-runtime assembly/update mechanism;
@@ -1370,7 +1392,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Begin the next dependency-correct material slice only after explicit task authorization: Local Forced Alignment V1, behind a provider-neutral adapter, promoting a stale-digest-guarded aligned result through the existing canonical `transcript.set` and ProjectHistory boundaries. Keep transcript cache as a separate later slice.
+1. Complete independent review, PR and merge closeout for Local Forced Alignment V1; do not begin Transcript Cache V1 on this branch.
 2. Do not reopen the closed Application Transcript Persistence, Local Transcription Engine V1 or Project IR v2 Slices A/B.
 3. Preserve the provider-neutral flow from authorized source through `TranscriptionEngineAdapter` and guarded Project History promotion.
 4. Validate the ADR 0015 supervised private-host path from native picker through existing application services, canonical ProjectHistory and source-scoped transcript presentation.
