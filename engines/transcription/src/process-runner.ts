@@ -388,8 +388,9 @@ async function collectWorkerResult(
     child.once("error", onChildError);
     child.once("close", onClose);
     if (signal?.aborted) abort();
-    // Keep the one-request pipe open while inference runs. The Python worker
-    // watches this pipe and exits if its supervising Node process dies.
+    // One-request parent-liveness contract: write exactly one JSON request, keep
+    // stdin open while the worker runs, read its result, and let process exit close
+    // the pipe. EOF before worker termination means supervising-parent loss.
     child.stdin.write(`${JSON.stringify(payload)}\n`);
   });
 }

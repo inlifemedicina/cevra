@@ -231,6 +231,9 @@ describe("CEVRA Vids desktop shell", () => {
 
   it("maintains exact PT-BR and EN-US catalog key parity", () => {
     expect(translationKeys("pt-BR")).toEqual(translationKeys("en-US"));
+    expect(translate("en-US", "runtime.hostUnavailable")).toBe("The local session has ended. Restart CEVRA to start a new session. Unsaved changes cannot be recovered yet.");
+    expect(translate("en-US", "composition.empty")).toBe("Import media to start composing.");
+    expect(translate("en-US", "audio.empty")).toBe("Import media with audio to get started.");
   });
 
   it("declares every execution capability unavailable in DemoDesktopBackend", async () => {
@@ -296,6 +299,21 @@ describe("CEVRA Vids desktop shell", () => {
     expect(screen.getByRole("slider", { name: "Régua e cursor da linha do tempo" }).getAttribute("aria-valuemax")).toBe("0");
     expect(screen.getByTestId("preview-timecode").textContent).toContain("00:00:00 / 00:00:00");
     expect(screen.getByTestId("app-shell").dataset.activeSourceId).toBeUndefined();
+  });
+
+  it("keeps a production empty Composition workspace free of fabricated assets", async () => {
+    const { user } = await renderFunctional();
+    await user.click(within(screen.getByRole("tablist", { name: "Espaços de trabalho do editor" })).getByRole("tab", { name: "Composição" }));
+    expect(screen.getByText("Importe mídia para começar a compor.")).toBeTruthy();
+    expect(document.querySelectorAll(".composition-card")).toHaveLength(0);
+  });
+
+  it("keeps a production empty Audio workspace free of fabricated channels and levels", async () => {
+    const { user } = await renderFunctional();
+    await user.click(within(screen.getByRole("tablist", { name: "Espaços de trabalho do editor" })).getByRole("tab", { name: "Áudio" }));
+    expect(screen.getByText("Importe mídia com áudio para começar.")).toBeTruthy();
+    expect(document.querySelectorAll(".audio-channel")).toHaveLength(0);
+    expect(screen.queryByText(/dB/)).toBeNull();
   });
 
   it("imports through the backend and selects the returned canonical source", async () => {
@@ -373,7 +391,7 @@ describe("CEVRA Vids desktop shell", () => {
     const backend = new FunctionalDesktopBackend();
     backend.loadState = async () => { throw { code: "HOST_START_FAILED" }; };
     render(<App backend={backend} />);
-    expect(await screen.findByText("A sessão local ficou indisponível e não será reiniciada sem recuperação persistente.")).toBeTruthy();
+    expect(await screen.findByText("A sessão local foi encerrada. Reinicie o CEVRA para iniciar uma nova sessão. Alterações não salvas ainda não podem ser recuperadas.")).toBeTruthy();
   });
 
   it("maps import conflicts without falsely terminating the host session", async () => {
@@ -470,8 +488,8 @@ describe("CEVRA Vids desktop shell", () => {
     backend.pickAndImportMedia = async () => { throw { code: "HOST_UNAVAILABLE" }; };
     const { user } = await renderFunctional(backend);
     await user.click(screen.getByRole("button", { name: "Importar" }));
-    expect((await screen.findByRole("alert")).textContent).toContain("A sessão local ficou indisponível");
-    const failureCopies = screen.getAllByText("A sessão local ficou indisponível e não será reiniciada sem recuperação persistente.");
+    expect((await screen.findByRole("alert")).textContent).toContain("Reinicie o CEVRA para iniciar uma nova sessão");
+    const failureCopies = screen.getAllByText("A sessão local foi encerrada. Reinicie o CEVRA para iniciar uma nova sessão. Alterações não salvas ainda não podem ser recuperadas.");
     expect(failureCopies.length).toBeGreaterThan(0);
     expect(failureCopies.some((element) => element.classList.contains("failed-status"))).toBe(true);
     expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);

@@ -960,6 +960,92 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn mutating_timeout_returns_a_late_canonical_success_without_cross_routing() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor
+            .ensure_started_with(|| Ok(launched))
+            .await
+            .unwrap();
+
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move {
+                supervisor
+                    .request_mutating(
+                        "media.ingestLocal",
+                        json!({ "operationId": "op-late-success" }),
+                        "op-late-success",
+                    )
+                    .await
+            })
+        };
+        let original = wait_for_write(&control, "media.ingestLocal").await;
+        wait_for_write(&control, "operation.cancel").await;
+        let canonical = json!({ "project": { "history": { "revision": 1 } } });
+        control.send_result(original["id"].as_str().unwrap(), canonical.clone());
+        assert_eq!(operation.await.unwrap().unwrap(), canonical);
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
+
+        let next = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(
+                async move { supervisor.request_control("after-success", json!({})).await },
+            )
+        };
+        let next_request = wait_for_write(&control, "after-success").await;
+        control.send_result(original["id"].as_str().unwrap(), json!("stale-duplicate"));
+        control.send_result(next_request["id"].as_str().unwrap(), json!("next-result"));
+        assert_eq!(next.await.unwrap().unwrap(), json!("next-result"));
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+    }
+
+    #[tokio::test]
+    async fn immediate_mutation_timeout_terminally_fails_and_cannot_restart_session() {
+        let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor
+            .ensure_started_with(|| Ok(launched))
+            .await
+            .unwrap();
+
+        let error = supervisor
+            .request_immediate_mutation("history.undo", json!({}))
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, "HOST_UNAVAILABLE");
+        assert_eq!(supervisor.core.state(), Lifecycle::Failed);
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 1);
+
+        let original = control.request("history.undo");
+        control.send_result(original["id"].as_str().unwrap(), json!({ "late": true }));
+        assert_eq!(supervisor.core.state(), Lifecycle::Failed);
+        assert_eq!(
+            supervisor
+                .request_control("project.snapshot", json!({}))
+                .await
+                .unwrap_err()
+                .code,
+            "HOST_UNAVAILABLE"
+        );
+        let launches = AtomicUsize::new(0);
+        assert_eq!(
+            supervisor
+                .ensure_started_with(|| {
+                    launches.fetch_add(1, Ordering::Relaxed);
+                    Ok(fake_launch(HelloMode::Valid, true, false).0)
+                })
+                .await
+                .unwrap_err()
+                .code,
+            "HOST_UNAVAILABLE"
+        );
+        assert_eq!(launches.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
     async fn malformed_stdout_fails_session_and_rejects_pending() {
         let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
         let (launched, control) = fake_launch(HelloMode::Valid, true, false);

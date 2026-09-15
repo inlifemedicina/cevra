@@ -936,8 +936,12 @@ truthfully unavailable without those fixed trusted resources. The model snapshot
 presence check is not an integrity claim; the existing adapter healthcheck remains
 authoritative and fail-closed. CI verifies both Node target archives, the exact
 Tauri resource/external-binary contract, and bundled worker-path resolution.
-Local pre-PR hardening validation is 261/261 Node/TypeScript tests, 22/22 Python
-tests, and 19/19 Rust tests; the slice remains **IN DEVELOPMENT** pending review.
+Final pre-PR lifecycle hardening moves the transcription parent-liveness watchdog
+to raw file-descriptor reads, proves normal real-worker completion and abnormal
+parent-death containment, closes command-ACL and mutation-timeout test gaps, and
+keeps real empty Composition/Audio workspaces free of presentation fixtures.
+Local validation is 266/266 Node/TypeScript tests, 22/22 Python tests, and 22/22
+Rust tests; the slice remains **IN DEVELOPMENT** pending review.
 
 ---
 

@@ -83,6 +83,14 @@ reaps its active subprocess. Native-process tests exercise both chains with real
 PIDs. A malformed protocol or non-settling mutation permanently fails the
 memory-only session.
 
+The transcription worker protocol is one request with an explicit stdin-lifetime
+contract: the parent starts the worker, writes exactly one request, keeps the
+stdin pipe open as the parent-liveness channel, reads the result, waits for the
+worker to exit, and only then lets the pipe close. Stdin EOF is not a normal
+request terminator; EOF while the worker is active means parent loss or a contract
+violation. The watchdog blocks directly on raw file descriptor 0 so normal
+CPython shutdown never contends with buffered stdin finalization.
+
 Control requests use bounded timeouts. A long mutation timeout triggers its
 operation cancellation and awaits settlement; after a cancelled/error settlement
 the supervisor requests a fresh canonical snapshot and returns it as reconciliation

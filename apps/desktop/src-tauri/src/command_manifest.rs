@@ -14,18 +14,44 @@ mod tests {
     use serde_json::Value;
     use std::collections::BTreeSet;
 
-    #[test]
-    fn invoke_handler_manifest_and_capability_are_exactly_aligned() {
-        let main_source = include_str!("main.rs");
-        let handler = main_source
+    fn registered_commands(source: &str) -> BTreeSet<&str> {
+        source
             .split("tauri::generate_handler![")
             .nth(1)
             .and_then(|value| value.split(']').next())
-            .expect("invoke handler must remain statically declared");
-        let registered = handler
-            .split(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
-            .filter(|value| value.starts_with("desktop_"))
-            .collect::<BTreeSet<_>>();
+            .expect("invoke handler must remain statically declared")
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| {
+                assert!(
+                    value
+                        .chars()
+                        .all(|character| character.is_ascii_alphanumeric()
+                            || character == '_'
+                            || character == ':'),
+                    "invoke handler commands must be plain identifiers"
+                );
+                value.rsplit("::").next().expect("command identifier")
+            })
+            .collect()
+    }
+
+    #[test]
+    fn invoke_handler_extraction_does_not_depend_on_command_prefixes() {
+        let registered = registered_commands(
+            "tauri::generate_handler![desktop_get_state, future_application_command]",
+        );
+        assert_eq!(
+            registered,
+            BTreeSet::from(["desktop_get_state", "future_application_command"])
+        );
+    }
+
+    #[test]
+    fn invoke_handler_manifest_and_capability_are_exactly_aligned() {
+        let main_source = include_str!("main.rs");
+        let registered = registered_commands(main_source);
         let approved = APPLICATION_COMMANDS
             .iter()
             .copied()

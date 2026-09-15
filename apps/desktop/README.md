@@ -74,8 +74,8 @@ production remains platform-specific, so this slice uses the deterministic
 resource contract plus Tauri `--no-bundle` compilation rather than claiming a
 cross-platform signed installer.
 
-Current pre-PR hardening validation passes 261 Node/TypeScript tests (including
-38 desktop UI and 16 desktop-host tests), 22 Python tests, and 19 Rust tests.
+Current pre-PR hardening validation passes 266 Node/TypeScript tests (including
+40 desktop UI and 16 desktop-host tests), 22 Python tests, and 22 Rust tests.
 The frontend production build, `cargo check --locked`, optimized Tauri
 `--no-bundle` build, native descendant-containment tests, and private-Node
 protocol smoke also pass locally.

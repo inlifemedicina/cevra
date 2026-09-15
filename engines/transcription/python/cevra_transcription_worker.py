@@ -73,10 +73,15 @@ def _validate_initial_message(message: object) -> None:
 
 
 def _start_parent_pipe_watchdog() -> None:
-    """Exit immediately when the supervising Node process closes its stdin pipe."""
+    """Watch raw fd 0 as a parent-liveness channel and exit immediately on EOF.
+
+    The parent writes exactly one request but deliberately keeps stdin open until
+    this process exits. EOF while the worker is active therefore means that the
+    supervising Node process is gone or has violated the worker lifecycle contract.
+    """
     def watch_parent_pipe() -> None:
         try:
-            while sys.stdin.buffer.read(1):
+            while os.read(0, 1):
                 pass
         except (OSError, ValueError):
             pass
