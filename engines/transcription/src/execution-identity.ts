@@ -20,7 +20,12 @@ const MAX_MODEL_FILES = 512;
 interface ModelFingerprint {
   revision: string;
   digest: `sha256:${string}`;
-  detector: string;
+  detector: string | undefined;
+}
+
+export interface FasterWhisperModelIdentityResolverOptions {
+  /** Test/diagnostic seam invoked only when an artifact's bytes are cryptographically rehashed. */
+  onArtifactHashed?: (relativePath: string) => void;
 }
 
 interface ResolvedModelDirectory { directory: string; artifactRoot: string; revision: string }
@@ -28,20 +33,29 @@ interface ResolvedModelDirectory { directory: string; artifactRoot: string; revi
 export class FasterWhisperModelIdentityResolver {
   private memo: ModelFingerprint | undefined;
 
-  constructor(private readonly profile: FasterWhisperProfile, private readonly modelId: SupportedTranscriptionModelId) {}
+  constructor(
+    private readonly profile: FasterWhisperProfile,
+    private readonly modelId: SupportedTranscriptionModelId,
+    private readonly options: FasterWhisperModelIdentityResolverOptions = {}
+  ) {}
 
   async describe(signal?: AbortSignal): Promise<TranscriptionExecutionIdentity | undefined> {
     try {
+      if (this.profile.device === "auto" || this.profile.computeType === "default") return undefined;
       const resolved = await resolveModelDirectory(this.profile, this.modelId);
       if (!resolved) return undefined;
       const files = await inventoryFiles(resolved.directory, resolved.artifactRoot, signal);
-      const detector = files.map((file) => `${file.path}\0${file.size}\0${file.mtimeMs}`).join("\n");
+      const metadataSupportsMemo = files.every((file) => file.dev !== "0" && file.ino !== "0" && file.mtimeNs !== "0" && file.ctimeNs !== "0");
+      const detector = metadataSupportsMemo ? files.map((file) => [
+        file.path, file.resolvedIdentity, file.dev, file.ino, file.size, file.mtimeNs, file.ctimeNs
+      ].join("\0")).join("\n") : undefined;
       let fingerprint = this.memo;
-      if (!fingerprint || fingerprint.revision !== resolved.revision || fingerprint.detector !== detector) {
+      if (!detector || !fingerprint || fingerprint.revision !== resolved.revision || fingerprint.detector !== detector) {
         const manifest: string[] = [];
         for (const file of files) {
           throwIfAborted(signal);
           manifest.push(`${file.path}\0${file.size}\0${await hashFile(file.absolute, signal)}`);
+          this.options.onArtifactHashed?.(file.path);
         }
         fingerprint = {
           revision: resolved.revision,
@@ -101,31 +115,61 @@ async function resolveModelDirectory(profile: FasterWhisperProfile, modelId: Sup
   return { directory: root, artifactRoot: root, revision: profile.trustedModelRevision };
 }
 
-async function inventoryFiles(root: string, artifactRoot: string, signal?: AbortSignal): Promise<Array<{ path: string; absolute: string; size: number; mtimeMs: number }>> {
-  const output: Array<{ path: string; absolute: string; size: number; mtimeMs: number }> = [];
+interface ModelArtifactState {
+  path: string;
+  absolute: string;
+  resolvedIdentity: string;
+  dev: string;
+  ino: string;
+  size: string;
+  mtimeNs: string;
+  ctimeNs: string;
+}
+
+async function inventoryFiles(root: string, artifactRoot: string, signal?: AbortSignal): Promise<ModelArtifactState[]> {
+  const output: ModelArtifactState[] = [];
   async function walk(directory: string): Promise<void> {
     throwIfAborted(signal);
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       const absolute = join(directory, entry.name);
       if (entry.isDirectory()) await walk(absolute);
       else if (entry.isFile()) {
-        const metadata = await lstat(absolute);
+        const metadata = await lstat(absolute, { bigint: true });
         if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Model artifact changed during inventory.");
-        output.push({ path: relative(root, absolute).split(sep).join("/"), absolute, size: metadata.size, mtimeMs: metadata.mtimeMs });
+        const resolvedIdentity = await realpath(absolute);
+        output.push(modelArtifactState(root, absolute, resolvedIdentity, metadata));
         if (output.length > MAX_MODEL_FILES) throw new Error("Model artifact inventory is too large.");
       } else if (entry.isSymbolicLink()) {
         const target = await realpath(absolute);
         if (target !== artifactRoot && !target.startsWith(`${artifactRoot}${sep}`)) throw new Error("Model artifact symlink escapes its trusted repository.");
-        const metadata = await lstat(target);
+        const metadata = await lstat(target, { bigint: true });
         if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Model artifact symlink target is invalid.");
-        output.push({ path: relative(root, absolute).split(sep).join("/"), absolute: target, size: metadata.size, mtimeMs: metadata.mtimeMs });
+        output.push(modelArtifactState(root, absolute, target, metadata));
         if (output.length > MAX_MODEL_FILES) throw new Error("Model artifact inventory is too large.");
       } else throw new Error("Model artifact is not a regular file.");
     }
   }
   await walk(root);
   if (output.length === 0) throw new Error("Model artifact inventory is empty.");
-  return output.sort((a, b) => a.path.localeCompare(b.path, "en"));
+  return output.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+}
+
+function modelArtifactState(
+  root: string,
+  logicalPath: string,
+  resolvedIdentity: string,
+  metadata: { dev: bigint; ino: bigint; size: bigint; mtimeNs: bigint; ctimeNs: bigint }
+): ModelArtifactState {
+  return {
+    path: relative(root, logicalPath).split(sep).join("/"),
+    absolute: resolvedIdentity,
+    resolvedIdentity,
+    dev: metadata.dev.toString(),
+    ino: metadata.ino.toString(),
+    size: metadata.size.toString(),
+    mtimeNs: metadata.mtimeNs.toString(),
+    ctimeNs: metadata.ctimeNs.toString()
+  };
 }
 
 async function hashFile(path: string, signal?: AbortSignal): Promise<string> {

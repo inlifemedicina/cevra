@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rename, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -35,6 +35,58 @@ test("direct model directories require an explicit trusted revision", async () =
   assert.equal(await new FasterWhisperModelIdentityResolver({ modelCacheDir: root }, "base").describe(), undefined);
   const exact = await new FasterWhisperModelIdentityResolver({ modelCacheDir: root, trustedModelRevision: revision }, "base").describe();
   assert.equal(exact.modelRevision, revision);
+}));
+
+test("model fingerprint memo invalidates same-size restored-mtime writes and reuses unchanged state", async () => withTemp(async (root) => {
+  const model = join(root, "model.bin");
+  await writeFile(join(root, "config.json"), "{}");
+  await writeFile(model, "model-v1");
+  const beforeMetadata = await stat(model);
+  const hashed = [];
+  const resolver = new FasterWhisperModelIdentityResolver(
+    { modelCacheDir: root, trustedModelRevision: revision, device: "cpu", computeType: "int8" },
+    "base",
+    { onArtifactHashed: (path) => hashed.push(path) }
+  );
+  const first = await resolver.describe();
+  const firstHashCount = hashed.length;
+  assert.ok(firstHashCount > 0);
+  assert.equal((await resolver.describe()).modelArtifactDigest, first.modelArtifactDigest);
+  assert.equal(hashed.length, firstHashCount, "unchanged artifacts must reuse the strong memo");
+  await writeFile(model, "model-v2");
+  await utimes(model, beforeMetadata.atime, beforeMetadata.mtime);
+  const changed = await resolver.describe();
+  assert.notEqual(changed.modelArtifactDigest, first.modelArtifactDigest);
+  assert.equal(hashed.length, firstHashCount * 2, "changed metadata must trigger a complete strong rehash");
+}));
+
+test("model fingerprint memo invalidates atomic same-size replacement with restored mtime", async () => withTemp(async (root) => {
+  const model = join(root, "model.bin");
+  const replacement = join(root, "replacement.bin");
+  await writeFile(join(root, "config.json"), "{}");
+  await writeFile(model, "model-v1");
+  const beforeMetadata = await stat(model);
+  const resolver = new FasterWhisperModelIdentityResolver({ modelCacheDir: root, trustedModelRevision: revision, device: "cpu", computeType: "int8" }, "base");
+  const first = await resolver.describe();
+  await writeFile(replacement, "model-v2");
+  await utimes(replacement, beforeMetadata.atime, beforeMetadata.mtime);
+  await rename(replacement, model);
+  const changed = await resolver.describe();
+  assert.notEqual(changed.modelArtifactDigest, first.modelArtifactDigest);
+}));
+
+test("only fixed device and compute profiles produce an exact cache identity", async () => withTemp(async (root) => {
+  await writeFile(join(root, "config.json"), "{}");
+  await writeFile(join(root, "model.bin"), "model");
+  const profile = { modelCacheDir: root, trustedModelRevision: revision };
+  const cpu = await new FasterWhisperModelIdentityResolver({ ...profile, device: "cpu", computeType: "int8" }, "base").describe();
+  const cuda = await new FasterWhisperModelIdentityResolver({ ...profile, device: "cuda", computeType: "float16" }, "base").describe();
+  assert.equal(cpu.effectiveDevice, "cpu");
+  assert.equal(cpu.computeType, "int8");
+  assert.equal(cuda.effectiveDevice, "cuda");
+  assert.equal(cuda.computeType, "float16");
+  assert.equal(await new FasterWhisperModelIdentityResolver({ ...profile, device: "auto", computeType: "int8" }, "base").describe(), undefined);
+  assert.equal(await new FasterWhisperModelIdentityResolver({ ...profile, device: "cpu", computeType: "default" }, "base").describe(), undefined);
 }));
 
 test("snapshot symlink escaping the trusted model repository makes identity unavailable", async () => withTemp(async (root) => {

@@ -75,7 +75,11 @@ class AlignmentMemoryCache {
 }
 function cacheableAlignmentEngine(impl) {
   const engine = new Engine(impl);
-  engine.describeAlignmentExecution = async () => structuredClone(alignmentExecutionIdentity);
+  engine.executionIdentityCalls = 0;
+  engine.describeAlignmentExecution = async () => {
+    engine.executionIdentityCalls++;
+    return structuredClone(alignmentExecutionIdentity);
+  };
   return engine;
 }
 function cacheableMedia(counter) {
@@ -289,14 +293,62 @@ test("alignment cache MISS writes and HIT bypasses PCM extraction and alignment 
   const first = setup({ engine: firstEngine, media: cacheableMedia(mediaCalls), additions: { cache, sourceIdentity: { identify: async () => structuredClone(alignmentSourceIdentity) } } });
   const generated = await first.service.alignSource({ sourceId: "source-1", id: "producer" });
   assert.equal(generated.cacheStatus, "miss"); assert.equal(mediaCalls.calls, 1); assert.equal(firstEngine.calls.length, 1); assert.equal(cache.writes, 1);
+  assert.equal(firstEngine.executionIdentityCalls, 2, "fresh execution verifies identity before and after alignment");
 
   const hitMedia = { calls: 0 };
   const hitEngine = cacheableAlignmentEngine(async () => assert.fail("cache hit must not align"));
   const second = setup({ engine: hitEngine, media: cacheableMedia(hitMedia), additions: { cache, sourceIdentity: { identify: async () => structuredClone(alignmentSourceIdentity) } } });
   const reused = await second.service.alignSource({ sourceId: "source-1", id: "consumer" });
   assert.equal(reused.cacheStatus, "hit"); assert.equal(hitMedia.calls, 0); assert.equal(hitEngine.calls.length, 0);
+  assert.equal(hitEngine.executionIdentityCalls, 1, "cache hit performs one current identity verification");
   assert.equal(reused.sourceTranscript.provenance.stages.at(-1).executionId, "producer");
   assert.equal(reused.sourceTranscript.provenance.stages.at(-1).createdAt, now);
+});
+
+test("fresh alignment timestamps the cleaned producer result and cache HIT preserves that producer time", async () => {
+  const cache = new AlignmentMemoryCache();
+  const producedAt = "2026-09-15T12:02:00.000Z";
+  let phase = "lookup";
+  let freshClockCalls = 0;
+  const engine = cacheableAlignmentEngine(async (request) => {
+    assert.equal(freshClockCalls, 0, "producer clock must not run before engine completion");
+    phase = "produced";
+    return aligned(request.transcript);
+  });
+  const audioWorkspace = {
+    async acquire() {
+      return { outputUri: "/tmp/cevra-alignment/audio.wav", async release() { assert.equal(phase, "produced"); phase = "cleaned"; } };
+    }
+  };
+  const sourceIdentity = { identify: async () => structuredClone(alignmentSourceIdentity) };
+  const fresh = setup({
+    engine,
+    media: cacheableMedia({ calls: 0 }),
+    audioWorkspace,
+    additions: {
+      cache,
+      sourceIdentity,
+      clock: () => { freshClockCalls++; assert.equal(phase, "cleaned"); return producedAt; }
+    }
+  });
+  const generated = await fresh.service.alignSource({ sourceId: "source-1", id: "original-aligner" });
+  assert.equal(freshClockCalls, 1);
+  assert.equal(generated.sourceTranscript.provenance.stages.at(-1).createdAt, producedAt);
+
+  let hitClockCalls = 0;
+  const hit = setup({
+    engine: cacheableAlignmentEngine(async () => assert.fail("cache hit must bypass engine")),
+    media: cacheableMedia({ calls: 0 }),
+    additions: {
+      cache,
+      sourceIdentity,
+      clock: () => { hitClockCalls++; throw new Error("consumer clock must not replace cached producer time"); }
+    }
+  });
+  const reused = await hit.service.alignSource({ sourceId: "source-1", id: "consumer-aligner" });
+  assert.equal(hitClockCalls, 0);
+  assert.equal(reused.sourceTranscript.provenance.stages.at(-1).createdAt, producedAt);
+  assert.equal(reused.sourceTranscript.provenance.stages.at(-1).executionId, "original-aligner");
 });
 
 test("alignment cache write failure still promotes and corrupt payload falls back to fresh execution", async () => {

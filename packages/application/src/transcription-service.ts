@@ -124,7 +124,7 @@ export class TranscriptionApplicationService {
     let result: TranscriptionResult | undefined;
     let candidate: SourceTranscript | undefined;
     let producerExecutionId = executionId;
-    let producedAt = this.clock();
+    let producedAt: string | undefined;
     if (normalized.cachePolicy === "prefer" && cacheKey && this.cache) {
       try {
         const cached = await this.cache.read(cacheKey, signal);
@@ -146,6 +146,7 @@ export class TranscriptionApplicationService {
       catch (cause) { if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause); throw appError("TRANSCRIPTION_APP_ENGINE_FAILED", locale, executionId, cause); }
       try { result = validateTranscriptionResult(rawResult, normalized.wordTimestamps); assertResultIdentity(result, executionBefore); }
       catch (cause) { throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId, cause); }
+      producedAt = this.clock();
       try { candidate = buildCandidate(source.id, source.checksum, result, identity, executionBefore, executionId, producedAt); }
       catch (cause) { throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId, cause); }
       assertNotCancelled(signal, locale, executionId);
@@ -156,7 +157,7 @@ export class TranscriptionApplicationService {
       }
     }
 
-    if (!candidate) throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId);
+    if (!candidate || !producedAt) throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId);
 
     const latest = this.history.current;
     if (latest.project.id !== beforeMarker.projectId || latest.history.revision !== beforeMarker.revision || latest.history.headSnapshotId !== beforeMarker.snapshot) throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId);

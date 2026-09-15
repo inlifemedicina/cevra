@@ -84,9 +84,16 @@ The FasterWhisper adapter resolves a trusted Hugging Face snapshot revision from
 the local refs/snapshot layout. A prepopulated direct CTranslate2 directory is
 cacheable only when trusted host configuration explicitly supplies an exact
 revision. Its model digest is a SHA-256 over a canonical sorted manifest of
-every runtime artifact's relative path, byte length and SHA-256. Cheap
-path/size/mtime metadata only invalidates an in-process memo; it never replaces
-the cryptographic identity. The reviewed pipeline fingerprint includes the
+every runtime artifact's relative path, byte length and SHA-256. A strong,
+cheap in-process change detector uses canonical logical/resolved identity plus
+`dev`, `ino`, byte size, nanosecond mtime and nanosecond ctime to decide whether
+that manifest must be rehashed. Filesystems that cannot prove unchanged state
+must rehash. This metadata never enters the durable key or replaces the
+cryptographic identity. Canonical manifest ordering uses deterministic
+code-unit ordering rather than locale collation. Automatic device policy and
+runtime-default compute profiles bypass caching because they do not prove an
+effective execution identity; fixed profiles such as the desktop default
+`cpu` + `int8` remain cacheable. The reviewed pipeline fingerprint includes the
 pinned FasterWhisper, CTranslate2 and PyAV/decode versions plus CEVRA result
 normalization. Drift tests bind it to the dependency audit.
 
@@ -129,10 +136,12 @@ may race, but every winner is a complete independently validated envelope.
 
 The default per-entry limit is 32 MiB and global budget is 256 MiB. Over-limit
 results remain valid but are not cached. Before a write, recognized entries are
-pruned by an atime/mtime least-recently-used approximation. Only recognized
-regular cache files are candidates; symlinks, unexpected directories and
-foreign files are never followed or removed. Eviction/storage failure skips the
-write and cannot block canonical promotion.
+pruned by an atime/mtime least-recently-used approximation. The canonical root,
+kind directory, two-hex prefix and regular entry are independently revalidated
+before enumeration and again before destructive eviction. Intermediate
+symlinks/junctions and canonical paths outside the root are skipped;
+unexpected directories and foreign files are never followed or removed.
+Eviction/storage failure skips the write and cannot block canonical promotion.
 
 ## Privacy and desktop trust boundary
 
@@ -154,11 +163,19 @@ termination/reaping.
 
 ## Consequences and deferred work
 
-Hits avoid the expensive engine path while miss overhead is one pre-execution
-source hash plus a post-execution stability hash. Hashing remains proportional
-in time but not memory to source size. The cache is cross-project reusable and
-bounded, yet remains strictly subordinate to current application validation and
-canonical state.
+Hits avoid the expensive engine path, but an application-level hit still pays
+for strong source hashing, exact execution/model identity, filesystem lookup
+and current application validation. Raw cache-file lookup latency is therefore
+not the complete hit latency. Miss overhead includes pre-execution source/model
+identity plus post-execution stability verification. Source hashing remains
+proportional in time but not memory to source size. Alignment V1's current
+identity description performs authoritative full prepared-model verification;
+the application calls it once on a hit and twice around a fresh execution,
+while `align()` independently verifies once before loading the model. This I/O
+is intentionally not memoized here because weakening the closed allow-list and
+per-file hash verification is outside this bounded remediation. The cache is
+cross-project reusable and bounded, yet remains strictly subordinate to current
+application validation and canonical state.
 
 Cache format evolution uses version invalidation: an old key/envelope becomes a
 miss and may later be evicted. It requires no Project IR or Project Store

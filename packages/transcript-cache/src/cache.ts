@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
+import type { Stats } from "node:fs";
 import { chmod, lstat, mkdir, open, readdir, realpath, rename, rm, stat, utimes } from "node:fs/promises";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import type { CachedProducerResult, TranscriptCacheKey, TranscriptResultCache } from "@cevra/application";
 import { canonicalJson, sha256Digest } from "./canonical-json.js";
 
@@ -164,11 +165,13 @@ export class FileTranscriptCache implements TranscriptResultCache {
   }
 
   private async ensureBudget(incomingBytes: number, targetPath: string): Promise<boolean> {
+    const root = await this.initialize();
     const entries = await this.knownEntries();
     const target = entries.find((entry) => entry.path === targetPath);
     let total = entries.reduce((sum, entry) => sum + entry.size, 0) - (target?.size ?? 0);
     if (total + incomingBytes <= this.maxTotalBytes) return true;
     for (const entry of entries.filter((item) => item.path !== targetPath).sort((a, b) => a.accessed - b.accessed)) {
+      if (!await isSafeRecognizedEntry(root, entry.path)) return false;
       try { await rm(entry.path); } catch { return false; }
       total -= entry.size;
       if (total + incomingBytes <= this.maxTotalBytes) return true;
@@ -179,31 +182,75 @@ export class FileTranscriptCache implements TranscriptResultCache {
   private async knownEntries(): Promise<Array<{ path: string; size: number; accessed: number }>> {
     const root = await this.initialize();
     const entries: Array<{ path: string; size: number; accessed: number }> = [];
+    if (!await isSafeOwnedDirectory(root, root)) return entries;
     for (const kind of ["transcription", "alignment"] as const) {
       const kindPath = join(root, kind);
+      if (!await isSafeOwnedDirectory(root, kindPath)) continue;
       const prefixes = await safeDirectoryEntries(kindPath);
       for (const prefix of prefixes) {
         if (!prefix.isDirectory() || prefix.isSymbolicLink() || !/^[0-9a-f]{2}$/u.test(prefix.name)) continue;
         const prefixPath = join(kindPath, prefix.name);
+        if (!await isSafeOwnedDirectory(root, prefixPath)) continue;
         for (const item of await safeDirectoryEntries(prefixPath)) {
           if (item.isFile() && !item.isSymbolicLink() && TEMPORARY_NAME.test(item.name)) {
             const temporaryPath = join(prefixPath, item.name);
-            const metadata = await lstat(temporaryPath);
-            if (this.now().getTime() - metadata.mtimeMs >= ORPHAN_TEMP_MAX_AGE_MS) {
+            const metadata = await safeOwnedRegularFile(temporaryPath);
+            if (metadata && this.now().getTime() - metadata.mtimeMs >= ORPHAN_TEMP_MAX_AGE_MS) {
               await rm(temporaryPath, { force: true }).catch(() => undefined);
             }
             continue;
           }
           if (!item.isFile() || item.isSymbolicLink() || !ENTRY_NAME.test(item.name)) continue;
           const path = join(prefixPath, item.name);
-          const metadata = await lstat(path);
-          if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
+          const metadata = await safeOwnedRegularFile(path);
+          if (!metadata) continue;
           entries.push({ path, size: metadata.size, accessed: Math.max(metadata.atimeMs, metadata.mtimeMs) });
         }
       }
     }
     return entries;
   }
+}
+
+async function isSafeOwnedDirectory(root: string, directory: string): Promise<boolean> {
+  const expected = resolve(directory);
+  if (!isContained(root, expected)) return false;
+  try {
+    const metadata = await lstat(expected);
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) return false;
+    const canonical = await realpath(expected);
+    return canonical === expected && isContained(root, canonical);
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw cause;
+  }
+}
+
+async function isSafeRecognizedEntry(root: string, path: string): Promise<boolean> {
+  const parts = relative(root, path).split(sep);
+  if (parts.length !== 3
+    || (parts[0] !== "transcription" && parts[0] !== "alignment")
+    || !/^[0-9a-f]{2}$/u.test(parts[1] ?? "")
+    || !ENTRY_NAME.test(parts[2] ?? "")) return false;
+  const kindPath = join(root, parts[0]!);
+  const prefixPath = join(kindPath, parts[1]!);
+  if (!await isSafeOwnedDirectory(root, kindPath) || !await isSafeOwnedDirectory(root, prefixPath)) return false;
+  return !!await safeOwnedRegularFile(path);
+}
+
+async function safeOwnedRegularFile(path: string): Promise<Stats | undefined> {
+  try {
+    const metadata = await lstat(path);
+    if (!metadata.isFile() || metadata.isSymbolicLink() || await realpath(path) !== path) return undefined;
+    return metadata;
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw cause;
+  }
+}
+
+function isContained(root: string, candidate: string): boolean {
+  return candidate === root || candidate.startsWith(`${root}${sep}`);
 }
 
 export function cacheKeyDigest(key: TranscriptCacheKey): `sha256:${string}` {

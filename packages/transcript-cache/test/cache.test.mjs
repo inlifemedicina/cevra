@@ -171,6 +171,35 @@ test("symlink roots and entries are never followed", async () => withTemp(async 
   assert.equal(await readFile(outside, "utf8"), "private");
 }));
 
+test("budget enumeration never follows kind-directory symlinks in either direction", async () => withTemp(async (root) => {
+  for (const [escapedKind, writtenKey] of [["transcription", alignmentKey], ["alignment", key]]) {
+    const cacheRoot = join(root, `cache-${escapedKind}`);
+    const external = join(root, `external-${escapedKind}`);
+    const prefix = join(external, "aa");
+    const foreign = join(prefix, `${"a".repeat(64)}.json`);
+    await mkdir(prefix, { recursive: true });
+    await writeFile(foreign, "external-private-data");
+    await mkdir(cacheRoot, { recursive: true });
+    await symlink(external, join(cacheRoot, escapedKind));
+    const cache = new FileTranscriptCache(cacheRoot, { maxEntryBytes: 4096, maxTotalBytes: 4096 });
+    assert.equal(await cache.write(writtenKey, producer), true);
+    assert.equal(await readFile(foreign, "utf8"), "external-private-data");
+  }
+}));
+
+test("budget enumeration never follows a prefix symlink or deletes foreign content", async () => withTemp(async (root) => {
+  const cacheRoot = join(root, "cache");
+  const external = join(root, "external");
+  const foreign = join(external, `${"b".repeat(64)}.json`);
+  await mkdir(join(cacheRoot, "transcription"), { recursive: true });
+  await mkdir(external, { recursive: true });
+  await writeFile(foreign, "external-private-data");
+  await symlink(external, join(cacheRoot, "transcription", "aa"));
+  const cache = new FileTranscriptCache(cacheRoot, { maxEntryBytes: 4096, maxTotalBytes: 4096 });
+  assert.equal(await cache.write(alignmentKey, producer), true);
+  assert.equal(await readFile(foreign, "utf8"), "external-private-data");
+}));
+
 test("concurrent same-key writers leave one complete validated entry", async () => withTemp(async (root) => {
   const cache = new FileTranscriptCache(root);
   const values = Array.from({ length: 12 }, (_, index) => ({ ...producer, producerExecutionId: `producer-${index}` }));

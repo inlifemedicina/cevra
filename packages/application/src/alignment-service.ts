@@ -195,7 +195,7 @@ export class AlignmentApplicationService {
     let result: AlignmentResult | undefined;
     let candidate: SourceTranscript | undefined;
     let producerExecutionId = executionId;
-    let producedAt = this.clock();
+    let producedAt: string | undefined;
     if (normalized.cachePolicy === "prefer" && cacheKey && this.cache) {
       try {
         const cached = await this.cache.read(cacheKey, signal);
@@ -259,6 +259,7 @@ export class AlignmentApplicationService {
       try {
         result = validateAlignmentResult(rawResult, current.transcript, language, source.durationMs);
         assertAlignmentResultIdentity(result, executionBefore);
+        producedAt = this.clock();
         candidate = buildAlignedCandidate(source.id, current, result, identity, inputTranscriptDigest, executionId, producedAt);
       } catch (cause) {
         throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId, cause);
@@ -273,7 +274,7 @@ export class AlignmentApplicationService {
       }
 
       if (!result) throw appError("ALIGNMENT_APP_ENGINE_FAILED", locale, executionId);
-      if (!candidate) throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId);
+      if (!candidate || !producedAt) throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId);
 
       const latest = this.history.current;
       const latestSource = latest.sources.find((item) => item.id === source.id);

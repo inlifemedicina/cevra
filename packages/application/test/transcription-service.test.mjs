@@ -644,6 +644,35 @@ test("transcription cache MISS writes and the next identical request HIT bypasse
   assert.equal(reused.sourceTranscript.provenance.stages[0].modelDigest, exactExecution.modelArtifactDigest);
 });
 
+test("fresh transcription timestamps the produced result and cache HIT preserves that producer time", async () => {
+  const cache = new MemoryCache();
+  const producedAt = "2026-09-15T12:01:00.000Z";
+  let phase = "lookup";
+  let freshClockCalls = 0;
+  const engine = cacheableEngine(async () => {
+    assert.equal(freshClockCalls, 0, "producer clock must not run before engine completion");
+    phase = "produced";
+    return result();
+  });
+  const fresh = fixture(engine, projectWith(), {
+    ...cacheOptions(cache),
+    clock: () => { freshClockCalls++; assert.equal(phase, "produced"); return producedAt; }
+  });
+  const generated = await fresh.service.transcribeSource({ sourceId: "source-1", id: "original-producer" });
+  assert.equal(freshClockCalls, 1);
+  assert.equal(generated.sourceTranscript.provenance.stages[0].createdAt, producedAt);
+
+  let hitClockCalls = 0;
+  const hit = fixture(cacheableEngine(async () => assert.fail("cache hit must bypass engine")), projectWith([source("other-source")]), {
+    ...cacheOptions(cache),
+    clock: () => { hitClockCalls++; throw new Error("consumer clock must not replace cached producer time"); }
+  });
+  const reused = await hit.service.transcribeSource({ sourceId: "other-source", id: "consumer" });
+  assert.equal(hitClockCalls, 0);
+  assert.equal(reused.sourceTranscript.provenance.stages[0].createdAt, producedAt);
+  assert.equal(reused.sourceTranscript.provenance.stages[0].executionId, "original-producer");
+});
+
 test("transcription refresh executes and bypass neither reads nor writes", async () => {
   const cache = new MemoryCache();
   const refreshEngine = cacheableEngine();
@@ -704,6 +733,18 @@ test("weak/unprovable identity bypasses cache without weakening transcription", 
   const cache = new MemoryCache(); const engine = cacheableEngine();
   const outcome = await fixture(engine, projectWith(), cacheOptions(cache, async () => undefined)).service.transcribeSource({ sourceId: "source-1" });
   assert.equal(outcome.cacheStatus, "bypass"); assert.equal(engine.calls.length, 1); assert.equal(cache.reads, 0); assert.equal(cache.writes, 0);
+});
+
+test("unresolved automatic execution profile bypasses cache while fresh transcription remains functional", async () => {
+  const cache = new MemoryCache();
+  const engine = cacheableEngine();
+  engine.describeTranscriptionExecution = async () => undefined;
+  const outcome = await fixture(engine, projectWith(), cacheOptions(cache)).service.transcribeSource({ sourceId: "source-1" });
+  assert.equal(outcome.cacheStatus, "bypass");
+  assert.equal(outcome.historyMutated, true);
+  assert.equal(engine.calls.length, 1);
+  assert.equal(cache.reads, 0);
+  assert.equal(cache.writes, 0);
 });
 
 test("a canonical project change during cache lookup still blocks cached promotion", async () => {

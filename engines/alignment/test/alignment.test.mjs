@@ -56,6 +56,18 @@ test("adapter sends a closed local-only protocol request and propagates pinned i
   assert.equal(result.modelRevision, ALIGNMENT_MODELS.pt.revision);
 });
 
+test("alignment execution identity and execution each retain authoritative model verification", async () => {
+  let verificationCalls = 0;
+  const value = adapter(runner(), async () => { verificationCalls++; });
+  const request = { inputUri: "/tmp/audio.wav", language: "pt", transcript: transcript() };
+  assert.ok(await value.describeAlignmentExecution(request));
+  assert.equal(verificationCalls, 1);
+  await value.align(request, { jobId: "job", locale: "pt-BR" });
+  assert.equal(verificationCalls, 2, "align() independently verifies the model before execution");
+  assert.ok(await value.describeAlignmentExecution(request));
+  assert.equal(verificationCalls, 3, "post-execution identity verification performs another authoritative pass");
+});
+
 test("unsupported language, remote URI, missing context and unexpected request fields fail closed", async () => {
   const cases = [
     () => normalizeAlignmentRequest({ inputUri: "/tmp/a.wav", language: "es", transcript: transcript() }),
