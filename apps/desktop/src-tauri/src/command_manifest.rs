@@ -96,5 +96,7 @@ mod tests {
         let supervisor = include_str!("supervisor.rs");
         assert!(supervisor.contains("app_data_dir()"));
         assert!(supervisor.contains("CEVRA_PROJECT_PERSISTENCE_ROOT"));
+        assert!(supervisor.contains("CEVRA_TRANSCRIPT_CACHE_ROOT"));
+        assert!(supervisor.contains("app_cache_dir()"));
     }
 }

@@ -16,6 +16,7 @@ import {
   type LocalTranscriptionAdapterOptions,
   type SupportedTranscriptionModelId
 } from "@cevra/transcription-faster-whisper";
+import { FileTranscriptCache, NodeSourceContentIdentityProvider } from "@cevra/transcript-cache";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, isAbsolute, resolve } from "node:path";
 import { DesktopPersistenceError, DesktopProjectPersistence } from "./persistence.js";
@@ -250,7 +251,16 @@ async function createTranscriptionServices(history: ProjectHistory, environment:
     });
     const health = await adapter.healthcheck();
     if (health.status !== "ready") return { capability: unavailable("runtime-invalid") };
-    return { capability: available(), service: new TranscriptionApplicationService({ engine: adapter, history }) };
+    const cacheRoot = environment.CEVRA_TRANSCRIPT_CACHE_ROOT;
+    const cache = cacheRoot && isAbsolute(cacheRoot) ? new FileTranscriptCache(cacheRoot) : undefined;
+    return {
+      capability: available(),
+      service: new TranscriptionApplicationService({
+        engine: adapter,
+        history,
+        ...(cache ? { cache, sourceIdentity: new NodeSourceContentIdentityProvider() } : {})
+      })
+    };
   } catch {
     return { capability: unavailable("runtime-invalid") };
   }
