@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { createReadStream, existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExecutionContext } from "@cevra/contracts";
@@ -90,6 +90,15 @@ export async function verifyPinnedModel(modelPath: string, files: Readonly<Recor
   try {
     if (!isAbsolute(modelPath) || !existsSync(modelPath) || !lstatSync(modelPath).isDirectory() || lstatSync(modelPath).isSymbolicLink()) throw new LocalAlignmentError("ALIGNMENT_MODEL_UNAVAILABLE", "The pinned local alignment model is unavailable.");
     const root = realpathSync(modelPath);
+    const expectedNames = Object.keys(files).sort();
+    const entries = readdirSync(root, { withFileTypes: true });
+    const actualNames = entries.map((entry) => entry.name).sort();
+    if (actualNames.length !== expectedNames.length || actualNames.some((name, index) => name !== expectedNames[index])) {
+      throw new LocalAlignmentError("ALIGNMENT_MODEL_UNAVAILABLE", "The pinned local alignment model contains an unexpected runtime file.");
+    }
+    if (entries.some((entry) => !entry.isFile() || entry.isSymbolicLink())) {
+      throw new LocalAlignmentError("ALIGNMENT_MODEL_UNAVAILABLE", "The pinned local alignment model contains an unsupported filesystem entry.");
+    }
     for (const [name, expected] of Object.entries(files)) {
       const path = resolve(root, name);
       if (!inside(root, path) || !existsSync(path) || !lstatSync(path).isFile() || lstatSync(path).isSymbolicLink()) throw new LocalAlignmentError("ALIGNMENT_MODEL_UNAVAILABLE", "The pinned local alignment model is incomplete.");

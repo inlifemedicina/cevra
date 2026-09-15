@@ -4,7 +4,10 @@ import type { AlignmentAudioLease, AlignmentAudioWorkspace } from "@cevra/contra
 import { LocalAlignmentError } from "./errors.js";
 
 export class NodeAlignmentAudioWorkspace implements AlignmentAudioWorkspace {
-  constructor(private readonly root: string) {
+  constructor(
+    private readonly root: string,
+    private readonly removeDirectory: typeof rm = rm
+  ) {
     if (!isAbsolute(root)) throw new LocalAlignmentError("ALIGNMENT_INVALID_REQUEST", "Alignment temporary root must be absolute.");
   }
   async acquire(_jobId: string): Promise<AlignmentAudioLease> {
@@ -13,7 +16,11 @@ export class NodeAlignmentAudioWorkspace implements AlignmentAudioWorkspace {
     let released = false;
     return {
       outputUri: join(directory, "audio.wav"),
-      release: async () => { if (released) return; released = true; await rm(directory, { recursive: true, force: true }); }
+      release: async () => {
+        if (released) return;
+        await this.removeDirectory(directory, { recursive: true, force: true });
+        released = true;
+      }
     };
   }
 }

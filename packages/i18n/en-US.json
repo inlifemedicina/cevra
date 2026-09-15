@@ -233,6 +233,7 @@
   "alignment.error.transcriptNotAlignable": "The selected transcript cannot be aligned.",
   "alignment.error.languageUnsupported": "Alignment currently supports Portuguese and English transcripts.",
   "alignment.error.audioPreparationFailed": "Audio could not be prepared for alignment.",
+  "alignment.error.audioCleanupFailed": "The temporary alignment audio could not be removed. Alignment was not applied.",
   "alignment.error.engineFailed": "The local alignment engine could not complete the operation.",
   "alignment.error.resultInvalid": "The alignment result is invalid and was not applied.",
   "alignment.error.projectConflict": "The project or transcript changed while alignment was running. Alignment was not applied.",

@@ -26,14 +26,31 @@ only through guarded `transcript.set` and `ProjectHistory`.
 
 A successful candidate preserves word and segment IDs, text/order/mapping,
 language, speaker assignment/state, source checksum and upstream provenance. It
-sets `wordTiming: "aligned"`, adds an alignment stage with exact execution,
-engine/model identity and consumed digest, and uses existing canonical digest
-machinery. Downstream speaker/manual provenance remains ordered and is rebased
-to the consumed canonical representation only after its unchanged semantic
-annotations are revalidated. Failure, cancellation, invalid output or any
+sets `wordTiming: "aligned"`, appends alignment as the newest consuming stage
+with exact execution, engine/model identity and consumed digest, and uses
+existing canonical digest machinery. Earlier transcription, speaker-attribution
+and manual-correction stages remain structurally unchanged and in their true
+historical order. Failure, cancellation, invalid output or any
 project/revision/source/transcript change produces no promotion or journal entry.
 Already-aligned and zero-word transcripts fail deterministically rather than
 creating meaningless history.
+
+Alignment execution is per canonical transcript segment. Each
+`segment.startMs`/`segment.endMs` window is read by seeking into the prepared PCM
+WAV, normalized independently to mono 16 kHz, inferred and aligned only against
+that segment's exact `wordIds`, then translated back to absolute source-relative
+milliseconds. CEVRA never constructs a whole-source PCM list, token stream or
+CTC trellis. V1 rejects, without truncation, a segment over 30 seconds or a
+window over 1,024 CTC tokens. Long sources remain supported as a sequence of
+bounded windows; repeated speech outside a segment's authorized window cannot
+capture its words.
+
+Unknown vocabulary characters retain their exact canonical positions through
+the WhisperX-compatible wildcard emission column (best non-blank score per
+frame). They are not silently discarded. Before promotion the application also
+requires words and segments, in canonical array order, to be positive-duration,
+monotonic and non-overlapping, with every unchanged mapped word inside segment
+boundaries derived from its aligned words.
 
 ## Local runtime and upstream provenance
 
@@ -61,9 +78,16 @@ V1 pins these Apache-2.0 16 kHz CTC model snapshots and file digests:
 - EN: `facebook/wav2vec2-base-960h` revision
   `22aad52d435eb6dbaf354bdad9b0da84ce7d6156`.
 
-Weights are not stored in Git and are not bundled by this slice. Production
-capability remains unavailable until a future model/runtime packaging manager
-installs every inventoried artifact and its SHA-256 verifies.
+Weights are not stored in Git and are not bundled by this slice. A prepared
+model directory is a closed exact allow-list: every expected runtime file is a
+regular non-symlink file with its pinned SHA-256, while every missing,
+unexpected, nested or alternate weight artifact fails verification. PT loads
+only the verified `pytorch_model.bin`; EN loads only the verified
+`model.safetensors`; remote code is disabled. `modelDigest` is specifically the
+SHA-256 of that principal weight artifact, not a complete-directory digest.
+Complete directory integrity is instead the exact allow-list plus per-file
+SHA-256 verification. Production capability remains unavailable until a future
+model/runtime packaging manager installs the complete prepared subset.
 
 ## Protocol and lifecycle
 
@@ -74,15 +98,29 @@ candidate again, including exact model identity, UTF-8/finite canonical values,
 complete words, unique IDs, mappings and source bounds. One active ML job is
 allowed; concurrent jobs return a stable busy error.
 
-Cancellation terminates/reaps the worker and always releases the disposable WAV
-workspace. The worker uses stdin as the parent-liveness channel and exits when
-its Node parent disappears. The original media is immutable; 16 kHz mono
-normalization occurs inside the alignment worker after Media Runtime extraction.
+Cancellation terminates/reaps the worker and attempts release of the disposable
+WAV workspace. Normal success releases the WAV before candidate validation and
+canonical promotion. A deletion failure returns bounded
+`ALIGNMENT_APP_AUDIO_CLEANUP_FAILED`, remains retryable, and prevents promotion;
+when an operation and cleanup both fail, the cleanup failure takes public
+precedence so sensitive audio retention is visible without exposing its path.
+The worker uses stdin as the parent-liveness channel and exits when its Node
+parent disappears. The original media is immutable; 16 kHz mono normalization
+occurs per segment window inside the alignment worker after Media Runtime
+extraction. A full-process crash can leave a temporary job directory because V1
+does not yet have a safe cross-process ownership sweep; later cleanup must never
+delete data belonging to an ambiguously live process.
+
+The worker loads only the active language model, uses inference/no-gradient
+execution and releases window PCM, inputs, logits/emissions and trellis data
+after each segment. One ML job remains active per adapter. CPU is the supported
+default; GPU is optional. Resource growth therefore follows the current bounded
+window plus a fixed model/runtime footprint, rather than total source duration.
 
 ## Scope and deferred work
 
 This ADR adds no Tauri command, WebView permission or UI. It adds no transcript
 cache, diarization, speaker registry, model download, cloud alignment, Project
 IR schema migration or Media Runtime operation. Transcript Cache V1 remains the
-next separate slice. Runtime/model installer assembly and real desktop product
-invocation are explicit later gates.
+next separate slice. Runtime/model installer assembly, safe crash-leftover temp
+reclamation and real desktop product invocation are explicit later gates.

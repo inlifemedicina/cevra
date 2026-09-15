@@ -349,6 +349,23 @@ test("provenance validates exact shape, order, duplicates, and bounded stages", 
   assert.equal(validateProjectIR(v2ProjectWith(tooMany)).ok, false);
 });
 
+test("alignment may be appended after historical speaker and manual stages without rewriting them", () => {
+  const original = sourceTranscript({ provenance: { stages: [
+    transcriptionStage(),
+    speakerAttributionStage(dummyDigest),
+    manualCorrectionStage(dummyDigest)
+  ] } });
+  const stages = clone(original.provenance.stages);
+  const aligned = createSourceTranscript({
+    ...original,
+    wordTiming: "aligned",
+    provenance: { stages: [...stages, alignmentStage(original.transcriptDigest)] }
+  });
+  assert.equal(validateProjectIR(v2ProjectWith(aligned)).ok, true);
+  assert.deepEqual(aligned.provenance.stages.slice(0, -1), stages);
+  assert.equal(aligned.provenance.stages.at(-1).inputTranscriptDigest, original.transcriptDigest);
+});
+
 test("migration discards only the exact historical factory-empty transcript", () => {
   for (const sources of [[], [source()], [source("a"), source("b")]]) {
     const migrated = migrateProject(v1Project({ sources }));

@@ -25,6 +25,7 @@ export function normalizeAlignmentWorkerResult(raw: unknown, request: AlignmentW
   validateTranscriptShape(raw.transcript, "worker transcript", true);
   if ((raw.transcript as TranscriptState).language !== request.language) malformed("Worker transcript language changed.");
   if (raw.durationMs !== undefined && !canonicalNonNegative(raw.durationMs)) malformed("Worker durationMs is invalid.");
+  validateCandidateIdentity(raw.transcript as TranscriptState, request.transcript, raw.durationMs as number | undefined);
   return {
     transcript: clone(raw.transcript as TranscriptState), modelId: pin.modelId,
     modelRevision: pin.revision, modelDigest: pin.modelDigest,
@@ -38,27 +39,57 @@ function validateTranscriptShape(value: unknown, field: string, requirePositiveT
   if (value.language !== "pt" && value.language !== "en") malformed(`${field}.language is unsupported.`);
   if (!Array.isArray(value.words) || value.words.length === 0 || !Array.isArray(value.segments) || value.segments.length === 0) malformed(`${field} must contain words and segments.`);
   const wordIds = new Set<string>();
+  let previousWordEnd = 0;
   value.words.forEach((raw, index) => {
     if (!isRecord(raw)) malformed(`${field}.words[${index}] must be an object.`);
     exactKeys(raw, ["id", "text", "startMs", "endMs", "confidence", "speakerId"], `${field}.words[${index}]`);
     if (typeof raw.id !== "string" || !raw.id || wordIds.has(raw.id) || typeof raw.text !== "string") malformed(`${field}.words[${index}] identity is invalid.`);
     wordIds.add(raw.id);
     if (!canonicalNonNegative(raw.startMs) || !canonicalNonNegative(raw.endMs) || (requirePositiveTimes && raw.endMs <= raw.startMs)) malformed(`${field}.words[${index}] timing is invalid.`);
+    if (requirePositiveTimes && index > 0 && raw.startMs < previousWordEnd) malformed(`${field}.words[${index}] crosses the prior word.`);
+    previousWordEnd = raw.endMs as number;
     if (raw.confidence !== undefined && (typeof raw.confidence !== "number" || !Number.isFinite(raw.confidence) || raw.confidence < 0 || raw.confidence > 1)) malformed(`${field}.words[${index}] confidence is invalid.`);
     if (raw.speakerId !== undefined && (typeof raw.speakerId !== "string" || !raw.speakerId)) malformed(`${field}.words[${index}] speakerId is invalid.`);
   });
   const segmentIds = new Set<string>();
   const mapped = new Set<string>();
+  let previousSegmentEnd = 0;
   value.segments.forEach((raw, index) => {
     if (!isRecord(raw)) malformed(`${field}.segments[${index}] must be an object.`);
     exactKeys(raw, ["id", "text", "startMs", "endMs", "wordIds", "speakerId"], `${field}.segments[${index}]`);
     if (typeof raw.id !== "string" || !raw.id || segmentIds.has(raw.id) || typeof raw.text !== "string" || !Array.isArray(raw.wordIds)) malformed(`${field}.segments[${index}] identity is invalid.`);
     segmentIds.add(raw.id);
     if (!canonicalNonNegative(raw.startMs) || !canonicalNonNegative(raw.endMs) || (requirePositiveTimes && raw.endMs <= raw.startMs)) malformed(`${field}.segments[${index}] timing is invalid.`);
+    if (requirePositiveTimes && index > 0 && raw.startMs < previousSegmentEnd) malformed(`${field}.segments[${index}] crosses the prior segment.`);
+    previousSegmentEnd = raw.endMs as number;
     raw.wordIds.forEach((id) => { if (typeof id !== "string" || !wordIds.has(id) || mapped.has(id)) malformed(`${field}.segments[${index}] word mapping is invalid.`); mapped.add(id); });
     if (raw.speakerId !== undefined && (typeof raw.speakerId !== "string" || !raw.speakerId)) malformed(`${field}.segments[${index}] speakerId is invalid.`);
   });
   if (mapped.size !== wordIds.size) malformed(`${field} does not map every canonical word exactly once.`);
+}
+
+function validateCandidateIdentity(candidate: TranscriptState, input: TranscriptState, durationMs?: number): void {
+  if (candidate.words.length !== input.words.length || candidate.segments.length !== input.segments.length) malformed("Worker transcript is partial.");
+  const candidateWords = new Map(candidate.words.map((word) => [word.id, word]));
+  candidate.words.forEach((word, index) => {
+    const original = input.words[index];
+    if (!original || word.id !== original.id || word.text !== original.text || word.confidence !== original.confidence || word.speakerId !== original.speakerId) malformed(`Worker word ${index} changed canonical identity or text.`);
+    if (durationMs !== undefined && word.endMs > durationMs) malformed(`Worker word ${index} exceeds prepared audio.`);
+  });
+  candidate.segments.forEach((segment, index) => {
+    const original = input.segments[index];
+    if (!original || segment.id !== original.id || segment.text !== original.text || segment.speakerId !== original.speakerId
+      || segment.wordIds.length !== original.wordIds.length || segment.wordIds.some((id, wordIndex) => id !== original.wordIds[wordIndex])) {
+      malformed(`Worker segment ${index} changed canonical identity or mapping.`);
+    }
+    const words = segment.wordIds.map((id) => candidateWords.get(id));
+    if (words.some((word) => word === undefined)
+      || words.length === 0
+      || words.some((word) => word!.startMs < segment.startMs || word!.endMs > segment.endMs)
+      || segment.startMs !== Math.min(...words.map((word) => word!.startMs))
+      || segment.endMs !== Math.max(...words.map((word) => word!.endMs))) malformed(`Worker segment ${index} timing is not derived from its words.`);
+    if (durationMs !== undefined && segment.endMs > durationMs) malformed(`Worker segment ${index} exceeds prepared audio.`);
+  });
 }
 
 function localPath(value: unknown): string {

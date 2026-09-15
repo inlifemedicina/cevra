@@ -9,6 +9,7 @@ export interface AlignmentModelPin {
   language: AlignmentLanguage;
   modelId: string;
   revision: string;
+  /** SHA-256 of the principal pinned weight artifact, not the complete directory. */
   modelDigest: string;
   requiredSampleRate: 16000;
   license: "Apache-2.0";

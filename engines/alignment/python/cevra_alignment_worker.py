@@ -21,6 +21,8 @@ ALIGNMENT_VERSION = "0.1.0"
 PINNED_TORCH_VERSION = "2.8.0"
 PINNED_TRANSFORMERS_VERSION = "4.57.6"
 MAX_REQUEST_CHARACTERS = 32 * 1024 * 1024
+MAX_ALIGNMENT_WINDOW_MS = 30_000
+MAX_CTC_TOKENS_PER_WINDOW = 1_024
 ALIGN_FIELDS = {
     "protocolVersion", "operation", "jobId", "inputPath", "language", "transcript",
     "modelPath", "modelId", "modelRevision", "modelDigest", "allowModelDownload", "device",
@@ -133,65 +135,103 @@ def _align(request: Mapping[str, object]) -> dict[str, object]:
     if not os.path.isdir(model_path):
         raise WorkerError("MODEL_UNAVAILABLE", "The configured local alignment model is unavailable.")
     try:
-        processor = transformers.AutoProcessor.from_pretrained(model_path, local_files_only=True)
-        model = transformers.AutoModelForCTC.from_pretrained(model_path, local_files_only=True)
+        language = str(request["language"])
+        processor = transformers.AutoProcessor.from_pretrained(
+            model_path, local_files_only=True, trust_remote_code=False
+        )
+        model = transformers.AutoModelForCTC.from_pretrained(
+            model_path,
+            local_files_only=True,
+            trust_remote_code=False,
+            use_safetensors=(language == "en"),
+        )
         device = str(request["device"])
         model.to(device)
         model.eval()
     except Exception as error:
         raise WorkerError("MODEL_UNAVAILABLE", "The configured local alignment model is unavailable.") from error
 
-    samples, sample_rate = load_and_normalize_wav(str(request["inputPath"]), 16000)
-    if not samples:
-        raise WorkerError("ALIGNMENT_FAILED", "Alignment audio contains no samples.")
-    try:
-        inputs = processor(samples, sampling_rate=sample_rate, return_tensors="pt")
-        input_values = inputs.input_values.to(str(request["device"]))
-        with torch.inference_mode():
-            emissions = model(input_values).logits[0].log_softmax(dim=-1).cpu().tolist()
-        vocabulary = processor.tokenizer.get_vocab()
-        blank_id = getattr(processor.tokenizer, "pad_token_id", 0)
-    except Exception as error:
-        raise WorkerError("ALIGNMENT_FAILED", "The local CTC model could not produce alignment emissions.") from error
+    reader = PcmWaveWindowReader(str(request["inputPath"]), 16000)
+    vocabulary = processor.tokenizer.get_vocab()
+    blank_id = int(getattr(processor.tokenizer, "pad_token_id", 0))
+
+    def infer_window(samples: Sequence[float], sample_rate: int) -> list[list[float]]:
+        try:
+            inputs = processor(samples, sampling_rate=sample_rate, return_tensors="pt")
+            input_values = inputs.input_values.to(str(request["device"]))
+            with torch.inference_mode():
+                logits = model(input_values).logits[0]
+                emissions = logits.log_softmax(dim=-1).cpu().tolist()
+            del logits, input_values, inputs
+            return emissions
+        except Exception as error:
+            raise WorkerError("ALIGNMENT_FAILED", "The local CTC model could not produce alignment emissions.") from error
 
     transcript = _object(request["transcript"], "transcript")
-    aligned = align_transcript(transcript, emissions, vocabulary, int(blank_id), len(samples), sample_rate)
+    aligned = align_transcript_windows(transcript, reader, infer_window, vocabulary, blank_id)
+    del model, processor
     return {
         "protocolVersion": PROTOCOL_VERSION,
         "transcript": aligned,
         "modelId": request["modelId"],
         "modelRevision": request["modelRevision"],
         "modelDigest": request["modelDigest"],
-        "durationMs": round(len(samples) * 1000 / sample_rate),
+        "durationMs": reader.duration_ms,
     }
 
 
-def load_and_normalize_wav(path: str, target_rate: int) -> tuple[list[float], int]:
-    """Read PCM WAV, downmix, and linearly resample without another media runtime."""
-    try:
-        with wave.open(path, "rb") as source:
-            channels = source.getnchannels()
-            width = source.getsampwidth()
-            rate = source.getframerate()
-            frames = source.readframes(source.getnframes())
-    except Exception as error:
-        raise WorkerError("ALIGNMENT_FAILED", "Prepared alignment audio is not a readable PCM WAV.") from error
-    if channels < 1 or width not in {1, 2, 4} or rate <= 0:
-        raise WorkerError("ALIGNMENT_FAILED", "Prepared alignment audio format is unsupported.")
+class PcmWaveWindowReader:
+    """Seek and normalize only the current canonical segment window."""
+
+    def __init__(self, path: str, target_rate: int) -> None:
+        self.path = path
+        self.target_rate = target_rate
+        try:
+            with wave.open(path, "rb") as source:
+                self.channels = source.getnchannels()
+                self.width = source.getsampwidth()
+                self.source_rate = source.getframerate()
+                self.frame_count = source.getnframes()
+        except Exception as error:
+            raise WorkerError("ALIGNMENT_FAILED", "Prepared alignment audio is not a readable PCM WAV.") from error
+        if self.channels < 1 or self.width not in {1, 2, 4} or self.source_rate <= 0 or self.frame_count <= 0:
+            raise WorkerError("ALIGNMENT_FAILED", "Prepared alignment audio format is unsupported.")
+        self.duration_ms = round(self.frame_count * 1000 / self.source_rate)
+
+    def read_window(self, start_ms: int, end_ms: int) -> tuple[list[float], int]:
+        if start_ms < 0 or end_ms <= start_ms or start_ms >= self.duration_ms or end_ms > self.duration_ms:
+            raise WorkerError("ALIGNMENT_FAILED", "Canonical segment timing exceeds prepared audio.")
+        start_frame = (start_ms * self.source_rate) // 1000
+        end_frame = min(self.frame_count, math.ceil(end_ms * self.source_rate / 1000))
+        if end_frame <= start_frame:
+            raise WorkerError("ALIGNMENT_FAILED", "Canonical segment window contains no audio samples.")
+        try:
+            with wave.open(self.path, "rb") as source:
+                source.setpos(start_frame)
+                frames = source.readframes(end_frame - start_frame)
+        except Exception as error:
+            raise WorkerError("ALIGNMENT_FAILED", "Prepared alignment audio window could not be read.") from error
+        return normalize_pcm_window(frames, self.channels, self.width, self.source_rate, self.target_rate), self.target_rate
+
+
+def normalize_pcm_window(frames: bytes, channels: int, width: int, source_rate: int, target_rate: int) -> list[float]:
+    """Downmix and linearly resample one bounded PCM window."""
     typecode = {1: "B", 2: "h", 4: "i"}[width]
     values = array(typecode)
     values.frombytes(frames)
+    del frames
     if sys.byteorder != "little" and width > 1:
         values.byteswap()
     scale = float(128 if width == 1 else (1 << (width * 8 - 1)))
     offset = 128.0 if width == 1 else 0.0
-    mono = [sum((float(values[i + c]) - offset) / scale for c in range(channels)) / channels for i in range(0, len(values), channels)]
-    if rate == target_rate:
-        return mono, target_rate
-    output_count = max(1, round(len(mono) * target_rate / rate))
+    mono = [sum((float(values[i + channel]) - offset) / scale for channel in range(channels)) / channels for i in range(0, len(values), channels)]
+    del values
+    if source_rate == target_rate:
+        return mono
+    output_count = max(1, round(len(mono) * target_rate / source_rate))
     if len(mono) == 1:
-        return [mono[0]] * output_count, target_rate
-    ratio = rate / target_rate
+        return [mono[0]] * output_count
+    ratio = source_rate / target_rate
     output: list[float] = []
     for index in range(output_count):
         position = min(index * ratio, len(mono) - 1)
@@ -199,50 +239,116 @@ def load_and_normalize_wav(path: str, target_rate: int) -> tuple[list[float], in
         right = min(left + 1, len(mono) - 1)
         fraction = position - left
         output.append(mono[left] * (1.0 - fraction) + mono[right] * fraction)
-    return output, target_rate
+    del mono
+    return output
 
 
-def align_transcript(transcript: Mapping[str, object], emissions: Sequence[Sequence[float]], vocabulary: Mapping[str, int], blank_id: int, sample_count: int, sample_rate: int) -> dict[str, object]:
+def align_transcript_windows(
+    transcript: Mapping[str, object],
+    reader: object,
+    infer_window: object,
+    vocabulary: Mapping[str, int],
+    blank_id: int,
+) -> dict[str, object]:
     words = [_object(word, "word") for word in transcript["words"]]  # type: ignore[index]
-    token_ids: list[int] = []
-    token_word_indexes: list[int] = []
+    word_by_id = {str(word["id"]): word for word in words}
+    aligned_by_id: dict[str, dict[str, object]] = {}
+    aligned_segments: list[dict[str, object]] = []
     uppercase = any(key != key.lower() for key in vocabulary if key.isalpha())
     delimiter = "|" if "|" in vocabulary else None
+    previous_segment_end = 0
+    for segment_index, raw in enumerate(transcript["segments"]):  # type: ignore[index]
+        segment = _object(raw, "segment")
+        start_ms = int(segment["startMs"])
+        end_ms = int(segment["endMs"])
+        if end_ms <= start_ms or (segment_index > 0 and start_ms < previous_segment_end):
+            raise WorkerError("ALIGNMENT_FAILED", "Canonical alignment segments must be monotonic and non-overlapping.")
+        if end_ms - start_ms > MAX_ALIGNMENT_WINDOW_MS:
+            raise WorkerError("ALIGNMENT_FAILED", f"Canonical segment {segment_index} exceeds the bounded alignment window.")
+        segment_words = [word_by_id[str(word_id)] for word_id in segment["wordIds"]]  # type: ignore[index]
+        if not segment_words:
+            raise WorkerError("ALIGNMENT_FAILED", "Every aligned segment must contain words.")
+        token_ids, token_word_indexes = tokenize_words(segment_words, vocabulary, uppercase, delimiter)
+        if len(token_ids) > MAX_CTC_TOKENS_PER_WINDOW:
+            raise WorkerError("ALIGNMENT_FAILED", f"Canonical segment {segment_index} exceeds the bounded CTC token count.")
+        samples, sample_rate = reader.read_window(start_ms, end_ms)  # type: ignore[attr-defined]
+        if not samples:
+            raise WorkerError("ALIGNMENT_FAILED", "Alignment audio window contains no samples.")
+        emissions = infer_window(samples, sample_rate)  # type: ignore[operator]
+        prepared_emissions, prepared_tokens = add_wildcard_emissions(emissions, token_ids, blank_id)
+        points = forced_align(prepared_emissions, prepared_tokens, blank_id)
+        ranges: list[list[int]] = [[] for _ in segment_words]
+        for token_index, frame_index in points:
+            word_index = token_word_indexes[token_index]
+            if word_index >= 0:
+                ranges[word_index].append(frame_index)
+        frame_ms = (end_ms - start_ms) / len(prepared_emissions)
+        window_words: list[dict[str, object]] = []
+        for word_index, (word, frames) in enumerate(zip(segment_words, ranges)):
+            if not frames:
+                raise WorkerError("ALIGNMENT_FAILED", f"Canonical word {word_index} was not completely aligned.")
+            word_start = max(start_ms, round(start_ms + min(frames) * frame_ms))
+            word_end = min(end_ms, max(word_start + 1, round(start_ms + (max(frames) + 1) * frame_ms)))
+            if word_end <= word_start:
+                raise WorkerError("ALIGNMENT_FAILED", "Aligned word has no positive duration inside its segment window.")
+            aligned_word = {**word, "startMs": word_start, "endMs": word_end}
+            aligned_by_id[str(word["id"])] = aligned_word
+            window_words.append(aligned_word)
+        aligned_segments.append({
+            **segment,
+            "startMs": min(int(word["startMs"]) for word in window_words),
+            "endMs": max(int(word["endMs"]) for word in window_words),
+        })
+        previous_segment_end = end_ms
+        del samples, emissions, prepared_emissions, points, ranges, window_words
+    aligned_words = [aligned_by_id[str(word["id"])] for word in words]
+    return {"language": transcript["language"], "words": aligned_words, "segments": aligned_segments}
+
+
+def tokenize_words(
+    words: Sequence[Mapping[str, object]],
+    vocabulary: Mapping[str, int],
+    uppercase: bool,
+    delimiter: str | None,
+) -> tuple[list[int], list[int]]:
+    """Preserve every canonical character; -1 denotes an upstream-compatible wildcard."""
+    token_ids: list[int] = []
+    token_word_indexes: list[int] = []
     for word_index, word in enumerate(words):
         text = str(word.get("text", ""))
+        if not text:
+            raise WorkerError("ALIGNMENT_FAILED", f"Canonical word {word_index} contains no characters.")
         normalized = text.upper() if uppercase else text.lower()
-        accepted = [int(vocabulary[char]) for char in normalized if char in vocabulary]
-        if not accepted:
-            raise WorkerError("ALIGNMENT_FAILED", f"Canonical word {word_index} has no alignable CTC tokens.")
         if token_ids and delimiter is not None:
             token_ids.append(int(vocabulary[delimiter]))
             token_word_indexes.append(-1)
-        token_ids.extend(accepted)
-        token_word_indexes.extend([word_index] * len(accepted))
-    points = forced_align(emissions, token_ids, blank_id)
-    ranges: list[list[int]] = [[] for _ in words]
-    for token_index, frame_index in points:
-        word_index = token_word_indexes[token_index]
-        if word_index >= 0:
-            ranges[word_index].append(frame_index)
-    duration_seconds = sample_count / sample_rate
-    frame_seconds = duration_seconds / len(emissions)
-    aligned_words: list[dict[str, object]] = []
-    for index, (word, frames) in enumerate(zip(words, ranges)):
-        if not frames:
-            raise WorkerError("ALIGNMENT_FAILED", f"Canonical word {index} was not completely aligned.")
-        start_ms = max(0, round(min(frames) * frame_seconds * 1000))
-        end_ms = max(start_ms + 1, round((max(frames) + 1) * frame_seconds * 1000))
-        aligned_words.append({**word, "startMs": start_ms, "endMs": end_ms})
-    word_by_id = {word["id"]: word for word in aligned_words}
-    aligned_segments: list[dict[str, object]] = []
-    for raw in transcript["segments"]:  # type: ignore[index]
-        segment = _object(raw, "segment")
-        segment_words = [word_by_id[word_id] for word_id in segment["wordIds"]]  # type: ignore[index]
-        if not segment_words:
-            raise WorkerError("ALIGNMENT_FAILED", "Every aligned segment must contain words.")
-        aligned_segments.append({**segment, "startMs": min(int(word["startMs"]) for word in segment_words), "endMs": max(int(word["endMs"]) for word in segment_words)})
-    return {"language": transcript["language"], "words": aligned_words, "segments": aligned_segments}
+        for character in normalized:
+            token_ids.append(int(vocabulary[character]) if character in vocabulary else -1)
+            token_word_indexes.append(word_index)
+    return token_ids, token_word_indexes
+
+
+def add_wildcard_emissions(
+    emissions: Sequence[Sequence[float]], tokens: Sequence[int], blank_id: int
+) -> tuple[Sequence[Sequence[float]], list[int]]:
+    if not emissions or not emissions[0] or blank_id < 0 or blank_id >= len(emissions[0]):
+        raise WorkerError("ALIGNMENT_FAILED", "CTC emissions are invalid.")
+    width = len(emissions[0])
+    if any(len(row) != width for row in emissions):
+        raise WorkerError("ALIGNMENT_FAILED", "CTC emissions are ragged.")
+    if not any(token == -1 for token in tokens):
+        if any(token < 0 or token >= width for token in tokens):
+            raise WorkerError("ALIGNMENT_FAILED", "CTC token identity is invalid.")
+        return emissions, list(tokens)
+    non_blank = [index for index in range(width) if index != blank_id]
+    if not non_blank:
+        raise WorkerError("ALIGNMENT_FAILED", "CTC vocabulary has no non-blank wildcard candidates.")
+    wildcard_id = width
+    expanded = [list(row) + [max(float(row[index]) for index in non_blank)] for row in emissions]
+    resolved = [wildcard_id if token == -1 else token for token in tokens]
+    if any(token < 0 or token > wildcard_id for token in resolved):
+        raise WorkerError("ALIGNMENT_FAILED", "CTC token identity is invalid.")
+    return expanded, resolved
 
 
 def forced_align(emissions: Sequence[Sequence[float]], tokens: Sequence[int], blank_id: int) -> list[tuple[int, int]]:
@@ -268,7 +374,7 @@ def forced_align(emissions: Sequence[Sequence[float]], tokens: Sequence[int], bl
     while token_index > 0 and time > 0:
         stayed = trellis[time - 1][token_index] + float(emissions[time - 1][blank_id])
         changed = trellis[time - 1][token_index - 1] + float(emissions[time - 1][tokens[token_index - 1]])
-        if changed >= stayed:
+        if changed > stayed:
             token_index -= 1
             points.append((token_index, time - 1))
         else:

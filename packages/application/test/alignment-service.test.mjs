@@ -81,14 +81,31 @@ test("successful alignment promotes one canonical SourceTranscript through histo
   assert.equal(releases.length, 1);
 });
 
-test("alignment preserves speaker assignments and provenance ordering", async () => {
+test("alignment preserves speaker assignments and appends provenance without rewriting history", async () => {
   const current = canonical("pt", true);
   const { service } = setup({ project: project({ speaker: true }), engine: new Engine(async () => aligned(current.transcript)) });
   const outcome = await service.alignSource({ sourceId: "source-1" });
   assert.equal(outcome.sourceTranscript.speakerState, "complete");
   assert.equal(outcome.sourceTranscript.transcript.words[0].speakerId, "spk1");
-  assert.deepEqual(outcome.sourceTranscript.provenance.stages.map((stage) => stage.kind), ["transcription", "alignment", "speaker-attribution"]);
+  assert.deepEqual(outcome.sourceTranscript.provenance.stages.map((stage) => stage.kind), ["transcription", "speaker-attribution", "alignment"]);
+  assert.deepEqual(outcome.sourceTranscript.provenance.stages.slice(0, -1), current.provenance.stages);
   assert.equal(outcome.sourceTranscript.provenance.stages.at(-1).inputTranscriptDigest, current.transcriptDigest);
+});
+
+test("alignment remains the newest consuming stage after manual and speaker provenance", async () => {
+  for (const kinds of [["manual-correction"], ["speaker-attribution", "manual-correction"]]) {
+    const withSpeaker = kinds.includes("speaker-attribution");
+    const initial = canonical("pt", withSpeaker);
+    const stages = structuredClone(initial.provenance.stages);
+    stages.push({ kind: "manual-correction", executionId: `manual-${kinds.length}`, inputTranscriptDigest: initial.transcriptDigest, createdAt: now });
+    const current = createSourceTranscript({ ...initial, provenance: { sourceChecksum: "sha256:media", stages } });
+    const value = project({ speaker: withSpeaker }); value.sourceTranscripts[0] = current;
+    const { service } = setup({ project: value, engine: new Engine(async () => aligned(current.transcript)) });
+    const outcome = await service.alignSource({ sourceId: "source-1" });
+    assert.deepEqual(outcome.sourceTranscript.provenance.stages.slice(0, -1), current.provenance.stages);
+    assert.equal(outcome.sourceTranscript.provenance.stages.at(-1).kind, "alignment");
+    assert.equal(outcome.sourceTranscript.provenance.stages.at(-1).inputTranscriptDigest, current.transcriptDigest);
+  }
 });
 
 test("audio is prepared through typed extract-audio and cleaned", async () => {
@@ -98,6 +115,31 @@ test("audio is prepared through typed extract-audio and cleaned", async () => {
   await service.alignSource({ sourceId: "source-1", id: "job" });
   assert.deepEqual(operations[0].operation, { type: "extract-audio", inputUri: "/media/input.mp4", outputUri: "/tmp/cevra-alignment/audio.wav", audioCodec: "pcm" });
   assert.equal(releases.length, 1);
+});
+
+test("temporary audio cleanup failure is bounded, retried, and prevents promotion", async () => {
+  let attempts = 0;
+  const audioWorkspace = { async acquire() { return { outputUri: "/tmp/cevra-alignment/audio.wav", async release() { attempts += 1; throw new Error("raw rm /private/path"); } }; } };
+  const { service, history } = setup({ audioWorkspace });
+  await assert.rejects(service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_AUDIO_CLEANUP_FAILED" && !error.message.includes("private"));
+  assert.equal(attempts, 2);
+  assert.equal(history.entries.length, 0);
+  assert.equal(history.current.sourceTranscripts[0].wordTiming, "model");
+});
+
+test("cleanup failure takes bounded precedence over engine failure and cancellation", async () => {
+  const cancelled = new AbortController();
+  for (const { engine, controller } of [
+    { engine: new Engine(async () => { throw new Error("raw engine /secret"); }) },
+    { controller: cancelled, engine: new Engine(() => { cancelled.abort(); throw Object.assign(new Error("aborted"), { name: "AbortError" }); }) }
+  ]) {
+    let attempts = 0;
+    const audioWorkspace = { async acquire() { return { outputUri: "/tmp/cevra-alignment/audio.wav", async release() { attempts += 1; throw new Error("raw rm /private/path"); } }; } };
+    const { service, history } = setup({ engine, audioWorkspace });
+    await assert.rejects(service.alignSource({ sourceId: "source-1" }, controller?.signal), (error) => error.code === "ALIGNMENT_APP_AUDIO_CLEANUP_FAILED" && !error.message.includes("private"));
+    assert.equal(attempts, 2);
+    assert.equal(history.entries.length, 0);
+  }
 });
 
 test("stale transcript replacement prevents promotion", async () => {
@@ -169,6 +211,41 @@ test("malformed or partial engine candidates never mutate history", async () => 
     { ...aligned(), transcript: { ...aligned().transcript, words: aligned().transcript.words.map((w, i) => i ? w : { ...w, endMs: 3_000 }) } }
   ];
   for (const value of invalid) { const { service, history } = setup({ engine: new Engine(async () => value) }); await assert.rejects(service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_RESULT_INVALID"); assert.equal(history.entries.length, 0); }
+});
+
+test("Alignment V1 rejects word and segment crossings without canonical mutation", async () => {
+  const overlapWords = aligned();
+  overlapWords.transcript.words[1] = { ...overlapWords.transcript.words[1], startMs: 300, endMs: 700 };
+  overlapWords.transcript.segments[0] = { ...overlapWords.transcript.segments[0], startMs: 100, endMs: 700 };
+  const first = setup({ engine: new Engine(async () => overlapWords) });
+  await assert.rejects(first.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_RESULT_INVALID");
+  assert.equal(first.history.entries.length, 0);
+
+  const currentTranscript = {
+    language: "pt",
+    words: [
+      { id: "w1", text: "um", startMs: 0, endMs: 300 },
+      { id: "w2", text: "dois", startMs: 500, endMs: 800 }
+    ],
+    segments: [
+      { id: "s1", text: "um", startMs: 0, endMs: 300, wordIds: ["w1"] },
+      { id: "s2", text: "dois", startMs: 500, endMs: 800, wordIds: ["w2"] }
+    ]
+  };
+  const current = createSourceTranscript({ sourceId: "source-1", wordTiming: "model", speakerState: "none", transcript: currentTranscript, provenance: { sourceChecksum: "sha256:media", stages: [{ kind: "transcription", executionId: "tx", engineId: "tx", engineVersion: "1", engineApiVersion: "1", modelId: "base", createdAt: now }] } });
+  const value = project(); value.sourceTranscripts[0] = current;
+  const crossing = aligned(currentTranscript);
+  crossing.transcript.words = [
+    { ...crossing.transcript.words[0], startMs: 600, endMs: 800 },
+    { ...crossing.transcript.words[1], startMs: 100, endMs: 300 }
+  ];
+  crossing.transcript.segments = [
+    { ...crossing.transcript.segments[0], startMs: 600, endMs: 800 },
+    { ...crossing.transcript.segments[1], startMs: 100, endMs: 300 }
+  ];
+  const second = setup({ project: value, engine: new Engine(async () => crossing) });
+  await assert.rejects(second.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_RESULT_INVALID");
+  assert.equal(second.history.entries.length, 0);
 });
 
 test("engine identity mismatch and media failure map to bounded errors", async () => {

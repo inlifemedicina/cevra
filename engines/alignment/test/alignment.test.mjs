@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import fs from "node:fs";
-import { mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -95,8 +95,47 @@ test("model verifier checks every artifact hash and rejects tampering", async ()
   await assert.rejects(verifyPinnedModel(root, { "config.json": digest }), (e) => e.code === "ALIGNMENT_MODEL_UNAVAILABLE");
 });
 
+test("prepared model directory rejects every unexpected file and alternate weight", async () => {
+  for (const injected of ["model.safetensors", "pytorch_model.bin", "unexpected-tokenizer.json"]) {
+    const root = await mkdtemp(join(tmpdir(), "cevra-model-closed-"));
+    await writeFile(join(root, "config.json"), "model");
+    const digest = createHash("sha256").update("model").digest("hex");
+    await writeFile(join(root, injected), "unverified");
+    await assert.rejects(verifyPinnedModel(root, { "config.json": digest }), (e) => e.code === "ALIGNMENT_MODEL_UNAVAILABLE", injected);
+    await rm(root, { recursive: true, force: true });
+  }
+  const directoryRoot = await mkdtemp(join(tmpdir(), "cevra-model-directory-"));
+  await mkdir(join(directoryRoot, "unexpected-directory"));
+  await assert.rejects(verifyPinnedModel(directoryRoot, {}), (e) => e.code === "ALIGNMENT_MODEL_UNAVAILABLE");
+  await rm(directoryRoot, { recursive: true, force: true });
+
+  const symlinkRoot = await mkdtemp(join(tmpdir(), "cevra-model-symlink-"));
+  await writeFile(join(symlinkRoot, "target"), "model");
+  await symlink(join(symlinkRoot, "target"), join(symlinkRoot, "config.json"));
+  const digest = createHash("sha256").update("model").digest("hex");
+  await assert.rejects(verifyPinnedModel(symlinkRoot, { "config.json": digest, target: digest }), (e) => e.code === "ALIGNMENT_MODEL_UNAVAILABLE");
+  await rm(symlinkRoot, { recursive: true, force: true });
+});
+
 test("temporary PCM workspace cleans complete job directory idempotently", async () => {
   const root = await mkdtemp(join(tmpdir(), "cevra-audio-")); const workspace = new NodeAlignmentAudioWorkspace(root); const lease = await workspace.acquire("ignored/path"); await mkdir(dirname(lease.outputUri), { recursive: true }); await writeFile(lease.outputUri, "pcm"); assert.equal((await readFile(lease.outputUri, "utf8")), "pcm"); await lease.release(); await lease.release(); await assert.rejects(stat(lease.outputUri));
+});
+
+test("temporary PCM release remains retryable after a deletion failure", async () => {
+  const root = await mkdtemp(join(tmpdir(), "cevra-audio-retry-"));
+  let attempts = 0;
+  const workspace = new NodeAlignmentAudioWorkspace(root, async (path, options) => {
+    attempts += 1;
+    if (attempts === 1) throw new Error("injected deletion failure");
+    await rm(path, options);
+  });
+  const lease = await workspace.acquire("job");
+  await writeFile(lease.outputUri, "sensitive-pcm");
+  await assert.rejects(lease.release(), /injected deletion failure/);
+  assert.equal((await readFile(lease.outputUri, "utf8")), "sensitive-pcm");
+  await lease.release();
+  assert.equal(attempts, 2);
+  await assert.rejects(stat(lease.outputUri));
 });
 
 test("process runner performs JSON protocol health round-trip without network", async () => {
@@ -157,6 +196,18 @@ test("production worker has no network listener or implicit download path", asyn
   assert.match(source, /local_files_only=True/u);
   assert.match(source, /allowModelDownload.*False/u);
   assert.match(source, /os\.read\(0, 1\)/u);
+  assert.match(source, /trust_remote_code=False/u);
+  assert.match(source, /use_safetensors=\(language == "en"\)/u);
+  assert.doesNotMatch(source, /readframes\(source\.getnframes\(\)\)/u);
+});
+
+test("PT and EN pins select only their verified principal weight formats", () => {
+  assert.equal(Object.hasOwn(ALIGNMENT_MODELS.pt.files, "pytorch_model.bin"), true);
+  assert.equal(Object.hasOwn(ALIGNMENT_MODELS.pt.files, "model.safetensors"), false);
+  assert.equal(Object.hasOwn(ALIGNMENT_MODELS.en.files, "model.safetensors"), true);
+  assert.equal(Object.hasOwn(ALIGNMENT_MODELS.en.files, "pytorch_model.bin"), false);
+  assert.equal(Object.hasOwn(ALIGNMENT_MODELS.en.files, "feature_extractor_config.json"), true);
+  assert.equal(ALIGNMENT_MODELS.en.files["feature_extractor_config.json"], "d3de0c797bf9b65f90bc65c30cb7b303ebeda341f6fc80af33628c4b26b95632");
 });
 
 test("managed alignment model root stays isolated from Python, engine, and Media Runtime roots", async () => {

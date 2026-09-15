@@ -30,6 +30,7 @@ export type AlignmentApplicationErrorCode =
   | "ALIGNMENT_APP_TRANSCRIPT_NOT_ALIGNABLE"
   | "ALIGNMENT_APP_LANGUAGE_UNSUPPORTED"
   | "ALIGNMENT_APP_AUDIO_PREPARATION_FAILED"
+  | "ALIGNMENT_APP_AUDIO_CLEANUP_FAILED"
   | "ALIGNMENT_APP_ENGINE_FAILED"
   | "ALIGNMENT_APP_RESULT_INVALID"
   | "ALIGNMENT_APP_PROJECT_CONFLICT"
@@ -44,6 +45,7 @@ const ERROR_KEYS: Readonly<Record<AlignmentApplicationErrorCode, TranslationKey>
   ALIGNMENT_APP_TRANSCRIPT_NOT_ALIGNABLE: "alignment.error.transcriptNotAlignable",
   ALIGNMENT_APP_LANGUAGE_UNSUPPORTED: "alignment.error.languageUnsupported",
   ALIGNMENT_APP_AUDIO_PREPARATION_FAILED: "alignment.error.audioPreparationFailed",
+  ALIGNMENT_APP_AUDIO_CLEANUP_FAILED: "alignment.error.audioCleanupFailed",
   ALIGNMENT_APP_ENGINE_FAILED: "alignment.error.engineFailed",
   ALIGNMENT_APP_RESULT_INVALID: "alignment.error.resultInvalid",
   ALIGNMENT_APP_PROJECT_CONFLICT: "alignment.error.projectConflict",
@@ -173,6 +175,14 @@ export class AlignmentApplicationService {
       }
       assertNotCancelled(signal, locale, executionId);
 
+      const completedLease = lease;
+      lease = undefined;
+      try {
+        await releaseAudioLease(completedLease);
+      } catch (cause) {
+        throw appError("ALIGNMENT_APP_AUDIO_CLEANUP_FAILED", locale, executionId, cause);
+      }
+
       let result: AlignmentResult;
       let candidate: SourceTranscript;
       try {
@@ -198,7 +208,7 @@ export class AlignmentApplicationService {
           transcript: result.transcript,
           provenance: {
             ...(current.provenance.sourceChecksum !== undefined ? { sourceChecksum: current.provenance.sourceChecksum } : {}),
-            stages: insertAlignmentStage(current.provenance.stages, alignmentStage, inputTranscriptDigest)
+            stages: appendAlignmentStage(current.provenance.stages, alignmentStage)
           },
           ...(current.extensions !== undefined ? { extensions: clone(current.extensions) } : {})
         });
@@ -231,8 +241,17 @@ export class AlignmentApplicationService {
       const registered = project.sourceTranscripts.find((item) => item.sourceId === source.id);
       if (!registered) throw appError("ALIGNMENT_APP_COMMIT_FAILED", locale, executionId);
       return { executionId, sourceId: source.id, result: clone(result), sourceTranscript: clone(registered), project };
-    } finally {
-      if (lease) await lease.release().catch(() => undefined);
+    } catch (cause) {
+      if (lease) {
+        const failedLease = lease;
+        lease = undefined;
+        try {
+          await releaseAudioLease(failedLease);
+        } catch (cleanupCause) {
+          throw appError("ALIGNMENT_APP_AUDIO_CLEANUP_FAILED", locale, executionId, { operation: cause, cleanup: cleanupCause });
+        }
+      }
+      throw cause;
     }
   }
 
@@ -281,6 +300,7 @@ function validateAlignmentResult(value: unknown, current: TranscriptState, langu
   if (value.transcript.words.length !== current.words.length || value.transcript.segments.length !== current.segments.length) {
     throw new Error("Alignment result is partial.");
   }
+  let previousWordEnd = 0;
   const words = value.transcript.words.map((raw, index) => {
     if (!isRecord(raw)) throw new Error(`Word ${index} is malformed.`);
     rejectUnexpectedKeys(raw, ["id", "text", "startMs", "endMs", "confidence", "speakerId"], `word ${index}`);
@@ -292,9 +312,12 @@ function validateAlignmentResult(value: unknown, current: TranscriptState, langu
       throw new Error(`Word ${index} timing is invalid.`);
     }
     if (sourceDurationMs !== undefined && raw.endMs > sourceDurationMs) throw new Error(`Word ${index} exceeds source duration.`);
+    if (index > 0 && raw.startMs < previousWordEnd) throw new Error(`Word ${index} crosses the prior canonical word.`);
+    previousWordEnd = raw.endMs;
     return clone(raw) as unknown as TranscriptState["words"][number];
   });
   const wordById = new Map(words.map((word) => [word.id, word]));
+  let previousSegmentEnd = 0;
   const segments = value.transcript.segments.map((raw, index) => {
     if (!isRecord(raw)) throw new Error(`Segment ${index} is malformed.`);
     rejectUnexpectedKeys(raw, ["id", "text", "startMs", "endMs", "wordIds", "speakerId"], `segment ${index}`);
@@ -309,9 +332,18 @@ function validateAlignmentResult(value: unknown, current: TranscriptState, langu
       throw new Error(`Segment ${index} timing is invalid.`);
     }
     if (sourceDurationMs !== undefined && raw.endMs > sourceDurationMs) throw new Error(`Segment ${index} exceeds source duration.`);
+    if (index > 0 && raw.startMs < previousSegmentEnd) throw new Error(`Segment ${index} crosses the prior canonical segment.`);
+    previousSegmentEnd = raw.endMs;
+    const containedWords = raw.wordIds.map((id) => typeof id === "string" ? wordById.get(id) : undefined);
+    if (containedWords.some((word) => word === undefined)) throw new Error(`Segment ${index} references an unknown word.`);
     for (const id of raw.wordIds) {
       const word = typeof id === "string" ? wordById.get(id) : undefined;
       if (!word || word.startMs < raw.startMs || word.endMs > raw.endMs) throw new Error(`Segment ${index} does not contain its words.`);
+    }
+    if (containedWords.length === 0
+      || raw.startMs !== Math.min(...containedWords.map((word) => word!.startMs))
+      || raw.endMs !== Math.max(...containedWords.map((word) => word!.endMs))) {
+      throw new Error(`Segment ${index} timing is not derived from its canonical words.`);
     }
     return clone(raw) as unknown as TranscriptState["segments"][number];
   });
@@ -320,14 +352,8 @@ function validateAlignmentResult(value: unknown, current: TranscriptState, langu
   return { transcript, modelId: value.modelId as string, ...(value.modelRevision === undefined ? {} : { modelRevision: value.modelRevision as string }), ...(value.modelDigest === undefined ? {} : { modelDigest: value.modelDigest as string }), ...(value.durationMs === undefined ? {} : { durationMs: value.durationMs as number }) };
 }
 
-function insertAlignmentStage(stages: readonly TranscriptProvenanceStage[], alignment: TranscriptProvenanceStage, inputDigest: SourceTranscript["transcriptDigest"]): TranscriptProvenanceStage[] {
-  const split = stages.findIndex((stage) => stage.kind === "speaker-attribution" || stage.kind === "manual-correction");
-  const index = split < 0 ? stages.length : split;
-  const before = stages.slice(0, index).map(clone);
-  const after = stages.slice(index).map((stage) => stage.kind === "speaker-attribution" || stage.kind === "manual-correction"
-    ? { ...clone(stage), inputTranscriptDigest: inputDigest }
-    : clone(stage));
-  return [...before, alignment, ...after];
+function appendAlignmentStage(stages: readonly TranscriptProvenanceStage[], alignment: TranscriptProvenanceStage): TranscriptProvenanceStage[] {
+  return [...stages.map(clone), alignment];
 }
 
 function assertAlignmentIdentity(value: unknown): asserts value is EngineIdentity {
@@ -341,6 +367,22 @@ function assertLease(value: unknown): asserts value is AlignmentAudioLease {
   if (!isRecord(value) || typeof value.outputUri !== "string" || !value.outputUri.endsWith(".wav") || typeof value.release !== "function") {
     throw new Error("Alignment audio workspace returned an invalid lease.");
   }
+}
+
+async function releaseAudioLease(lease: AlignmentAudioLease): Promise<void> {
+  let firstFailure: unknown;
+  try {
+    await lease.release();
+    return;
+  } catch (cause) {
+    firstFailure = cause;
+  }
+  try {
+    await lease.release();
+  } catch (retryFailure) {
+    throw new AggregateError([firstFailure, retryFailure], "Alignment audio cleanup failed after a bounded retry.");
+  }
+  throw firstFailure;
 }
 
 function validateActor(value: unknown): JournalActor {
