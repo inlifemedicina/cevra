@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-undo"
+description = "Enables the desktop_undo command without any pre-configured scope."
+commands.allow = ["desktop_undo"]
+
+[[permission]]
+identifier = "deny-desktop-undo"
+description = "Denies the desktop_undo command without any pre-configured scope."
+commands.deny = ["desktop_undo"]

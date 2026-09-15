@@ -2,7 +2,7 @@ import type { CevraLocale, TranslationKey } from "@cevra/i18n";
 import { translate } from "@cevra/i18n";
 import type { ProjectIR } from "@cevra/project-ir";
 import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import type { DesktopBackend, DesktopBackendState } from "./backend/desktop-backend";
+import type { DesktopBackend, DesktopBackendState, DesktopOperationError } from "./backend/desktop-backend";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
 import { DirectorPanel } from "./components/DirectorPanel";
 import { Inspector } from "./components/Inspector";
@@ -113,7 +113,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function importMedia() {
-    if (importBusy) return;
+    if (importBusy || transcriptionOperationId) return;
     setImportBusy(true);
     setRuntimeError(null);
     setRuntimeNotice(null);
@@ -129,6 +129,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function changeHistory(direction: "undo" | "redo") {
+    if (importBusy || transcriptionOperationId) return;
     setRuntimeNotice(null);
     try {
       applyBackendState(await backend[direction]());
@@ -138,7 +139,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function transcribeSource() {
-    if (!activeSourceId || transcriptionOperationId) return;
+    if (!activeSourceId || transcriptionOperationId || importBusy) return;
     const operationId = typeof globalThis.crypto?.randomUUID === "function"
       ? globalThis.crypto.randomUUID()
       : `transcription-${Date.now()}`;
@@ -157,16 +158,26 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   async function cancelTranscription() {
     if (!transcriptionOperationId) return;
     try {
-      await backend.cancelOperation(transcriptionOperationId);
+      const result = await backend.cancelOperation(transcriptionOperationId);
+      setRuntimeError(null);
+      setRuntimeNotice(result.cancelled ? "runtime.cancellationRequested" : "runtime.operationAlreadyFinished");
     } catch (cause) {
       handleRuntimeError(cause);
     }
   }
 
   function handleRuntimeError(cause: unknown) {
-    const code = errorCode(cause);
+    const operationError = desktopOperationError(cause);
+    const code = operationError.code;
+    if (operationError.reconciledState) applyBackendState(operationError.reconciledState);
+    if (isCancellationCode(code)) {
+      setRuntimeError(null);
+      setRuntimeNotice("runtime.operationCancelled");
+      return;
+    }
+    setRuntimeNotice(null);
     setRuntimeError(code);
-    if (!code.includes("HOST")) return;
+    if (!isTerminalHostCode(code)) return;
     setBackendState((current) => current ? {
       ...current,
       canUndo: false,
@@ -179,15 +190,16 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   if (!project || !backendState) return <main className="loading-screen"><span className="brand-mark">C</span><p>{runtimeError ? t("runtime.hostUnavailable") : t("app.loadingProject")}</p></main>;
 
   const layoutStyle = { "--timeline-height": `${timelineHeight}px` } as CSSProperties;
+  const mutationBusy = importBusy || transcriptionOperationId !== null;
   return (
     <main className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${inspectorOpen ? " inspector-open" : " inspector-closed"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision} data-selected-project-item-id={selectedProjectItemId ?? undefined} data-active-source-id={activeSourceId ?? undefined}>
-      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} inspectorOpen={inspectorOpen} exportAvailable={backendState.capabilities["project.export"].available} status={backendState.status} canUndo={backendState.canUndo} canRedo={backendState.canRedo} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onInspectorToggle={() => setInspectorOpen((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} />
+      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} inspectorOpen={inspectorOpen} exportAvailable={backendState.capabilities["project.export"].available} status={backendState.status} canUndo={backendState.canUndo && !mutationBusy} canRedo={backendState.canRedo && !mutationBusy} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onInspectorToggle={() => setInspectorOpen((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={setActiveTool} />
-        {mediaOpen && <MediaPanel sources={project.sources} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
+        {mediaOpen && <MediaPanel sources={project.sources} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !transcriptionOperationId} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
-            <WorkspaceStage workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />
+            <WorkspaceStage workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />
           </div>
           {runtimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(runtimeError))}</div>}
           {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
@@ -214,13 +226,35 @@ function resolvesProjectItem(project: Readonly<ProjectIR>, id: string): boolean 
     || project.graphics.some((item) => item.id === id);
 }
 
-function errorCode(cause: unknown): string {
-  if (typeof cause === "object" && cause !== null && "code" in cause && typeof cause.code === "string") return cause.code;
-  return "HOST_OPERATION_FAILED";
+function desktopOperationError(cause: unknown): DesktopOperationError {
+  if (typeof cause === "object" && cause !== null && "code" in cause && typeof cause.code === "string") return cause as DesktopOperationError;
+  return { code: "HOST_OPERATION_FAILED" };
+}
+
+function isCancellationCode(code: string): boolean {
+  return new Set([
+    "OPERATION_CANCELLED",
+    "MEDIA_OPERATION_CANCELLED",
+    "TRANSCRIPTION_APP_CANCELLED",
+    "TRANSCRIPTION_CANCELLED"
+  ]).has(code);
+}
+
+function isTerminalHostCode(code: string): boolean {
+  return new Set([
+    "HOST_UNAVAILABLE",
+    "HOST_START_FAILED",
+    "HOST_PROTOCOL_MISMATCH",
+    "HOST_MALFORMED_RESPONSE",
+    "HOST_MESSAGE_TOO_LARGE",
+    "HOST_SUPERVISOR_FAILED"
+  ]).has(code);
 }
 
 function runtimeErrorKey(code: string): TranslationKey {
-  if (code.includes("CANCEL")) return "runtime.operationCancelled";
+  if (code === "OPERATION_TIMEOUT" || code === "HOST_TIMEOUT") return "runtime.operationTimedOut";
+  if (code === "TRANSCRIPTION_APP_PROJECT_CONFLICT") return "runtime.transcriptionProjectConflict";
+  if (code === "LOCAL_SOURCE_PROJECT_CONFLICT" || code === "MEDIA_PROJECT_CONFLICT") return "runtime.importProjectConflict";
   if (code.includes("MEDIA") || code.includes("INGEST")) return "runtime.mediaError";
   if (code.includes("TRANSCRIPTION")) return "runtime.transcriptionError";
   if (code.includes("HOST")) return "runtime.hostUnavailable";

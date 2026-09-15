@@ -16,6 +16,7 @@
     "ci": "npm run build && npm run test:ci",
     "desktop:host:build": "npm run build -w @cevra/desktop-host",
     "desktop:runtime:prepare": "npm run runtime:prepare -w @cevra/desktop-host",
+    "desktop:packaging:verify": "npm run packaging:verify -w @cevra/desktop-host",
     "desktop:runtime:smoke": "npm run smoke:private-node -w @cevra/desktop-host",
     "desktop:dev": "npm run desktop:host:build && npm run desktop:runtime:prepare && npm run tauri:dev -w @cevra/desktop",
     "desktop:build": "npm run desktop:host:build && npm run desktop:runtime:prepare && npm run tauri:build -w @cevra/desktop -- --no-bundle",

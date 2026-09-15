@@ -173,7 +173,9 @@ async function createTranscriptionServices(history: ProjectHistory, environment:
   const modelCacheDir = environment.CEVRA_TRANSCRIPTION_MODEL_CACHE;
   if (!pythonExecutable || !environmentRoot || !modelCacheDir) return { capability: unavailable("runtime-not-configured") };
   const modelId = transcriptionModel(environment.CEVRA_TRANSCRIPTION_MODEL_ID);
-  if (!modelAvailable(modelCacheDir, modelId)) return { capability: unavailable("model-not-available") };
+  // This is intentionally only a cheap presence gate. The existing adapter
+  // healthcheck remains authoritative for runtime/model integrity.
+  if (!modelSnapshotPresent(modelCacheDir, modelId)) return { capability: unavailable("model-not-available") };
   try {
     const mode = environment.CEVRA_TRANSCRIPTION_MODE === "development" ? "development" : "managed";
     const runtime: LocalTranscriptionAdapterOptions["runtime"] = mode === "development"
@@ -220,7 +222,7 @@ function validatedMediaRuntimeRoot(value: string): string {
   return root;
 }
 
-function modelAvailable(cacheRoot: string, modelId: string): boolean {
+function modelSnapshotPresent(cacheRoot: string, modelId: string): boolean {
   if (!isAbsolute(cacheRoot) || !existsSync(cacheRoot)) return false;
   const repository = `models--Systran--faster-whisper-${modelId}`;
   const snapshots = resolve(cacheRoot, "hub", repository, "snapshots");

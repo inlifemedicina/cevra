@@ -24,6 +24,7 @@ export type ImportMediaResult =
 export interface DesktopOperationError {
   readonly code: string;
   readonly message?: string;
+  readonly reconciledState?: DesktopBackendState;
 }
 
 export interface DesktopBackend {

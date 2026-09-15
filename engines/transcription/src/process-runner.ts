@@ -388,7 +388,9 @@ async function collectWorkerResult(
     child.once("error", onChildError);
     child.once("close", onClose);
     if (signal?.aborted) abort();
-    child.stdin.end(`${JSON.stringify(payload)}\n`);
+    // Keep the one-request pipe open while inference runs. The Python worker
+    // watches this pipe and exits if its supervising Node process dies.
+    child.stdin.write(`${JSON.stringify(payload)}\n`);
   });
 }
 

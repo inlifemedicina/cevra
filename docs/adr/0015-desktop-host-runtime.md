@@ -33,7 +33,11 @@ Rust/Tauri is the trusted local gate. It owns the native file picker, launches
 only the bundled private Node executable with the fixed desktop-host resource,
 sanitizes the child environment, routes the closed operation set, supports
 cancellation, and reaps the child. The shell and dialog plugins are used only
-from Rust; the main WebView capability remains `permissions: []`.
+from Rust. Plugin/core capabilities remain ungranted to the WebView. The main
+window has an explicit application-command ACL containing only the six typed
+`desktop_*` commands; adding a registered command without matching manifest and
+capability review fails the regression guard. A future window/WebView receives
+none of these commands unless it is explicitly included in a reviewed capability.
 
 The persistent Node desktop host owns the live application session: one
 canonical `ProjectHistory`, existing application services, Media Runtime and
@@ -68,6 +72,34 @@ An unexpected host exit rejects all pending requests and marks the session
 unavailable. It is not automatically restarted: ProjectHistory is memory-only,
 so restart would silently replace the user's session. Recovery after host crash
 belongs to the future persistence milestone.
+
+On cooperative shutdown the host aborts active application operations, waits
+for their existing engine cleanup, closes the Media Runtime client, and exits.
+On abnormal Node termination, Rust can only force-kill the direct Node child; it
+does not claim process-tree reaping. Descendant containment is instead explicit:
+the transcription worker keeps a parent-liveness stdin pipe and exits immediately
+on EOF, while the persistent Media worker's existing EOF cleanup cancels and
+reaps its active subprocess. Native-process tests exercise both chains with real
+PIDs. A malformed protocol or non-settling mutation permanently fails the
+memory-only session.
+
+Control requests use bounded timeouts. A long mutation timeout triggers its
+operation cancellation and awaits settlement; after a cancelled/error settlement
+the supervisor requests a fresh canonical snapshot and returns it as reconciliation
+metadata. If settlement cannot be proven, the supervisor kills the host and makes
+the session unusable, preventing an invisible late mutation in a still-usable UI.
+
+Desktop Runtime Integration V1 redistributes the pinned private Node runtime and
+the fixed transcription worker script, but it does **not** yet redistribute a
+Media Runtime bundle, private Python distribution, transcription dependency
+environment, or model cache. Consequently, release import/transcription remain
+capability-gated unavailable unless future packaging supplies their fixed trusted
+resources; internal debug operation may use only the Rust-side allow-listed
+configuration documented for development. Model downloads remain disabled. The
+model-cache directory check is only a cheap snapshot-presence gate; the existing
+transcription adapter healthcheck is authoritative and fails closed on unusable
+runtime/model state. Full model artifact inventory belongs to the model-manager
+milestone.
 
 ## Rejected designs
 

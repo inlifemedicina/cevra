@@ -906,11 +906,21 @@ React/WebView
 
 Rust owns native file selection, the fixed private host lifecycle, closed JSONL
 IPC, cancellation routing and child-process reaping. The WebView receives no
-shell, dialog, generic filesystem, network or sidecar permission; its Tauri
-capability remains `permissions: []`. The Node host owns the one authoritative
-in-memory `ProjectHistory` session and composes the existing media ingest and
-transcription application services without duplicating Project IR or engine
-behavior.
+shell, dialog, generic filesystem, network or sidecar permission. Its Tauri
+capability grants only the six explicit generated `desktop_*` application-command
+permissions, guarded against drift from registration/build manifest. The Node
+host owns the one authoritative in-memory `ProjectHistory` session and composes
+the existing media ingest and transcription application services without
+duplicating Project IR or engine behavior.
+
+Abnormal lifecycle hardening does not claim process-tree reaping from a direct
+Node kill. The transcription worker now treats its private stdin as a parent-life
+pipe, and the Media worker uses its existing EOF cancellation/reaping path;
+native-process tests prove both descendant chains terminate after abrupt parent
+death. Supervisor handshake is fail-closed, startup is single-flight, host failure
+is terminal for the memory-only session, and mutating timeouts reconcile a fresh
+canonical snapshot after cancellation or permanently fail the session when
+settlement cannot be proven.
 
 The slice adds real local ingest when the trusted Media Runtime is available,
 optional real local transcription only when an explicit trusted runtime and
@@ -918,6 +928,16 @@ already-local model are configured, and host-derived undo/redo. Model download
 remains disabled. Project persistence, crash recovery, real preview playback,
 Director execution, Workflow Preset execution and mobile remote-control or
 delegation remain deferred.
+
+V1 packages the pinned private Node runtime and fixed host/worker resources, but
+does not yet distribute the Media Runtime bundle, private Python distribution,
+transcription environment, or model cache. Release capabilities therefore remain
+truthfully unavailable without those fixed trusted resources. The model snapshot
+presence check is not an integrity claim; the existing adapter healthcheck remains
+authoritative and fail-closed. CI verifies both Node target archives, the exact
+Tauri resource/external-binary contract, and bundled worker-path resolution.
+Local pre-PR hardening validation is 261/261 Node/TypeScript tests, 22/22 Python
+tests, and 19/19 Rust tests; the slice remains **IN DEVELOPMENT** pending review.
 
 ---
 

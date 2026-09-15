@@ -50,7 +50,32 @@ Debug Rust copies only this allow-list after `env_clear()`. React cannot set
 runtime paths, executables, scripts, arguments, or child environment. Model
 downloads remain disabled.
 
-The Tauri capability attached to the main window remains `permissions: []`.
-Shell and dialog plugins are used only by trusted Rust commands. React has no
-generic shell, filesystem, network, sidecar, dialog-plugin, or host-RPC surface.
-The CSP remains explicit and closed.
+The Tauri capability attached to the main window grants only the six generated
+application-command permissions for `desktop_get_state`, native pick-and-ingest,
+transcription, undo, redo, and cancellation. No shell, dialog-plugin, filesystem,
+HTTP, process, or sidecar permission is granted to the WebView. Shell and dialog
+plugins are used only inside trusted Rust code. The CSP remains explicit and
+closed, and a Rust regression guard keeps command registration, the build
+manifest, and the capability ACL identical.
+
+The current package prepares and redistributes the pinned private Node runtime
+and fixed desktop-host/transcription-worker resources. It does not yet ship the
+Media Runtime bundle, private Python runtime, transcription environment, or a
+model cache. Therefore real ingest/transcription are unavailable in an ordinary
+V1 package unless those fixed trusted resources are supplied by a later release;
+the environment configuration above is debug/developer-only. A cache snapshot
+directory is merely a presence gate—the existing adapter healthcheck remains the
+authoritative fail-closed runtime/model validation. Model downloads stay off.
+
+CI verifies both pinned Node archives and hashes, executes the host under the
+Linux private runtime, checks the exact Tauri external-binary/resource map, and
+executes a staged bundled-worker resolution probe. Native installer/signing
+production remains platform-specific, so this slice uses the deterministic
+resource contract plus Tauri `--no-bundle` compilation rather than claiming a
+cross-platform signed installer.
+
+Current pre-PR hardening validation passes 261 Node/TypeScript tests (including
+38 desktop UI and 16 desktop-host tests), 22 Python tests, and 19 Rust tests.
+The frontend production build, `cargo check --locked`, optimized Tauri
+`--no-bundle` build, native descendant-containment tests, and private-Node
+protocol smoke also pass locally.

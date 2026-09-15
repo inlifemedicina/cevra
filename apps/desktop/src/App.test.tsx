@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { translate, translationKeys } from "@cevra/i18n";
 import { createEmptyProject, createSourceTranscript, ProjectHistory, validateProjectIR, type ProjectIR } from "@cevra/project-ir";
@@ -289,7 +289,12 @@ describe("CEVRA Vids desktop shell", () => {
   it("renders a true empty Project IR with presentation-only timeline scaffolding", async () => {
     await renderFunctional();
     expect(screen.getByText("Nenhuma mídia corresponde a este filtro.")).toBeTruthy();
+    expect(screen.getByText("Importe um vídeo para começar")).toBeTruthy();
+    expect(screen.queryByText("CONSULTA • SEÇÃO 02")).toBeNull();
+    expect(screen.queryByText(/Clareza gera confiança/)).toBeNull();
     expect(screen.getAllByTestId(/^timeline-track-/)).toHaveLength(7);
+    expect(screen.getByRole("slider", { name: "Régua e cursor da linha do tempo" }).getAttribute("aria-valuemax")).toBe("0");
+    expect(screen.getByTestId("preview-timecode").textContent).toContain("00:00:00 / 00:00:00");
     expect(screen.getByTestId("app-shell").dataset.activeSourceId).toBeUndefined();
   });
 
@@ -363,4 +368,156 @@ describe("CEVRA Vids desktop shell", () => {
     expect(JSON.stringify(calls)).not.toContain("path");
     expect(JSON.stringify(calls)).not.toContain("uri");
   });
+
+  it("renders a terminal localized state when initial host loading fails", async () => {
+    const backend = new FunctionalDesktopBackend();
+    backend.loadState = async () => { throw { code: "HOST_START_FAILED" }; };
+    render(<App backend={backend} />);
+    expect(await screen.findByText("A sessão local ficou indisponível e não será reiniciada sem recuperação persistente.")).toBeTruthy();
+  });
+
+  it("maps import conflicts without falsely terminating the host session", async () => {
+    const backend = new FunctionalDesktopBackend();
+    backend.pickAndImportMedia = async () => { throw { code: "LOCAL_SOURCE_PROJECT_CONFLICT" }; };
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("A fonte não foi adicionada");
+    expect(screen.getByText("Sessão local · não salva")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("surfaces a normal import failure and restores the import action", async () => {
+    const backend = new FunctionalDesktopBackend();
+    backend.pickAndImportMedia = async () => { throw { code: "MEDIA_OPERATION_FAILED" }; };
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Não foi possível importar a mídia selecionada.");
+    expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("surfaces transcription failures and restores the action after settlement", async () => {
+    const backend = new FunctionalDesktopBackend();
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    backend.transcribeSource = async () => { throw { code: "TRANSCRIPTION_OPERATION_FAILED" }; };
+    await user.click(screen.getByRole("tab", { name: "Transcrição" }));
+    await user.click(screen.getByRole("button", { name: "Transcrever" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Não foi possível concluir a transcrição local.");
+    expect((screen.getByRole("button", { name: "Transcrever" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("explains a transcription project conflict without leaking host details", async () => {
+    const backend = new FunctionalDesktopBackend();
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    backend.transcribeSource = async () => { throw { code: "TRANSCRIPTION_APP_PROJECT_CONFLICT", message: "internal execution id" }; };
+    await user.click(screen.getByRole("tab", { name: "Transcrição" }));
+    await user.click(screen.getByRole("button", { name: "Transcrever" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("A transcrição não foi aplicada");
+    expect(alert.textContent).not.toContain("execution id");
+  });
+
+  it("keeps cancellation neutral and distinguishes accepted from already-finished requests", async () => {
+    const backend = new FunctionalDesktopBackend();
+    const pending = deferred<DesktopBackendState>();
+    backend.transcribeSource = () => pending.promise;
+    backend.cancelOperation = async (operationId) => ({ operationId, cancelled: true });
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    await user.click(screen.getByRole("tab", { name: "Transcrição" }));
+    await user.click(screen.getByRole("button", { name: "Transcrever" }));
+    expect((screen.getByRole("button", { name: "Transcrevendo…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Desfazer" }) as HTMLButtonElement).disabled).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(await screen.findByText("Cancelamento solicitado. A operação será encerrada com segurança.")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    backend.cancelOperation = async (operationId) => ({ operationId, cancelled: false });
+    await user.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(await screen.findByText("A operação já foi concluída ou não está mais ativa.")).toBeTruthy();
+    pending.reject({ code: "OPERATION_CANCELLED" });
+    expect(await screen.findByText("A operação foi cancelada sem alterar o projeto.")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("applies reconciled canonical state from a timed-out mutation", async () => {
+    const backend = new FunctionalDesktopBackend();
+    const reconciled = await backend.pickAndImportMedia();
+    if (reconciled.outcome !== "imported") throw new Error("test fixture import failed");
+    backend.pickAndImportMedia = async () => {
+      throw { code: "OPERATION_TIMEOUT", reconciledState: reconciled.state };
+    };
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect(await screen.findByRole("button", { name: /imported\.mp4/ })).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("O estado do projeto foi reconciliado");
+    expect(screen.getByText("Sessão local · não salva")).toBeTruthy();
+  });
+
+  it("keeps HOST_TIMEOUT non-terminal when the supervisor does not declare failure", async () => {
+    const backend = new FunctionalDesktopBackend();
+    backend.pickAndImportMedia = async () => { throw { code: "HOST_TIMEOUT" }; };
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("excedeu o tempo limite");
+    expect(screen.getByText("Sessão local · não salva")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("treats only terminal host codes as terminal and disables mutations", async () => {
+    const backend = new FunctionalDesktopBackend();
+    backend.pickAndImportMedia = async () => { throw { code: "HOST_UNAVAILABLE" }; };
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("A sessão local ficou indisponível");
+    const failureCopies = screen.getAllByText("A sessão local ficou indisponível e não será reiniciada sem recuperação persistente.");
+    expect(failureCopies.length).toBeGreaterThan(0);
+    expect(failureCopies.some((element) => element.classList.contains("failed-status"))).toBe(true);
+    expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("disables history while a canonical mutation is pending", async () => {
+    const backend = new FunctionalDesktopBackend();
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect((screen.getByRole("button", { name: "Desfazer" }) as HTMLButtonElement).disabled).toBe(false);
+    const pending = deferred<ImportMediaResult>();
+    backend.pickAndImportMedia = () => pending.promise;
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect((screen.getByRole("button", { name: "Desfazer" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Refazer" }) as HTMLButtonElement).disabled).toBe(true);
+    pending.resolve({ outcome: "cancelled" });
+    await waitFor(() => expect((screen.getByRole("button", { name: "Desfazer" }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it("normalizes reconciled state returned in a Tauri command error", async () => {
+    const state = new FunctionalDesktopBackend().state();
+    const backend = new TauriDesktopBackend(async () => {
+      throw { code: "OPERATION_TIMEOUT", message: "safe", details: { state: {
+        project: state.project,
+        canUndo: state.canUndo,
+        canRedo: state.canRedo,
+        status: { hostAvailable: true, persistence: "local-unsaved" },
+        capabilities: {
+          mediaImport: state.capabilities["media.import"],
+          transcription: state.capabilities["transcription.transcribe"]
+        }
+      } } };
+    });
+    await expect(backend.undo()).rejects.toMatchObject({
+      code: "OPERATION_TIMEOUT",
+      reconciledState: { status: "local-unsaved", project: { project: { id: "desktop-real" } } }
+    });
+  });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}

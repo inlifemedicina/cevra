@@ -22,6 +22,7 @@
     "build": "tsc -p tsconfig.json && node scripts/build-bundle.mjs",
     "test": "npm run build && node --test test/*.test.mjs",
     "runtime:prepare": "node runtime/prepare-runtime.mjs",
+    "packaging:verify": "node scripts/verify-packaging-contract.mjs",
     "smoke:private-node": "node scripts/private-node-smoke.mjs"
   }
 }

@@ -62,7 +62,7 @@ export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpe
         <button type="button" className={inspectorOpen ? "icon-button toggled" : "icon-button"} onClick={onInspectorToggle} aria-label={t("top.inspector")} title={t("top.inspector")}><Icon name="inspect" /></button>
         <button type="button" className="icon-button" disabled={!canUndo} onClick={onUndo} aria-label={t("action.undo")} title={canUndo ? t("action.undo") : t("history.undoUnavailable")}><Icon name="undo" /></button>
         <button type="button" className="icon-button" disabled={!canRedo} onClick={onRedo} aria-label={t("action.redo")} title={canRedo ? t("action.redo") : t("history.redoUnavailable")}><Icon name="redo" /></button>
-        <span className={status === "demo-not-persisted" ? "save-status demo-status" : "save-status"}><i aria-hidden="true" />{t(status === "demo-not-persisted" ? "top.demoNotPersisted" : status === "local-unsaved" ? "top.localUnsaved" : "runtime.hostUnavailable")}</span>
+        <span className={`save-status ${status === "demo-not-persisted" ? "demo-status" : status === "host-unavailable" ? "failed-status" : "local-status"}`}><i aria-hidden="true" />{t(status === "demo-not-persisted" ? "top.demoNotPersisted" : status === "local-unsaved" ? "top.localUnsaved" : "runtime.hostUnavailable")}</span>
         <button className="locale-button" type="button" onClick={() => onLocaleChange(locale === "pt-BR" ? "en-US" : "pt-BR")} aria-label={t("top.switchLanguage")} title={t("top.switchLanguage")}>
           {locale === "pt-BR" ? "EN" : "PT"}
         </button>
