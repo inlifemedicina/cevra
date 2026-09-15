@@ -1,0 +1,31 @@
+# CEVRA Local Forced Alignment V1 isolated environment for CPython 3.12.
+# Direct dependencies are exact. Release assembly must select the official
+# platform CPU artifact for torch and add per-artifact hashes before bundling.
+# This environment is distinct from Media Runtime and Transcription Engine.
+torch==2.8.0
+transformers==4.57.6
+numpy==2.2.6
+
+# Exact transitive closure audited from the WhisperX 3.8.6 lock baseline.
+filelock==3.19.1
+fsspec==2025.9.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+networkx==3.4.2
+sympy==1.14.0
+mpmath==1.3.0
+typing_extensions==4.15.0
+setuptools==80.9.0
+huggingface-hub==0.35.3
+hf-xet==1.1.10
+packaging==25.0
+PyYAML==6.0.3
+regex==2025.9.18
+requests==2.32.5
+certifi==2025.10.5
+charset-normalizer==3.4.3
+idna==3.10
+urllib3==2.5.0
+tokenizers==0.22.1
+safetensors==0.6.2
+tqdm==4.67.1

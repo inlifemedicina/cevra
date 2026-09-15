@@ -4,6 +4,7 @@ export type EngineKind =
   | "media"
   | "composition"
   | "transcription"
+  | "alignment"
   | "qa"
   | "image-generation"
   | "video-generation"
