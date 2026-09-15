@@ -225,5 +225,17 @@
   "transcription.error.engineFailed": "The transcription engine could not complete the operation.",
   "transcription.error.resultInvalid": "The transcription result is invalid and was not added to the project.",
   "transcription.error.commitFailed": "The transcript could not be added to the project.",
-  "transcription.error.cancelled": "The transcription operation was cancelled."
+  "transcription.error.cancelled": "The transcription operation was cancelled.",
+  "alignment.error.invalidRequest": "The alignment request is invalid.",
+  "alignment.error.sourceUnknown": "The selected project source could not be found.",
+  "alignment.error.sourceIneligible": "The selected project source cannot be aligned.",
+  "alignment.error.transcriptMissing": "The selected source has no transcript to align.",
+  "alignment.error.transcriptNotAlignable": "The selected transcript cannot be aligned.",
+  "alignment.error.languageUnsupported": "Alignment currently supports Portuguese and English transcripts.",
+  "alignment.error.audioPreparationFailed": "Audio could not be prepared for alignment.",
+  "alignment.error.engineFailed": "The local alignment engine could not complete the operation.",
+  "alignment.error.resultInvalid": "The alignment result is invalid and was not applied.",
+  "alignment.error.projectConflict": "The project or transcript changed while alignment was running. Alignment was not applied.",
+  "alignment.error.commitFailed": "The aligned transcript could not be added to the project.",
+  "alignment.error.cancelled": "The alignment operation was cancelled."
 }
