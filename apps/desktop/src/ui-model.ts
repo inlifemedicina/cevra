@@ -1,4 +1,5 @@
 import type { TranslationKey } from "@cevra/i18n";
+import type { DesktopCapabilityReason } from "./backend/desktop-backend";
 
 export const workspaces = ["edit", "transcription", "composition", "captions", "audio"] as const;
 export type Workspace = (typeof workspaces)[number];
@@ -30,4 +31,15 @@ export function formatTime(milliseconds: number): string {
   const seconds = totalSeconds % 60;
   const frames = Math.floor((milliseconds % 1000) / (1000 / 30));
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}:${String(frames).padStart(2, "0")}`;
+}
+
+export function capabilityReasonKey(reason: DesktopCapabilityReason): TranslationKey {
+  switch (reason) {
+    case "runtime-not-configured": return "runtime.notConfigured";
+    case "runtime-invalid": return "runtime.invalid";
+    case "model-not-available": return "runtime.modelUnavailable";
+    case "host-unavailable": return "runtime.hostUnavailable";
+    case "available": return "status.ready";
+    case "desktop-runtime-deferred": return "status.unavailableDetail";
+  }
 }

@@ -388,7 +388,10 @@ async function collectWorkerResult(
     child.once("error", onChildError);
     child.once("close", onClose);
     if (signal?.aborted) abort();
-    child.stdin.end(`${JSON.stringify(payload)}\n`);
+    // One-request parent-liveness contract: write exactly one JSON request, keep
+    // stdin open while the worker runs, read its result, and let process exit close
+    // the pipe. EOF before worker termination means supervising-parent loss.
+    child.stdin.write(`${JSON.stringify(payload)}\n`);
   });
 }
 

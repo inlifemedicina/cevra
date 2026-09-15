@@ -14,6 +14,15 @@ const trackKeys = {
 } as const;
 
 const waveformBars = [4, 12, 7, 16, 9, 5, 14, 8, 17, 11, 6, 15, 9, 13, 5, 16, 8, 12, 6, 14, 10, 17, 7, 12, 5, 15, 9, 13, 6, 16, 8, 11, 5, 14, 9, 17];
+const EMPTY_TRACK_SCAFFOLD: readonly TimelineTrack[] = [
+  { id: "track-v4", kind: "overlay", name: "V4", locked: false, hidden: false, muted: false },
+  { id: "track-v3", kind: "video", name: "V3", locked: false, hidden: false, muted: false },
+  { id: "track-v2", kind: "caption", name: "V2", locked: false, hidden: false, muted: false },
+  { id: "track-v1", kind: "video", name: "V1", locked: false, hidden: false, muted: false },
+  { id: "track-a3", kind: "audio", name: "A3", locked: false, hidden: false, muted: false },
+  { id: "track-a2", kind: "audio", name: "A2", locked: false, hidden: false, muted: false },
+  { id: "track-a1", kind: "audio", name: "A1", locked: false, hidden: false, muted: false }
+];
 
 interface TimelineProps {
   project: Readonly<ProjectIR>;
@@ -33,22 +42,24 @@ type TimelineVisual =
   | { id: string; kind: "graphic"; startMs: number; endMs: number; label: string; graphic: GraphicItem };
 
 export function Timeline({ project, selectedId, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart }: TimelineProps) {
-  const duration = project.timeline.durationMs;
-  const playheadPercent = (playheadMs / duration) * 100;
-  const ticks = Array.from({ length: 14 }, (_, index) => Math.round((duration / 13) * index));
+  const canonicalDuration = project.timeline.durationMs;
+  const geometryDuration = Math.max(60_000, canonicalDuration);
+  const tracks = project.timeline.tracks.length > 0 ? project.timeline.tracks : EMPTY_TRACK_SCAFFOLD;
+  const playheadPercent = canonicalDuration === 0 ? 0 : (playheadMs / geometryDuration) * 100;
+  const ticks = canonicalDuration === 0 ? [0] : Array.from({ length: 14 }, (_, index) => Math.round((geometryDuration / 13) * index));
 
   function setPlayheadFromPointer(event: ReactPointerEvent<HTMLDivElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-    onPlayheadChange(Math.round(ratio * duration));
+    onPlayheadChange(Math.round(ratio * canonicalDuration));
   }
 
   function movePlayheadFromKeyboard(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return;
     event.preventDefault();
     if (event.key === "Home") return onPlayheadChange(0);
-    if (event.key === "End") return onPlayheadChange(duration);
-    onPlayheadChange(Math.min(duration, Math.max(0, playheadMs + (event.key === "ArrowRight" ? 1000 : -1000))));
+    if (event.key === "End") return onPlayheadChange(canonicalDuration);
+    onPlayheadChange(Math.min(canonicalDuration, Math.max(0, playheadMs + (event.key === "ArrowRight" ? 1000 : -1000))));
   }
 
   return (
@@ -66,19 +77,19 @@ export function Timeline({ project, selectedId, playheadMs, zoom, t, onSelect, o
           tabIndex={0}
           aria-label={t("timeline.ruler")}
           aria-valuemin={0}
-          aria-valuemax={duration}
+          aria-valuemax={canonicalDuration}
           aria-valuenow={playheadMs}
           aria-valuetext={t("timeline.playhead", { time: formatTime(playheadMs) })}
           onPointerDown={setPlayheadFromPointer}
           onKeyDown={movePlayheadFromKeyboard}
         >
           <div className="timeline-width" style={{ width: `${zoom}%` }}>
-            {ticks.map((tick) => <span key={tick} style={{ left: `${(tick / duration) * 100}%` }}><i />{formatTime(tick).slice(0, 5)}</span>)}
+            {ticks.map((tick) => <span key={tick} style={{ left: `${(tick / geometryDuration) * 100}%` }}><i />{formatTime(tick).slice(0, 5)}</span>)}
           </div>
         </div>
-        {project.timeline.tracks.map((track) => {
+        {tracks.map((track) => {
           const label = t(trackKeys[track.id as keyof typeof trackKeys]);
-          return <TimelineRow key={track.id} track={track} label={label} visuals={visualsForTrack(project, track)} duration={duration} zoom={zoom} playheadPercent={playheadPercent} selectedId={selectedId} t={t} onSelect={onSelect} />;
+          return <TimelineRow key={track.id} track={track} label={label} visuals={visualsForTrack(project, track)} duration={geometryDuration} zoom={zoom} playheadPercent={playheadPercent} selectedId={selectedId} t={t} onSelect={onSelect} />;
         })}
       </div>
     </section>

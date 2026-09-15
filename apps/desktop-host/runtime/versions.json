@@ -1,0 +1,23 @@
+{
+  "format": "cevra-desktop-node-runtime",
+  "formatVersion": 1,
+  "nodeVersion": "22.23.2",
+  "license": "MIT and bundled third-party notices in the official Node.js LICENSE",
+  "provenance": "Official Node.js distribution archives from https://nodejs.org/dist/v22.23.2/",
+  "targets": {
+    "darwin-arm64": {
+      "rustTarget": "aarch64-apple-darwin",
+      "archive": "node-v22.23.2-darwin-arm64.tar.gz",
+      "url": "https://nodejs.org/dist/v22.23.2/node-v22.23.2-darwin-arm64.tar.gz",
+      "sha256": "61130f394c1630d211dd50aecc4353d379480f36d3ac913cd85dbba1aed585c6",
+      "executableSha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572"
+    },
+    "linux-x64": {
+      "rustTarget": "x86_64-unknown-linux-gnu",
+      "archive": "node-v22.23.2-linux-x64.tar.gz",
+      "url": "https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.gz",
+      "sha256": "b294a556e639d64338823920e5866c21c02741742d2e1529ee1a225c1ec9252a",
+      "executableSha256": "3517c2df0b2f8cd7f422b4b8450ef81c6889f08eb03e281d6de9079b15e6a327"
+    }
+  }
+}

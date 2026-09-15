@@ -6,6 +6,7 @@ import json
 import math
 import os
 import sys
+import threading
 from typing import Any, Mapping
 
 PROTOCOL_VERSION = 1
@@ -54,6 +55,39 @@ def process_message(message: object) -> dict[str, object]:
         return {"ok": False, "error": {"code": error.code, "message": str(error)}}
     except Exception as error:  # The stable envelope hides tracebacks from the product surface.
         return {"ok": False, "error": {"code": "TRANSCRIPTION_FAILED", "message": str(error)}}
+
+
+def _validate_initial_message(message: object) -> None:
+    """Validate the one request before arming parent-pipe containment."""
+    request = _object(message, "request")
+    if request.get("protocolVersion") != PROTOCOL_VERSION:
+        raise WorkerError("INVALID_REQUEST", "Unsupported transcription protocol version.")
+    operation = request.get("operation")
+    if operation == "health":
+        if set(request) != {"protocolVersion", "operation"}:
+            raise WorkerError("INVALID_REQUEST", "Unexpected health request fields.")
+        return
+    if operation != "transcribe":
+        raise WorkerError("INVALID_REQUEST", "Unsupported transcription operation.")
+    _validate_transcribe(request)
+
+
+def _start_parent_pipe_watchdog() -> None:
+    """Watch raw fd 0 as a parent-liveness channel and exit immediately on EOF.
+
+    The parent writes exactly one request but deliberately keeps stdin open until
+    this process exits. EOF while the worker is active therefore means that the
+    supervising Node process is gone or has violated the worker lifecycle contract.
+    """
+    def watch_parent_pipe() -> None:
+        try:
+            while os.read(0, 1):
+                pass
+        except (OSError, ValueError):
+            pass
+        os._exit(70)
+
+    threading.Thread(target=watch_parent_pipe, name="cevra-parent-pipe-watchdog", daemon=True).start()
 
 
 def _health() -> dict[str, object]:
@@ -212,9 +246,14 @@ def main() -> int:
         response = {"ok": False, "error": {"code": "INVALID_REQUEST", "message": "A single typed request is required."}}
     else:
         try:
-            response = process_message(json.loads(line))
+            message = json.loads(line)
+            _validate_initial_message(message)
+            _start_parent_pipe_watchdog()
+            response = process_message(message)
         except json.JSONDecodeError:
             response = {"ok": False, "error": {"code": "INVALID_REQUEST", "message": "Request JSON is invalid."}}
+        except WorkerError as error:
+            response = {"ok": False, "error": {"code": error.code, "message": str(error)}}
     sys.stdout.write(json.dumps(response, ensure_ascii=False, allow_nan=False) + "\n")
     sys.stdout.flush()
     return 0

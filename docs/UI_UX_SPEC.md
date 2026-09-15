@@ -61,10 +61,19 @@ trade dress.
 
 At narrower desktop widths the inspector and then the expanded media panel may
 collapse while preview and timeline remain usable. The primary verification
-viewports are 1440×900 and 1920×1080. This V0.1 direction is presentation-only:
-real ingest, preview rendering, Director execution, preset orchestration,
-Change Set application and export remain visibly unavailable until the typed
-desktop runtime is connected.
+viewports are 1440×900 and 1920×1080.
+
+Desktop Runtime Integration V1 preserves this visual direction while adding
+truthful runtime states. A real desktop session begins with an empty canonical
+Project IR and reports **Sessão local · não salva**. Import uses a Rust-owned
+native file picker and is enabled only when the trusted Media Runtime is
+available. The source-scoped Transcrição workspace shows Transcrever or
+Retranscrever only when the trusted local transcription capability is
+available, exposes busy/cancel state during an operation, and otherwise gives a
+localized safe reason. Empty timeline lanes remain presentation scaffolding and
+do not become fake Project IR tracks. Preview playback, Director execution,
+preset orchestration, Change Set application, export and project persistence
+remain visibly unavailable.
 
 ## Primary CEVRA Vids flow
 

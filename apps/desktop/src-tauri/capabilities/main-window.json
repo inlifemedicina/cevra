@@ -1,7 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-window",
-  "description": "Main CEVRA Vids presentation window with no host permissions.",
+  "description": "Main CEVRA Vids window with six narrow application commands. Native host plugins remain Rust-only.",
   "windows": ["main"],
-  "permissions": []
+  "permissions": [
+    "allow-desktop-get-state",
+    "allow-desktop-pick-and-ingest-media",
+    "allow-desktop-transcribe-source",
+    "allow-desktop-undo",
+    "allow-desktop-redo",
+    "allow-desktop-cancel-operation"
+  ]
 }

@@ -35,6 +35,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": []
+    "icon": [],
+    "externalBin": ["binaries/cevra-node"],
+    "resources": {
+      "../../desktop-host/dist/desktop-host.cjs": "desktop-host/desktop-host.cjs",
+      "../../desktop-host/dist/python/cevra_transcription_worker.py": "python/cevra_transcription_worker.py",
+      "../../desktop-host/dist/node-runtime-LICENSE.txt": "licenses/node-runtime-LICENSE.txt",
+      "../../desktop-host/dist/node-runtime-manifest.json": "provenance/node-runtime-manifest.json"
+    }
   }
 }

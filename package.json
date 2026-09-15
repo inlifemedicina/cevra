@@ -9,13 +9,17 @@
   },
   "workspaces": ["apps/*", "packages/*", "engines/*"],
   "scripts": {
-    "build": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application && npm run build -w @cevra/project-store && npm run build -w @cevra/media-ffmpeg && npm run build -w @cevra/transcription-faster-whisper && npm run build -w @cevra/desktop",
-    "test": "npm run test -w @cevra/project-ir && npm run test -w @cevra/contracts && npm run test -w @cevra/i18n && npm run test -w @cevra/application && npm run test -w @cevra/project-store && npm run test -w @cevra/media-ffmpeg && npm run test -w @cevra/transcription-faster-whisper && npm run test -w @cevra/desktop",
+    "build": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application && npm run build -w @cevra/project-store && npm run build -w @cevra/media-ffmpeg && npm run build -w @cevra/transcription-faster-whisper && npm run build -w @cevra/desktop-host && npm run build -w @cevra/desktop",
+    "test": "npm run test -w @cevra/project-ir && npm run test -w @cevra/contracts && npm run test -w @cevra/i18n && npm run test -w @cevra/application && npm run test -w @cevra/project-store && npm run test -w @cevra/media-ffmpeg && npm run test -w @cevra/transcription-faster-whisper && npm run test -w @cevra/desktop-host && npm run test -w @cevra/desktop",
     "test:ci": "npm run test --workspaces --if-present",
     "test:python": "python3 -I -B -m unittest discover -s engines/media-ffmpeg/test_python -p 'test_*.py' -v && python3 -I -B -m unittest discover -s engines/transcription/test_python -p 'test_*.py' -v",
     "ci": "npm run build && npm run test:ci",
-    "desktop:dev": "npm run tauri:dev -w @cevra/desktop",
-    "desktop:build": "npm run tauri:build -w @cevra/desktop -- --no-bundle",
+    "desktop:host:build": "npm run build -w @cevra/desktop-host",
+    "desktop:runtime:prepare": "npm run runtime:prepare -w @cevra/desktop-host",
+    "desktop:packaging:verify": "npm run packaging:verify -w @cevra/desktop-host",
+    "desktop:runtime:smoke": "npm run smoke:private-node -w @cevra/desktop-host",
+    "desktop:dev": "npm run desktop:host:build && npm run desktop:runtime:prepare && npm run tauri:dev -w @cevra/desktop",
+    "desktop:build": "npm run desktop:host:build && npm run desktop:runtime:prepare && npm run tauri:build -w @cevra/desktop -- --no-bundle",
     "doctor": "python3 scripts/doctor.py"
   },
   "devDependencies": {

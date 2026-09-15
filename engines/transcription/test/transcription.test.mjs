@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import {
   FasterWhisperTranscriptionAdapter,
@@ -23,6 +24,111 @@ const localInput = path.join(os.tmpdir(), "cevra-transcription-input.wav");
 const runtime = { mode: "development", pythonExecutable: python };
 const profile = { modelCacheDir: path.join(os.tmpdir(), "cevra-model-cache") };
 const transportWorkerScript = path.join(here, "fixtures", "transport_worker.py");
+const productionWorkerScript = path.resolve(here, "..", "python", "cevra_transcription_worker.py");
+let realWorkerFixture;
+
+test.after(() => {
+  if (realWorkerFixture) fs.rmSync(realWorkerFixture.root, { recursive: true, force: true });
+});
+
+function controlledRealWorkerFixture() {
+  if (realWorkerFixture) return realWorkerFixture;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-real-transcription-worker-"));
+  const environmentRoot = path.join(root, "environment");
+  const venv = spawnSync(python, ["-m", "venv", "--without-pip", environmentRoot], { encoding: "utf8" });
+  assert.equal(venv.status, 0, `controlled Python environment failed: ${venv.stderr}`);
+  const pythonExecutable = path.join(environmentRoot, process.platform === "win32" ? "Scripts/python.exe" : "bin/python3");
+  const siteProbe = spawnSync(pythonExecutable, ["-I", "-c", "import site; print(site.getsitepackages()[0])"], { encoding: "utf8" });
+  assert.equal(siteProbe.status, 0, `site-packages probe failed: ${siteProbe.stderr}`);
+  const packageRoot = path.join(siteProbe.stdout.trim(), "faster_whisper");
+  fs.mkdirSync(packageRoot, { recursive: true });
+  fs.writeFileSync(path.join(packageRoot, "__init__.py"), `
+import os
+import time
+from types import SimpleNamespace
+
+__version__ = "1.2.1"
+
+class WhisperModel:
+    def __init__(self, model_source, *, device, compute_type, download_root, local_files_only):
+        if not local_files_only:
+            raise RuntimeError("downloads must remain disabled")
+
+    def transcribe(self, input_path, **options):
+        delay = float(os.environ.get("CEVRA_TEST_FAKE_DELAY", "0"))
+        if delay:
+            time.sleep(delay)
+        word = SimpleNamespace(start=0.0, end=0.5, word=" teste", probability=0.99)
+        segment = SimpleNamespace(start=0.0, end=0.5, text=" teste controlado", words=[word])
+        info = SimpleNamespace(language="pt", duration=0.5)
+        return [segment], info
+`, "utf8");
+  const modelCacheDir = path.join(root, "model-cache");
+  fs.mkdirSync(modelCacheDir);
+  realWorkerFixture = { root, environmentRoot, pythonExecutable, modelCacheDir };
+  return realWorkerFixture;
+}
+
+function productionRunner() {
+  const fixture = controlledRealWorkerFixture();
+  return new ProcessTranscriptionWorkerRunner({
+    runtime: {
+      mode: "development",
+      pythonExecutable: fixture.pythonExecutable,
+      environmentRoot: fixture.environmentRoot,
+      workerScript: productionWorkerScript
+    },
+    stopTimeoutMs: 200
+  });
+}
+
+function productionRequest() {
+  const fixture = controlledRealWorkerFixture();
+  return {
+    protocolVersion: TRANSCRIPTION_PROTOCOL_VERSION,
+    operation: "transcribe",
+    jobId: "real-worker-normal-completion",
+    inputPath: localInput,
+    language: "pt",
+    modelId: "base",
+    modelCacheDir: fixture.modelCacheDir,
+    device: "cpu",
+    computeType: "int8",
+    wordTimestamps: true,
+    allowModelDownload: false
+  };
+}
+
+async function runProductionWorkerMain(request, { closeStdin = false, delay = false } = {}) {
+  const fixture = controlledRealWorkerFixture();
+  const child = spawn(fixture.pythonExecutable, ["-I", "-B", productionWorkerScript], {
+    cwd: fixture.environmentRoot,
+    env: {
+      LANG: "C.UTF-8",
+      LC_ALL: "C.UTF-8",
+      PYTHONNOUSERSITE: "1",
+      PYTHONDONTWRITEBYTECODE: "1",
+      VIRTUAL_ENV: fixture.environmentRoot,
+      PATH: "",
+      CEVRA_TRANSCRIPTION_MANAGED: "0",
+      ...(delay ? { CEVRA_TEST_FAKE_DELAY: "1" } : {}),
+      HF_HOME: fixture.modelCacheDir,
+      HUGGINGFACE_HUB_CACHE: fixture.modelCacheDir,
+      HF_HUB_OFFLINE: "1"
+    },
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk.toString("utf8"); });
+  child.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8"); });
+  child.stdin.on("error", () => undefined);
+  const line = `${JSON.stringify(request)}\n`;
+  if (closeStdin) child.stdin.end(line);
+  else child.stdin.write(line);
+  const [code, signal] = await once(child, "close");
+  return { code, signal, stdout, stderr };
+}
 
 function validRaw(options = {}) {
   return {
@@ -343,6 +449,56 @@ test("cancellation terminates and reaps the process worker", async () => {
   await assert.rejects(job, (error) => error?.code === "TRANSCRIPTION_CANCELLED");
   assert.equal(processRunner.workerPid, undefined);
   assert.throws(() => process.kill(pid, 0));
+});
+
+test("real production worker health completes normally without SIGABRT", async (context) => {
+  const runner = productionRunner();
+  assert.deepEqual(await runner.healthcheck(), {
+    protocolVersion: 1,
+    status: "ready",
+    fasterWhisperVersion: "1.2.1"
+  });
+  assert.equal(runner.workerPid, undefined);
+  const completed = await runProductionWorkerMain({ protocolVersion: 1, operation: "health" });
+  assert.equal(completed.code, 0);
+  assert.equal(completed.signal, null);
+  assert.equal(JSON.parse(completed.stdout).ok, true);
+  assert.doesNotMatch(completed.stderr, /Py_FatalError|SIGABRT|_enter_buffered_busy/);
+  context.diagnostic("real worker health parsed after process close: exit code 0, signal null, no Py_FatalError/SIGABRT");
+});
+
+test("real production worker transcription completes normally without SIGABRT", async (context) => {
+  const runner = productionRunner();
+  const result = await runner.transcribe(productionRequest(), context.signal ? { jobId: "real-worker", locale: "pt-BR", signal: context.signal } : { jobId: "real-worker", locale: "pt-BR" });
+  assert.deepEqual(result, {
+    protocolVersion: 1,
+    modelId: "base",
+    detectedLanguage: "pt",
+    durationSeconds: 0.5,
+    segments: [{
+      startSeconds: 0,
+      endSeconds: 0.5,
+      text: " teste controlado",
+      words: [{ startSeconds: 0, endSeconds: 0.5, text: " teste", confidence: 0.99 }]
+    }]
+  });
+  assert.equal(runner.workerPid, undefined);
+  const completed = await runProductionWorkerMain(productionRequest());
+  assert.equal(completed.code, 0);
+  assert.equal(completed.signal, null);
+  const envelope = JSON.parse(completed.stdout);
+  assert.equal(envelope.ok, true);
+  assert.equal(envelope.result.segments[0].text, " teste controlado");
+  assert.doesNotMatch(completed.stderr, /Py_FatalError|SIGABRT|_enter_buffered_busy/);
+  context.diagnostic("real worker transcription envelope parsed after process close: exit code 0, signal null, no Py_FatalError/SIGABRT");
+});
+
+test("closing stdin after the request deterministically violates the parent-liveness contract", { skip: process.platform === "win32" }, async (context) => {
+  const completed = await runProductionWorkerMain(productionRequest(), { closeStdin: true, delay: true });
+  assert.equal(completed.code, 70);
+  assert.equal(completed.signal, null);
+  assert.doesNotMatch(completed.stderr, /Py_FatalError|SIGABRT|_enter_buffered_busy/);
+  context.diagnostic("intentional early stdin EOF produced deterministic contract-violation exit code 70, signal null");
 });
 
 test("process transport preserves PT-BR UTF-8 split across stdout chunks", async () => {
