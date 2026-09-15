@@ -9,15 +9,19 @@ interface TopBarProps {
   inspectorOpen: boolean;
   mediaOpen: boolean;
   exportAvailable: boolean;
-  presentationOnly: boolean;
+  status: "demo-not-persisted" | "local-unsaved" | "host-unavailable";
+  canUndo: boolean;
+  canRedo: boolean;
   t: Translate;
   onWorkspaceChange(workspace: Workspace): void;
   onLocaleChange(locale: CevraLocale): void;
   onInspectorToggle(): void;
   onMediaToggle(): void;
+  onUndo(): void;
+  onRedo(): void;
 }
 
-export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpen, exportAvailable, presentationOnly, t, onWorkspaceChange, onLocaleChange, onInspectorToggle, onMediaToggle }: TopBarProps) {
+export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpen, exportAvailable, status, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onInspectorToggle, onMediaToggle, onUndo, onRedo }: TopBarProps) {
   function handleWorkspaceKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const currentIndex = workspaces.indexOf(workspace);
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -56,9 +60,9 @@ export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpe
       <div className="top-actions">
         <button type="button" className={mediaOpen ? "icon-button toggled" : "icon-button"} onClick={onMediaToggle} aria-label={t("top.mediaPanel")} title={t("top.mediaPanel")}><Icon name="panel" /></button>
         <button type="button" className={inspectorOpen ? "icon-button toggled" : "icon-button"} onClick={onInspectorToggle} aria-label={t("top.inspector")} title={t("top.inspector")}><Icon name="inspect" /></button>
-        <button type="button" className="icon-button" disabled aria-label={t("action.undo")} title={t("status.unavailableDetail")}><Icon name="undo" /></button>
-        <button type="button" className="icon-button" disabled aria-label={t("action.redo")} title={t("status.unavailableDetail")}><Icon name="redo" /></button>
-        <span className={presentationOnly ? "save-status demo-status" : "save-status"}><i aria-hidden="true" />{t(presentationOnly ? "top.demoNotPersisted" : "top.saved")}</span>
+        <button type="button" className="icon-button" disabled={!canUndo} onClick={onUndo} aria-label={t("action.undo")} title={canUndo ? t("action.undo") : t("history.undoUnavailable")}><Icon name="undo" /></button>
+        <button type="button" className="icon-button" disabled={!canRedo} onClick={onRedo} aria-label={t("action.redo")} title={canRedo ? t("action.redo") : t("history.redoUnavailable")}><Icon name="redo" /></button>
+        <span className={status === "demo-not-persisted" ? "save-status demo-status" : "save-status"}><i aria-hidden="true" />{t(status === "demo-not-persisted" ? "top.demoNotPersisted" : status === "local-unsaved" ? "top.localUnsaved" : "runtime.hostUnavailable")}</span>
         <button className="locale-button" type="button" onClick={() => onLocaleChange(locale === "pt-BR" ? "en-US" : "pt-BR")} aria-label={t("top.switchLanguage")} title={t("top.switchLanguage")}>
           {locale === "pt-BR" ? "EN" : "PT"}
         </button>

@@ -854,7 +854,7 @@ Boundary hardening preserves raw engine numeric values through canonical `create
 
 ---
 
-# 16A. CEVRA Vids Desktop Visual V0.1 — APPROVED / UI SHELL IN DEVELOPMENT
+# 16A. CEVRA Vids Desktop Visual V0.1 — IMPLEMENTED / CLOSED
 
 The approved visual/product direction is **Adaptive Hybrid**, with **Editar as
 preview-first**, Director CEVRA integrated directly into the workspace,
@@ -864,9 +864,9 @@ Composição, Legendas and Áudio. They retain one demo/canonical project contex
 selection, playhead and timeline rather than creating workspace-specific
 sources of truth.
 
-Desktop UI Shell V0.1 is **IN DEVELOPMENT** on
-`feat/desktop-ui-shell-v0-1`, created from exact `main`
-`aaecd62647b49c1090f961a3f872dff0ebc9889c`. The slice establishes the real
+Desktop UI Shell V0.1 merged in PR #18 at
+`6c6d0bd64590daffed962ecf64f84405e39f9606`, is **CLOSED**, and
+`feat/desktop-ui-shell-v0-1` was removed locally and remotely. The slice establishes the real
 Tauri 2 + React + TypeScript window, reusable visual tokens, PT-BR/EN-US UI,
 adaptive presentation workspaces, isolated Project IR-shaped demo projection,
 typed `DesktopBackend` presentation boundary and deterministic UI tests.
@@ -885,6 +885,39 @@ Python tests pass. Frontend production build and responsive visual checks at
 without installer bundling, and a native-process launch smoke test pass with a
 checksum-verified isolated Rust toolchain; the host profile remains unchanged.
 The Linux CI job independently compiles the same Tauri shell.
+
+## 16A.1 Desktop Runtime Integration V1 — IN DEVELOPMENT
+
+Desktop Runtime Integration V1 is **IN DEVELOPMENT** on
+`feat/desktop-runtime-integration-v1`, created from exact `main`
+`6c6d0bd64590daffed962ecf64f84405e39f9606`.
+
+ADR 0015 records the accepted runtime boundary:
+
+```text
+React/WebView
+→ narrow typed Tauri application commands
+→ Rust Desktop Host Supervisor
+→ private persistent Node.js desktop host
+→ existing TypeScript Application Services
+→ ProjectHistory / Project IR
+→ Media / Transcription engines
+```
+
+Rust owns native file selection, the fixed private host lifecycle, closed JSONL
+IPC, cancellation routing and child-process reaping. The WebView receives no
+shell, dialog, generic filesystem, network or sidecar permission; its Tauri
+capability remains `permissions: []`. The Node host owns the one authoritative
+in-memory `ProjectHistory` session and composes the existing media ingest and
+transcription application services without duplicating Project IR or engine
+behavior.
+
+The slice adds real local ingest when the trusted Media Runtime is available,
+optional real local transcription only when an explicit trusted runtime and
+already-local model are configured, and host-derived undo/redo. Model download
+remains disabled. Project persistence, crash recovery, real preview playback,
+Director execution, Workflow Preset execution and mobile remote-control or
+delegation remain deferred.
 
 ---
 
@@ -1125,7 +1158,8 @@ Foundation / Media Runtime       [CLOSED]
 → Local Transcription Engine V1  [CLOSED]
 → Project IR v2 transcripts      [CLOSED]
 → App transcript persistence     [CLOSED]
-→ Desktop UI Shell V0.1          [IN DEVELOPMENT]
+→ Desktop UI Shell V0.1          [CLOSED]
+→ Desktop Runtime Integration V1 [IN DEVELOPMENT]
 → alignment / transcript cache / Project IR multi-source mapping as separate small slices
 → editorial transcript / analysis
 → strategy / take selection / cut planning
@@ -1160,12 +1194,13 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After Application Transcript Persistence / Orchestration V1 merged in PR #17:
+After Desktop UI Shell V0.1 merged in PR #18:
 
-`aaecd62647b49c1090f961a3f872dff0ebc9889c`
+`6c6d0bd64590daffed962ecf64f84405e39f9606`
 
-This is the Git-authoritative `main` immediately before Desktop UI Shell V0.1
-and the exact base of `feat/desktop-ui-shell-v0-1`.
+This is the Git-authoritative `main` immediately before Desktop Runtime
+Integration V1 and the exact base of
+`feat/desktop-runtime-integration-v1`.
 
 ## 24.2 Important merged milestones
 
@@ -1182,16 +1217,17 @@ and the exact base of `feat/desktop-ui-shell-v0-1`.
 | Project IR v2 transcript core — Slice A | #15 | `edb98184c144ea1f8b7b834ebd6a427198e5a68f` | CLOSED |
 | Project IR v2 transcript commands — Slice B | #16 | `900112f88e85a59ae57541a2f2faf5997ad8f908` | CLOSED |
 | Application Transcript Persistence / Orchestration V1 | #17 | `aaecd62647b49c1090f961a3f872dff0ebc9889c` | CLOSED |
+| Desktop UI Shell V0.1 | #18 | `6c6d0bd64590daffed962ecf64f84405e39f9606` | CLOSED |
 
 ## 24.3 Active work
 
 | Branch | Status |
 |---|---|
-| `feat/desktop-ui-shell-v0-1` | CEVRA Vids Desktop UI Shell V0.1 — approved Adaptive Hybrid presentation foundation in a real Tauri window; IN DEVELOPMENT |
+| `feat/desktop-runtime-integration-v1` | Desktop Runtime Integration V1 — private supervised Node host, native ingest, optional configured transcription and real ProjectHistory undo/redo; IN DEVELOPMENT |
 
-The proposal, both Project IR v2 Slice A/B, and Application Transcript
-Persistence branches were removed after their merges. Desktop UI Shell V0.1 is
-active only on the branch above.
+The proposal, both Project IR v2 Slice A/B, Application Transcript Persistence
+and Desktop UI Shell branches were removed after their merges. Desktop Runtime
+Integration V1 is active only on the branch above.
 
 ---
 
@@ -1231,8 +1267,9 @@ active only on the branch above.
 - **IMPLEMENTED/CLOSED:** Project IR v2 transcript command Slice B merged in PR #16 at `900112f88e85a59ae57541a2f2faf5997ad8f908`. Whole-aggregate set/remove commands, stable transcript command errors, digest/provenance concurrency guards, consumer-promotion hardening and failure-safe redo preservation are implemented. `feat/project-ir-v2-transcript-commands` was removed locally and remotely.
 - **IMPLEMENTED/CLOSED:** Application Transcript Persistence / Orchestration V1 merged in PR #17 at `aaecd62647b49c1090f961a3f872dff0ebc9889c`. The application service authorizes a current Project IR source, invokes `TranscriptionEngineAdapter`, performs non-coercing runtime boundary checks, passes raw transcript values into canonical `createSourceTranscript` validation, and promotes only through guarded `transcript.set` and `ProjectHistory`. Defensive outcome cloning occurs only after canonical validation. No execution repository, cache, UI or engine change was introduced. Merge validation retained 207 Node/TypeScript and 22 Python tests.
 - **CANONICAL:** Desktop Visual V0.1 uses Adaptive Hybrid workspaces: Editar is preview-first; Transcrição, Composição, Legendas and Áudio specialize the center workspace while preserving one project, selection, playhead and layered timeline. Director CEVRA is integrated into the editor with Workflow Preset quick access and a reviewable AI Change Set model. The inspector is contextual. The visual language is dark graphite, neutral, compact and restrained with configurable-accent-ready tokens and no glass/neon/SaaS-dashboard trade dress.
-- **IN DEVELOPMENT:** Desktop UI Shell V0.1 started on `feat/desktop-ui-shell-v0-1` from exact base `aaecd62647b49c1090f961a3f872dff0ebc9889c`. It is the presentation foundation in a real least-privilege Tauri 2 window. Typed Tauri↔desktop-host integration and all real engine/application execution are intentionally deferred to the next slice.
-- **HARDENED ON ACTIVE BRANCH:** Desktop UI source context is explicitly source-scoped for Project IR v2 multi-source transcripts. Persistent Project IR selection and `activeSourceId` are separate from workspace-local transcript, composition and demo audio focus; unresolved selections produce a neutral inspector state. `DemoDesktopBackend` now truthfully reports that its presentation state is not persisted. The visual direction and empty Tauri capability set are unchanged.
+- **IMPLEMENTED/CLOSED:** Desktop UI Shell V0.1 merged in PR #18 at `6c6d0bd64590daffed962ecf64f84405e39f9606`. The approved Adaptive Hybrid shell, source-scoped transcript presentation, separated project/workspace selection, truthful demo status and least-privilege Tauri window are implemented; `feat/desktop-ui-shell-v0-1` was removed locally and remotely.
+- **ACCEPTED / IN DEVELOPMENT:** ADR 0015 defines a narrow typed Tauri application-command boundary, Rust-owned native picker and persistent supervisor, private pinned Node.js host, closed JSONL protocol, sanitized child environment and no automatic recovery after host crash. Desktop Runtime Integration V1 is active on `feat/desktop-runtime-integration-v1` from exact base `6c6d0bd64590daffed962ecf64f84405e39f9606`.
+- **CANONICAL:** Desktop persistence and crash recovery are separate future work. The active runtime slice keeps one authoritative in-memory `ProjectHistory`; it must never silently replace a crashed session with a new empty project. Real preview playback and mobile remote-control/delegation also remain deferred.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1274,10 +1311,10 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete and independently review Desktop UI Shell V0.1 on `feat/desktop-ui-shell-v0-1` without adding a sidecar, localhost server, broad Tauri capability or engine integration.
+1. Complete and independently review Desktop Runtime Integration V1 on `feat/desktop-runtime-integration-v1` without adding a localhost server, WebView shell/filesystem capability or duplicate Project IR.
 2. Do not reopen the closed Application Transcript Persistence, Local Transcription Engine V1 or Project IR v2 Slices A/B.
 3. Preserve the provider-neutral flow from authorized source through `TranscriptionEngineAdapter` and guarded Project History promotion.
-4. After the UI shell closes, design the typed Tauri↔desktop-host integration slice that replaces `DemoDesktopBackend` without redesigning UI components or importing Node-only implementations into the WebView.
+4. Validate the ADR 0015 supervised private-host path from native picker through existing application services, canonical ProjectHistory and source-scoped transcript presentation.
 5. Preserve the EDVID baseline and dependency-driven implementation order.
 6. Apply the quality/performance policy to future preview, render, composition and export work.
 7. Keep this document updated after every material decision, merge or completed research finding.

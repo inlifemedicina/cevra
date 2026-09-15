@@ -3,7 +3,7 @@ import { formatTime, type Translate } from "../ui-model";
 
 const waveformBars = [5, 9, 13, 7, 16, 10, 6, 14, 18, 11, 7, 15, 9, 13, 6, 17, 11, 8, 14, 6, 12, 16, 9, 5];
 
-export function Preview({ compact = false, playing, playheadMs, durationMs, t, onPlayingChange }: { compact?: boolean; playing: boolean; playheadMs: number; durationMs: number; t: Translate; onPlayingChange(value: boolean): void }) {
+export function Preview({ compact = false, interactive, playing, playheadMs, durationMs, t, onPlayingChange }: { compact?: boolean; interactive: boolean; playing: boolean; playheadMs: number; durationMs: number; t: Translate; onPlayingChange(value: boolean): void }) {
   return (
     <section className={compact ? "preview-panel compact" : "preview-panel"} aria-label={t("preview.title")}>
       <div className="preview-heading"><span>{t("preview.title")}</span><span className="demo-chip">{t("status.demo")}</span></div>
@@ -18,7 +18,7 @@ export function Preview({ compact = false, playing, playheadMs, durationMs, t, o
         <div className="preview-caption">{t("preview.sceneCaption")}</div>
       </div>
       <div className="preview-controls">
-        <button type="button" className="play-button" onClick={() => onPlayingChange(!playing)} aria-label={t(playing ? "preview.pause" : "preview.play")} title={t(playing ? "preview.pause" : "preview.play")}><Icon name={playing ? "pause" : "play"} size={16} /></button>
+        <button type="button" className="play-button" disabled={!interactive} onClick={() => onPlayingChange(!playing)} aria-label={t(playing ? "preview.pause" : "preview.play")} title={interactive ? t(playing ? "preview.pause" : "preview.play") : t("preview.notConnected")}><Icon name={playing ? "pause" : "play"} size={16} /></button>
         <output className="timecode" data-testid="preview-timecode" aria-label={t("preview.timecode", { current: formatTime(playheadMs), duration: formatTime(durationMs) })}>{formatTime(playheadMs)} <span>/ {formatTime(durationMs)}</span></output>
         <div className="control-spacer" />
         <span className="micro-wave" aria-hidden="true">{waveformBars.slice(0, 10).map((height, index) => <i key={index} style={{ height }} />)}</span>

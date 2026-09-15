@@ -69,6 +69,9 @@ h1, h2, h3, p { margin: 0; }
 .unavailable-note, .empty-state { color: var(--cevra-fg-muted); font-size: 9px; line-height: 1.45; }
 .unavailable-note { display: flex; align-items: flex-start; margin-top: auto; gap: 5px; }
 .unavailable-note span { color: var(--cevra-warning); font-size: 7px; line-height: 14px; }
+.runtime-alert { margin: 0 10px 8px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--cevra-error) 50%, var(--cevra-border)); border-radius: var(--cevra-radius-sm); background: color-mix(in srgb, var(--cevra-error) 8%, var(--cevra-surface-2)); color: var(--cevra-fg-soft); font-size: 9px; }
+.runtime-notice { margin: 0 10px 8px; padding: 8px 10px; border: 1px solid var(--cevra-border); border-radius: var(--cevra-radius-sm); background: var(--cevra-surface-2); color: var(--cevra-fg-muted); font-size: 9px; }
+.transcription-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 
 .center-stack { grid-area: center; display: grid; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; min-height: 0; overflow: hidden; background: var(--cevra-bg); }
 .workspace-stage { min-width: 0; min-height: 0; overflow: hidden; }

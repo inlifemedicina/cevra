@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { translate, translationKeys } from "@cevra/i18n";
-import { createSourceTranscript, validateProjectIR, type ProjectIR } from "@cevra/project-ir";
+import { createEmptyProject, createSourceTranscript, ProjectHistory, validateProjectIR, type ProjectIR } from "@cevra/project-ir";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
+import type { DesktopBackend, DesktopBackendState, ImportMediaResult } from "./backend/desktop-backend";
+import { TauriDesktopBackend } from "./backend/tauri-desktop-backend";
 import { Inspector } from "./components/Inspector";
 import { createDemoProject } from "./fixtures/demo-project";
 
@@ -16,8 +18,9 @@ async function renderApplication(backend = new DemoDesktopBackend()) {
 }
 
 class MultiSourceDemoDesktopBackend extends DemoDesktopBackend {
-  override async loadProjectProjection(): Promise<Readonly<ProjectIR>> {
-    const project = structuredClone(await super.loadProjectProjection()) as ProjectIR;
+  override async loadState() {
+    const state = await super.loadState();
+    const project = structuredClone(state.project) as ProjectIR;
     project.sources.push({
       id: "source-secondary",
       kind: "video",
@@ -51,8 +54,61 @@ class MultiSourceDemoDesktopBackend extends DemoDesktopBackend {
         }]
       }
     }));
-    return project;
+    return { ...state, project };
   }
+}
+
+class FunctionalDesktopBackend implements DesktopBackend {
+  readonly adapterName = "FunctionalDesktopBackend";
+  readonly presentationOnly = false;
+  readonly history = new ProjectHistory(createEmptyProject({ id: "desktop-real", name: "CEVRA Vids", now: "2026-09-14T00:00:00.000Z" }), {
+    idGenerator: (() => { let value = 0; return () => `desktop-test-${++value}`; })(),
+    clock: () => "2026-09-14T00:00:00.000Z"
+  });
+  pickerCancelled = false;
+
+  async loadState(): Promise<DesktopBackendState> { return this.state(); }
+  async pickAndImportMedia(): Promise<ImportMediaResult> {
+    if (this.pickerCancelled) return { outcome: "cancelled" };
+    const project = this.history.commit({ type: "source.add", source: { id: "imported-source", kind: "video", uri: "/tmp/imported.mp4", displayName: "imported.mp4", durationMs: 4000, width: 1920, height: 1080, frameRate: 30 } });
+    return { outcome: "imported", state: this.state(project), importedSourceId: "imported-source" };
+  }
+  async transcribeSource(sourceId: string): Promise<DesktopBackendState> {
+    this.history.commit({ type: "transcript.set", transcript: createSourceTranscript({
+      sourceId,
+      wordTiming: "none",
+      speakerState: "none",
+      transcript: { language: "pt-BR", words: [], segments: [{ id: "real-segment", startMs: 0, endMs: 1000, text: "Transcrição local concluída.", wordIds: [] }] },
+      provenance: { stages: [{ kind: "transcription", executionId: "real-transcription", engineId: "test", engineVersion: "1", engineApiVersion: "1", modelId: "base", createdAt: "2026-09-14T00:00:00.000Z" }] }
+    }) });
+    return this.state();
+  }
+  async undo(): Promise<DesktopBackendState> { this.history.undo(); return this.state(); }
+  async redo(): Promise<DesktopBackendState> { this.history.redo(); return this.state(); }
+  async cancelOperation(operationId: string) { return { operationId, cancelled: false }; }
+
+  state(project = this.history.current): DesktopBackendState {
+    return {
+      project,
+      canUndo: this.history.canUndo,
+      canRedo: this.history.canRedo,
+      status: "local-unsaved",
+      capabilities: {
+        "media.import": { available: true, reason: "available" },
+        "transcription.transcribe": { available: true, reason: "available" },
+        "director.execute": { available: false, reason: "desktop-runtime-deferred" },
+        "changes.apply": { available: false, reason: "desktop-runtime-deferred" },
+        "project.export": { available: false, reason: "desktop-runtime-deferred" }
+      }
+    };
+  }
+}
+
+async function renderFunctional(backend = new FunctionalDesktopBackend()) {
+  const user = userEvent.setup();
+  render(<App backend={backend} />);
+  await screen.findByText("Sessão local · não salva");
+  return { user, backend };
 }
 
 describe("CEVRA Vids desktop shell", () => {
@@ -177,15 +233,16 @@ describe("CEVRA Vids desktop shell", () => {
     expect(translationKeys("pt-BR")).toEqual(translationKeys("en-US"));
   });
 
-  it("declares every execution capability unavailable in DemoDesktopBackend", () => {
+  it("declares every execution capability unavailable in DemoDesktopBackend", async () => {
     const backend = new DemoDesktopBackend();
-    const capabilities = ["media.import", "director.execute", "changes.apply", "project.export"] as const;
-    expect(capabilities.map((capability) => backend.capability(capability).available)).toEqual([false, false, false, false]);
+    const state = await backend.loadState();
+    const capabilities = ["media.import", "transcription.transcribe", "director.execute", "changes.apply", "project.export"] as const;
+    expect(capabilities.map((capability) => state.capabilities[capability].available)).toEqual([false, false, false, false, false]);
     expect(backend.presentationOnly).toBe(true);
   });
 
   it("loads a fixture that remains a valid Project IR projection", async () => {
-    const project = await new DemoDesktopBackend().loadProjectProjection();
+    const project = (await new DemoDesktopBackend().loadState()).project;
     expect(validateProjectIR(project)).toEqual({ ok: true, value: project });
   });
 
@@ -227,5 +284,83 @@ describe("CEVRA Vids desktop shell", () => {
     expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Exportar" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("A importação real de arquivos não está conectada nesta versão de apresentação.")).toBeTruthy();
+  });
+
+  it("renders a true empty Project IR with presentation-only timeline scaffolding", async () => {
+    await renderFunctional();
+    expect(screen.getByText("Nenhuma mídia corresponde a este filtro.")).toBeTruthy();
+    expect(screen.getAllByTestId(/^timeline-track-/)).toHaveLength(7);
+    expect(screen.getByTestId("app-shell").dataset.activeSourceId).toBeUndefined();
+  });
+
+  it("imports through the backend and selects the returned canonical source", async () => {
+    const { user } = await renderFunctional();
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect(await screen.findByRole("button", { name: /imported\.mp4/ })).toBeTruthy();
+    expect(screen.getByTestId("app-shell").dataset.activeSourceId).toBe("imported-source");
+    expect(screen.getByRole("button", { name: "Desfazer" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("treats native picker cancellation as a no-op", async () => {
+    const backend = new FunctionalDesktopBackend();
+    backend.pickerCancelled = true;
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect(screen.getByTestId("app-shell").dataset.projectRevision).toBe("0");
+    expect(screen.queryByText("imported.mp4")).toBeNull();
+    expect(screen.getByText("Seleção de arquivo cancelada; o projeto não foi alterado.")).toBeTruthy();
+  });
+
+  it("uses host-derived undo and redo state", async () => {
+    const { user } = await renderFunctional();
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    await user.click(screen.getByRole("button", { name: "Desfazer" }));
+    expect(screen.queryByText("imported.mp4")).toBeNull();
+    expect(screen.getByRole("button", { name: "Refazer" }).hasAttribute("disabled")).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Refazer" }));
+    expect(await screen.findByRole("button", { name: /imported\.mp4/ })).toBeTruthy();
+  });
+
+  it("transcribes the active canonical source and exposes Retranscrever", async () => {
+    const { user } = await renderFunctional();
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    await user.click(screen.getByRole("tab", { name: "Transcrição" }));
+    await user.click(screen.getByRole("button", { name: "Transcrever" }));
+    expect(await screen.findByText("Transcrição local concluída.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Retranscrever" })).toBeTruthy();
+  });
+
+  it("keeps real preview playback disabled until preview integration", async () => {
+    await renderFunctional();
+    expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Reproduzir" }).getAttribute("title")).toBe("A reprodução real ainda não está conectada.");
+  });
+
+  it("maps only narrow Tauri application commands and never sends an ingest path", async () => {
+    const calls: Array<{ command: string; args?: Record<string, unknown> }> = [];
+    const empty = new FunctionalDesktopBackend().state();
+    const hostState = {
+      project: empty.project,
+      canUndo: false,
+      canRedo: false,
+      status: { hostAvailable: true, persistence: "local-unsaved" as const },
+      capabilities: {
+        mediaImport: { available: false, reason: "runtime-not-configured" as const },
+        transcription: { available: false, reason: "runtime-not-configured" as const }
+      }
+    };
+    const backend = new TauriDesktopBackend(async (command, args) => {
+      calls.push({ command, ...(args ? { args } : {}) });
+      if (command === "desktop_pick_and_ingest_media") return { outcome: "cancelled" } as never;
+      return hostState as never;
+    });
+    await backend.loadState();
+    await backend.pickAndImportMedia("pt-BR");
+    await backend.undo();
+    await backend.redo();
+    await backend.cancelOperation("operation-1");
+    expect(calls.map((call) => call.command)).toEqual(["desktop_get_state", "desktop_pick_and_ingest_media", "desktop_undo", "desktop_redo", "desktop_cancel_operation"]);
+    expect(JSON.stringify(calls)).not.toContain("path");
+    expect(JSON.stringify(calls)).not.toContain("uri");
   });
 });

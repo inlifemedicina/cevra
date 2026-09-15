@@ -1,6 +1,7 @@
 import type { SourceAsset } from "@cevra/project-ir";
 import { useMemo, useState } from "react";
-import { workspaceKeys, type Translate, type Workspace } from "../ui-model";
+import { capabilityReasonKey, workspaceKeys, type Translate, type Workspace } from "../ui-model";
+import type { DesktopCapabilityReason } from "../backend/desktop-backend";
 import { Icon } from "./Icon";
 
 type MediaFilter = "all" | SourceAsset["kind"];
@@ -12,7 +13,7 @@ const filters = [
   ["image", "media.filter.image"]
 ] as const;
 
-export function MediaPanel({ sources, selectedId, workspace, importAvailable, t, onSelect }: { sources: readonly SourceAsset[]; selectedId: string | null; workspace: Workspace; importAvailable: boolean; t: Translate; onSelect(id: string): void }) {
+export function MediaPanel({ sources, selectedId, workspace, importAvailable, importReason, importBusy, t, onSelect, onImport }: { sources: readonly SourceAsset[]; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; t: Translate; onSelect(id: string): void; onImport(): void }) {
   const [filter, setFilter] = useState<MediaFilter>("all");
   const [query, setQuery] = useState("");
   const visibleSources = useMemo(() => sources.filter((source) => {
@@ -24,8 +25,8 @@ export function MediaPanel({ sources, selectedId, workspace, importAvailable, t,
     <aside className="media-panel" aria-label={t("media.title")}>
       <div className="panel-heading">
         <div><span className="eyebrow">{t(workspaceKeys[workspace])}</span><h2>{t("media.title")}</h2></div>
-        <button type="button" className="import-button" disabled={!importAvailable} title={importAvailable ? undefined : t("media.importUnavailable")}>
-          <span aria-hidden="true">＋</span>{t("media.import")}
+        <button type="button" className="import-button" disabled={!importAvailable || importBusy} onClick={onImport} title={importAvailable ? undefined : t(capabilityReasonKey(importReason))}>
+          <span aria-hidden="true">＋</span>{t(importBusy ? "media.importBusy" : "media.import")}
         </button>
       </div>
       <div className="search-field">
@@ -49,7 +50,7 @@ export function MediaPanel({ sources, selectedId, workspace, importAvailable, t,
         ))}
         {visibleSources.length === 0 && <p className="empty-state">{t("media.empty")}</p>}
       </div>
-      {!importAvailable && <p className="unavailable-note"><span aria-hidden="true">●</span>{t("media.importUnavailable")}</p>}
+      {!importAvailable && <p className="unavailable-note"><span aria-hidden="true">●</span>{t(importReason === "desktop-runtime-deferred" ? "media.importUnavailable" : capabilityReasonKey(importReason))}</p>}
     </aside>
   );
 }
