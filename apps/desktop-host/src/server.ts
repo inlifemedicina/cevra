@@ -26,7 +26,11 @@ export class DesktopHostProtocolServer {
   private readonly framer = new JsonLineFramer();
   private accepting = true;
 
-  constructor(private readonly session: DesktopSession, private readonly output: ProtocolOutput) {}
+  constructor(
+    private readonly session: DesktopSession | null,
+    private readonly output: ProtocolOutput,
+    private readonly startupError?: unknown
+  ) {}
 
   accept(chunk: Buffer): void {
     if (!this.accepting) return;
@@ -65,7 +69,7 @@ export class DesktopHostProtocolServer {
     }
 
     try {
-      const dispatched = await dispatch(this.session, request);
+      const dispatched = await dispatch(this.session, request, this.startupError);
       this.respond({ protocolVersion: DESKTOP_HOST_PROTOCOL_VERSION, id: request.id, result: dispatched.result });
       if (dispatched.shutdown) {
         this.accepting = false;
@@ -73,7 +77,7 @@ export class DesktopHostProtocolServer {
       }
     } catch (cause) {
       const code = safeCode(cause);
-      this.respond(errorResponse(request.id, { code, message: safeMessage(code) }));
+      this.respond(errorResponse(request.id, { code, message: safeMessage(code), ...safeDetails(cause, code) }));
     }
   }
 
@@ -89,7 +93,8 @@ export class DesktopHostProtocolServer {
   }
 }
 
-async function dispatch(session: DesktopSession, request: HostRequest): Promise<{ result: unknown; shutdown?: true }> {
+async function dispatch(session: DesktopSession | null, request: HostRequest, startupError?: unknown): Promise<{ result: unknown; shutdown?: true }> {
+  if (startupError && request.method !== "host.shutdown") throw startupError;
   switch (request.method) {
     case "host.hello":
       validateNoParams(request.params, request.id);
@@ -97,23 +102,28 @@ async function dispatch(session: DesktopSession, request: HostRequest): Promise<
     case "host.status":
     case "project.snapshot":
       validateNoParams(request.params, request.id);
-      return { result: session.state() };
+      return { result: requireSession(session).state() };
     case "host.shutdown":
       validateNoParams(request.params, request.id);
       return { result: { shuttingDown: true }, shutdown: true };
     case "media.ingestLocal":
-      return { result: await session.ingestLocal(validateIngestParams(request.params, request.id)) };
+      return { result: await requireSession(session).ingestLocal(validateIngestParams(request.params, request.id)) };
     case "transcription.transcribeSource":
-      return { result: await session.transcribeSource(validateTranscriptionParams(request.params, request.id)) };
+      return { result: await requireSession(session).transcribeSource(validateTranscriptionParams(request.params, request.id)) };
     case "history.undo":
       validateNoParams(request.params, request.id);
-      return { result: session.undo() };
+      return { result: await requireSession(session).undo() };
     case "history.redo":
       validateNoParams(request.params, request.id);
-      return { result: session.redo() };
+      return { result: await requireSession(session).redo() };
     case "operation.cancel":
-      return { result: session.cancel(validateCancelParams(request.params, request.id).operationId) };
+      return { result: requireSession(session).cancel(validateCancelParams(request.params, request.id).operationId) };
   }
+}
+
+function requireSession(session: DesktopSession | null): DesktopSession {
+  if (!session) throw Object.assign(new Error("PROJECT_PERSISTENCE_UNAVAILABLE"), { code: "PROJECT_PERSISTENCE_UNAVAILABLE" });
+  return session;
 }
 
 function errorResponse(id: string, error: HostErrorPayload): HostResponse {
@@ -138,6 +148,21 @@ function safeMessage(code: string): string {
     case "MEDIA_OPERATION_CANCELLED":
     case "TRANSCRIPTION_APP_CANCELLED":
     case "TRANSCRIPTION_CANCELLED": return "The operation was cancelled.";
+    case "PROJECT_PERSISTENCE_FAILED": return "The project changed in memory but could not be saved.";
+    case "PROJECT_PERSISTENCE_CORRUPT": return "The saved project failed integrity validation.";
+    case "PROJECT_PERSISTENCE_UNAVAILABLE": return "Project persistence is unavailable.";
+    case "PROJECT_MUTATION_BUSY": return "Another canonical project mutation is still active.";
     default: return "The desktop operation failed.";
   }
+}
+
+function safeDetails(cause: unknown, code: string): { details?: Record<string, unknown> } {
+  if (code !== "PROJECT_PERSISTENCE_FAILED") return {};
+  if (typeof cause !== "object" || cause === null || !("details" in cause)) return {};
+  const details = cause.details;
+  if (typeof details !== "object" || details === null || Array.isArray(details) || !("state" in details)) return {};
+  const state = details.state;
+  return typeof state === "object" && state !== null && !Array.isArray(state)
+    ? { details: { state } }
+    : {};
 }

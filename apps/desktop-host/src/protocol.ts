@@ -36,7 +36,7 @@ export interface DesktopHostState {
   canRedo: boolean;
   status: {
     hostAvailable: true;
-    persistence: "local-unsaved";
+    persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error";
   };
   capabilities: {
     mediaImport: CapabilityState;

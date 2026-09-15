@@ -74,14 +74,14 @@ test("real application services compose ingest, transcription, undo, and redo", 
   assert.equal(state.project.sourceTranscripts[0].sourceId, sourceId);
   assert.equal(state.project.history.revision, 2);
 
-  state = session.undo();
+  state = await session.undo();
   assert.equal(state.project.sources.length, 1);
   assert.equal(state.project.sourceTranscripts.length, 0);
-  state = session.undo();
+  state = await session.undo();
   assert.equal(state.project.sources.length, 0);
-  state = session.redo();
+  state = await session.redo();
   assert.equal(state.project.sources.length, 1);
   assert.equal(state.project.sourceTranscripts.length, 0);
-  state = session.redo();
+  state = await session.redo();
   assert.equal(state.project.sourceTranscripts.length, 1);
 });

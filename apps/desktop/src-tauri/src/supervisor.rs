@@ -39,6 +39,7 @@ enum Lifecycle {
     Starting,
     Ready,
     Stopping,
+    Recoverable,
     Failed,
 }
 
@@ -92,6 +93,7 @@ struct SupervisorCore {
     pending: Mutex<PendingRequests>,
     lifecycle: watch::Sender<Lifecycle>,
     next_id: AtomicU64,
+    restart_count: AtomicU64,
     timeouts: SupervisorTimeouts,
 }
 
@@ -103,6 +105,7 @@ impl SupervisorCore {
             pending: Mutex::new(PendingRequests::default()),
             lifecycle,
             next_id: AtomicU64::new(1),
+            restart_count: AtomicU64::new(0),
             timeouts,
         }
     }
@@ -351,10 +354,21 @@ impl SupervisorCore {
                 ))
             });
             self.set_state(Lifecycle::Stopped);
+        } else if self.state() == Lifecycle::Ready
+            && self.restart_count.load(Ordering::Relaxed) == 0
+        {
+            self.process.lock().ok().map(|mut process| process.take());
+            self.pending.lock().ok().map(|mut pending| {
+                pending.reject_all(DesktopCommandError::new(
+                    "HOST_PROCESS_EXITED",
+                    "Desktop host exited unexpectedly; durable recovery is available.",
+                ))
+            });
+            self.set_state(Lifecycle::Recoverable);
         } else if self.state() != Lifecycle::Failed {
             self.fail(DesktopCommandError::new(
                 "HOST_UNAVAILABLE",
-                "Desktop host exited unexpectedly.",
+                "Desktop host recovery is unavailable.",
             ));
         }
     }
@@ -404,12 +418,21 @@ impl DesktopHostSupervisor {
     }
 
     pub async fn ensure_started(&self, app: &AppHandle) -> Result<(), DesktopCommandError> {
-        self.ensure_started_with(|| launch_tauri_host(app)).await
+        self.ensure_started_with_mode(|recovering| launch_tauri_host(app, recovering))
+            .await
     }
 
+    #[cfg(test)]
     async fn ensure_started_with<F>(&self, launch: F) -> Result<(), DesktopCommandError>
     where
         F: FnOnce() -> Result<LaunchedHost, DesktopCommandError>,
+    {
+        self.ensure_started_with_mode(|_| launch()).await
+    }
+
+    async fn ensure_started_with_mode<F>(&self, launch: F) -> Result<(), DesktopCommandError>
+    where
+        F: FnOnce(bool) -> Result<LaunchedHost, DesktopCommandError>,
     {
         if self.core.state() == Lifecycle::Ready {
             return Ok(());
@@ -417,7 +440,7 @@ impl DesktopHostSupervisor {
         if self.core.state() == Lifecycle::Failed {
             return Err(DesktopCommandError::new(
                 "HOST_UNAVAILABLE",
-                "Desktop host session cannot be recovered without persistence.",
+                "Desktop host session failed closed.",
             ));
         }
         let _guard = self.start_guard.lock().await;
@@ -427,11 +450,20 @@ impl DesktopHostSupervisor {
         if self.core.state() == Lifecycle::Failed {
             return Err(DesktopCommandError::new(
                 "HOST_UNAVAILABLE",
-                "Desktop host session cannot be recovered without persistence.",
+                "Desktop host session failed closed.",
             ));
         }
+        let recovering = self.core.state() == Lifecycle::Recoverable;
+        if recovering && self.core.restart_count.fetch_add(1, Ordering::Relaxed) > 0 {
+            let error = DesktopCommandError::new(
+                "HOST_UNAVAILABLE",
+                "Desktop host recovery limit was reached.",
+            );
+            self.core.fail(error.clone());
+            return Err(error);
+        }
         self.core.set_state(Lifecycle::Starting);
-        let launched = launch().map_err(|error| {
+        let launched = launch(recovering).map_err(|error| {
             self.core.fail(error.clone());
             error
         })?;
@@ -490,6 +522,20 @@ impl DesktopHostSupervisor {
             .await
     }
 
+    pub async fn recover_state_after_process_loss(
+        &self,
+        app: &AppHandle,
+        error: DesktopCommandError,
+    ) -> Result<Value, DesktopCommandError> {
+        if error.code != "HOST_PROCESS_EXITED" {
+            return Err(error);
+        }
+        self.ensure_started(app).await?;
+        self.core
+            .request_control("project.snapshot", json!({}))
+            .await
+    }
+
     pub async fn shutdown(&self) {
         if self.core.state() == Lifecycle::Stopped {
             return;
@@ -519,7 +565,10 @@ impl DesktopHostSupervisor {
     }
 }
 
-fn launch_tauri_host(app: &AppHandle) -> Result<LaunchedHost, DesktopCommandError> {
+fn launch_tauri_host(
+    app: &AppHandle,
+    recovering: bool,
+) -> Result<LaunchedHost, DesktopCommandError> {
     let script = app
         .path()
         .resolve(
@@ -539,7 +588,7 @@ fn launch_tauri_host(app: &AppHandle) -> Result<LaunchedHost, DesktopCommandErro
         .env_clear()
         .env("LANG", "C.UTF-8")
         .env("LC_ALL", "C.UTF-8")
-        .envs(trusted_runtime_environment(app));
+        .envs(trusted_runtime_environment(app, recovering)?);
     let (mut receiver, child) = command.set_raw_out(true).spawn().map_err(|_| {
         DesktopCommandError::new("HOST_START_FAILED", "Desktop host could not be started.")
     })?;
@@ -598,8 +647,35 @@ fn spawn_event_loop(core: Arc<SupervisorCore>, mut receiver: mpsc::Receiver<Host
     });
 }
 
-fn trusted_runtime_environment(app: &AppHandle) -> BTreeMap<String, String> {
+fn trusted_runtime_environment(
+    app: &AppHandle,
+    recovering: bool,
+) -> Result<BTreeMap<String, String>, DesktopCommandError> {
     let mut allowed = BTreeMap::new();
+    let persistence_root = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| {
+            DesktopCommandError::new(
+                "PROJECT_PERSISTENCE_UNAVAILABLE",
+                "Trusted application data is unavailable.",
+            )
+        })?
+        .join("projects")
+        .join("active-v1");
+    let persistence_root = persistence_root.to_str().ok_or_else(|| {
+        DesktopCommandError::new(
+            "PROJECT_PERSISTENCE_UNAVAILABLE",
+            "Trusted application data path is invalid.",
+        )
+    })?;
+    allowed.insert(
+        "CEVRA_PROJECT_PERSISTENCE_ROOT".into(),
+        persistence_root.to_owned(),
+    );
+    if recovering {
+        allowed.insert("CEVRA_HOST_RECOVERY".into(), "1".into());
+    }
     if !cfg!(debug_assertions) {
         if let Ok(resources) = app.path().resource_dir() {
             let media = resources.join("media-runtime");
@@ -638,7 +714,7 @@ fn trusted_runtime_environment(app: &AppHandle) -> BTreeMap<String, String> {
                 );
             }
         }
-        return allowed;
+        return Ok(allowed);
     }
     for name in [
         "CEVRA_MEDIA_RUNTIME_ROOT",
@@ -657,7 +733,7 @@ fn trusted_runtime_environment(app: &AppHandle) -> BTreeMap<String, String> {
             allowed.insert(name.to_string(), value);
         }
     }
-    allowed
+    Ok(allowed)
 }
 
 fn lock_error<T>(_: std::sync::PoisonError<T>) -> DesktopCommandError {
@@ -686,6 +762,7 @@ mod tests {
         hello: HelloMode,
         shutdown_responds: bool,
         cancel_original: bool,
+        snapshot_revision: u64,
     }
 
     impl FakeControl {
@@ -732,7 +809,7 @@ mod tests {
                     HelloMode::Mismatch => self.send_result(id, json!({ "identity": "wrong", "version": "0.1.0", "protocolVersion": 1 })),
                     HelloMode::Manual => {}
                 },
-                "project.snapshot" | "host.status" => self.send_result(id, json!({ "project": { "history": { "revision": 0 } } })),
+                "project.snapshot" | "host.status" => self.send_result(id, json!({ "project": { "history": { "revision": self.snapshot_revision } } })),
                 "operation.cancel" => {
                     self.send_result(id, json!({ "operationId": request["params"]["operationId"], "cancelled": true }));
                     if self.cancel_original {
@@ -771,6 +848,15 @@ mod tests {
         shutdown_responds: bool,
         cancel_original: bool,
     ) -> (LaunchedHost, Arc<FakeControl>) {
+        fake_launch_with_revision(hello, shutdown_responds, cancel_original, 0)
+    }
+
+    fn fake_launch_with_revision(
+        hello: HelloMode,
+        shutdown_responds: bool,
+        cancel_original: bool,
+        snapshot_revision: u64,
+    ) -> (LaunchedHost, Arc<FakeControl>) {
         let (events, receiver) = mpsc::channel(64);
         let control = Arc::new(FakeControl {
             events,
@@ -779,6 +865,7 @@ mod tests {
             hello,
             shutdown_responds,
             cancel_original,
+            snapshot_revision,
         });
         (
             LaunchedHost {
@@ -1100,7 +1187,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unexpected_termination_rejects_pending_and_prevents_restart() {
+    async fn unexpected_termination_allows_one_bounded_durable_restart_without_replay() {
         let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
         let (launched, control) = fake_launch(HelloMode::Valid, true, false);
         supervisor
@@ -1109,16 +1196,70 @@ mod tests {
             .unwrap();
         let pending = {
             let supervisor = supervisor.clone();
-            tokio::spawn(async move { supervisor.request_control("pending", json!({})).await })
+            tokio::spawn(async move {
+                supervisor
+                    .request_mutating(
+                        "media.ingestLocal",
+                        json!({ "operationId": "interrupted-import" }),
+                        "interrupted-import",
+                    )
+                    .await
+            })
         };
-        wait_for_write(&control, "pending").await;
+        wait_for_write(&control, "media.ingestLocal").await;
         control.events.send(HostEvent::Terminated).await.unwrap();
-        assert_eq!(pending.await.unwrap().unwrap_err().code, "HOST_UNAVAILABLE");
+        assert_eq!(
+            pending.await.unwrap().unwrap_err().code,
+            "HOST_PROCESS_EXITED"
+        );
+        assert_eq!(supervisor.core.state(), Lifecycle::Recoverable);
         let launches = AtomicUsize::new(0);
+        let (recovered, recovered_control) =
+            fake_launch_with_revision(HelloMode::Valid, true, false, 7);
+        supervisor
+            .ensure_started_with_mode(|recovering| {
+                assert!(recovering);
+                launches.fetch_add(1, Ordering::Relaxed);
+                Ok(recovered)
+            })
+            .await
+            .unwrap();
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(launches.load(Ordering::Relaxed), 1);
+        let restored = supervisor
+            .request_control("project.snapshot", json!({}))
+            .await
+            .unwrap();
+        assert_eq!(restored["project"]["history"]["revision"], 7);
+        assert_eq!(
+            recovered_control
+                .writes
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|request| request["method"] == "media.ingestLocal")
+                .count(),
+            0
+        );
+
+        recovered_control
+            .events
+            .send(HostEvent::Terminated)
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_millis(100), async {
+            while supervisor.core.state() == Lifecycle::Ready {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(supervisor.core.state(), Lifecycle::Failed);
+        let later_launches = AtomicUsize::new(0);
         assert_eq!(
             supervisor
                 .ensure_started_with(|| {
-                    launches.fetch_add(1, Ordering::Relaxed);
+                    later_launches.fetch_add(1, Ordering::Relaxed);
                     Ok(fake_launch(HelloMode::Valid, true, false).0)
                 })
                 .await
@@ -1126,7 +1267,7 @@ mod tests {
                 .code,
             "HOST_UNAVAILABLE"
         );
-        assert_eq!(launches.load(Ordering::Relaxed), 0);
+        assert_eq!(later_launches.load(Ordering::Relaxed), 0);
     }
 
     #[tokio::test]

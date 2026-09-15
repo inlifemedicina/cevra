@@ -89,5 +89,12 @@ mod tests {
             .all(|permission| !["shell", "dialog", "fs", "http", "process"]
                 .iter()
                 .any(|name| permission.contains(name))));
+
+        let commands = include_str!("commands.rs");
+        assert!(!commands.contains("persistence_path"));
+        assert!(!commands.contains("persistencePath"));
+        let supervisor = include_str!("supervisor.rs");
+        assert!(supervisor.contains("app_data_dir()"));
+        assert!(supervisor.contains("CEVRA_PROJECT_PERSISTENCE_ROOT"));
     }
 }

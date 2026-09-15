@@ -9,7 +9,7 @@ interface TopBarProps {
   inspectorOpen: boolean;
   mediaOpen: boolean;
   exportAvailable: boolean;
-  status: "demo-not-persisted" | "local-unsaved" | "host-unavailable";
+  status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable";
   canUndo: boolean;
   canRedo: boolean;
   t: Translate;
@@ -62,7 +62,7 @@ export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpe
         <button type="button" className={inspectorOpen ? "icon-button toggled" : "icon-button"} onClick={onInspectorToggle} aria-label={t("top.inspector")} title={t("top.inspector")}><Icon name="inspect" /></button>
         <button type="button" className="icon-button" disabled={!canUndo} onClick={onUndo} aria-label={t("action.undo")} title={canUndo ? t("action.undo") : t("history.undoUnavailable")}><Icon name="undo" /></button>
         <button type="button" className="icon-button" disabled={!canRedo} onClick={onRedo} aria-label={t("action.redo")} title={canRedo ? t("action.redo") : t("history.redoUnavailable")}><Icon name="redo" /></button>
-        <span className={`save-status ${status === "demo-not-persisted" ? "demo-status" : status === "host-unavailable" ? "failed-status" : "local-status"}`}><i aria-hidden="true" />{t(status === "demo-not-persisted" ? "top.demoNotPersisted" : status === "local-unsaved" ? "top.localUnsaved" : "runtime.hostUnavailable")}</span>
+        <span className={`save-status ${status === "demo-not-persisted" ? "demo-status" : status === "host-unavailable" || status === "persistence-error" ? "failed-status" : "local-status"}`}><i aria-hidden="true" />{t(statusKey(status))}</span>
         <button className="locale-button" type="button" onClick={() => onLocaleChange(locale === "pt-BR" ? "en-US" : "pt-BR")} aria-label={t("top.switchLanguage")} title={t("top.switchLanguage")}>
           {locale === "pt-BR" ? "EN" : "PT"}
         </button>
@@ -71,4 +71,15 @@ export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpe
       </div>
     </header>
   );
+}
+
+function statusKey(status: TopBarProps["status"]): "top.demoNotPersisted" | "top.localUnsaved" | "top.saved" | "top.recovered" | "top.persistenceError" | "runtime.hostUnavailable" {
+  switch (status) {
+    case "demo-not-persisted": return "top.demoNotPersisted";
+    case "local-unsaved": return "top.localUnsaved";
+    case "local-saved": return "top.saved";
+    case "local-recovered": return "top.recovered";
+    case "persistence-error": return "top.persistenceError";
+    case "host-unavailable": return "runtime.hostUnavailable";
+  }
 }

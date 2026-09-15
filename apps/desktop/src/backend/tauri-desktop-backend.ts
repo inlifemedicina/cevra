@@ -14,7 +14,7 @@ interface HostState {
   project: ProjectIR;
   canUndo: boolean;
   canRedo: boolean;
-  status: { hostAvailable: true; persistence: "local-unsaved" };
+  status: { hostAvailable: true; persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" };
   capabilities: {
     mediaImport: { available: boolean; reason: DesktopCapabilityReason };
     transcription: { available: boolean; reason: DesktopCapabilityReason };
@@ -93,7 +93,7 @@ function fromHostState(state: HostState): DesktopBackendState {
     project: structuredClone(state.project),
     canUndo: state.canUndo,
     canRedo: state.canRedo,
-    status: "local-unsaved",
+    status: state.status.persistence,
     capabilities: {
       "media.import": { ...state.capabilities.mediaImport },
       "transcription.transcribe": { ...state.capabilities.transcription },

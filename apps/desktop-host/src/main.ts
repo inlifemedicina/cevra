@@ -8,12 +8,18 @@ void start().catch((cause) => {
 
 async function start(): Promise<void> {
   let shuttingDown = false;
-  const session = await createProductionDesktopSession();
+  let session: Awaited<ReturnType<typeof createProductionDesktopSession>> | null = null;
+  let startupError: unknown;
+  try {
+    session = await createProductionDesktopSession();
+  } catch (cause) {
+    startupError = cause;
+  }
   const server = new DesktopHostProtocolServer(session, {
     writeProtocolLine(line) { process.stdout.write(line); },
     writeLog(line) { process.stderr.write(`[cevra-desktop-host] ${line}\n`); },
     requestShutdown() { void shutdown(0); }
-  });
+  }, startupError);
 
   process.stdin.on("data", (chunk: Buffer) => server.accept(chunk));
   process.stdin.on("end", () => { server.finish(); void shutdown(0); });
@@ -32,7 +38,7 @@ async function start(): Promise<void> {
     const forced = setTimeout(() => process.exit(1), 5000);
     forced.unref();
     try {
-      await session.close();
+      await session?.close();
     } finally {
       clearTimeout(forced);
       process.exit(exitCode);
