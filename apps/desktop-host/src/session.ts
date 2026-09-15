@@ -108,7 +108,11 @@ export class DesktopSession {
       ...this.activeTasks.values(),
       ...(this.activeMutationTask ? [this.activeMutationTask] : [])
     ]);
-    await this.services.close?.();
+    try {
+      await this.services.close?.();
+    } finally {
+      await this.services.persistence?.close();
+    }
   }
 
   private async runOperation<T>(operationId: string, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {

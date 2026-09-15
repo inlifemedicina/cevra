@@ -957,6 +957,11 @@ Successful ingest, transcription promotion, undo and redo are reported only
 after checkpoint completion. A bounded one-time supervisor restart may restore
 durable state after unexpected host process loss; protocol and integrity faults
 remain terminal, and interrupted operations are never replayed automatically.
+The active root admits one PID/token owner at a time: live or ambiguous owner
+contention fails closed, while a demonstrably dead host lock may be reclaimed by
+the authorized recovery startup. Storage/I/O unavailability is kept distinct
+from proven checkpoint corruption and raw platform errno values are never host
+protocol error codes.
 
 ---
 
@@ -1310,7 +1315,7 @@ on the branch above.
 - **CANONICAL:** Desktop Visual V0.1 uses Adaptive Hybrid workspaces: Editar is preview-first; Transcrição, Composição, Legendas and Áudio specialize the center workspace while preserving one project, selection, playhead and layered timeline. Director CEVRA is integrated into the editor with Workflow Preset quick access and a reviewable AI Change Set model. The inspector is contextual. The visual language is dark graphite, neutral, compact and restrained with configurable-accent-ready tokens and no glass/neon/SaaS-dashboard trade dress.
 - **IMPLEMENTED/CLOSED:** Desktop UI Shell V0.1 merged in PR #18 at `6c6d0bd64590daffed962ecf64f84405e39f9606`. The approved Adaptive Hybrid shell, source-scoped transcript presentation, separated project/workspace selection, truthful demo status and least-privilege Tauri window are implemented; `feat/desktop-ui-shell-v0-1` was removed locally and remotely.
 - **IMPLEMENTED/CLOSED:** Desktop Runtime Integration V1 merged in PR #19 at `1c6e512e54e49bbec18b8b1afee6f96afc544d7c`. ADR 0015, the narrow Tauri ACL, supervised private Node host, native ingest, configured local transcription, cancellation and real ProjectHistory undo/redo are closed; the feature branch was removed.
-- **ACCEPTED / IN DEVELOPMENT:** ADR 0016 defines Desktop Project Persistence and Recovery V1: trusted app-data ownership, canonical Project Store checkpoints, current plus previous-known-good recovery, corruption quarantine/fail-closed behavior and one bounded host-process restart without operation replay. Work is active on `feat/project-persistence-v1`.
+- **ACCEPTED / IN DEVELOPMENT:** ADR 0016 defines Desktop Project Persistence and Recovery V1: trusted app-data ownership, one exclusive live PID/token writer, canonical Project Store checkpoints, current plus previous-known-good recovery, strict I/O-versus-corruption classification, corruption quarantine/fail-closed behavior and one bounded host-process restart without operation replay. Work is active on `feat/project-persistence-v1`.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---

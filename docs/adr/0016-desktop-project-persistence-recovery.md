@@ -26,6 +26,16 @@ audiovisual source of truth. Each checkpoint is exactly a serialized
 desktop layer adds no competing project schema, journal, transcript store or
 database. Source-scoped transcripts persist naturally inside Project IR.
 
+The active project root has exactly one live persistence writer. The Desktop
+Host creates an exclusive bounded owner record containing only a format/version,
+PID and random owner token, verifies that token before every checkpoint, and
+releases it during graceful session close. A second host never steals a lock
+whose PID is alive or whose ownership is ambiguous. A lock whose owner PID is
+demonstrably dead may be reclaimed with an atomic stale-claim step, allowing the
+one supervisor-authorized recovery host to restore the durable session after a
+crash. Malformed metadata or inability to prove exclusive ownership fails
+closed. This is local active-session exclusion, not a distributed lock manager.
+
 Every successful ingest, transcript promotion, undo and redo follows one
 durability boundary:
 
@@ -50,6 +60,16 @@ cannot promote a partial temporary payload. Original imported media is not
 copied. Project IR continues to retain its authorized URI and provenance.
 
 ## Startup and corruption policy
+
+Filesystem availability and content integrity are separate boundaries. JSON,
+Project Store envelope, digest, package and Project IR validation failures are
+content corruption. Permission, open/read, descriptor, device and other OS I/O
+failures are storage unavailability; they do not trigger quarantine or fallback
+to an older checkpoint as though corruption had been established. Public host
+errors use only the bounded `PROJECT_PERSISTENCE_UNAVAILABLE`,
+`PROJECT_PERSISTENCE_CORRUPT` and `PROJECT_PERSISTENCE_FAILED` vocabulary. Raw
+platform errno values, paths and filesystem messages never cross the persistence
+protocol boundary.
 
 - A valid current checkpoint restores the complete `ProjectHistory`, including
   IDs, Project IR, journal, snapshots, revision, cursor and undo/redo state.
