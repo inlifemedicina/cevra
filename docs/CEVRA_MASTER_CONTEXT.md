@@ -886,11 +886,11 @@ without installer bundling, and a native-process launch smoke test pass with a
 checksum-verified isolated Rust toolchain; the host profile remains unchanged.
 The Linux CI job independently compiles the same Tauri shell.
 
-## 16A.1 Desktop Runtime Integration V1 — IN DEVELOPMENT
+## 16A.1 Desktop Runtime Integration V1 — IMPLEMENTED / CLOSED
 
-Desktop Runtime Integration V1 is **IN DEVELOPMENT** on
-`feat/desktop-runtime-integration-v1`, created from exact `main`
-`6c6d0bd64590daffed962ecf64f84405e39f9606`.
+Desktop Runtime Integration V1 merged in PR #19 at
+`1c6e512e54e49bbec18b8b1afee6f96afc544d7c`, is **CLOSED**, and
+`feat/desktop-runtime-integration-v1` was removed locally and remotely.
 
 ADR 0015 records the accepted runtime boundary:
 
@@ -917,17 +917,17 @@ Abnormal lifecycle hardening does not claim process-tree reaping from a direct
 Node kill. The transcription worker now treats its private stdin as a parent-life
 pipe, and the Media worker uses its existing EOF cancellation/reaping path;
 native-process tests prove both descendant chains terminate after abrupt parent
-death. Supervisor handshake is fail-closed, startup is single-flight, host failure
-is terminal for the memory-only session, and mutating timeouts reconcile a fresh
-canonical snapshot after cancellation or permanently fail the session when
-settlement cannot be proven.
+death. Supervisor handshake is fail-closed, startup is single-flight, and at
+this milestone host failure was terminal for the memory-only session. Mutating
+timeouts reconcile a fresh canonical snapshot after cancellation or permanently
+fail the session when settlement cannot be proven.
 
 The slice adds real local ingest when the trusted Media Runtime is available,
 optional real local transcription only when an explicit trusted runtime and
 already-local model are configured, and host-derived undo/redo. Model download
-remains disabled. Project persistence, crash recovery, real preview playback,
-Director execution, Workflow Preset execution and mobile remote-control or
-delegation remain deferred.
+remains disabled. Project persistence and bounded crash recovery moved to the
+active ADR 0016 slice. Real preview playback, Director execution, Workflow
+Preset execution and mobile remote-control or delegation remain deferred.
 
 V1 packages the pinned private Node runtime and fixed host/worker resources, but
 does not yet distribute the Media Runtime bundle, private Python distribution,
@@ -940,8 +940,23 @@ Final pre-PR lifecycle hardening moves the transcription parent-liveness watchdo
 to raw file-descriptor reads, proves normal real-worker completion and abnormal
 parent-death containment, closes command-ACL and mutation-timeout test gaps, and
 keeps real empty Composition/Audio workspaces free of presentation fixtures.
-Local validation is 266/266 Node/TypeScript tests, 22/22 Python tests, and 22/22
-Rust tests; the slice remains **IN DEVELOPMENT** pending review.
+Local validation was 266/266 Node/TypeScript tests, 22/22 Python tests, and 22/22
+Rust tests.
+
+## 16A.2 Project Persistence V1 — IN DEVELOPMENT
+
+Project Persistence V1 is **IN DEVELOPMENT** on `feat/project-persistence-v1`,
+created from exact `main` `1c6e512e54e49bbec18b8b1afee6f96afc544d7c`.
+ADR 0016 accepts one active-project persistence and recovery boundary owned by
+the private Desktop Host. Rust derives the trusted Tauri app-data root; the
+WebView receives no path or filesystem privilege. The host serializes its sole
+canonical `ProjectHistory` with `@cevra/project-store`, atomically rotates
+current and previous-known-good checkpoints, quarantines an invalid current
+artifact before recovery, and fails closed when no valid checkpoint exists.
+Successful ingest, transcription promotion, undo and redo are reported only
+after checkpoint completion. A bounded one-time supervisor restart may restore
+durable state after unexpected host process loss; protocol and integrity faults
+remain terminal, and interrupted operations are never replayed automatically.
 
 ---
 
@@ -1183,7 +1198,8 @@ Foundation / Media Runtime       [CLOSED]
 → Project IR v2 transcripts      [CLOSED]
 → App transcript persistence     [CLOSED]
 → Desktop UI Shell V0.1          [CLOSED]
-→ Desktop Runtime Integration V1 [IN DEVELOPMENT]
+→ Desktop Runtime Integration V1 [CLOSED]
+→ Project Persistence V1         [IN DEVELOPMENT]
 → alignment / transcript cache / Project IR multi-source mapping as separate small slices
 → editorial transcript / analysis
 → strategy / take selection / cut planning
@@ -1218,13 +1234,12 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ## 24.1 `main`
 
-After Desktop UI Shell V0.1 merged in PR #18:
+After Desktop Runtime Integration V1 merged in PR #19:
 
-`6c6d0bd64590daffed962ecf64f84405e39f9606`
+`1c6e512e54e49bbec18b8b1afee6f96afc544d7c`
 
-This is the Git-authoritative `main` immediately before Desktop Runtime
-Integration V1 and the exact base of
-`feat/desktop-runtime-integration-v1`.
+This is the Git-authoritative `main` immediately before Project Persistence V1
+and the exact base of `feat/project-persistence-v1`.
 
 ## 24.2 Important merged milestones
 
@@ -1242,16 +1257,18 @@ Integration V1 and the exact base of
 | Project IR v2 transcript commands — Slice B | #16 | `900112f88e85a59ae57541a2f2faf5997ad8f908` | CLOSED |
 | Application Transcript Persistence / Orchestration V1 | #17 | `aaecd62647b49c1090f961a3f872dff0ebc9889c` | CLOSED |
 | Desktop UI Shell V0.1 | #18 | `6c6d0bd64590daffed962ecf64f84405e39f9606` | CLOSED |
+| Desktop Runtime Integration V1 | #19 | `1c6e512e54e49bbec18b8b1afee6f96afc544d7c` | CLOSED |
 
 ## 24.3 Active work
 
 | Branch | Status |
 |---|---|
-| `feat/desktop-runtime-integration-v1` | Desktop Runtime Integration V1 — private supervised Node host, native ingest, optional configured transcription and real ProjectHistory undo/redo; IN DEVELOPMENT |
+| `feat/project-persistence-v1` | Project Persistence V1 — durable active ProjectHistory checkpointing and bounded Desktop Host crash recovery; IN DEVELOPMENT |
 
 The proposal, both Project IR v2 Slice A/B, Application Transcript Persistence
 and Desktop UI Shell branches were removed after their merges. Desktop Runtime
-Integration V1 is active only on the branch above.
+Integration V1 was removed after merge. Project Persistence V1 is active only
+on the branch above.
 
 ---
 
@@ -1292,8 +1309,8 @@ Integration V1 is active only on the branch above.
 - **IMPLEMENTED/CLOSED:** Application Transcript Persistence / Orchestration V1 merged in PR #17 at `aaecd62647b49c1090f961a3f872dff0ebc9889c`. The application service authorizes a current Project IR source, invokes `TranscriptionEngineAdapter`, performs non-coercing runtime boundary checks, passes raw transcript values into canonical `createSourceTranscript` validation, and promotes only through guarded `transcript.set` and `ProjectHistory`. Defensive outcome cloning occurs only after canonical validation. No execution repository, cache, UI or engine change was introduced. Merge validation retained 207 Node/TypeScript and 22 Python tests.
 - **CANONICAL:** Desktop Visual V0.1 uses Adaptive Hybrid workspaces: Editar is preview-first; Transcrição, Composição, Legendas and Áudio specialize the center workspace while preserving one project, selection, playhead and layered timeline. Director CEVRA is integrated into the editor with Workflow Preset quick access and a reviewable AI Change Set model. The inspector is contextual. The visual language is dark graphite, neutral, compact and restrained with configurable-accent-ready tokens and no glass/neon/SaaS-dashboard trade dress.
 - **IMPLEMENTED/CLOSED:** Desktop UI Shell V0.1 merged in PR #18 at `6c6d0bd64590daffed962ecf64f84405e39f9606`. The approved Adaptive Hybrid shell, source-scoped transcript presentation, separated project/workspace selection, truthful demo status and least-privilege Tauri window are implemented; `feat/desktop-ui-shell-v0-1` was removed locally and remotely.
-- **ACCEPTED / IN DEVELOPMENT:** ADR 0015 defines a narrow typed Tauri application-command boundary, Rust-owned native picker and persistent supervisor, private pinned Node.js host, closed JSONL protocol, sanitized child environment and no automatic recovery after host crash. Desktop Runtime Integration V1 is active on `feat/desktop-runtime-integration-v1` from exact base `6c6d0bd64590daffed962ecf64f84405e39f9606`.
-- **CANONICAL:** Desktop persistence and crash recovery are separate future work. The active runtime slice keeps one authoritative in-memory `ProjectHistory`; it must never silently replace a crashed session with a new empty project. Real preview playback and mobile remote-control/delegation also remain deferred.
+- **IMPLEMENTED/CLOSED:** Desktop Runtime Integration V1 merged in PR #19 at `1c6e512e54e49bbec18b8b1afee6f96afc544d7c`. ADR 0015, the narrow Tauri ACL, supervised private Node host, native ingest, configured local transcription, cancellation and real ProjectHistory undo/redo are closed; the feature branch was removed.
+- **ACCEPTED / IN DEVELOPMENT:** ADR 0016 defines Desktop Project Persistence and Recovery V1: trusted app-data ownership, canonical Project Store checkpoints, current plus previous-known-good recovery, corruption quarantine/fail-closed behavior and one bounded host-process restart without operation replay. Work is active on `feat/project-persistence-v1`.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
 ---
@@ -1335,7 +1352,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete and independently review Desktop Runtime Integration V1 on `feat/desktop-runtime-integration-v1` without adding a localhost server, WebView shell/filesystem capability or duplicate Project IR.
+1. Complete and independently review Project Persistence V1 on `feat/project-persistence-v1` without adding WebView filesystem capability, another Project IR/history representation or automatic mutation replay.
 2. Do not reopen the closed Application Transcript Persistence, Local Transcription Engine V1 or Project IR v2 Slices A/B.
 3. Preserve the provider-neutral flow from authorized source through `TranscriptionEngineAdapter` and guarded Project History promotion.
 4. Validate the ADR 0015 supervised private-host path from native picker through existing application services, canonical ProjectHistory and source-scoped transcript presentation.

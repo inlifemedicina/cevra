@@ -231,7 +231,7 @@ describe("CEVRA Vids desktop shell", () => {
 
   it("maintains exact PT-BR and EN-US catalog key parity", () => {
     expect(translationKeys("pt-BR")).toEqual(translationKeys("en-US"));
-    expect(translate("en-US", "runtime.hostUnavailable")).toBe("The local session has ended. Restart CEVRA to start a new session. Unsaved changes cannot be recovered yet.");
+    expect(translate("en-US", "runtime.hostUnavailable")).toBe("The local session is unavailable. Restart CEVRA to restore the latest durable project state.");
     expect(translate("en-US", "composition.empty")).toBe("Import media to start composing.");
     expect(translate("en-US", "audio.empty")).toBe("Import media with audio to get started.");
   });
@@ -391,7 +391,15 @@ describe("CEVRA Vids desktop shell", () => {
     const backend = new FunctionalDesktopBackend();
     backend.loadState = async () => { throw { code: "HOST_START_FAILED" }; };
     render(<App backend={backend} />);
-    expect(await screen.findByText("A sessão local foi encerrada. Reinicie o CEVRA para iniciar uma nova sessão. Alterações não salvas ainda não podem ser recuperadas.")).toBeTruthy();
+    expect(await screen.findByText("A sessão local está indisponível. Reinicie o CEVRA para restaurar o estado durável mais recente do projeto.")).toBeTruthy();
+  });
+
+  it("renders persistence corruption as fail-closed instead of implying an empty first run", async () => {
+    const backend = new FunctionalDesktopBackend();
+    backend.loadState = async () => { throw { code: "PROJECT_PERSISTENCE_CORRUPT" }; };
+    render(<App backend={backend} />);
+    expect(await screen.findByText("O projeto salvo falhou na verificação de integridade e não pôde ser aberto com segurança. O CEVRA não o substituiu por um projeto vazio.")).toBeTruthy();
+    expect(screen.queryByText("Importe um vídeo para começar")).toBeNull();
   });
 
   it("maps import conflicts without falsely terminating the host session", async () => {
@@ -488,8 +496,8 @@ describe("CEVRA Vids desktop shell", () => {
     backend.pickAndImportMedia = async () => { throw { code: "HOST_UNAVAILABLE" }; };
     const { user } = await renderFunctional(backend);
     await user.click(screen.getByRole("button", { name: "Importar" }));
-    expect((await screen.findByRole("alert")).textContent).toContain("Reinicie o CEVRA para iniciar uma nova sessão");
-    const failureCopies = screen.getAllByText("A sessão local foi encerrada. Reinicie o CEVRA para iniciar uma nova sessão. Alterações não salvas ainda não podem ser recuperadas.");
+    expect((await screen.findByRole("alert")).textContent).toContain("Reinicie o CEVRA para restaurar o estado durável mais recente");
+    const failureCopies = screen.getAllByText("A sessão local está indisponível. Reinicie o CEVRA para restaurar o estado durável mais recente do projeto.");
     expect(failureCopies.length).toBeGreaterThan(0);
     expect(failureCopies.some((element) => element.classList.contains("failed-status"))).toBe(true);
     expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);
@@ -527,6 +535,75 @@ describe("CEVRA Vids desktop shell", () => {
       code: "OPERATION_TIMEOUT",
       reconciledState: { status: "local-unsaved", project: { project: { id: "desktop-real" } } }
     });
+  });
+
+  it("maps host-derived saved and recovered persistence status without a frontend save guess", async () => {
+    const state = new FunctionalDesktopBackend().state();
+    for (const persistence of ["local-saved", "local-recovered", "persistence-error"] as const) {
+      const backend = new TauriDesktopBackend(async () => ({
+        project: state.project,
+        canUndo: false,
+        canRedo: false,
+        status: { hostAvailable: true, persistence },
+        capabilities: {
+          mediaImport: state.capabilities["media.import"],
+          transcription: state.capabilities["transcription.transcribe"]
+        }
+      }) as never);
+      expect((await backend.loadState()).status).toBe(persistence);
+    }
+  });
+
+  it("renders truthful saved, recovered, and persistence-error labels with locale parity", async () => {
+    const labels = [
+      ["local-saved", "Salvo", "Saved"],
+      ["local-recovered", "Sessão recuperada · salva", "Recovered session · saved"],
+      ["persistence-error", "Alterações não salvas", "Changes not saved"]
+    ] as const;
+    for (const [status, pt, en] of labels) {
+      const backend = new FunctionalDesktopBackend();
+      backend.loadState = async () => ({ ...backend.state(), status });
+      const view = render(<App backend={backend} />);
+      expect(await screen.findByText(pt)).toBeTruthy();
+      await userEvent.setup().click(screen.getByRole("button", { name: "Trocar idioma" }));
+      expect(screen.getByText(en)).toBeTruthy();
+      view.unmount();
+    }
+  });
+
+  it("reconciles durable host recovery without marking the recovered state unavailable", async () => {
+    const state = new FunctionalDesktopBackend().state();
+    const backend = new TauriDesktopBackend(async () => {
+      throw { code: "HOST_RECOVERED", details: { state: {
+        project: state.project,
+        canUndo: state.canUndo,
+        canRedo: state.canRedo,
+        status: { hostAvailable: true, persistence: "local-recovered" },
+        capabilities: {
+          mediaImport: state.capabilities["media.import"],
+          transcription: state.capabilities["transcription.transcribe"]
+        }
+      } } };
+    });
+    await expect(backend.undo()).rejects.toMatchObject({
+      code: "HOST_RECOVERED",
+      reconciledState: { status: "local-recovered" }
+    });
+  });
+
+  it("keeps reconciled in-memory state visible when persistence fails", async () => {
+    const backend = new FunctionalDesktopBackend();
+    const project = backend.history.commit({ type: "project.rename", name: "Alteração em memória" });
+    backend.pickAndImportMedia = async () => { throw {
+      code: "PROJECT_PERSISTENCE_FAILED",
+      reconciledState: { ...backend.state(project), status: "persistence-error" }
+    }; };
+    const { user } = await renderFunctional(backend);
+    await user.click(screen.getByRole("button", { name: "Importar" }));
+    expect(await screen.findByText("Alterações não salvas")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("existe nesta sessão");
+    expect(screen.getByText("Alteração em memória")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
 

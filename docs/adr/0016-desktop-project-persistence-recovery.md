@@ -1,6 +1,6 @@
 # ADR 0016 — Desktop Project Persistence and Recovery V1
 
-**Status:** Accepted by this implementation  
+**Status:** Accepted by this implementation
 **Date:** 2026-09-15
 
 ## Context
@@ -90,4 +90,3 @@ autosave policy controls and automatic operation replay. Preview playback,
 Director, Presets and export remain separate milestones.
 
 No new third-party dependency is introduced.
-

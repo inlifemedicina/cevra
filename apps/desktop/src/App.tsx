@@ -170,6 +170,11 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     const operationError = desktopOperationError(cause);
     const code = operationError.code;
     if (operationError.reconciledState) applyBackendState(operationError.reconciledState);
+    if (code === "HOST_RECOVERED") {
+      setRuntimeError(null);
+      setRuntimeNotice("runtime.sessionRecovered");
+      return;
+    }
     if (isCancellationCode(code)) {
       setRuntimeError(null);
       setRuntimeNotice("runtime.operationCancelled");
@@ -187,7 +192,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     } : current);
   }
 
-  if (!project || !backendState) return <main className="loading-screen"><span className="brand-mark">C</span><p>{runtimeError ? t("runtime.hostUnavailable") : t("app.loadingProject")}</p></main>;
+  if (!project || !backendState) return <main className="loading-screen"><span className="brand-mark">C</span><p>{runtimeError ? t(runtimeErrorKey(runtimeError)) : t("app.loadingProject")}</p></main>;
 
   const layoutStyle = { "--timeline-height": `${timelineHeight}px` } as CSSProperties;
   const mutationBusy = importBusy || transcriptionOperationId !== null;
@@ -247,12 +252,17 @@ function isTerminalHostCode(code: string): boolean {
     "HOST_PROTOCOL_MISMATCH",
     "HOST_MALFORMED_RESPONSE",
     "HOST_MESSAGE_TOO_LARGE",
-    "HOST_SUPERVISOR_FAILED"
+    "HOST_SUPERVISOR_FAILED",
+    "PROJECT_PERSISTENCE_CORRUPT",
+    "PROJECT_PERSISTENCE_UNAVAILABLE"
   ]).has(code);
 }
 
 function runtimeErrorKey(code: string): TranslationKey {
   if (code === "OPERATION_TIMEOUT" || code === "HOST_TIMEOUT") return "runtime.operationTimedOut";
+  if (code === "PROJECT_PERSISTENCE_FAILED") return "runtime.persistenceError";
+  if (code === "PROJECT_PERSISTENCE_CORRUPT") return "runtime.persistenceCorrupt";
+  if (code === "PROJECT_PERSISTENCE_UNAVAILABLE") return "runtime.persistenceUnavailable";
   if (code === "TRANSCRIPTION_APP_PROJECT_CONFLICT") return "runtime.transcriptionProjectConflict";
   if (code === "LOCAL_SOURCE_PROJECT_CONFLICT" || code === "MEDIA_PROJECT_CONFLICT") return "runtime.importProjectConflict";
   if (code.includes("MEDIA") || code.includes("INGEST")) return "runtime.mediaError";

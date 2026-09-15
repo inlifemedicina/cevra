@@ -13,7 +13,7 @@ export interface DesktopBackendState {
   readonly project: Readonly<ProjectIR>;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
-  readonly status: "demo-not-persisted" | "local-unsaved" | "host-unavailable";
+  readonly status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable";
   readonly capabilities: Readonly<Record<DesktopRuntimeCapability, DesktopCapabilityState>>;
 }
 
