@@ -21,6 +21,31 @@ export interface AlignmentEngineAdapter extends EngineAdapter {
   align(request: AlignmentRequest, context: ExecutionContext): Promise<AlignmentResult>;
 }
 
+export interface AlignmentExecutionIdentity {
+  engineId: string;
+  engineVersion: string;
+  engineApiVersion: number;
+  workerProtocolVersion: number;
+  modelId: string;
+  modelRevision: string;
+  modelDigest: `sha256:${string}`;
+  device: string;
+  pipelineVersion: string;
+  requiredSampleRate: number;
+  maximumWindowMs: number;
+  maximumTokensPerWindow: number;
+  wildcardAlgorithmVersion: string;
+  resultValidationVersion: string;
+}
+
+/** Optional additive cache capability. Absence means cache bypass, never a weak key. */
+export interface AlignmentExecutionIdentityProvider {
+  describeAlignmentExecution(
+    request: AlignmentRequest,
+    signal?: AbortSignal
+  ): Promise<AlignmentExecutionIdentity | undefined>;
+}
+
 export interface AlignmentAudioLease {
   outputUri: string;
   release(): Promise<void>;

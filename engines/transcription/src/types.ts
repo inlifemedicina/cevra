@@ -36,6 +36,8 @@ export interface FasterWhisperProfile {
   allowModelDownload?: boolean;
   device?: TranscriptionDevice;
   computeType?: TranscriptionComputeType;
+  /** Trusted exact revision for a direct prepopulated model directory; absent means cache identity bypass. */
+  trustedModelRevision?: string;
 }
 
 export interface LocalTranscriptionAdapterOptions {

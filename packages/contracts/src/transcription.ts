@@ -20,3 +20,31 @@ export interface TranscriptionResult {
 export interface TranscriptionEngineAdapter extends EngineAdapter {
   transcribe(request: TranscriptionRequest, context: ExecutionContext): Promise<TranscriptionResult>;
 }
+
+/** Exact, provider-neutral identity of one deterministic transcription execution profile. */
+export interface TranscriptionExecutionIdentity {
+  engineId: string;
+  engineVersion: string;
+  engineApiVersion: number;
+  workerProtocolVersion: number;
+  modelId: string;
+  /** Provider-facing model identifier expected in TranscriptionResult. */
+  resultModelId: string;
+  modelRevision: string;
+  modelArtifactDigest: `sha256:${string}`;
+  languageDetectionPolicyVersion: string;
+  devicePolicy: string;
+  effectiveDevice: string;
+  computeType: string;
+  task: "transcribe";
+  resultNormalizationVersion: string;
+  runtimePipelineVersion: string;
+}
+
+/** Optional additive cache capability. Absence means cache bypass, never a weak key. */
+export interface TranscriptionExecutionIdentityProvider {
+  describeTranscriptionExecution(
+    request: TranscriptionRequest,
+    signal?: AbortSignal
+  ): Promise<TranscriptionExecutionIdentity | undefined>;
+}
