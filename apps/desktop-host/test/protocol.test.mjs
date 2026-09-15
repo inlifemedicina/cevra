@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import test from "node:test";
@@ -41,6 +42,23 @@ test("host.hello returns the exact protocol identity and version", async () => {
     id: "hello-1",
     result: { identity: "cevra.desktop-host", version: "0.1.0", protocolVersion: 1 }
   }]);
+});
+
+test("persistence integrity failure is a stable fail-closed hello error", async () => {
+  const lines = [];
+  const startupError = Object.assign(new Error("sensitive path must not escape"), { code: "PROJECT_PERSISTENCE_CORRUPT" });
+  const server = new DesktopHostProtocolServer(null, {
+    writeProtocolLine(line) { lines.push(JSON.parse(line)); },
+    writeLog() {},
+    requestShutdown() {}
+  }, startupError);
+  await server.handleLine(JSON.stringify({ protocolVersion: 1, id: "hello-corrupt", method: "host.hello", params: {} }));
+  assert.deepEqual(lines[0], {
+    protocolVersion: 1,
+    id: "hello-corrupt",
+    error: { code: "PROJECT_PERSISTENCE_CORRUPT", message: "The saved project failed integrity validation." }
+  });
+  assert.doesNotMatch(JSON.stringify(lines[0]), /sensitive path/u);
 });
 
 test("unknown methods are rejected by the closed request schema", () => {
@@ -157,11 +175,16 @@ test("the bundled host keeps stdout protocol-only and logs on stderr", async () 
 
 test("an externally terminated host exits and cannot leave a network listener", async () => {
   const bundle = resolve(hostRoot, "dist", "desktop-host.cjs");
-  const child = spawn(process.execPath, [bundle], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
-  await new Promise((resolvePromise) => child.stderr.once("data", resolvePromise));
-  child.kill("SIGTERM");
-  const code = await new Promise((resolvePromise) => child.once("exit", resolvePromise));
-  assert.equal(code, 0);
+  const persistenceRoot = await mkdtemp(resolve(tmpdir(), "cevra-host-exit-"));
+  const child = spawn(process.execPath, [bundle], { env: { CEVRA_PROJECT_PERSISTENCE_ROOT: persistenceRoot }, stdio: ["pipe", "pipe", "pipe"] });
+  try {
+    await new Promise((resolvePromise) => child.stderr.once("data", resolvePromise));
+    child.kill("SIGTERM");
+    const code = await new Promise((resolvePromise) => child.once("exit", resolvePromise));
+    assert.equal(code, 0);
+  } finally {
+    await rm(persistenceRoot, { recursive: true, force: true });
+  }
   const sources = await Promise.all(["src/main.ts", "src/server.ts", "src/session.ts"].map((file) => readFile(resolve(hostRoot, file), "utf8")));
   assert.equal(sources.some((source) => /node:(?:net|http|https)|createServer\s*\(/u.test(source)), false);
 });
@@ -173,7 +196,8 @@ test("method dispatch is an explicit switch and never property lookup", async ()
 });
 
 async function runHost(requests) {
-  const child = spawn(process.execPath, [resolve(hostRoot, "dist", "desktop-host.cjs")], { env: {}, stdio: ["pipe", "pipe", "pipe"] });
+  const persistenceRoot = await mkdtemp(resolve(tmpdir(), "cevra-host-protocol-"));
+  const child = spawn(process.execPath, [resolve(hostRoot, "dist", "desktop-host.cjs")], { env: { CEVRA_PROJECT_PERSISTENCE_ROOT: persistenceRoot }, stdio: ["pipe", "pipe", "pipe"] });
   let stdout = "";
   let stderr = "";
   child.stdout.on("data", (chunk) => { stdout += chunk.toString("utf8"); });
@@ -183,5 +207,6 @@ async function runHost(requests) {
     child.once("error", reject);
     child.once("exit", resolvePromise);
   });
+  await rm(persistenceRoot, { recursive: true, force: true });
   return { code, stdout, stderr };
 }

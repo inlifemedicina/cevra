@@ -1,13 +1,15 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const hostRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(await readFile(resolve(hostRoot, "dist", "node-runtime-manifest.json"), "utf8"));
 const privateNode = resolve(hostRoot, "..", "desktop", "src-tauri", "binaries", manifest.preparedBinaryName);
+const persistenceRoot = await mkdtemp(resolve(tmpdir(), "cevra-private-node-smoke-"));
 const child = spawn(privateNode, [resolve(hostRoot, "dist", "desktop-host.cjs")], {
-  env: {},
+  env: { CEVRA_PROJECT_PERSISTENCE_ROOT: persistenceRoot },
   stdio: ["pipe", "pipe", "pipe"]
 });
 let stdout = "";
@@ -20,6 +22,7 @@ const exitCode = await new Promise((resolvePromise, reject) => {
   child.once("error", reject);
   child.once("exit", resolvePromise);
 });
+await rm(persistenceRoot, { recursive: true, force: true });
 if (exitCode !== 0) throw new Error(`Private Node host smoke failed (${exitCode}): ${stderr}`);
 const responses = stdout.trim().split("\n").map((line) => JSON.parse(line));
 if (responses.length !== 2 || responses[0]?.result?.identity !== "cevra.desktop-host" || responses[1]?.result?.shuttingDown !== true) {

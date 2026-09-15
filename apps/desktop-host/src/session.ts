@@ -10,7 +10,7 @@ import {
   PersistentMediaWorkerClient,
   ProcessMediaWorkerTransport
 } from "@cevra/media-ffmpeg";
-import { createEmptyProject, ProjectHistory } from "@cevra/project-ir";
+import { ProjectHistory } from "@cevra/project-ir";
 import {
   FasterWhisperTranscriptionAdapter,
   type LocalTranscriptionAdapterOptions,
@@ -18,6 +18,7 @@ import {
 } from "@cevra/transcription-faster-whisper";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, isAbsolute, resolve } from "node:path";
+import { DesktopPersistenceError, DesktopProjectPersistence } from "./persistence.js";
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
 
 type Locale = "pt-BR" | "en-US";
@@ -28,12 +29,14 @@ export interface DesktopSessionServices {
   transcription?: Pick<TranscriptionApplicationService, "transcribeSource">;
   mediaCapability: CapabilityState;
   transcriptionCapability: CapabilityState;
+  persistence?: DesktopProjectPersistence;
   close?(): Promise<void>;
 }
 
 export class DesktopSession {
   private readonly operations = new Map<string, AbortController>();
   private readonly activeTasks = new Map<string, Promise<unknown>>();
+  private activeMutationTask: Promise<unknown> | null = null;
 
   constructor(private readonly services: DesktopSessionServices) {}
 
@@ -42,7 +45,7 @@ export class DesktopSession {
       project: this.services.history.current,
       canUndo: this.services.history.canUndo,
       canRedo: this.services.history.canRedo,
-      status: { hostAvailable: true, persistence: "local-unsaved" },
+      status: { hostAvailable: true, persistence: this.services.persistence?.state ?? "local-unsaved" },
       capabilities: {
         mediaImport: { ...this.services.mediaCapability },
         transcription: { ...this.services.transcriptionCapability }
@@ -52,15 +55,16 @@ export class DesktopSession {
 
   async ingestLocal(params: { uri: string; displayName: string; operationId: string; locale: Locale }): Promise<{ state: DesktopHostState; importedSourceId: string }> {
     if (!this.services.mediaCapability.available || !this.services.ingest) throw safeError("MEDIA_UNAVAILABLE");
-    return this.runOperation(params.operationId, async (signal) => {
+    return this.runOperation(params.operationId, (signal) => this.runMutation(async () => {
       const outcome = await this.services.ingest!.ingest({ uri: params.uri, displayName: params.displayName, locale: params.locale }, signal);
+      await this.persistMutation();
       return { state: this.state(), importedSourceId: outcome.source.id };
-    });
+    }));
   }
 
   async transcribeSource(params: { sourceId: string; operationId: string; locale: Locale }): Promise<DesktopHostState> {
     if (!this.services.transcriptionCapability.available || !this.services.transcription) throw safeError("TRANSCRIPTION_UNAVAILABLE");
-    return this.runOperation(params.operationId, async (signal) => {
+    return this.runOperation(params.operationId, (signal) => this.runMutation(async () => {
       await this.services.transcription!.transcribeSource({
         sourceId: params.sourceId,
         id: params.operationId,
@@ -68,8 +72,9 @@ export class DesktopSession {
         language: "auto",
         wordTimestamps: true
       }, signal);
+      await this.persistMutation();
       return this.state();
-    });
+    }));
   }
 
   cancel(operationId: string): { operationId: string; cancelled: boolean } {
@@ -79,19 +84,30 @@ export class DesktopSession {
     return { operationId, cancelled: true };
   }
 
-  undo(): DesktopHostState {
-    this.services.history.undo();
-    return this.state();
+  async undo(): Promise<DesktopHostState> {
+    return this.runMutation(async () => {
+      const changed = this.services.history.canUndo;
+      this.services.history.undo();
+      if (changed) await this.persistMutation();
+      return this.state();
+    });
   }
 
-  redo(): DesktopHostState {
-    this.services.history.redo();
-    return this.state();
+  async redo(): Promise<DesktopHostState> {
+    return this.runMutation(async () => {
+      const changed = this.services.history.canRedo;
+      this.services.history.redo();
+      if (changed) await this.persistMutation();
+      return this.state();
+    });
   }
 
   async close(): Promise<void> {
     for (const controller of this.operations.values()) controller.abort();
-    await Promise.allSettled([...this.activeTasks.values()]);
+    await Promise.allSettled([
+      ...this.activeTasks.values(),
+      ...(this.activeMutationTask ? [this.activeMutationTask] : [])
+    ]);
     await this.services.close?.();
   }
 
@@ -108,10 +124,35 @@ export class DesktopSession {
       this.activeTasks.delete(operationId);
     }
   }
+
+  private async persistMutation(): Promise<void> {
+    if (!this.services.persistence) return;
+    try {
+      await this.services.persistence.checkpoint(this.services.history);
+    } catch {
+      throw safeError("PROJECT_PERSISTENCE_FAILED", { state: this.state() });
+    }
+  }
+
+  private async runMutation<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+    const task = operation();
+    this.activeMutationTask = task;
+    try {
+      return await task;
+    } finally {
+      if (this.activeMutationTask === task) this.activeMutationTask = null;
+    }
+  }
 }
 
 export async function createProductionDesktopSession(environment: NodeJS.ProcessEnv = process.env): Promise<DesktopSession> {
-  const history = new ProjectHistory(createEmptyProject({ name: "CEVRA Vids", locale: "pt-BR" }));
+  const persistenceRoot = environment.CEVRA_PROJECT_PERSISTENCE_ROOT;
+  if (!persistenceRoot) throw new DesktopPersistenceError("PROJECT_PERSISTENCE_UNAVAILABLE");
+  const opened = await DesktopProjectPersistence.open(persistenceRoot, {
+    recoveredSession: environment.CEVRA_HOST_RECOVERY === "1"
+  });
+  const history = opened.history;
   const media = await createMediaServices(history, environment);
   const transcription = await createTranscriptionServices(history, environment, media.runtimeRoot);
   return new DesktopSession({
@@ -120,6 +161,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
     ...(transcription.service ? { transcription: transcription.service } : {}),
     mediaCapability: media.capability,
     transcriptionCapability: transcription.capability,
+    persistence: opened.persistence,
     close: async () => {
       await media.close?.();
     }
@@ -256,6 +298,6 @@ function transcriptionModel(value: string | undefined): SupportedTranscriptionMo
 function available(): CapabilityState { return { available: true, reason: "available" }; }
 function unavailable(reason: Exclude<CapabilityState["reason"], "available">): CapabilityState { return { available: false, reason }; }
 
-function safeError(code: string): Error {
-  return Object.assign(new Error(code), { code });
+function safeError(code: string, details?: Record<string, unknown>): Error {
+  return Object.assign(new Error(code), { code, ...(details ? { details } : {}) });
 }

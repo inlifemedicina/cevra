@@ -68,10 +68,11 @@ archives. The executable is prepared into ignored build output and packaged as
 the `cevra-node` Tauri external binary. The fixed CommonJS desktop-host bundle
 is a resource. Packaged operation does not require user-installed Node.js.
 
-An unexpected host exit rejects all pending requests and marks the session
-unavailable. It is not automatically restarted: ProjectHistory is memory-only,
-so restart would silently replace the user's session. Recovery after host crash
-belongs to the future persistence milestone.
+An unexpected host exit originally rejected all pending requests and marked the
+memory-only session unavailable. ADR 0016 now narrowly supersedes that lifecycle
+consequence: once a durable Project Store checkpoint exists, one bounded restart
+may restore it. ADR 0015 protocol/identity failures remain terminal, and no
+interrupted operation is automatically replayed.
 
 On cooperative shutdown the host aborts active application operations, waits
 for their existing engine cleanup, closes the Media Runtime client, and exits.
@@ -81,7 +82,8 @@ the transcription worker keeps a parent-liveness stdin pipe and exits immediatel
 on EOF, while the persistent Media worker's existing EOF cleanup cancels and
 reaps its active subprocess. Native-process tests exercise both chains with real
 PIDs. A malformed protocol or non-settling mutation permanently fails the
-memory-only session.
+active session; ADR 0016 does not classify those integrity failures as a
+recoverable process loss.
 
 The transcription worker protocol is one request with an explicit stdin-lifetime
 contract: the parent starts the worker, writes exactly one request, keeps the

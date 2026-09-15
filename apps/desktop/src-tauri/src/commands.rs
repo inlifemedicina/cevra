@@ -36,9 +36,17 @@ pub async fn desktop_get_state(
     supervisor: State<'_, Arc<DesktopHostSupervisor>>,
 ) -> Result<Value, DesktopCommandError> {
     supervisor.ensure_started(&app).await?;
-    supervisor
+    match supervisor
         .request_control("project.snapshot", json!({}))
         .await
+    {
+        Ok(state) => Ok(state),
+        Err(error) => {
+            supervisor
+                .recover_state_after_process_loss(&app, error)
+                .await
+        }
+    }
 }
 
 #[tauri::command]
@@ -89,7 +97,7 @@ pub async fn desktop_pick_and_ingest_media(
         "native-import-{}",
         OPERATION_SEQUENCE.fetch_add(1, Ordering::Relaxed)
     );
-    let result = supervisor
+    let result = match supervisor
         .request_mutating(
             "media.ingestLocal",
             json!({
@@ -100,7 +108,11 @@ pub async fn desktop_pick_and_ingest_media(
             }),
             &operation_id,
         )
-        .await?;
+        .await
+    {
+        Ok(result) => result,
+        Err(error) => return Err(recover_mutation(&app, &supervisor, error).await),
+    };
     Ok(json!({ "outcome": "imported", "result": result }))
 }
 
@@ -114,7 +126,7 @@ pub async fn desktop_transcribe_source(
     validate_id(&args.operation_id, "operationId")?;
     validate_locale(&args.locale)?;
     supervisor.ensure_started(&app).await?;
-    supervisor
+    match supervisor
         .request_mutating(
             "transcription.transcribeSource",
             json!({
@@ -125,6 +137,10 @@ pub async fn desktop_transcribe_source(
             &args.operation_id,
         )
         .await
+    {
+        Ok(state) => Ok(state),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
 }
 
 #[tauri::command]
@@ -133,9 +149,13 @@ pub async fn desktop_undo(
     supervisor: State<'_, Arc<DesktopHostSupervisor>>,
 ) -> Result<Value, DesktopCommandError> {
     supervisor.ensure_started(&app).await?;
-    supervisor
+    match supervisor
         .request_immediate_mutation("history.undo", json!({}))
         .await
+    {
+        Ok(state) => Ok(state),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
 }
 
 #[tauri::command]
@@ -144,9 +164,13 @@ pub async fn desktop_redo(
     supervisor: State<'_, Arc<DesktopHostSupervisor>>,
 ) -> Result<Value, DesktopCommandError> {
     supervisor.ensure_started(&app).await?;
-    supervisor
+    match supervisor
         .request_immediate_mutation("history.redo", json!({}))
         .await
+    {
+        Ok(state) => Ok(state),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
 }
 
 #[tauri::command]
@@ -157,12 +181,34 @@ pub async fn desktop_cancel_operation(
 ) -> Result<Value, DesktopCommandError> {
     validate_id(&args.operation_id, "operationId")?;
     supervisor.ensure_started(&app).await?;
-    supervisor
+    match supervisor
         .request_control(
             "operation.cancel",
             json!({ "operationId": args.operation_id }),
         )
         .await
+    {
+        Ok(result) => Ok(result),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
+}
+
+async fn recover_mutation(
+    app: &AppHandle,
+    supervisor: &DesktopHostSupervisor,
+    error: DesktopCommandError,
+) -> DesktopCommandError {
+    if error.code != "HOST_PROCESS_EXITED" {
+        return error;
+    }
+    match supervisor.recover_state_after_process_loss(app, error).await {
+        Ok(state) => DesktopCommandError::new(
+            "HOST_RECOVERED",
+            "The desktop host restarted from the durable project checkpoint; the interrupted operation was not replayed.",
+        )
+        .with_details(json!({ "state": state })),
+        Err(recovery_error) => recovery_error,
+    }
 }
 
 fn validate_locale(locale: &str) -> Result<(), DesktopCommandError> {
