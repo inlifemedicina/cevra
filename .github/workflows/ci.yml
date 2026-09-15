@@ -54,10 +54,18 @@ jobs:
           rustc --version
           cargo --version
       - run: npm ci
+      - name: Build the private desktop host bundle
+        run: npm run desktop:host:build
+      - name: Prepare and verify the pinned private Node runtime
+        run: npm run runtime:prepare -w @cevra/desktop-host -- --target linux-x64
+      - name: Execute host protocol smoke under private Node
+        run: npm run desktop:runtime:smoke
+      - name: Run Rust supervisor tests
+        run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
       - name: Check locked Rust dependency graph
         run: cargo check --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
       - name: Compile the Tauri application shell
-        run: npm run desktop:build
+        run: npm run tauri:build -w @cevra/desktop -- --no-bundle
 
   media-runtime:
     name: Media Runtime reproducibility checks (Ubuntu x64)

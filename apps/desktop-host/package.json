@@ -1,0 +1,27 @@
+{
+  "name": "@cevra/desktop-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.23.2"
+  },
+  "dependencies": {
+    "@cevra/application": "0.1.0",
+    "@cevra/contracts": "0.1.0",
+    "@cevra/media-ffmpeg": "0.1.0",
+    "@cevra/project-ir": "0.1.0",
+    "@cevra/transcription-faster-whisper": "0.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "scripts": {
+    "prebuild": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application && npm run build -w @cevra/media-ffmpeg && npm run build -w @cevra/transcription-faster-whisper",
+    "build": "tsc -p tsconfig.json && node scripts/build-bundle.mjs",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "runtime:prepare": "node runtime/prepare-runtime.mjs",
+    "smoke:private-node": "node scripts/private-node-smoke.mjs"
+  }
+}
