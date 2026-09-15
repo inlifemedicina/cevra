@@ -57,8 +57,33 @@ function setup(options = {}) {
   const releases = [];
   const audioWorkspace = options.audioWorkspace ?? { async acquire() { return { outputUri: "/tmp/cevra-alignment/audio.wav", async release() { releases.push(true); } }; } };
   const engine = options.engine ?? new Engine();
-  const service = new AlignmentApplicationService({ engine, media, audioWorkspace, history, clock: () => now, idGenerator: () => "alignment-1" });
+  const service = new AlignmentApplicationService({ engine, media, audioWorkspace, history, clock: () => now, idGenerator: () => "alignment-1", ...(options.additions ?? {}) });
   return { service, history, engine, releases, media };
+}
+const alignmentSourceIdentity = { algorithm: "sha256", digest: `sha256:${"a".repeat(64)}`, byteLength: 500 };
+const alignmentExecutionIdentity = {
+  engineId: "test.alignment", engineVersion: "1.0.0", engineApiVersion: 1, workerProtocolVersion: 1,
+  modelId: "model/pt", modelRevision: "revision", modelDigest: "sha256:model", device: "cpu",
+  pipelineVersion: "ctc-v1", requiredSampleRate: 16000, maximumWindowMs: 30000,
+  maximumTokensPerWindow: 1024, wildcardAlgorithmVersion: "wildcard-v1", resultValidationVersion: "alignment-result-v1"
+};
+class AlignmentMemoryCache {
+  entries = new Map(); reads = 0; writes = 0; invalidations = 0;
+  async read(key) { this.reads++; return structuredClone(this.entries.get(JSON.stringify(key))); }
+  async write(key, value) { this.writes++; this.entries.set(JSON.stringify(key), structuredClone(value)); return true; }
+  async invalidate(key) { this.invalidations++; this.entries.delete(JSON.stringify(key)); }
+}
+function cacheableAlignmentEngine(impl) {
+  const engine = new Engine(impl);
+  engine.describeAlignmentExecution = async () => structuredClone(alignmentExecutionIdentity);
+  return engine;
+}
+function cacheableMedia(counter) {
+  return {
+    async identity() { return { id: "test.media", kind: "media", displayName: "Media", version: "1.0.0", apiVersion: 1 }; },
+    async healthcheck() { return { status: "ready", checkedAt: now, checks: [] }; }, async capabilities() { return []; },
+    async execute(operation) { counter.calls++; return { type: "file", outputUri: operation.outputUri }; }
+  };
 }
 function deferred() { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; }
 
@@ -256,4 +281,68 @@ test("engine identity mismatch and media failure map to bounded errors", async (
   const engineFailed = setup({ engine: new Engine(async () => { throw new Error("python traceback /secret/path"); }) });
   await assert.rejects(engineFailed.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_ENGINE_FAILED" && !error.message.includes("secret"));
   assert.equal(engineFailed.history.entries.length, 0);
+});
+
+test("alignment cache MISS writes and HIT bypasses PCM extraction and alignment engine", async () => {
+  const cache = new AlignmentMemoryCache(); const mediaCalls = { calls: 0 };
+  const firstEngine = cacheableAlignmentEngine(async (request) => aligned(request.transcript));
+  const first = setup({ engine: firstEngine, media: cacheableMedia(mediaCalls), additions: { cache, sourceIdentity: { identify: async () => structuredClone(alignmentSourceIdentity) } } });
+  const generated = await first.service.alignSource({ sourceId: "source-1", id: "producer" });
+  assert.equal(generated.cacheStatus, "miss"); assert.equal(mediaCalls.calls, 1); assert.equal(firstEngine.calls.length, 1); assert.equal(cache.writes, 1);
+
+  const hitMedia = { calls: 0 };
+  const hitEngine = cacheableAlignmentEngine(async () => assert.fail("cache hit must not align"));
+  const second = setup({ engine: hitEngine, media: cacheableMedia(hitMedia), additions: { cache, sourceIdentity: { identify: async () => structuredClone(alignmentSourceIdentity) } } });
+  const reused = await second.service.alignSource({ sourceId: "source-1", id: "consumer" });
+  assert.equal(reused.cacheStatus, "hit"); assert.equal(hitMedia.calls, 0); assert.equal(hitEngine.calls.length, 0);
+  assert.equal(reused.sourceTranscript.provenance.stages.at(-1).executionId, "producer");
+  assert.equal(reused.sourceTranscript.provenance.stages.at(-1).createdAt, now);
+});
+
+test("alignment cache write failure still promotes and corrupt payload falls back to fresh execution", async () => {
+  const denied = { async read() { return undefined; }, async write() { throw new Error("denied"); }, async invalidate() {} };
+  const sourceIdentity = { identify: async () => structuredClone(alignmentSourceIdentity) };
+  const promoted = setup({ engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)), media: cacheableMedia({ calls: 0 }), additions: { cache: denied, sourceIdentity } });
+  assert.equal((await promoted.service.alignSource({ sourceId: "source-1" })).historyMutated, true);
+
+  const cache = new AlignmentMemoryCache(); const keySeed = setup({ engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)), media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  await keySeed.service.alignSource({ sourceId: "source-1" });
+  const [key] = cache.entries.keys(); cache.entries.set(key, { producerExecutionId: "bad", producedAt: now, payload: { modelId: "model/pt" } });
+  const engine = cacheableAlignmentEngine(async (request) => aligned(request.transcript));
+  const fallback = setup({ engine, media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  assert.equal((await fallback.service.alignSource({ sourceId: "source-1" })).cacheStatus, "miss");
+  assert.equal(engine.calls.length, 1); assert.equal(cache.invalidations, 1);
+});
+
+test("source change during fresh alignment prevents cache and canonical promotion", async () => {
+  const cache = new AlignmentMemoryCache(); let hashes = 0;
+  const sourceIdentity = { identify: async () => ({ ...alignmentSourceIdentity, digest: `sha256:${(++hashes === 1 ? "a" : "c").repeat(64)}` }) };
+  const fixture = setup({ engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)), media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  await assert.rejects(fixture.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT");
+  assert.equal(fixture.history.current.history.revision, 0); assert.equal(cache.writes, 0);
+});
+
+test("cached alignment still rejects a transcript replaced during lookup", async () => {
+  const cache = new AlignmentMemoryCache();
+  const sourceIdentity = { identify: async () => structuredClone(alignmentSourceIdentity) };
+  const seed = setup({ engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)), media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  await seed.service.alignSource({ sourceId: "source-1", id: "cached-aligner" });
+
+  const engine = cacheableAlignmentEngine(async () => assert.fail("cache hit must not run alignment"));
+  const active = setup({ engine, media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  const read = cache.read.bind(cache);
+  cache.read = async (cacheKey) => {
+    const previous = active.history.current.sourceTranscripts[0];
+    const replacement = createSourceTranscript({
+      ...canonical(),
+      transcript: transcript("en"),
+      provenance: { sourceChecksum: "sha256:media", stages: [{ kind: "transcription", executionId: "replacement", engineId: "test.tx", engineVersion: "1", engineApiVersion: "1", modelId: "base", createdAt: now }] }
+    });
+    active.history.commit({ type: "transcript.set", transcript: replacement, expectedCurrentTranscriptDigest: previous.transcriptDigest });
+    return read(cacheKey);
+  };
+  await assert.rejects(active.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT");
+  assert.equal(engine.calls.length, 0);
+  assert.equal(active.history.current.sourceTranscripts[0].transcript.language, "en");
+  assert.equal(active.history.current.history.revision, 1);
 });

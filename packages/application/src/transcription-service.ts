@@ -2,6 +2,9 @@ import {
   CEVRA_ENGINE_API_VERSION,
   type EngineIdentity,
   type TranscriptionEngineAdapter,
+  type TranscriptionExecutionIdentity,
+  type TranscriptionExecutionIdentityProvider,
+  type TranscriptionRequest,
   type TranscriptionResult
 } from "@cevra/contracts";
 import { translate, type CevraLocale, type TranslationKey } from "@cevra/i18n";
@@ -15,16 +18,21 @@ import {
   type SourceTranscript,
   type TranscriptWordTiming
 } from "@cevra/project-ir";
+import {
+  isTranscriptionIdentityProvider,
+  type SourceContentIdentity,
+  type SourceContentIdentityProvider,
+  type TranscriptCachePolicy,
+  type TranscriptCacheStatus,
+  type TranscriptResultCache,
+  type TranscriptionCacheKey
+} from "./transcript-cache.js";
 
 export type TranscriptionApplicationErrorCode =
-  | "TRANSCRIPTION_APP_INVALID_REQUEST"
-  | "TRANSCRIPTION_APP_SOURCE_UNKNOWN"
-  | "TRANSCRIPTION_APP_SOURCE_INELIGIBLE"
-  | "TRANSCRIPTION_APP_PROJECT_CONFLICT"
-  | "TRANSCRIPTION_APP_ENGINE_FAILED"
-  | "TRANSCRIPTION_APP_RESULT_INVALID"
-  | "TRANSCRIPTION_APP_COMMIT_FAILED"
-  | "TRANSCRIPTION_APP_CANCELLED";
+  | "TRANSCRIPTION_APP_INVALID_REQUEST" | "TRANSCRIPTION_APP_SOURCE_UNKNOWN"
+  | "TRANSCRIPTION_APP_SOURCE_INELIGIBLE" | "TRANSCRIPTION_APP_PROJECT_CONFLICT"
+  | "TRANSCRIPTION_APP_ENGINE_FAILED" | "TRANSCRIPTION_APP_RESULT_INVALID"
+  | "TRANSCRIPTION_APP_COMMIT_FAILED" | "TRANSCRIPTION_APP_CANCELLED";
 
 const ERROR_KEYS: Readonly<Record<TranscriptionApplicationErrorCode, TranslationKey>> = {
   TRANSCRIPTION_APP_INVALID_REQUEST: "transcription.error.invalidRequest",
@@ -39,13 +47,7 @@ const ERROR_KEYS: Readonly<Record<TranscriptionApplicationErrorCode, Translation
 
 export class TranscriptionApplicationError extends Error {
   readonly cause: unknown;
-
-  constructor(
-    readonly code: TranscriptionApplicationErrorCode,
-    readonly locale: CevraLocale,
-    readonly executionId: string,
-    cause?: unknown
-  ) {
+  constructor(readonly code: TranscriptionApplicationErrorCode, readonly locale: CevraLocale, readonly executionId: string, cause?: unknown) {
     super(translate(locale, ERROR_KEYS[code]));
     this.name = "TranscriptionApplicationError";
     this.cause = cause;
@@ -53,311 +55,187 @@ export class TranscriptionApplicationError extends Error {
 }
 
 export interface TranscribeSourceRequest {
-  sourceId: string;
-  id?: string;
-  locale?: CevraLocale;
-  language?: "auto" | "pt" | "en";
-  wordTimestamps?: boolean;
-  actor?: JournalActor;
+  sourceId: string; id?: string; locale?: CevraLocale; language?: "auto" | "pt" | "en";
+  wordTimestamps?: boolean; actor?: JournalActor; cachePolicy?: TranscriptCachePolicy;
 }
-
 export interface TranscribeSourceOutcome {
-  executionId: string;
-  sourceId: string;
-  result: TranscriptionResult;
-  sourceTranscript: SourceTranscript;
-  project: ProjectIR;
+  executionId: string; sourceId: string; result: TranscriptionResult; sourceTranscript: SourceTranscript;
+  project: ProjectIR; cacheStatus: TranscriptCacheStatus; historyMutated: boolean;
 }
-
 export interface TranscriptionApplicationServiceOptions {
-  engine: TranscriptionEngineAdapter;
-  history: ProjectHistory;
-  clock?: () => string;
-  idGenerator?: () => string;
+  engine: TranscriptionEngineAdapter; history: ProjectHistory; cache?: TranscriptResultCache;
+  sourceIdentity?: SourceContentIdentityProvider; clock?: () => string; idGenerator?: () => string;
 }
-
-interface NormalizedTranscribeSourceRequest {
-  sourceId: string;
-  locale: CevraLocale;
-  language: "auto" | "pt" | "en";
-  wordTimestamps: boolean;
-  actor: JournalActor;
+interface NormalizedRequest {
+  sourceId: string; locale: CevraLocale; language: "auto" | "pt" | "en"; wordTimestamps: boolean;
+  actor: JournalActor; cachePolicy: TranscriptCachePolicy;
 }
 
 export class TranscriptionApplicationService {
   private readonly engine: TranscriptionEngineAdapter;
   private readonly history: ProjectHistory;
+  private readonly cache: TranscriptResultCache | undefined;
+  private readonly sourceIdentity: SourceContentIdentityProvider | undefined;
   private readonly clock: () => string;
   private readonly idGenerator: () => string;
 
   constructor(options: TranscriptionApplicationServiceOptions) {
-    this.engine = options.engine;
-    this.history = options.history;
-    this.clock = options.clock ?? (() => new Date().toISOString());
+    this.engine = options.engine; this.history = options.history; this.cache = options.cache;
+    this.sourceIdentity = options.sourceIdentity; this.clock = options.clock ?? (() => new Date().toISOString());
     this.idGenerator = options.idGenerator ?? defaultId;
   }
 
   async transcribeSource(request: TranscribeSourceRequest, signal?: AbortSignal): Promise<TranscribeSourceOutcome> {
     const before = this.history.current;
-    const requestRecord = isRecord(request) ? request : undefined;
-    const locale = isLocale(requestRecord?.locale) ? requestRecord.locale : before.project.defaultLocale;
-    const executionId = this.executionId(requestRecord, locale);
-    const normalized = validateRequest(requestRecord, locale, executionId);
-
+    const record = isRecord(request) ? request : undefined;
+    const locale = isLocale(record?.locale) ? record.locale : before.project.defaultLocale;
+    const executionId = this.executionId(record, locale);
+    const normalized = validateRequest(record, locale, executionId);
     const source = before.sources.find((item) => item.id === normalized.sourceId);
     if (!source) throw appError("TRANSCRIPTION_APP_SOURCE_UNKNOWN", locale, executionId);
-    if (source.kind !== "audio" && source.kind !== "video") {
-      throw appError("TRANSCRIPTION_APP_SOURCE_INELIGIBLE", locale, executionId);
-    }
-
+    if (source.kind !== "audio" && source.kind !== "video") throw appError("TRANSCRIPTION_APP_SOURCE_INELIGIBLE", locale, executionId);
     const current = before.sourceTranscripts.find((item) => item.sourceId === source.id);
-    const currentDigest = current?.transcriptDigest;
-    const projectIdBefore = before.project.id;
-    const revisionBefore = before.history.revision;
-    const snapshotBefore = before.history.headSnapshotId;
-
-    if (signal?.aborted) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, signal.reason);
+    const beforeMarker = { projectId: before.project.id, revision: before.history.revision, snapshot: before.history.headSnapshotId };
+    assertNotCancelled(signal, locale, executionId);
 
     let identity: EngineIdentity;
-    try {
-      identity = await this.engine.identity();
-      assertTranscriptionIdentity(identity);
-    } catch (cause) {
-      if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause);
-      throw appError("TRANSCRIPTION_APP_ENGINE_FAILED", locale, executionId, cause);
-    }
-    if (signal?.aborted) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, signal.reason);
+    try { identity = await this.engine.identity(); assertIdentity(identity); }
+    catch (cause) { if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause); throw appError("TRANSCRIPTION_APP_ENGINE_FAILED", locale, executionId, cause); }
 
-    let result: TranscriptionResult;
-    try {
-      result = await this.engine.transcribe({
-        inputUri: source.uri,
-        language: normalized.language,
-        wordTimestamps: normalized.wordTimestamps
-      }, {
-        jobId: executionId,
-        locale: normalized.locale,
-        ...(signal ? { signal } : {})
-      });
-    } catch (cause) {
-      if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause);
-      throw appError("TRANSCRIPTION_APP_ENGINE_FAILED", locale, executionId, cause);
+    const engineRequest: TranscriptionRequest = { inputUri: source.uri, language: normalized.language, wordTimestamps: normalized.wordTimestamps };
+    const identityProvider = isTranscriptionIdentityProvider(this.engine)
+      ? this.engine as TranscriptionEngineAdapter & TranscriptionExecutionIdentityProvider : undefined;
+    let cacheStatus: TranscriptCacheStatus = "bypass";
+    let cacheKey: TranscriptionCacheKey | undefined;
+    let sourceBefore: SourceContentIdentity | undefined;
+    let executionBefore: TranscriptionExecutionIdentity | undefined;
+    if (normalized.cachePolicy !== "bypass" && this.cache && this.sourceIdentity && identityProvider) {
+      try {
+        [sourceBefore, executionBefore] = await Promise.all([
+          this.sourceIdentity.identify(source.uri, signal), identityProvider.describeTranscriptionExecution(engineRequest, signal)
+        ]);
+      } catch (cause) { if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause); }
+      if (sourceBefore && executionBefore && executionMatches(executionBefore, identity)) {
+        cacheKey = { schemaVersion: 1, kind: "transcription", source: sourceBefore, execution: executionBefore, requestedLanguage: normalized.language, wordTimestamps: normalized.wordTimestamps };
+        cacheStatus = normalized.cachePolicy === "refresh" ? "refresh" : "miss";
+      }
     }
-    if (signal?.aborted) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, signal.reason);
 
-    let validatedResult: TranscriptionResult;
-    let outcomeResult: TranscriptionResult;
-    let candidate: SourceTranscript;
-    try {
-      validatedResult = validateResult(result, normalized.wordTimestamps);
-      const wordTiming = normalizeWordTiming(validatedResult);
-      const speakerState = deriveTranscriptSpeakerState(validatedResult.transcript);
-      candidate = createSourceTranscript({
-        sourceId: source.id,
-        wordTiming,
-        speakerState,
-        transcript: validatedResult.transcript,
-        provenance: {
-          ...(source.checksum !== undefined ? { sourceChecksum: source.checksum } : {}),
-          stages: [{
-            kind: "transcription",
-            executionId,
-            engineId: identity.id,
-            engineVersion: identity.version,
-            engineApiVersion: String(identity.apiVersion),
-            modelId: validatedResult.modelId,
-            createdAt: this.clock()
-          }]
+    let result: TranscriptionResult | undefined;
+    let candidate: SourceTranscript | undefined;
+    let producerExecutionId = executionId;
+    let producedAt = this.clock();
+    if (normalized.cachePolicy === "prefer" && cacheKey && this.cache) {
+      try {
+        const cached = await this.cache.read(cacheKey, signal);
+        if (cached) {
+          try {
+            result = validateTranscriptionResult(cached.payload, normalized.wordTimestamps);
+            assertResultIdentity(result, executionBefore);
+            producerExecutionId = cached.producerExecutionId; producedAt = cached.producedAt;
+            candidate = buildCandidate(source.id, source.checksum, result, identity, executionBefore, producerExecutionId, producedAt);
+            cacheStatus = "hit";
+          } catch { result = undefined; candidate = undefined; await this.cache.invalidate(cacheKey); }
         }
-      });
-      outcomeResult = clone(validatedResult);
-    } catch (cause) {
-      throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId, cause);
+      } catch (cause) { if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause); }
     }
+
+    if (!result) {
+      let rawResult: TranscriptionResult;
+      try { rawResult = await this.engine.transcribe(engineRequest, { jobId: executionId, locale, ...(signal ? { signal } : {}) }); }
+      catch (cause) { if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause); throw appError("TRANSCRIPTION_APP_ENGINE_FAILED", locale, executionId, cause); }
+      try { result = validateTranscriptionResult(rawResult, normalized.wordTimestamps); assertResultIdentity(result, executionBefore); }
+      catch (cause) { throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId, cause); }
+      try { candidate = buildCandidate(source.id, source.checksum, result, identity, executionBefore, executionId, producedAt); }
+      catch (cause) { throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId, cause); }
+      assertNotCancelled(signal, locale, executionId);
+      if (cacheKey && sourceBefore && executionBefore && this.cache && identityProvider) {
+        if (!await this.identityStable(source.uri, engineRequest, sourceBefore, executionBefore, identity, identityProvider, signal)) throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId);
+        try { await this.cache.write(cacheKey, { producerExecutionId: executionId, producedAt, payload: result }, signal); }
+        catch (cause) { if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause); }
+      }
+    }
+
+    if (!candidate) throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId);
 
     const latest = this.history.current;
-    if (latest.project.id !== projectIdBefore
-      || latest.history.revision !== revisionBefore
-      || latest.history.headSnapshotId !== snapshotBefore) {
-      throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId);
+    if (latest.project.id !== beforeMarker.projectId || latest.history.revision !== beforeMarker.revision || latest.history.headSnapshotId !== beforeMarker.snapshot) throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId);
+    assertNotCancelled(signal, locale, executionId);
+    if (cacheStatus === "hit" && current && current.transcriptDigest === candidate.transcriptDigest) {
+      return { executionId, sourceId: source.id, result: clone(result), sourceTranscript: clone(current), project: latest, cacheStatus, historyMutated: false };
     }
-    if (signal?.aborted) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, signal.reason);
-
     let project: ProjectIR;
-    try {
-      project = this.history.commit({
-        type: "transcript.set",
-        transcript: candidate,
-        ...(currentDigest !== undefined ? { expectedCurrentTranscriptDigest: currentDigest } : {})
-      }, normalized.actor);
-    } catch (cause) {
-      throw mapCommitError(cause, locale, executionId);
-    }
-
+    try { project = this.history.commit({ type: "transcript.set", transcript: candidate, ...(current ? { expectedCurrentTranscriptDigest: current.transcriptDigest } : {}) }, normalized.actor); }
+    catch (cause) { throw mapCommitError(cause, locale, executionId); }
     const registered = project.sourceTranscripts.find((item) => item.sourceId === source.id);
     if (!registered) throw appError("TRANSCRIPTION_APP_COMMIT_FAILED", locale, executionId);
-    return {
-      executionId,
-      sourceId: source.id,
-      result: outcomeResult,
-      sourceTranscript: clone(registered),
-      project
-    };
+    return { executionId, sourceId: source.id, result: clone(result), sourceTranscript: clone(registered), project, cacheStatus, historyMutated: true };
+  }
+
+  private async identityStable(uri: string, request: TranscriptionRequest, sourceBefore: SourceContentIdentity, executionBefore: TranscriptionExecutionIdentity, engine: EngineIdentity, provider: TranscriptionExecutionIdentityProvider, signal?: AbortSignal): Promise<boolean> {
+    try {
+      const [sourceAfter, executionAfter] = await Promise.all([this.sourceIdentity!.identify(uri, signal), provider.describeTranscriptionExecution(request, signal)]);
+      return !!sourceAfter && !!executionAfter && executionMatches(executionAfter, engine) && equalJson(sourceBefore, sourceAfter) && equalJson(executionBefore, executionAfter);
+    } catch (cause) { if (isAbort(cause, signal)) throw cause; return false; }
   }
 
   private executionId(request: Record<string, unknown> | undefined, locale: CevraLocale): string {
-    try {
-      const value = request?.id === undefined ? this.idGenerator() : request.id;
-      if (typeof value !== "string" || value.trim().length === 0) {
-        throw new Error("Transcription execution ID must be a non-empty string.");
-      }
-      return value;
-    } catch (cause) {
-      throw appError("TRANSCRIPTION_APP_INVALID_REQUEST", locale, "transcription-unassigned", cause);
-    }
+    try { const value = request?.id === undefined ? this.idGenerator() : request.id; if (typeof value !== "string" || !value.trim()) throw new Error("Execution ID is invalid."); return value; }
+    catch (cause) { throw appError("TRANSCRIPTION_APP_INVALID_REQUEST", locale, "transcription-unassigned", cause); }
   }
 }
 
-function validateRequest(
-  request: Record<string, unknown> | undefined,
-  locale: CevraLocale,
-  executionId: string
-): NormalizedTranscribeSourceRequest {
+function validateRequest(request: Record<string, unknown> | undefined, locale: CevraLocale, executionId: string): NormalizedRequest {
   try {
-    if (!request) throw new Error("Transcription request must be an object.");
-    rejectUnexpectedKeys(request, ["sourceId", "id", "locale", "language", "wordTimestamps", "actor"], "request");
-    if (typeof request.sourceId !== "string" || request.sourceId.trim().length === 0) {
-      throw new Error("sourceId must be a non-empty string.");
-    }
+    if (!request) throw new Error("Request must be an object.");
+    rejectUnexpectedKeys(request, ["sourceId", "id", "locale", "language", "wordTimestamps", "actor", "cachePolicy"], "request");
+    if (typeof request.sourceId !== "string" || !request.sourceId.trim()) throw new Error("sourceId is invalid.");
     if (request.id !== undefined && request.id !== executionId) throw new Error("Execution ID is invalid.");
     if (request.locale !== undefined && !isLocale(request.locale)) throw new Error("locale is unsupported.");
-    const language = normalizeLanguage(request.language);
-    if (request.wordTimestamps !== undefined && typeof request.wordTimestamps !== "boolean") {
-      throw new Error("wordTimestamps must be a boolean.");
-    }
-    const actor = validateActor(request.actor);
-    return {
-      sourceId: request.sourceId,
-      locale,
-      language,
-      wordTimestamps: request.wordTimestamps ?? true,
-      actor
-    };
-  } catch (cause) {
-    if (cause instanceof TranscriptionApplicationError) throw cause;
-    throw appError("TRANSCRIPTION_APP_INVALID_REQUEST", locale, executionId, cause);
-  }
+    if (request.wordTimestamps !== undefined && typeof request.wordTimestamps !== "boolean") throw new Error("wordTimestamps is invalid.");
+    return { sourceId: request.sourceId, locale, language: normalizeLanguage(request.language), wordTimestamps: request.wordTimestamps ?? true, actor: validateActor(request.actor), cachePolicy: normalizeCachePolicy(request.cachePolicy) };
+  } catch (cause) { throw appError("TRANSCRIPTION_APP_INVALID_REQUEST", locale, executionId, cause); }
 }
 
-function validateActor(value: unknown): JournalActor {
-  if (value === undefined) return { type: "user" };
-  if (!isRecord(value)) throw new Error("actor must be an object.");
-  rejectUnexpectedKeys(value, ["type", "id"], "actor");
-  if (value.type !== "user" && value.type !== "agent" && value.type !== "system") {
-    throw new Error("actor.type is unsupported.");
-  }
-  if (value.id !== undefined && (typeof value.id !== "string" || value.id.trim().length === 0)) {
-    throw new Error("actor.id must be a non-empty string.");
-  }
-  return clone(value) as unknown as JournalActor;
-}
-
-function assertTranscriptionIdentity(value: unknown): asserts value is EngineIdentity {
-  if (!isRecord(value)
-    || value.kind !== "transcription"
-    || typeof value.id !== "string"
-    || value.id.trim().length === 0
-    || typeof value.version !== "string"
-    || value.version.trim().length === 0
-    || value.apiVersion !== CEVRA_ENGINE_API_VERSION) {
-    throw new Error("Transcription engine identity is invalid or incompatible.");
-  }
-}
-
-function validateResult(value: unknown, wordTimestampsRequested: boolean): TranscriptionResult {
-  if (!isRecord(value)) throw new Error("Transcription result must be an object.");
+export function validateTranscriptionResult(value: unknown, wordTimestamps: boolean): TranscriptionResult {
+  if (!isRecord(value)) throw new Error("Result must be an object.");
   rejectUnexpectedKeys(value, ["transcript", "detectedLanguage", "modelId", "durationMs", "wordTiming"], "result");
-  if (!isRecord(value.transcript) || !Array.isArray(value.transcript.words) || !Array.isArray(value.transcript.segments)) {
-    throw new Error("Transcription result transcript is malformed.");
-  }
-  if (typeof value.modelId !== "string" || value.modelId.trim().length === 0) {
-    throw new Error("Transcription result modelId must be a non-empty string.");
-  }
-  if (value.detectedLanguage !== undefined && (typeof value.detectedLanguage !== "string" || value.detectedLanguage.trim().length === 0)) {
-    throw new Error("Transcription detectedLanguage must be a non-empty string.");
-  }
-  if (value.durationMs !== undefined && (!Number.isSafeInteger(value.durationMs) || (value.durationMs as number) < 0)) {
-    throw new Error("Transcription durationMs must be a non-negative safe integer.");
-  }
-  if (value.wordTiming !== undefined && value.wordTiming !== "none" && value.wordTiming !== "model") {
-    throw new Error("Transcription wordTiming is unsupported.");
-  }
-  if (!wordTimestampsRequested && value.transcript.words.length > 0) {
-    throw new Error("Transcription returned words when word timestamps were disabled.");
-  }
-  if (value.transcript.words.length > 0 && value.wordTiming !== "model") {
-    throw new Error("Transcription words require model timing metadata.");
-  }
+  if (!isRecord(value.transcript) || !Array.isArray(value.transcript.words) || !Array.isArray(value.transcript.segments)) throw new Error("Transcript is malformed.");
+  if (typeof value.modelId !== "string" || !value.modelId.trim()) throw new Error("modelId is invalid.");
+  if (value.detectedLanguage !== undefined && (typeof value.detectedLanguage !== "string" || !value.detectedLanguage.trim())) throw new Error("detectedLanguage is invalid.");
+  if (value.durationMs !== undefined && (!Number.isSafeInteger(value.durationMs) || (value.durationMs as number) < 0)) throw new Error("durationMs is invalid.");
+  if (value.wordTiming !== undefined && value.wordTiming !== "none" && value.wordTiming !== "model") throw new Error("wordTiming is invalid.");
+  if (!wordTimestamps && value.transcript.words.length) throw new Error("Unexpected words.");
+  if (value.transcript.words.length && value.wordTiming !== "model") throw new Error("Words require model timing.");
   return value as unknown as TranscriptionResult;
 }
 
-function normalizeWordTiming(result: TranscriptionResult): TranscriptWordTiming {
-  return result.transcript.words.length === 0 ? "none" : "model";
+function buildCandidate(sourceId: string, sourceChecksum: string | undefined, result: TranscriptionResult, engine: EngineIdentity, exact: TranscriptionExecutionIdentity | undefined, producerExecutionId: string, producedAt: string): SourceTranscript {
+  const speakerState = deriveTranscriptSpeakerState(result.transcript);
+  return createSourceTranscript({
+    sourceId, wordTiming: normalizeWordTiming(result), speakerState, transcript: result.transcript,
+    provenance: { ...(sourceChecksum !== undefined ? { sourceChecksum } : {}), stages: [{
+      kind: "transcription", executionId: producerExecutionId, engineId: engine.id, engineVersion: engine.version,
+      engineApiVersion: String(engine.apiVersion), modelId: exact?.modelId ?? result.modelId,
+      ...(exact ? { modelRevision: exact.modelRevision, modelDigest: exact.modelArtifactDigest } : {}), createdAt: producedAt
+    }] }
+  });
 }
 
-function mapCommitError(cause: unknown, locale: CevraLocale, executionId: string): TranscriptionApplicationError {
-  if (cause instanceof ProjectCommandError) {
-    if (cause.code === "PROJECT_TRANSCRIPT_INVALID" || cause.code === "PROJECT_TRANSCRIPT_DIGEST_MISMATCH") {
-      return appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId, cause);
-    }
-    if (cause.code === "PROJECT_TRANSCRIPT_STALE"
-      || cause.code === "PROJECT_TRANSCRIPT_ALREADY_EXISTS"
-      || cause.code === "PROJECT_TRANSCRIPT_SOURCE_UNKNOWN"
-      || cause.code === "PROJECT_TRANSCRIPT_SOURCE_INELIGIBLE"
-      || cause.code === "PROJECT_TRANSCRIPT_MISSING") {
-      return appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId, cause);
-    }
-  }
-  return appError("TRANSCRIPTION_APP_COMMIT_FAILED", locale, executionId, cause);
-}
-
-function rejectUnexpectedKeys(value: Record<string, unknown>, allowed: readonly string[], field: string): void {
-  const unexpected = Object.keys(value).filter((key) => !allowed.includes(key));
-  if (unexpected.length > 0) throw new Error(`${field} contains unexpected fields: ${unexpected.join(", ")}.`);
-}
-
-function isLocale(value: unknown): value is CevraLocale {
-  return value === "pt-BR" || value === "en-US";
-}
-
-function normalizeLanguage(value: unknown): NormalizedTranscribeSourceRequest["language"] {
-  if (value === undefined) return "auto";
-  if (value === "auto" || value === "pt" || value === "en") return value;
-  throw new Error("language is unsupported.");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isAbort(cause: unknown, signal?: AbortSignal): boolean {
-  return signal?.aborted === true || (cause instanceof Error && cause.name === "AbortError");
-}
-
-function appError(
-  code: TranscriptionApplicationErrorCode,
-  locale: CevraLocale,
-  executionId: string,
-  cause?: unknown
-): TranscriptionApplicationError {
-  return new TranscriptionApplicationError(code, locale, executionId, cause);
-}
-
-function defaultId(): string {
-  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
-  return `transcription_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-}
-
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
+function validateActor(value: unknown): JournalActor { if (value === undefined) return { type: "user" }; if (!isRecord(value)) throw new Error("actor invalid"); rejectUnexpectedKeys(value, ["type", "id"], "actor"); if (!['user','agent','system'].includes(String(value.type))) throw new Error("actor type invalid"); if (value.id !== undefined && (typeof value.id !== "string" || !value.id.trim())) throw new Error("actor id invalid"); return clone(value) as unknown as JournalActor; }
+function assertIdentity(value: unknown): asserts value is EngineIdentity { if (!isRecord(value) || value.kind !== "transcription" || typeof value.id !== "string" || !value.id.trim() || typeof value.version !== "string" || !value.version.trim() || value.apiVersion !== CEVRA_ENGINE_API_VERSION) throw new Error("Engine identity invalid."); }
+function mapCommitError(cause: unknown, locale: CevraLocale, id: string): TranscriptionApplicationError { if (cause instanceof ProjectCommandError) { if (["PROJECT_TRANSCRIPT_INVALID", "PROJECT_TRANSCRIPT_DIGEST_MISMATCH"].includes(cause.code)) return appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, id, cause); if (["PROJECT_TRANSCRIPT_STALE", "PROJECT_TRANSCRIPT_ALREADY_EXISTS", "PROJECT_TRANSCRIPT_SOURCE_UNKNOWN", "PROJECT_TRANSCRIPT_SOURCE_INELIGIBLE", "PROJECT_TRANSCRIPT_MISSING"].includes(cause.code)) return appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, id, cause); } return appError("TRANSCRIPTION_APP_COMMIT_FAILED", locale, id, cause); }
+function normalizeWordTiming(result: TranscriptionResult): TranscriptWordTiming { return result.transcript.words.length ? "model" : "none"; }
+function normalizeLanguage(value: unknown): NormalizedRequest["language"] { if (value === undefined) return "auto"; if (value === "auto" || value === "pt" || value === "en") return value; throw new Error("language unsupported"); }
+function normalizeCachePolicy(value: unknown): TranscriptCachePolicy { if (value === undefined) return "prefer"; if (value === "prefer" || value === "refresh" || value === "bypass") return value; throw new Error("cachePolicy unsupported"); }
+function executionMatches(value: TranscriptionExecutionIdentity, engine: EngineIdentity): boolean { return value.engineId === engine.id && value.engineVersion === engine.version && value.engineApiVersion === engine.apiVersion; }
+function assertResultIdentity(result: TranscriptionResult, identity?: TranscriptionExecutionIdentity): void { if (identity && result.modelId !== identity.resultModelId) throw new Error("Transcription result model identity changed."); }
+function rejectUnexpectedKeys(value: Record<string, unknown>, allowed: readonly string[], field: string): void { const extras = Object.keys(value).filter((key) => !allowed.includes(key)); if (extras.length) throw new Error(`${field} has unexpected fields: ${extras.join(", ")}`); }
+function equalJson(a: unknown, b: unknown): boolean { return JSON.stringify(a) === JSON.stringify(b); }
+function isLocale(value: unknown): value is CevraLocale { return value === "pt-BR" || value === "en-US"; }
+function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
+function isAbort(cause: unknown, signal?: AbortSignal): boolean { return signal?.aborted === true || (cause instanceof Error && cause.name === "AbortError"); }
+function assertNotCancelled(signal: AbortSignal | undefined, locale: CevraLocale, id: string): void { if (signal?.aborted) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, id, signal.reason); }
+function appError(code: TranscriptionApplicationErrorCode, locale: CevraLocale, id: string, cause?: unknown): TranscriptionApplicationError { return new TranscriptionApplicationError(code, locale, id, cause); }
+function defaultId(): string { return typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `transcription_${Date.now()}_${Math.random().toString(36).slice(2)}`; }
+function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T; }
