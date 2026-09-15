@@ -76,7 +76,7 @@ export class FasterWhisperTranscriptionAdapter implements TranscriptionEngineAda
       { id: "transcription.local.faster-whisper", version: 1, available, detail: `model=${this.modelId}` },
       { id: "transcription.language.auto-pt-en", version: 1, available },
       { id: "transcription.word-timestamps.model", version: 1, available },
-      { id: "transcription.forced-alignment", version: 1, available: false, detail: "WhisperX is not implemented." },
+      { id: "transcription.forced-alignment", version: 1, available: false, detail: "Provided separately by AlignmentEngineAdapter." },
       { id: "transcription.diarization", version: 1, available: false }
     ];
   }

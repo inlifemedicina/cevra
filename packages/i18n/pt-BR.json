@@ -225,5 +225,18 @@
   "transcription.error.engineFailed": "O mecanismo de transcrição não conseguiu concluir a operação.",
   "transcription.error.resultInvalid": "O resultado da transcrição é inválido e não foi adicionado ao projeto.",
   "transcription.error.commitFailed": "Não foi possível adicionar a transcrição ao projeto.",
-  "transcription.error.cancelled": "A operação de transcrição foi cancelada."
+  "transcription.error.cancelled": "A operação de transcrição foi cancelada.",
+  "alignment.error.invalidRequest": "A solicitação de alinhamento é inválida.",
+  "alignment.error.sourceUnknown": "A fonte selecionada não foi encontrada no projeto.",
+  "alignment.error.sourceIneligible": "A fonte selecionada não pode ser alinhada.",
+  "alignment.error.transcriptMissing": "A fonte selecionada não possui transcrição para alinhar.",
+  "alignment.error.transcriptNotAlignable": "A transcrição selecionada não pode ser alinhada.",
+  "alignment.error.languageUnsupported": "O alinhamento aceita atualmente transcrições em português e inglês.",
+  "alignment.error.audioPreparationFailed": "Não foi possível preparar o áudio para alinhamento.",
+  "alignment.error.audioCleanupFailed": "Não foi possível remover o áudio temporário de alinhamento. O resultado não foi aplicado.",
+  "alignment.error.engineFailed": "O mecanismo de alinhamento local não conseguiu concluir a operação.",
+  "alignment.error.resultInvalid": "O resultado do alinhamento é inválido e não foi aplicado.",
+  "alignment.error.projectConflict": "O projeto ou a transcrição mudou durante o alinhamento. O resultado não foi aplicado.",
+  "alignment.error.commitFailed": "Não foi possível adicionar a transcrição alinhada ao projeto.",
+  "alignment.error.cancelled": "A operação de alinhamento foi cancelada."
 }

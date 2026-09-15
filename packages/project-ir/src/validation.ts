@@ -488,7 +488,10 @@ function validateProvenance(value: unknown, aggregatePath: string, issues: Valid
     if (index === 0 && stage.kind !== "transcription" && stage.kind !== "migration") push(issues, `${stagePath}.kind`, "origin", "The first provenance stage must be transcription or migration.");
     if (index > 0) {
       const prior = stages[index - 1];
-      if (prior && (rank[String(stage.kind)] ?? -1) <= (rank[String(prior.kind)] ?? -1)) push(issues, `${stagePath}.kind`, "order", "Provenance stages are out of order.");
+      // Alignment may consume the latest canonical transcript after speaker or
+      // manual work. It is therefore valid as the newest historical stage even
+      // though its semantic kind ordinarily precedes those optional stages.
+      if (prior && stage.kind !== "alignment" && (rank[String(stage.kind)] ?? -1) <= (rank[String(prior.kind)] ?? -1)) push(issues, `${stagePath}.kind`, "order", "Provenance stages are out of order.");
     }
     validateProvenanceStage(stage, stagePath, issues);
   });

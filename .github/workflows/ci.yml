@@ -140,3 +140,23 @@ jobs:
         run: python -m py_compile engines/transcription/python/cevra_transcription_worker.py
       - name: Run transcription worker unit tests without model downloads
         run: python -I -B -m unittest discover -s engines/transcription/test_python -p 'test_*.py' -v
+
+  alignment-worker:
+    name: Alignment worker contract tests (Python 3.12)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: 3.12.14
+      - name: Validate alignment dependency and model inventories
+        run: |
+          python -m json.tool engines/alignment/runtime/dependency-audit.json >/dev/null
+          python -m json.tool engines/alignment/runtime/models.json >/dev/null
+      - name: Compile closed alignment worker
+        env:
+          PYTHONPYCACHEPREFIX: ${{ runner.temp }}/cevra-alignment-pycache
+        run: python -m py_compile engines/alignment/python/cevra_alignment_worker.py
+      - name: Run alignment worker contract tests without ML dependencies or model downloads
+        run: python -I -B -m unittest discover -s engines/alignment/test_python -p 'test_*.py' -v

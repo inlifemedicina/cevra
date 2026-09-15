@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "auditedAt": "2026-09-15",
+  "python": "3.12",
+  "baseline": {
+    "project": "m-bain/whisperX",
+    "version": "3.8.6",
+    "commit": "3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0",
+    "license": "BSD-2-Clause",
+    "scope": "Adapted CTC trellis/backtrack/word-boundary behavior only; the WhisperX package is not installed or redistributed."
+  },
+  "direct": [
+    { "name": "torch", "version": "2.8.0", "license": "BSD-3-Clause", "purpose": "Local CTC inference; release assembly must select official CPU artifacts." },
+    { "name": "transformers", "version": "4.57.6", "license": "Apache-2.0", "purpose": "Local-only processor and AutoModelForCTC loading." },
+    { "name": "numpy", "version": "2.2.6", "license": "BSD-3-Clause with bundled permissive component notices", "purpose": "Pinned numeric dependency of the isolated ML stack." }
+  ],
+  "transitiveLicenses": {
+    "filelock@3.19.1": "MIT",
+    "fsspec@2025.9.0": "BSD-3-Clause",
+    "Jinja2@3.1.6": "BSD-3-Clause",
+    "MarkupSafe@3.0.3": "BSD-3-Clause",
+    "networkx@3.4.2": "BSD-3-Clause",
+    "sympy@1.14.0": "BSD-3-Clause",
+    "mpmath@1.3.0": "BSD-3-Clause",
+    "typing_extensions@4.15.0": "PSF-2.0",
+    "setuptools@80.9.0": "MIT",
+    "huggingface-hub@0.35.3": "Apache-2.0",
+    "hf-xet@1.1.10": "Apache-2.0",
+    "packaging@25.0": "Apache-2.0 OR BSD-2-Clause",
+    "PyYAML@6.0.3": "MIT",
+    "regex@2025.9.18": "Apache-2.0",
+    "requests@2.32.5": "Apache-2.0",
+    "certifi@2025.10.5": "MPL-2.0",
+    "charset-normalizer@3.4.3": "MIT",
+    "idna@3.10": "BSD-3-Clause",
+    "urllib3@2.5.0": "MIT",
+    "tokenizers@0.22.1": "Apache-2.0",
+    "safetensors@0.6.2": "Apache-2.0",
+    "tqdm@4.67.1": "MPL-2.0 AND MIT"
+  },
+  "excludedWhisperXDependencies": ["faster-whisper", "pyannote-audio", "torchvision", "torchcodec"],
+  "releaseTargetsValidated": [],
+  "notes": [
+    "No GPL or AGPL dependency is present in the selected isolated dependency set.",
+    "Version pins are not yet a cryptographic wheel lock; packaging must add exact platform artifact hashes and notices.",
+    "Model artifacts are not committed or bundled by this slice; both pins are Apache-2.0 and SHA-256 inventoried.",
+    "Runtime and model network access is disabled in normal execution."
+  ]
+}

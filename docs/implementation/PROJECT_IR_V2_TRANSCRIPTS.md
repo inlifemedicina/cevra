@@ -269,7 +269,11 @@ Provenance describes only the current canonical representation. It is not an unb
 - `stages` contains 1–5 entries.
 - The first stage is exactly one origin: `transcription` or `migration`.
 - Each stage kind appears at most once.
-- Subsequent stages, when present, are ordered `alignment`, `speaker-attribution`, `manual-correction`.
+- Subsequent stages preserve execution order. The ordinary initial pipeline is
+  `alignment`, `speaker-attribution`, `manual-correction`, but a later
+  alignment of the current canonical representation is appended after existing
+  speaker/manual stages as specified by ADR 0017; historical stages are never
+  rewritten to simulate a different execution order.
 - When a same-kind operation replaces an earlier stage, the candidate retains only the stage that produced the current representation and discards downstream stages invalidated by that replacement. Prior provenance remains in history.
 - Execution stages require execution/engine/version/API-version/time fields. `transcription` additionally requires `modelId`. Alignment and speaker attribution may be deterministic engines without a separately named model, so `modelId`, `modelRevision` and `modelDigest` are optional there. Revision/digest fields require `modelId` and may not be empty when present.
 - `alignment` and `speaker-attribution` require `inputTranscriptDigest`.
