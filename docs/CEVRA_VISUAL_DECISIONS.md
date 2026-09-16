@@ -1,9 +1,9 @@
 # CEVRA — Decisões visuais e de produção: continuidade a partir da decisão 14
 
 **Data:** 2026-09-16, aprovação do product owner nesta rodada de continuidade.
-**Versão deste registro:** 3.
+**Versão deste registro:** 4.
 **Status:** DIREÇÃO DE PRODUTO APROVADA / IMPLEMENTAÇÃO NÃO AUTORIZADA POR ESTE REGISTRO.
-**Decisões aprovadas neste documento:** 14, 15 e 16, respeitadas as condições de viabilidade e escopo abaixo. Não há aprovação implícita de uma decisão 17 ou posterior.
+**Decisões aprovadas neste documento:** 14, 15, 16 e 17, respeitadas as condições de viabilidade e escopo abaixo. Não há aprovação implícita de uma decisão 18 ou posterior.
 
 ## 0. Autoridade, localização e continuidade
 
@@ -23,6 +23,8 @@ Este arquivo é acrescentado à branch documental existente. Não é mudança no
 Na atualização para a versão 2, `refs/heads/main` foi novamente consultado e permanecia em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`; o PR #26 estava aberto/draft, não mesclado, em `b33bd3ba0869731472c03056344ba6cc29c8f89d`, commit de criação deste registro. A atualização acrescenta a aprovação da decisão 15 com sua ressalva de esforço/escopo, preserva a decisão 14 e atualiza o handoff. Não declara novo closeout do cache ou dos ajustes coordenados.
 
 Na atualização para a versão 3, `refs/heads/main` foi conferido novamente em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` e o PR #26 permanecia aberto/draft, não mesclado, com head `428e615002ed30a82c87383f6409c98273d80a96`. O product owner aprovou a decisão 16; este registro acrescenta seus detalhes, preserva as decisões 14–15 e atualiza o handoff. Não fecha o gate de implementação nem declara a decisão 17 aprovada.
+
+Na atualização para a versão 4, `refs/heads/main` foi novamente confirmado em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` e o PR #26 estava aberto/draft, não mesclado, em `89e77c02a1e52a019cf6bf20b7f65235136affe8`. A resposta “certo.” aprovou a decisão 17. Esta atualização preserva as decisões 14–16, acrescenta o posicionamento de legendas com seus limites e atualiza o handoff. Não declara conclusão do Media Runtime, não altera sua programação e não aprova a decisão 18.
 
 ## 1. Regra desta rodada antecipada
 
@@ -290,9 +292,65 @@ Registrar como **DIVERGÊNCIA EDVID** a mudança concreta de comportamento que e
 
 > O CEVRA organizará as palavras em grupos legíveis conforme o estilo escolhido, respeitando a fala, os tempos e o espaço disponível. Evitará quebras inadequadas, redução excessiva do texto e palavras exibidas rápido demais, sem resumir a fala nem trocar silenciosamente o estilo. Reutilizará os comportamentos úteis do EDVID, com processamento local e validação por estilo.
 
-## 5. Handoff e integração documental
+## 5. Decisão 17 — Onde a legenda aparece e como acompanha mudanças de layout
 
-Antes de qualquer prompt dependente no CEVRA 3, recuperar o estado real do main e dos PRs. Até a integração, ler explicitamente PR #26 / `docs/editorial-decisions-1-8`: registro editorial v4 para decisões 1–13 e inventário MR; este documento v3 para decisões 14–16; e o registro do Director no PR #25/revisão aplicável.
+**APROVADA COMO DIREÇÃO DE PRODUTO em 2026-09-16.** O product owner respondeu “certo.” à proposta de posicionamento, estabilidade e ajustes por trecho. Preservar todos os limites abaixo; aprovação não equivale a função pronta, teste realizado, nova dependência autorizada ou liberação do gate do Media Runtime.
+
+### 5.1 Referência EDVID e evidência
+
+Referência fixa: `fillrochaa/edvid@d8e6389db02e8de0b46ee680105c09d4250d4703`, considerada com SKILL.md e referências shortform/longform já consultadas.
+
+- [Main.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/Main.tsx), `CaptionShell`: o karaokê utiliza `captions.windows` para reposicionar a legenda durante intervalos, inclusive na junção da tela dividida; resolve a janela conforme o frame em exibição, não apenas no começo da linha.
+- [references/shortform.md](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/references/shortform.md): posições próprias para as duas variantes de tela dividida, indicação de limpar janelas obsoletas ao voltar ao estilo Limpa e orientação de não colocar o Disperso sobre o rosto de um apresentador.
+- [SimpleCaptions.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/SimpleCaptions.tsx): os três estilos estáticos inspecionados usam posição inferior fixa do componente. Não inferir que o reposicionamento do karaokê esteja integrado de forma equivalente em todos os estilos.
+
+O EDVID já prevê posicionamento por apresentação e mudanças de composição. As evidências são instruções e código inspecionado, não um teste de renderização realizado nesta consulta. Valores de exemplo da referência não são medidas universais para todo vídeo CEVRA.
+
+### 5.2 Comportamento aprovado e limites
+
+**Recomendação:** posicionamento adequado ao estilo e à composição, sem movimentação desnecessária da caixa de legenda.
+
+1. **Posição característica por estilo/layout.** Preservar a apresentação de cada estilo, sem colocar todas as legendas na mesma altura. O preset define uma posição inicial apropriada; tela dividida, título e inserções são considerados para evitar sobreposições inadequadas. Usar margens de segurança pertinentes ao formato de entrega, não uma medida fixa universal.
+2. **Estabilidade.** Manter a caixa de legenda estável enquanto a composição não exigir mudança. A animação das palavras permanece conforme o estilo; estabilidade da caixa não significa eliminar animações internas ou fazer o texto perseguir continuamente o apresentador.
+3. **Ajuste geral ou localizado.** Permitir reposicionar no vídeo inteiro ou somente em um trecho. Uma posição explicitamente fixada não será sobrescrita silenciosamente pelo automático; conflitos relevantes devem ser sinalizados. Preservar ajustes válidos e a referência da versão assistida conforme decisões anteriores.
+4. **Adaptação coordenada.** Uma mudança de layout pode reposicionar a legenda sem alterar texto, áudio ou sincronismo. Ao terminar a inserção, retornar à posição apropriada anterior, sem carregar deslocamentos de um layout que já não existe.
+5. **Evidência visual proporcional.** Evitar rosto, produto ou demonstração conforme as informações realmente disponíveis. Não presumir que cálculos geométricos sobre elementos do projeto identificam todos os objetos ou rostos na imagem. Na dúvida relevante, usar amostra visual ou revisão; não declarar a área livre sem evidência. Não exigir reconhecimento/rastreamento contínuo de todos os objetos, quadro a quadro, para posicionar legendas.
+6. **Escopo da apresentação.** Esta decisão refere-se à legenda desenhada no vídeo. Para SRT separado, a apresentação depende do reprodutor; não prometer transporte do mesmo layout visual. Não escolher aqui um novo formato ou motor de legendagem.
+
+Exemplo apresentado e aprovado: apresentador em tela cheia com legenda abaixo do rosto; entrada de uma imagem em tela dividida leva a legenda à região prevista; ao terminar a inserção, ela retorna à posição anterior sem alterar texto ou sincronismo. O exemplo não impõe esse posicionamento a todo tipo de conteúdo ou estilo.
+
+### 5.3 Viabilidade, alternativas e custos
+
+Baseline consultado: `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`, confirmado novamente antes do registro. Referências CEVRA: [types.ts](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/project-ir/src/types.ts), [commands.ts](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/project-ir/src/commands.ts), [Inspector.tsx](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/apps/desktop/src/components/Inspector.tsx), [contrato de composição](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/contracts/src/composition.ts) e ADRs aplicáveis. Não confundir contrato ou controle de apresentação com recurso integrado.
+
+| Classificação | Situação / acréscimo necessário |
+|---|---|
+| Primitivas existentes | Regiões de layout, estilos, intervalos, comandos de legenda e ProjectHistory. Reutilizar essa base canônica. |
+| Extensões e integração | Regras de posicionamento, ajustes por trecho, verificação de sobreposição entre elementos conhecidos, representação validada dos parâmetros ausentes e ligação aplicação/host/UI/compilador/render. Não criar uma segunda timeline ou guardar estado audiovisual apenas na UI. |
+| Ponta a ponta | Não disponível conforme proposto. O inspetor apresenta posição de legenda em campo somente de leitura; os tipos e comandos básicos não implementam toda a adaptação visual e seus controles. |
+| Dependências externas/não verificadas | Nenhum novo modelo ou API paga identificado como obrigatório para o núcleo geométrico local. A apresentação final depende da composição. Nenhuma biblioteca/modelo novo escolhido; evidência visual contextual não equivale a rastreamento automático já entregue. |
+
+**Benefício esperado:** menos sobreposições e ajustes manuais. **Contrapartida:** testar combinações de estilos/layouts e preservar decisões explícitas. Uma posição fixa universal é mais simples, mas perde adaptação útil do EDVID; rastreamento contínuo obrigatório acrescenta custo e complexidade não justificados. Recomenda-se adaptação por composição, com evidência proporcional onde necessária.
+
+Cálculos sobre elementos conhecidos podem ser locais. Processamento, RAM, armazenamento dos parâmetros, espera de preview/render e manutenção têm custo ainda não medido. Não exigir cópias de vídeo, nova transcrição ou análise completa por reposicionamento. Não prometer latência, custo desprezível, ausência universal de colisões ou equivalência visual antes de testar. Qualquer dependência futura requer versão/proveniência/licença/termos/privacidade e compatibilidade comercial verificadas.
+
+Director impact: pedidos textuais podem propor ajustes; ações explícitas e cálculos geométricos não exigem novo raciocínio de IA. O Director respeita posições fixadas, versões e permissões; não usa um indício de conflito como autorização para alterar conteúdo ou o layout inteiro fora do pedido.
+
+### 5.4 Momento e validação
+
+**IMPLEMENTAR NA INTEGRAÇÃO DE LEGENDAS COM COMPOSIÇÃO**, apoiada na base temporal e nos agrupamentos das decisões 15–16. Nenhuma nova operação obrigatória de Media Runtime foi identificada. O gate atual e o inventário coordenado permanecem inalterados; não mover posicionamento tipográfico para o worker nem exigir todo o rastreamento/QA/editor para fechar o MR.
+
+Validar todos os estilos entregues em tela cheia e dividida, com títulos, inserções e ajustes manuais. Incluir linha de legenda que atravessa a troca de layout, retorno sem janela obsoleta, estabilidade da caixa, sincronismo, margens e preservação de posição explicitamente fixada. Usar evidência do conteúdo real para testar casos de rosto/produto/demonstração; não converter ausência de análise em PASS. Comparar escolha/configuração/preview/exportação com as referências EDVID pertinentes e medir consumo.
+
+A extensão coordenada entre estilos será registrada como **DIVERGÊNCIA EDVID** quando efetivamente alterar o comportamento, com validação proporcional de paridade/melhoria. Não declarar superioridade nem teste aprovado por este registro. Expansão material de escopo, dependências ou custo volta ao product owner antes do código.
+
+### 5.5 Redação objetiva aprovada
+
+> O CEVRA posicionará as legendas conforme o estilo, o layout e as margens de entrega, mantendo estabilidade e evitando sobreposições com base nas informações disponíveis. Permitirá ajustes gerais ou por trecho, preservando escolhas explícitas do usuário. Mudanças de composição poderão reposicionar a legenda sem alterar texto ou sincronismo, sem exigir rastreamento contínuo ou novo modelo de IA.
+
+## 6. Handoff e integração documental
+
+Antes de qualquer prompt dependente no CEVRA 3, recuperar o estado real do main e dos PRs. Até a integração, ler explicitamente PR #26 / `docs/editorial-decisions-1-8`: registro editorial v4 para decisões 1–13 e inventário MR; este documento v4 para decisões 14–17; e o registro do Director no PR #25/revisão aplicável.
 
 No fechamento documental autorizado, acrescentar ao Master Context um resumo curto e links para ambos os registros, o estado real dos marcos/branches e a prioridade do MR; reconciliar AGENTS sem duplicar detalhes ou apagar políticas concorrentes. Esta rodada não deve impedir o fechamento das aprovações já existentes nem ser confundida com autorização para mesclar uma feature.
 
@@ -304,6 +362,8 @@ Resumos para o índice global, a integrar no momento correto:
 
 > 2026-09-16 — Decisão 16 aprovada: agrupamento legível por estilo, com pausas/pontuação/largura/tempos, evitando quebras inadequadas, texto minúsculo e palavras que apenas piscam; sem resumir a fala, trocar silenciosamente estilo ou exigir IA por quebra. Reutilizar comportamentos EDVID existentes. Implementar na fatia de legendas após a base temporal da decisão 15 e junto da integração visual. Nenhuma nova operação MR obrigatória identificada; parâmetros, consumo e paridade continuam pendentes. Detalhes em `docs/CEVRA_VISUAL_DECISIONS.md`, versão 3.
 
-Próximos temas são candidatos à discussão, não aprovações: posicionamento e demais detalhes de legendas; composição/layouts e inserções; B-roll/ativos; música/SFX e geração conforme dependências. Continuar a numeração real a partir de 17. Subdividir temas quando necessário para decidir um comportamento por resposta, sem inventar aprovações ou transformar o mapa em escopo automático.
+> 2026-09-16 — Decisão 17 aprovada: posição de legenda própria do estilo/layout, estabilidade da caixa, adaptação às inserções e margens, ajustes gerais ou por trecho sem sobrescrever posições explícitas. Evitar sobreposição conforme evidência disponível, sem rastreamento contínuo obrigatório nem promessa de detectar todo objeto. Implementar com legendas/composição depois das bases 15–16; nenhuma nova operação MR obrigatória identificada. SRT não recebe promessa de layout idêntico. Detalhes, viabilidade e validação pendente em `docs/CEVRA_VISUAL_DECISIONS.md`, versão 4.
+
+Próximos temas são candidatos à discussão, não aprovações: personalização e demais detalhes dos estilos de legendas; composição/layouts e inserções; B-roll/ativos; música/SFX e geração conforme dependências. Continuar a numeração real a partir de 18. Subdividir temas quando necessário para decidir um comportamento por resposta, sem inventar aprovações ou transformar o mapa em escopo automático.
 
 Aprovações posteriores devem ser registradas com seus detalhes e limites, e revisões materiais precisam de aprovação e marcação explícita de substituição/refinamento. Ao final da rodada, consolidar decisões, dependências, pendências e ordem de implementação em handoff autossuficiente, com localização e situação de integração. Não alegar envio automático de mensagem para outro chat.
