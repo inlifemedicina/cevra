@@ -1,9 +1,9 @@
 # CEVRA — Decisões de análise editorial e montagem
 
 **Data das aprovações:** 2026-09-16, conversa do product owner.
-**Versão do registro:** 3.
+**Versão do registro:** 4.
 **Status:** DIREÇÃO DE PRODUTO / IMPLEMENTAÇÃO NÃO AUTORIZADA NESTA DISCUSSÃO. Ver o status específico de cada seção.
-**Escopo:** decisões 1–10 aprovadas, núcleo convencional da decisão 11 e inclusão das extensões justificadas na próxima frente de Media Runtime, refinamentos e diretrizes transversais. A seção 17 registra a revisão de viabilidade das onze decisões; código, arquitetura detalhada e novas dependências não são autorizados por este registro.
+**Escopo:** decisões 1–13 de análise editorial, montagem, cor, áudio convencional, QA e revisão, com refinamentos e condições de viabilidade aprovados. A seção 17 preserva a revisão das onze primeiras decisões; as seções 18–20 registram as aprovações finais e o retorno ao planejamento. Código, arquitetura detalhada, novas dependências e merge não são autorizados por este registro.
 
 ## 0. Autoridade, continuidade e situação da integração
 
@@ -223,11 +223,11 @@ Nenhuma divergência dispensa evidência de paridade/superioridade nem revoga si
 
 A discussão aprovou comportamentos, não uma implementação monolítica. O cache em andamento não recebe nova análise editorial por causa deste registro. Concluir seu processo real e reconciliar os PRs documentais antes de emissão de prompt dependente.
 
-O próximo estágio do roadmap é contexto/transcrição editorial compacta e evidências, seguido por estratégia/plano/validação. As decisões registradas orientam seu escopo; não exigem que todos os modelos, técnicas de corte, mobile ou estilos estejam escolhidos antes de construir uma projeção básica.
+**Prioridade posterior aprovada pelo product owner:** após concluir o processo efetivamente em andamento no chat “CEVRA 3”, a próxima frente de implementação será a extensão coordenada do Media Runtime, antes de outro avanço funcional. Aplicar o alerta e o gate registrados no `AGENTS.md` em `85e5e5bbf816fe0c67a73019fc647a8d8bbf260b`. Essa prioridade refina a orientação anterior que permitia seguir diretamente para contexto editorial; não interrompe o processo atual nem exige um PR gigante. Depois do fechamento dos ajustes delimitados, retomar o roadmap de contexto/transcrição editorial compacta, evidências, estratégia/plano e demais funções, conforme dependências reais.
 
-**Atualização de 2026-09-16:** a discussão de conteúdo mínimo da estratégia, antes pendente na versão 1, foi resolvida pela decisão 9; cor/aparência foi aprovada na decisão 10. Ambas constam da seção 15. A decisão 11 tem levantamento e planejamento de extensões registrados na seção 16, com inclusão do núcleo convencional na próxima frente de extensão conforme a seção 17; não confundir isso com implementação atual ou autorização indiscriminada de restauração avançada.
+**Atualização de 2026-09-16:** estratégia (decisão 9) e cor (decisão 10) constam da seção 15; áudio convencional (decisão 11) e extensões justificadas constam das seções 16–17. Verificação/correções (decisão 12) e revisão/avanço de fase (decisão 13) foram aprovadas após a versão 3 e estão nas seções 18–19. As referências anteriores a decisões 12/13 como candidatas ficam substituídas por esses registros aprovados; nenhuma implementação é declarada concluída por isso.
 
-Verificação/correções (decisão 12 candidata) e revisão da montagem/avanço de fase (decisão 13 candidata) continuam pendentes. Parâmetros exatos, QA/preview, composição e demais integrações permanecem nos respectivos gates. O mapa de discussões não exige bloqueio de trabalho seguro não dependente.
+A revisão comportamental dos treze blocos previstos para a Fase 1 está consolidada nesta rodada. Parâmetros exatos, contratos, QA/preview reais, modelos e demais integrações permanecem nos respectivos gates técnicos. Legendas, composição, música e geração de mídia são temas posteriores, não aprovações implícitas. Uma nova dúvida material identificada na viabilidade deverá ser apresentada antes da implementação dependente, sem reabrir de rotina decisões resolvidas.
 
 **Impacto no Director e demais componentes:** extensão comportamental compatível em intenção; futuros contratos precisam preservar contexto com evidências, restrições de duração/ritmo, autorização, referências/digests e plano único. Nenhuma auditoria de implementação ou garantia de ausência de conflito futuro é alegada. Conflito material descoberto deve voltar ao product owner antes de implementar.
 
@@ -237,7 +237,7 @@ Antes de marcar pronto/mesclar, reconciliar com os resultados reais do PR #24 e 
 
 Resumo curto atualizado para o índice, sem copiar todo este registro:
 
-> 2026-09-16 — DIREÇÃO APROVADA / IMPLEMENTAÇÃO PENDENTE: decisões 1–11 de entrada, leitura multimodal, evidências, takes, montagem, duração, ritmo, junções, estratégia, cor e núcleo convencional de áudio, com as condições registradas. Preparação compartilhada, sem cascata obrigatória de modelos ou compressão repetida de pausas. Priorizar bons resultados sem API paga obrigatória, evidência mínima no mobile, auditoria comercial e propostas refinadas por custo total e viabilidade executável. Próxima extensão coordenada: MR-A01–MR-A06 (áudio e integração), MR-V01 (metadados) e MR-V02 (cor); reaproveitar capacidades existentes, sem reescrita das fundações. Restauração avançada e seleção de modelos continuam em investigação. Registro e revisão das onze decisões: `docs/CEVRA_EDITORIAL_DECISIONS.md`, seções 16–17. Não há código implementado por esta aprovação.
+> 2026-09-16 — DIREÇÃO APROVADA / IMPLEMENTAÇÃO PENDENTE: decisões 1–13 de entrada, leitura multimodal, evidências, takes, montagem, duração, ritmo, junções, estratégia, cor, áudio convencional, QA limitado e revisão vinculada à versão assistida. Preparação compartilhada, sem cascata obrigatória de modelos, compressão repetida de pausas ou reanálise/renderização a cada interação. Priorizar bons resultados sem API paga obrigatória, evidência mínima no mobile, auditoria comercial e viabilidade/custo total antes da adoção. Após o processo atual do CEVRA 3, anunciar PAUSA DE AVANÇO e realizar os ajustes coordenados do Media Runtime antes de outro avanço: inventário MR-A01–MR-A06, MR-V01–MR-V02 e diagnósticos mínimos MR-Q01. QA, revisão e aprovação na aplicação não pertencem ao worker nem viram um novo motor. Restauração avançada, seleção de modelos e otimizações complexas seguem em investigação. Registro detalhado: `docs/CEVRA_EDITORIAL_DECISIONS.md`, versão 4. Nenhum código, teste de mídia ou merge realizado por esta consolidação.
 
 ## 15. Continuidade — decisões 9 e 10
 
@@ -279,7 +279,7 @@ Não confundir disponibilidade genérica de filtro no FFmpeg com sua presença n
 
 ### 16.2 Lista de necessidades para a próxima frente coordenada de Media Runtime
 
-As necessidades abaixo ficam incluídas no planejamento da próxima extensão, conforme o pedido posterior consolidado na seção 17. A implementação será delimitada e testada antes do uso por funcionalidades dependentes; esta lista não autoriza código agora, filtros arbitrários nem inclusão de todos os recursos opcionais do FFmpeg. Manter o levantamento único neste registro, com detalhamento técnico futuro por referência.
+As necessidades abaixo ficam incluídas no planejamento da próxima extensão, conforme o pedido posterior consolidado na seção 17. A implementação será delimitada e testada antes do uso por funcionalidades dependentes; esta lista não autoriza código agora, filtros arbitrários nem inclusão de todos os recursos opcionais do FFmpeg. Manter o levantamento único neste registro, com detalhamento técnico futuro por referência. A versão 4 acrescenta somente os diagnósticos mínimos decorrentes da decisão 12 e vincula a integração de revisão da decisão 13 ao trabalho de aplicação já distinguido em MR-A06.
 
 | ID | Necessidade identificada | Tratamento a avaliar antes da execução |
 |---|---|---|
@@ -291,12 +291,13 @@ As necessidades abaixo ficam incluídas no planejamento da próxima extensão, c
 | MR-A06 | Entrega editável pelo aplicativo. | Mapear separadamente comandos/Project IR quando necessários, serviço de aplicação, compilação, Desktop Host e UI; não colocar lógica editorial ou novo estado canônico dentro do worker. |
 | MR-V01 | Metadados necessários à interpretação de imagem e ao planejamento temporal. | Estender o probe tipado e seu mapeamento com evidência pertinente de cor, profundidade/formato de pixel, orientação/display e precisão temporal; manter valores desconhecidos explícitos e compatibilidade dos consumidores atuais. |
 | MR-V02 | Executar interpretação/correção/estilo de cor aprovados na decisão 10. | Acrescentar a menor superfície tipada necessária, verificar transformações/filtros do bundle e coerência preview/export; ajustes não destrutivos, sem normalização ou grade aplicada duas vezes. |
+| MR-Q01 | Evidências técnicas mínimas que faltarem para verificar a montagem, conforme decisão 12. | Reutilizar probe, silêncio, medições MR-A02 e duração/mapeamento MR-A05. Acrescentar diagnósticos tipados necessários, como intervalos de quadros pretos e sinais de problemas de áudio, somente com capacidade validada no bundle. Resultado de medição não ordena alteração; regras, contexto, severidade e limites de correção ficam na aplicação/QA. Não criar outro runtime, IA obrigatória ou análise indiscriminada por frame. |
 
 Ganho, fades e normalização básicos não serão reimplementados sem necessidade. O incremento é o que falta para compô-los com segurança e completar as capacidades aprovadas. Novas necessidades de cor, junções, QA ou outros pontos que efetivamente afetem o Media Runtime devem entrar no mesmo levantamento com origem, evidência, dependência e status, não ser acrescentadas silenciosamente ao código.
 
 ### 16.3 Momento de implementação e agrupamento
 
-Não modificar agora o Media Runtime já fechado. Reunir as extensões justificadas durante a revisão e apresentar um plano coordenado no ponto do roadmap em que forem necessárias, antes de implementar funções dependentes de capacidades ausentes. Comparar correção agora/depois, regressão, compatibilidade, consumo e retrabalho.
+Não modificar agora o Media Runtime já fechado. Reunir as extensões justificadas durante a revisão e apresentar um plano coordenado no ponto do roadmap em que forem necessárias, antes de implementar funções dependentes de capacidades ausentes. Comparar correção agora/depois, regressão, compatibilidade, consumo e retrabalho. A prioridade de execução foi posteriormente fixada para imediatamente após o fechamento do processo atual do CEVRA 3, conforme AGENTS e seções 13/20; não tratar esta orientação geral como permissão para pular esse gate.
 
 Agrupar planejamento e mudanças relacionadas evita remendos isolados; não obriga um único commit/PR gigantesco ou uma reescrita. Preservar fatias testáveis e revisão incremental conforme risco. Não esperar indefinidamente por todas as necessidades futuras do produto. Se adiar bloquear uma dependência imediata ou criar risco/custo material, avisar o product owner antes de prosseguir; só a parte afetada precisa pausar.
 
@@ -360,8 +361,82 @@ Preservar também a distinção entre código de backend disponível e recurso d
 
 Organizar a próxima frente por dependência: contratos/metadados/medições e áudio isolado; depois execução temporal e tratamentos; integração canônica/desktop e verificação de cada entrega na sua fatia. Essa ordem não obriga completar cor, modelos locais e restauração antes de uma projeção editorial básica segura. Evitar um PR gigante, atrasos indefinidos e implementações dependentes sobre capacidades inexistentes. Extensão fora destes limites volta para decisão, não entra escondida como requisito técnico.
 
-O aceite deve demonstrar funções no bundle real, compatibilidade de projetos, undo/redo, cancelamento/recovery, ausência de alteração dos originais, sync/duração, preservação de pausas e nenhuma recodificação cumulativa indevida. Medir tempo/RAM/I/O por operação completa, inclusive muitas junções e áudio ruim, com fixtures de paridade EDVID. Esses são requisitos de verificação das extensões, não aprovação antecipada do fluxo de QA/correção da futura decisão 12.
+O aceite deve demonstrar funções no bundle real, compatibilidade de projetos, undo/redo, cancelamento/recovery, ausência de alteração dos originais, sync/duração, preservação de pausas e nenhuma recodificação cumulativa indevida. Medir tempo/RAM/I/O por operação completa, inclusive muitas junções e áudio ruim, com fixtures de paridade EDVID. Esses são requisitos de verificação das extensões; o fluxo de QA/correção recebeu aprovação posterior própria na seção 18, sem confundir testes de implementação com recurso de produto já entregue.
 
 Amostragem visual em lote, novos índices/caches, separação de falantes/fontes, restauração avançada e outros motores permanecem opcionais ou de pesquisa quando não necessários ao núcleo aprovado; só promover com evidência de benefício e custo aceitável. Não substituir a avaliação de inteligibilidade por uma métrica única.
 
 Daqui em diante, cada nova proposta aplica a seção 11.4: disponível hoje / falta integração / extensão interna / dependência externa ou não verificada. Acrescentar lacunas justificadas ao inventário único com decisão de origem e momento necessário; rever este plano antes do prompt dependente e reconciliar seu status com o main real. Nesta atualização somente o registro documental foi modificado; não foram executados novos testes, benchmarks ou alterações de runtime.
+
+## 18. Decisão 12 — Verificação e correções delimitadas
+
+**APROVADA em 2026-09-16 como comportamento e inclusão no planejamento. Implementação, parâmetros e validação continuam pendentes.** A resposta “Ok. Vamos seguir” aprovou a proposta desta decisão; a consolidação foi solicitada após a aprovação da decisão 13.
+
+### 18.1 Referência EDVID e adaptação aprovada
+
+Na revisão EDVID fixada, `verify_cut.py` procura problemas de duração, emendas de áudio, silêncios, quadros pretos e níveis. A skill recomenda verificações numéricas primeiro, investigação dos pontos sinalizados e até três ciclos de correção antes de apresentar alertas restantes. Preservar o método de evidências e refinamento; não interpretar seus limiares ou número de ciclos como universais nem converter cada alerta em defeito confirmado.
+
+CEVRA verifica primeiro o que puder ser resolvido no plano: fontes/referências, intervalos, duração prevista, capacidades e restrições expressas. Depois verifica a saída efetivamente produzida. Separar falha técnica comprovada, indício dependente de contexto e questão editorial. Uma pausa longa ou tela preta pode ser intencional; confrontar com o plano e a evidência antes de alterar.
+
+Usar os estados existentes PASS/WARN/FAIL/UNKNOWN conforme evidência. Checagem não realizada ou inconclusiva não vira PASS. Aprovação técnica não demonstra naturalidade ou qualidade semântica; revisão editorial adicional é proporcional, não um segundo modelo obrigatório para todo vídeo.
+
+### 18.2 Correções, tentativas e parada
+
+Permitir correção automática delimitada, com causa identificada e dentro da estratégia/permissões autorizadas. Não exigir autorização por pequeno ajuste técnico, mas não retirar informação importante, alterar ordem narrativa ou comprimir uma pausa protegida apenas para eliminar um alerta.
+
+Agrupar correções compatíveis. Só repetir uma tentativa quando houver problema restante identificado e mudança concreta a testar. Parar se não houver progresso verificável, o mesmo resultado se repetir, a próxima intervenção mudar o escopo ou o limite de tentativas/processamento/consumo da operação for atingido. Os limites numéricos serão definidos e validados na fatia técnica; não estão fixados nesta aprovação.
+
+Não criar ciclos ilimitados, renderizações alternativas obrigatórias ou troca silenciosa de modelo/cobrança. Reutilizar medições válidas sem ignorar o que mudou. Preservar a última versão válida. Falhas não impeditivas podem acompanhar uma versão para revisão com avisos; arquivo inválido ou descumprimento de requisito obrigatório não pode ser apresentado como entrega concluída porque acabaram as tentativas.
+
+### 18.3 Viabilidade informada antes da aprovação
+
+No baseline `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`, [QaEngineAdapter](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/contracts/src/qa.ts) é um contrato; [engines/qa](https://github.com/inlifemedicina/cevra/tree/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/engines/qa) contém somente README de direção. Não declarar um verificador de montagens completo implementado. Reutilizar probe, detect-silence, resultados das operações e medições previstas em MR-A02/MR-A05.
+
+MR-Q01 registra no inventário único apenas a evidência técnica adicional necessária. Confirmar filtros e saída de relatórios no bundle exato; não presumir presença ou qualidade de uma função apenas por existir no FFmpeg. A interpretação, o estado de QA e os limites de correção são trabalho de aplicação/QA, não julgamento semântico no worker. Não foi identificado motor externo ou API paga obrigatório para o núcleo técnico proposto; isso não dispensa implementação e testes.
+
+Revalidar contratos e estado real antes da fatia dependente. A aprovação não exige scanner audiovisual pesado em toda etapa, mas também não permite omitir verificação indispensável de uma entrega alterada.
+
+## 19. Decisão 13 — Revisão vinculada à montagem assistida
+
+**APROVADA em 2026-09-16; incluir no planejamento. Último bloco principal previsto para esta rodada da Fase 1, não declaração de implementação concluída.**
+
+### 19.1 Referência EDVID e interação
+
+A mesma SKILL.md do EDVID apresenta `cut.mp4` para aprovação, oferece navegação, aparo/remoção de takes e marcações de intervalos com pedidos de correção. O mecanismo distingue tempos da timeline em edição e do vídeo renderizado. Preservar essa rastreabilidade e a possibilidade de reunir várias observações por rodada; não copiar arquivos de controle do EDVID como um estado paralelo ao Project IR.
+
+No CEVRA, apresentar montagem real, permitir instruções gerais e localizadas e manter controles explícitos de ajuste. Ação direta suficientemente definida não exige IA; pedido editorial ambíguo pode exigir interpretação. O usuário pode agrupar observações sem iniciar reanálise ou renderização completa em cada marcação. Não obrigá-lo a usar a timeline quando uma instrução textual suficiente resolve o pedido.
+
+### 19.2 Referência de versão e preservação do trabalho
+
+Pedidos localizados referenciam a versão efetivamente assistida e os trechos correspondentes, não apenas segundos soltos. Se outra correção deslocar a timeline, resolver a referência original quando for seguro; dúvida material exige esclarecimento, não alteração de trecho errado. Um preview anterior pode permanecer acessível enquanto o novo é preparado, identificado como anterior.
+
+Aplicar pelo caminho canônico e pelo histórico existente, com validação contra o estado atual. Preservar decisões e ajustes manuais válidos. Reavaliar somente o conteúdo e as dependências realmente afetados, sem refazer globalmente a interpretação por padrão ou sobrescrever mudanças posteriores silenciosamente.
+
+Distinguir economia de raciocínio da renderização: reutilizar análises e resultados tecnicamente válidos; renderizar novamente o necessário para consistência. Não prometer que toda alteração admite renderização parcial. Renderização incremental sofisticada, múltiplas versões pré-renderizadas e comparação complexa não são requisitos iniciais; entram por benefício medido. Não reutilizar intermediário inválido para economizar trabalho.
+
+### 19.3 Aprovação e avanço
+
+A aprovação identifica a montagem apresentada e permite avançar às etapas seguintes dentro das permissões vigentes; não é autorização de novo upload/gasto ou aprovação por emenda. Preservar a autonomia previamente delimitada.
+
+A montagem continua editável depois de aprovada. Alterações devem atualizar os elementos dependentes e solicitar revisão quando materiais, sem reiniciar tudo nem manter falsamente o status da versão anterior. Mudanças que deslocam tempos devem repercutir nas futuras legendas/inserções correspondentes; preservação do restante não autoriza deixar dependências fora de sincronia.
+
+### 19.4 Viabilidade informada antes da aprovação
+
+No baseline consultado `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`, [Preview.tsx](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/apps/desktop/src/components/Preview.tsx) exibe demonstração; [Timeline.tsx](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/apps/desktop/src/components/Timeline.tsx) oferece seleção/navegação, não todo o fluxo proposto. Project IR fornece fontes/clips/intervalos/revisão e comandos básicos; o [protocolo do Desktop Host](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/apps/desktop-host/src/protocol.ts) já inclui undo/redo. Essas bases não equivalem a preview e revisão ponta a ponta disponíveis.
+
+Planejar reprodução real segura, marcações, referência de versão, integração de correções e estado de aprovação na aplicação/host/UI. Reutilizar MR-A05/MR-A06 e o histórico, acrescentando somente contratos/controles demonstradamente ausentes. Não construir segundo estado audiovisual nem colocar pedidos/aprovações dentro do worker.
+
+Não foi identificado outro motor ou API paga obrigatório para esse fluxo. O acréscimo principal é integração e comportamento de aplicação; recursos de reprodução e empacotamento devem ser validados na plataforma real. Não transformar todo o editor de revisão em alteração de Media Runtime ou presumir que ele estará pronto ao terminar os filtros de áudio. Aplicar o gate de viabilidade antes da especificação executável.
+
+## 20. Encerramento desta rodada e retorno ao chat dos prompts
+
+**As treze decisões comportamentais previstas estão aprovadas com suas condições e incorporadas ao planejamento.** Não foi identificado outro bloco de produto que precise ser decidido imediatamente para encerrar esta revisão da Fase 1. Isso não declara o produto pronto nem elimina escolhas técnicas: contratos, filtros reais, perfis/limites, consumo, paridade e integração continuam a ser verificados nas fatias correspondentes. Se aparecer uma lacuna material, avisar antes da implementação dependente.
+
+A sequência obrigatória já aprovada e registrada no AGENTS permanece: concluir o processo atual real do chat CEVRA 3; anunciar **PAUSA DE AVANÇO — ajustes coordenados do Media Runtime antes da próxima etapa**; reconciliar documentação/main e apresentar o plano delimitado; executar, revisar e validar os ajustes aprovados; só então avançar para outra etapa funcional, salvo adiamento delimitado expressamente aprovado pelo product owner. Não pressupor que o processo atual terminou por causa desta consolidação.
+
+Usar a seção 16.2 como inventário único, incluindo MR-Q01, e as seções 17–19 para separar reuso, extensões do motor e integração de aplicação/QA/preview. Delimitar o que deve ser entregue por cada fatia; não converter o próximo ajuste num PR monolítico de todo o aplicativo. Diagnósticos necessários do runtime entram na frente coordenada; o fluxo completo de revisão/QA pertence às fatias de aplicação correspondentes, com dependências explícitas.
+
+Legendas, composição/layouts, música/efeitos e geração de mídia não foram detalhados/aprovados nesta rodada e deverão ser discutidos antes de suas implementações. Modelos editoriais, restauração avançada e otimizações de render permanecem investigação/validação, não novos bloqueadores automáticos dos ajustes convencionais. A ausência de API paga obrigatória e a investigação de comercialização continuam requisitos.
+
+Handoff enquanto o PR #26 não estiver integrado: “Leia o PR #26 e `docs/CEVRA_EDITORIAL_DECISIONS.md` na branch `docs/editorial-decisions-1-8`, inclusive decisões 12–13 e a prioridade do AGENTS. Considere o Director/PR #25 e o estado real do main. Ao terminar o processo atual do CEVRA 3, os ajustes coordenados do Media Runtime precedem o próximo avanço funcional.” Não alegar envio automático de mensagem para outro chat.
+
+Esta atualização foi documental na branch existente, cujo head consultado era `85e5e5bbf816fe0c67a73019fc647a8d8bbf260b`; não alterou código, dependências, main ou o trabalho de outro PR. Não executou teste de mídia, benchmark ou auditoria jurídica. O Master Context ainda requer a integração do resumo/link e do estado real pelo processo normal, conforme seção 14; não presumir que consultar main já recupera estas aprovações.
