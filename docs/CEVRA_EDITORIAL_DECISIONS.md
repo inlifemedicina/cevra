@@ -1,9 +1,9 @@
 # CEVRA — Decisões de análise editorial e montagem
 
 **Data das aprovações:** 2026-09-16, conversa do product owner.
-**Versão do registro:** 1.
-**Status:** DIREÇÃO DE PRODUTO APROVADA / IMPLEMENTAÇÃO NÃO AUTORIZADA NESTA DISCUSSÃO.
-**Escopo:** decisões 1–8, refinamentos finais e diretrizes transversais aprovados na conversa “CEVRA — Análise editorial e montagem”.
+**Versão do registro:** 2.
+**Status:** DIREÇÃO DE PRODUTO / IMPLEMENTAÇÃO NÃO AUTORIZADA NESTA DISCUSSÃO. Ver o status específico de cada seção.
+**Escopo:** decisões 1–10 aprovadas, refinamentos finais, diretrizes transversais e levantamento condicionado da decisão 11 na conversa “CEVRA — Análise editorial e montagem”.
 
 ## 0. Autoridade, continuidade e situação da integração
 
@@ -11,7 +11,7 @@ Este é o registro detalhado das decisões desta discussão, não um segundo Mas
 
 A redação refinada e aprovada abaixo prevalece sobre sugestões anteriores desta conversa. Aprovação de direção não comprova desempenho, superioridade editorial ou disponibilidade de uma integração. Não foram escolhidos modelos, fornecedores, limites numéricos finais ou uma nova arquitetura.
 
-Estado consultado para este registro:
+Estado consultado na criação deste registro (histórico, não atualização dos PRs):
 
 - `main`: `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`.
 - PR #24, Transcript Cache V1: aberto e draft, head `5131d9f8e372a37ae7e8749d6e000e6e88553da2`; não declarar merge/closeout a partir desta discussão.
@@ -201,6 +201,16 @@ Recomendar a solução mais simples que satisfaça a qualidade necessária e pre
 
 Distinguir hipótese de evidência medida. Validação proporcional à importância; nenhum ganho exato de custo/desempenho ou superioridade editorial sem teste. Gratuidade nominal não vence automaticamente uma solução melhor no custo total, mas API paga permanece opcional, não requisito introduzido silenciosamente.
 
+### 11.4 Viabilidade executável antes de pedir aprovação — acrescentada em 2026-09-16
+
+Toda proposta deve ser confrontada com o que o CEVRA realmente executa no baseline consultado, antes de ser apresentada para adoção. Ler contratos, implementação e evidência de testes pertinentes; um nome de motor, uma interface ainda não integrada ou uma capacidade genérica do upstream não demonstram entrega ponta a ponta.
+
+Explicitar de forma proporcional: o que já existe e pode ser reutilizado; o que só precisa de integração; o que exige extensão interna de contrato/adapter/worker/bundle/aplicação/Project IR/UI; o que depende de componente externo ou pesquisa. Marcar o desconhecido como não verificado, sem convertê-lo em recurso disponível ou dependência obrigatória.
+
+Quando a proposta exceder as capacidades existentes, informar ao product owner a implementação adicional mínima, os componentes afetados, novas dependências, impacto esperado em qualidade/consumo/custo/complexidade/manutenção e elegibilidade comercial. Apresentar alternativa mais simples quando houver e comparação entre corrigir agora ou depois. Esses custos e lacunas podem levar a reduzir, adiar ou rejeitar a proposta, não são detalhes a descobrir somente após a aprovação.
+
+Não iniciar implementação ou testes com efeitos externos sob autorização de discussão. Lacunas materiais descobertas posteriormente voltam para avaliação antes de ampliar escopo. Não atribuir toda integração nova ao Media Runtime: separar o que pertence ao motor do que pertence ao planejamento, aos comandos e à UI.
+
 ## 12. Validação e divergências EDVID
 
 **Pendente, não executada por este registro.** Testar material real com os mesmos vídeos, objetivo e, quando possível, modelo editorial. Incluir fala já fluida, múltiplas tentativas, demonstração com pausas sem voz, pausas expressivas e muitas junções. Comparar excesso de cortes e lentidão residual, sentido, naturalidade, continuidade, correções manuais e consumo. Menor duração não é vitória automática.
@@ -213,11 +223,11 @@ Nenhuma divergência dispensa evidência de paridade/superioridade nem revoga si
 
 A discussão aprovou comportamentos, não uma implementação monolítica. O cache em andamento não recebe nova análise editorial por causa deste registro. Concluir seu processo real e reconciliar os PRs documentais antes de emissão de prompt dependente.
 
-O próximo estágio do roadmap é contexto/transcrição editorial compacta e evidências, seguido por estratégia/plano/validação. As oito decisões orientam seu escopo; não exigem que todos os modelos, técnicas de corte, mobile ou estilos estejam escolhidos antes de construir uma projeção básica.
+O próximo estágio do roadmap é contexto/transcrição editorial compacta e evidências, seguido por estratégia/plano/validação. As decisões registradas orientam seu escopo; não exigem que todos os modelos, técnicas de corte, mobile ou estilos estejam escolhidos antes de construir uma projeção básica.
 
-**Discussão seguinte candidata, ainda NÃO APROVADA neste registro:** conteúdo mínimo da proposta editorial e tratamento de ambiguidades antes da confirmação da estratégia. A existência da aprovação padrão e dos modos narrativos já está decidida; não rediscuti-la do zero. Resolver esse detalhe antes da fatia que fixar a interação/contrato de estratégia, sem bloquear trabalho seguro não dependente.
+**Atualização de 2026-09-16:** a discussão de conteúdo mínimo da estratégia, antes pendente na versão 1, foi resolvida pela decisão 9; cor/aparência foi aprovada na decisão 10. Ambas constam da seção 15. A decisão 11 tem levantamento e planejamento de extensões registrados na seção 16; não confundir isso com implementação ou autorização indiscriminada de restauração avançada.
 
-Tratamento de cor, refinamento de áudio, parâmetros exatos de corte, QA/preview e composição continuam nos respectivos gates, não constituem autorizações implícitas deste documento.
+Verificação/correções (decisão 12 candidata) e revisão da montagem/avanço de fase (decisão 13 candidata) continuam pendentes. Parâmetros exatos, QA/preview, composição e demais integrações permanecem nos respectivos gates. O mapa de discussões não exige bloqueio de trabalho seguro não dependente.
 
 **Impacto no Director e demais componentes:** extensão comportamental compatível em intenção; futuros contratos precisam preservar contexto com evidências, restrições de duração/ritmo, autorização, referências/digests e plano único. Nenhuma auditoria de implementação ou garantia de ausência de conflito futuro é alegada. Conflito material descoberto deve voltar ao product owner antes de implementar.
 
@@ -225,6 +235,75 @@ Tratamento de cor, refinamento de áudio, parâmetros exatos de corte, QA/previe
 
 Antes de marcar pronto/mesclar, reconciliar com os resultados reais do PR #24 e PR #25; preservar alterações concorrentes e a política de discussão. Adicionar resumo/link deste registro e do Director ao Master Context, atualizar o estado real das branches e integrar a diretriz transversal ao AGENTS sem duplicar o texto detalhado. Este arquivo não fecha marcos nem muda o main canônico.
 
-Resumo curto para o índice, sem copiar todo este registro:
+Resumo curto atualizado para o índice, sem copiar todo este registro:
 
-> 2026-09-16 — DIREÇÃO APROVADA / IMPLEMENTAÇÃO PENDENTE: oito decisões de entrada, leitura multimodal progressiva, evidências de qualidade, escolha/combinação de takes, duração, ritmo seletivo e junções controladas; preparação compartilhada, sem cascata obrigatória de modelos nem compressão repetida de pausas. Priorizar bons resultados sem API paga obrigatória, mobile com evidência mínima, auditoria comercial exata, revisões justificadas em qualquer componente e propostas refinadas por custo total. Registro detalhado: `docs/CEVRA_EDITORIAL_DECISIONS.md`. Paridade, recursos e seleção de modelos ainda dependem de validação.
+> 2026-09-16 — DIREÇÃO APROVADA / IMPLEMENTAÇÃO PENDENTE: decisões 1–10 de entrada, leitura multimodal, evidências, takes, montagem, duração, ritmo, junções, estratégia e cor. Preparação compartilhada, sem cascata obrigatória de modelos ou compressão repetida de pausas. Priorizar bons resultados sem API paga obrigatória, evidência mínima no mobile, auditoria comercial e propostas refinadas por custo total e viabilidade executável. Decisão 11: lacunas de áudio e extensões do Media Runtime reunidas para planejamento futuro, não execução automática; restauração avançada ainda depende de investigação. Registro detalhado: `docs/CEVRA_EDITORIAL_DECISIONS.md`.
+
+## 15. Continuidade — decisões 9 e 10
+
+### 15.1 Decisão 9 — Estratégia principal clara e perguntas proporcionais
+
+**APROVADA em 2026-09-16; resolve a pendência indicada na versão 1.**
+
+Preservar a conversa contextual e a confirmação da estratégia do EDVID. Apresentar uma proposta principal compreensível e ajustável, reaproveitando pedido, material, restrições e preset. Não obrigar o usuário a preencher checklist fixo, escolher entre várias propostas ou repetir informação já disponível.
+
+A proposta resume resultado, estrutura, duração e natureza da restrição, intensidade de limpeza, preservações e limitações relevantes. Perguntar apenas sobre lacuna ou conflito que mude materialmente a edição, preferencialmente oferecendo recomendação concreta. Escolhas rotineiras dentro do escopo não exigem confirmação por take/pausa/corte.
+
+Aprovação padrão e autonomia previamente delimitada permanecem como decididas no Director. Aprovar estratégia não autoriza novos uploads, gastos ou ações fora das permissões. A apresentação aproveita o planejamento; não exige um segundo modelo nem renderizações alternativas por padrão.
+
+### 15.2 Decisão 10 — Interpretação técnica, correção e estilo de cor
+
+**APROVADA em 2026-09-16 como comportamento; funções e integração ainda devem passar pelo gate de viabilidade.**
+
+Separar interpretação técnica da gravação, correção de problema identificado e estilo estético. Preservar imagens adequadas; não aumentar contraste/saturação indiscriminadamente. Perfil incerto não deve ser inferido como certeza apenas pela aparência lavada. Preservar diferenças intencionais de iluminação/ambiente.
+
+Usar transformações compatíveis com o perfil, projeto e saída pretendida quando sustentadas por evidência. Correções discretas ficam no escopo autorizado; estilo decorre do pedido, preset ou proposta aprovada. Não foi escolhido aqui espaço de saída, profundidade de bits, LUT, motor adicional ou algoritmo novo.
+
+Oferecer comparação acessível para mudanças perceptíveis/dúvidas relevantes, com interpretação técnica equivalente no antes/depois. Não exigir vários looks ou aprovação repetida por take quando a intenção já foi autorizada.
+
+Priorizar metadados e amostras representativas, aprofundar mudanças relevantes, preservar originais/ajustes editáveis e evitar análise obrigatória por frame ou recálculo em cada emenda. Custo e qualidade ainda requerem teste.
+
+## 16. Decisão 11 — Áudio: viabilidade e extensões a planejar
+
+**REGISTRO DE LACUNAS E PLANEJAMENTO AGRUPADO APROVADOS em 2026-09-16. Escopo técnico final, consumo e implementação permanecem sujeitos a avaliação; não registrar a proposta inteira como entregue ou como autorização irrestrita de novos motores.**
+
+Objetivo em discussão: áudio compreensível, consistente e natural, preservando timbre, dinâmica expressiva e sons relevantes; corrigir problemas proporcionalmente, sem voz de estúdio universal, tratamento cumulativo ou IA por trecho. Reutilizar o Media Runtime é a direção preferida para o núcleo convencional. O product owner determinou que o custo de implementar capacidades ausentes seja apresentado antes da adoção final do escopo.
+
+### 16.1 Base e limites verificados
+
+Baseline do levantamento: `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`, não promessa sobre futuras versões. Referências: [Media Runtime](MEDIA_RUNTIME.md), [contrato de mídia nessa revisão](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/contracts/src/media.ts) e [adaptador nessa revisão](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/engines/media-ffmpeg/src/adapter.ts). Revalidar o baseline real antes da implementação dependente.
+
+O contrato admite `probe`, `extract-audio`, `detect-silence`, `volume`, `audio-fade`, `loudness-normalize` e `mux-audio`. Isso não prova um tratamento automático ponta a ponta na UI. `volume` recebe ganho único, não envelope temporal; os resultados tipados não contêm relatório completo de qualidade vocal. `resolveAudioMutationDelivery` rejeita saída em contêiner audio-only (WAV/M4A), embora extração/transcode de áudio tenham suas próprias regras. EQ, compressão, de-ess e redução de ruído não estão expostos como operações tipadas nesse contrato.
+
+Não confundir disponibilidade genérica de filtro no FFmpeg com sua presença no bundle exato, exposição segura pelo CEVRA ou qualidade validada. Ampliar o Media Runtime significa primeiro contratos/adapter/worker/validação e integração; não implica automaticamente modificar o código-fonte do FFmpeg, trocar sua versão, adicionar um segundo runtime ou alterar uma fundação estável.
+
+### 16.2 Lista inicial de necessidades para a frente coordenada de Media Runtime
+
+Esta lista registra necessidades e candidatas, não uma especificação executável ou autorização para implementar todas. Manter aqui o levantamento enquanto esta discussão estiver aberta; um plano técnico futuro poderá detalhá-lo por referência, sem criar registros concorrentes.
+
+| ID | Necessidade identificada | Tratamento a avaliar antes da execução |
+|---|---|---|
+| MR-A01 | Fluxo de tratamento de áudio isolado sem recodificação intermediária desnecessária. | Ampliar saídas/validação adequadas ao processamento, particularmente PCM quando pertinente, preservando compatibilidade e segurança de entrega. |
+| MR-A02 | Evidências de nível por passagem, picos e ruído para justificar correções. | Relatório local tipado e medições reutilizáveis; não confundir detecção de silêncio ou transcrição correta com inteligibilidade comprovada. |
+| MR-A03 | Ajustar região baixa sem elevar desnecessariamente todo o take. | Ganho temporal limitado e transições suaves, integrado ao plano editável; não criar cortes na imagem só para alterar volume. |
+| MR-A04 | Tratamento convencional quando justificado: EQ, compressão, de-ess, limitação e redução de ruído. | Verificar filtros/capacidades do bundle, escolher apenas os necessários, expor operações fechadas e testar qualidade/consumo; não liberar filtergraph arbitrário. |
+| MR-A05 | Junções, eventual mistura de faixas e normalização coerente da saída. | Conferir requisitos conjuntos com decisão 8, distinguir mux de mistura e projetar processamento coordenado a partir das fontes. Não pressupor que toda a proposta já cabe nas primitivas atuais. |
+| MR-A06 | Entrega editável pelo aplicativo. | Mapear separadamente comandos/Project IR quando necessários, serviço de aplicação, compilação, Desktop Host e UI; não colocar lógica editorial ou novo estado canônico dentro do worker. |
+
+Ganho, fades e normalização básicos não serão reimplementados sem necessidade. O incremento é o que falta para compô-los com segurança e completar as capacidades aprovadas. Novas necessidades de cor, junções, QA ou outros pontos que efetivamente afetem o Media Runtime devem entrar no mesmo levantamento com origem, evidência, dependência e status, não ser acrescentadas silenciosamente ao código.
+
+### 16.3 Momento de implementação e agrupamento
+
+Não modificar agora o Media Runtime já fechado. Reunir as extensões justificadas durante a revisão e apresentar um plano coordenado no ponto do roadmap em que forem necessárias, antes de implementar funções dependentes de capacidades ausentes. Comparar correção agora/depois, regressão, compatibilidade, consumo e retrabalho.
+
+Agrupar planejamento e mudanças relacionadas evita remendos isolados; não obriga um único commit/PR gigantesco ou uma reescrita. Preservar fatias testáveis e revisão incremental conforme risco. Não esperar indefinidamente por todas as necessidades futuras do produto. Se adiar bloquear uma dependência imediata ou criar risco/custo material, avisar o product owner antes de prosseguir; só a parte afetada precisa pausar.
+
+### 16.4 Restauração avançada e dependências externas
+
+Restauração avançada não foi demonstrada como atendida pela superfície atual. Pode exigir funções adicionais e, conforme o problema e os testes, um modelo/motor especializado. Isso não comprova que todo caso de restauração necessita de outro motor, de serviço remoto ou de API paga.
+
+Manter essa investigação separada do núcleo convencional. Não tornar separação de fontes, reconstrução de fala ou remoção forte de reverberação dependências obrigatórias da edição básica. Qualquer recurso externo exige necessidade demonstrada, comparação com a alternativa interna, qualidade/recursos medidos, licença/termos comerciais exatos e aprovação antes da incorporação. Não prometer recuperação perfeita nem sintetizar/substituir a fala original sob autorização de simples melhoria do áudio.
+
+### 16.5 Fechamento desta atualização documental
+
+Foram registradas as aprovações de estratégia/cor que ocorreram após a versão 1 e a nova exigência de viabilidade executável, com as lacunas de áudio para planejamento futuro. Nenhum código, bundle, comando, modelo, versão de FFmpeg ou fundação do runtime foi alterado; nenhum benchmark ou teste de áudio novo foi realizado por este registro. Integrar este resumo ao Master Context junto da reconciliação documental já exigida na seção 14.
