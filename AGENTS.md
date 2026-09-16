@@ -12,7 +12,7 @@ Before substantial implementation, architecture work, review, or product researc
 6. Desktop and mobile must share domain types, Project IR, design tokens and terminology where practical.
 7. External engines and providers must be accessed behind stable CEVRA interfaces/adapters.
 8. Project schemas are versioned. Backwards compatibility is preserved by explicit tested migrations.
-9. Audit licenses before adding dependencies. Prefer Apache-2.0, MIT and BSD. LGPL/GPL/AGPL/UNLICENSED require explicit review before implementation.
+9. Audit licenses before adding dependencies. Prefer Apache-2.0, MIT and BSD. LGPL/GPL/AGPL/proprietary/UNLICENSED require explicit review before implementation.
 10. EDVID MIT code may be reused with required attribution. Auroq or other proprietary/UNLICENSED code may be studied for behavior and architecture but must be independently reimplemented unless a compatible license is obtained.
 11. Never commit secrets, API keys, access tokens, signing keys or private model credentials.
 12. CEVRA-owned source is proprietary unless a file explicitly states otherwise. Third-party notices belong in `THIRD_PARTY_LICENSES.md` and `NOTICE`.
