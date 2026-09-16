@@ -1,9 +1,9 @@
 # CEVRA — Decisões visuais e de produção: continuidade a partir da decisão 14
 
 **Data:** 2026-09-16, aprovação do product owner nesta rodada de continuidade.
-**Versão deste registro:** 2.
+**Versão deste registro:** 3.
 **Status:** DIREÇÃO DE PRODUTO APROVADA / IMPLEMENTAÇÃO NÃO AUTORIZADA POR ESTE REGISTRO.
-**Decisões aprovadas neste documento:** 14 e 15, respeitadas as condições de viabilidade e escopo abaixo. Não há aprovação implícita de uma decisão 16 ou posterior.
+**Decisões aprovadas neste documento:** 14, 15 e 16, respeitadas as condições de viabilidade e escopo abaixo. Não há aprovação implícita de uma decisão 17 ou posterior.
 
 ## 0. Autoridade, localização e continuidade
 
@@ -21,6 +21,8 @@ Estado remoto conferido antes da criação da versão 1 (histórico):
 Este arquivo é acrescentado à branch documental existente. Não é mudança no main, implementação, merge, gasto, integração externa ou autorização para alterar a branch de trabalho do cache. Antes de emissão de prompt dependente, recuperar explicitamente o PR #26 e este arquivo até sua integração. O Master Context continua pendente de resumo/link e reconciliação pelo processo normal, sem mover uma base congelada somente para integrar documentação.
 
 Na atualização para a versão 2, `refs/heads/main` foi novamente consultado e permanecia em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`; o PR #26 estava aberto/draft, não mesclado, em `b33bd3ba0869731472c03056344ba6cc29c8f89d`, commit de criação deste registro. A atualização acrescenta a aprovação da decisão 15 com sua ressalva de esforço/escopo, preserva a decisão 14 e atualiza o handoff. Não declara novo closeout do cache ou dos ajustes coordenados.
+
+Na atualização para a versão 3, `refs/heads/main` foi conferido novamente em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` e o PR #26 permanecia aberto/draft, não mesclado, com head `428e615002ed30a82c87383f6409c98273d80a96`. O product owner aprovou a decisão 16; este registro acrescenta seus detalhes, preserva as decisões 14–15 e atualiza o handoff. Não fecha o gate de implementação nem declara a decisão 17 aprovada.
 
 ## 1. Regra desta rodada antecipada
 
@@ -105,7 +107,7 @@ Referências verificadas: [WORKFLOW_PRESETS.md](WORKFLOW_PRESETS.md), [ADR 0010]
 |---|---|
 | Ponta a ponta disponível | Não há o fluxo completo escolher → aplicar → revisar → salvar presets. O seletor atual é de apresentação e a escolha fica no estado local da UI. |
 | Primitivas existentes | `StyleState`, campos de estilo/cor, referências de layouts, `CaptionCue`/`GraphicItem` e `style.patch` implementado; Project IR e histórico existentes são a autoridade a reutilizar. Isso não prova um renderizador de estilos. |
-| Extensão interna mínima | Catálogo validado; resolução das escolhas; biblioteca local de presets; registro de versão e parâmetros resolvidos; integração aplicação–Desktop Host–UI; ligação aos compiladores de legenda/composição. Avaliar o que os campos/comandos existentes representam corretamente; ampliar somente lacunas demonstradas, sem migração especulativa ou objetos não validados em `extensions`. |
+| Extensão interna mínima | Catálogo validado; resolução das escolhas; biblioteca local de presets; registro de versão e parâmetros resolvidos; integração aplicação–Desktop Host–UI; ligação aos compiladores de legenda/composição. Avaliar o que os campos/comandos existentes representam corretamente a necessidade; ampliar somente lacunas demonstradas, sem migração especulativa ou objetos não validados em `extensions`. |
 | Dependências posteriores | Execução dos componentes visuais e seleção/integração validada do Composition Engine. Tracking, mídia externa e geração conservam suas dependências próprias; não são pré-requisitos para selecionar ou salvar um preset. |
 
 Director impact: extensão comportamental compatível com o reaproveitamento de preferências, o contexto compacto, a aprovação delimitada e a execução por comandos. Não é prova de integração do Director. Presets declarativos ficam na aplicação; estado audiovisual aplicado permanece no Project IR/ProjectHistory, sem segunda timeline ou estado paralelo baseado nos JSONs do EDVID.
@@ -230,9 +232,67 @@ Os limites numéricos e a representação técnica final serão especificados e 
 
 > As legendas do CEVRA representarão fielmente a fala efetivamente presente na montagem e acompanharão seu tempo de áudio. O sistema reutilizará transcrições e alinhamentos válidos, com referências verificáveis, sem retranscrição obrigatória a cada alteração. Dúvidas ou falhas concretas poderão exigir análise adicional, inclusive da montagem completa quando justificado. Correções permanecerão editáveis, rastreáveis e protegidas contra sobrescrita indevida. A implementação ocorrerá na fatia de legendas, apoiada no mapeamento temporal e nas capacidades de mídia previamente validados.
 
-## 4. Handoff e integração documental
+## 4. Decisão 16 — Como dividir a fala em legendas fáceis de ler
 
-Antes de qualquer prompt dependente no CEVRA 3, recuperar o estado real do main e dos PRs. Até a integração, ler explicitamente PR #26 / `docs/editorial-decisions-1-8`: registro editorial v4 para decisões 1–13 e inventário MR; este documento v2 para decisões 14–15; e o registro do Director no PR #25/revisão aplicável.
+**APROVADA COMO DIREÇÃO DE PRODUTO em 2026-09-16.** O product owner respondeu “Aprovado. Proximo” à proposta detalhada de agrupamento e legibilidade. A aprovação não comprova esforço pequeno, limites numéricos finais ou disponibilidade; não autoriza código, merge, gasto nem seleção de nova dependência.
+
+### 4.1 Referência EDVID e evidência
+
+Referência fixada: `fillrochaa/edvid@d8e6389db02e8de0b46ee680105c09d4250d4703`. Manter SKILL.md e as referências shortform/longform em conjunto com os helpers e componentes, distinguindo instrução, código inspecionado e validação real.
+
+- [Main.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/Main.tsx), `buildLines`, `Word` e `Karaoke`: pequenos grupos por quantidade e pontuação, entrada progressiva de palavras, medição do texto e redução de escala para caber na largura configurada. Não inferir que essa política seja idêntica em todos os estilos.
+- [caption_style.py](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/helpers/caption_style.py): preparação própria do Empilhado, incluindo agrupamento e tentativa de juntar palavras isoladas breves demais a blocos vizinhos. Regras locais não equivalem a interpretação semântica universal.
+- [captions_srt.py](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/helpers/captions_srt.py): agrupamento por pontuação, pausas, comprimento/duração e quebra em linhas. As constantes da referência não são limites universais aprovados para CEVRA.
+- Conferência complementar ao registrar esta aprovação: [SimpleCaptions.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/SimpleCaptions.tsx) já agrupa por largura medida, limita palavras, considera pontuação/pausas e penaliza algumas quebras depois de palavras funcionais. Preservar esse comportamento útil; não atribuir a CEVRA a invenção de toda proteção de leitura.
+
+O EDVID já adapta o agrupamento à apresentação. A proposta não é substituir isso por um novo sistema uniforme. Nenhum teste de renderização ou benchmark foi executado nesta aprovação.
+
+### 4.2 Comportamento aprovado e exemplo
+
+**Preservar os comportamentos úteis do EDVID e acrescentar proteções simples de leitura, sem transformar todos os estilos na mesma legenda.**
+
+1. **Quebras naturais e proporcionais.** Considerar pontuação, pausas e espaço disponível. Evitar separar desnecessariamente expressões como “30 segundos” ou “não é obrigatório”. Isso não impede entrada/destaque por palavra; não promete uma regra determinística capaz de compreender toda expressão.
+2. **Fazer caber sem texto minúsculo.** Quando um grupo for longo demais, buscar divisão melhor antes de reduzir excessivamente a fonte. Adicionar outra linha somente se o estilo permitir. Não converter silenciosamente karaokê de uma linha em Empilhado nem retirar o controle do usuário.
+3. **Evitar palavras que apenas piscam.** Preservar palavra isolada como recurso de ênfase, desde que haja tempo para percebê-la. Ajustar agrupamento quando necessário, sem apagar palavras, mudar a gravação ou deixar indevidamente texto preso durante uma pausa.
+4. **Sem IA por quebra.** Usar processamento local de texto/tempos e regras próprias de cada estilo. Dificuldade isolada não autoriza automaticamente adicionar um modelo ou uma cascata de inferência.
+5. **Fidelidade e compatibilidade.** Preservar texto, sincronismo e correções válidas conforme decisão 15, além do catálogo e escolhas da decisão 14. Não impor uma contagem ou número de linhas único a todos os estilos. Preservar ajustes editáveis no caminho canônico.
+
+Exemplo apresentado: em “O vídeo precisa de 30 segundos”, tentar manter “30 segundos” no mesmo grupo quando couber, em vez de separá-los apenas por alcançar uma contagem fixa. É orientação de agrupamento, não autorização para alterar a frase ou atrasar a fala.
+
+Esta aprovação não escolhe fontes, animações, posicionamento, tradução ou valores exatos de tamanho mínimo, duração e número de palavras. Esses parâmetros dependem do estilo e de validação na fatia técnica.
+
+### 4.3 Viabilidade, componentes e custos
+
+Baseline da proposta: `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`, mantido pela nova consulta ao main antes do registro. Referências CEVRA: tipos e comandos de `packages/project-ir/src/`, `packages/application/src/index.ts`, contrato `packages/contracts/src/composition.ts` e ADRs 0010/0012/0013. Revalidar antes da implementação dependente.
+
+| Classificação | Situação |
+|---|---|
+| Primitivas existentes | Palavras com tempos, blocos `CaptionCue`, comandos de alteração de legendas e ProjectHistory. Isso não entrega por si só agrupamento legível ou medição visual. |
+| Integração/extensão interna | Formar grupos, medir texto com a fonte efetivamente utilizada, verificar tempo de exibição, representar os parâmetros que faltarem de forma validada e ligar o compilador ao renderizador, à aplicação e à UI. Reutilizar primeiro o que for correto; nenhuma migração especulativa ou segunda timeline. |
+| Ponta a ponta | As proteções de agrupamento, medição e apresentação propostas não estão demonstradas integradas no aplicativo. Testes dos tipos/histórico não provam legibilidade no render. |
+| Externo/não verificado | Nenhum novo modelo ou API paga identificado como obrigatório para o núcleo. A medição visual depende da solução de composição; não foi selecionada biblioteca ou fonte. Qualquer incorporação futura requer versão exata, proveniência, licença/termos e compatibilidade comercial. |
+
+**Benefício esperado:** reduzir quebras inadequadas, texto excessivamente pequeno e palavras rápidas demais para leitura. **Contrapartida:** manter e testar regras por estilo. Contagem rígida seria simples, mas ignora largura/duração; redução indiscriminada pode prejudicar leitura; análise semântica por quebra adicionaria custo e complexidade não justificados. Recomenda-se a extensão local proporcional dos comportamentos úteis.
+
+Processamento e armazenamento adicionais concentram-se em texto, tempos, medições e parâmetros; renderização tem custo separado. Tempo/RAM/armazenamento/espera e esforço não foram medidos. Não prometer custo desprezível, hardware mínimo ou qualidade superior. Evitar nova transcrição por alteração de agrupamento puramente visual, cópias integrais e pré-render de todas as combinações. A necessidade real de análise de fala continua regida pela decisão 15.
+
+Director impact: agrupamento mecânico e medição não dependem de nova chamada editorial; intenção/ênfase ambígua pode permanecer no planejamento autorizado. Não alterar significado ou ultrapassar permissões para resolver um problema de layout. Expansão material de arquitetura, dependência ou custo deve voltar ao product owner antes do código.
+
+### 4.4 Momento de implementação, divergência e validação
+
+**IMPLEMENTAR NA FATIA DE LEGENDAS, após a base temporal da decisão 15 e junto da integração visual.** Nenhuma nova operação obrigatória de Media Runtime foi identificada. O gate atual continua aberto; não colocar agrupamento tipográfico no worker ou reabrir motores fechados por causa desta decisão.
+
+Conferir com o EDVID, nos mesmos tipos de material: fala rápida, pausas, palavras longas, números e unidades, negações, palavras isoladas de ênfase, estilos de uma e duas linhas e variantes animadas/estáticas. Verificar legibilidade, preservação de todas as palavras e da ordem, sincronismo, duração útil, largura real da fonte, ausência de texto residual indevido em pausas e preservação da identidade de cada estilo. Medir consumo por operação representativa e manter controles/correções editáveis.
+
+Registrar como **DIVERGÊNCIA EDVID** a mudança concreta de comportamento que efetivamente ocorrer, com evidência proporcional de paridade/melhoria; não registrar como novidade aquilo que o EDVID já faz nem declarar a comparação aprovada antes do teste. Os limiares finais serão escolhidos e validados na fatia executável. Falha de qualidade ou custo desproporcional exige solução mais simples/revisão antes de ampliar escopo.
+
+### 4.5 Redação objetiva aprovada
+
+> O CEVRA organizará as palavras em grupos legíveis conforme o estilo escolhido, respeitando a fala, os tempos e o espaço disponível. Evitará quebras inadequadas, redução excessiva do texto e palavras exibidas rápido demais, sem resumir a fala nem trocar silenciosamente o estilo. Reutilizará os comportamentos úteis do EDVID, com processamento local e validação por estilo.
+
+## 5. Handoff e integração documental
+
+Antes de qualquer prompt dependente no CEVRA 3, recuperar o estado real do main e dos PRs. Até a integração, ler explicitamente PR #26 / `docs/editorial-decisions-1-8`: registro editorial v4 para decisões 1–13 e inventário MR; este documento v3 para decisões 14–16; e o registro do Director no PR #25/revisão aplicável.
 
 No fechamento documental autorizado, acrescentar ao Master Context um resumo curto e links para ambos os registros, o estado real dos marcos/branches e a prioridade do MR; reconciliar AGENTS sem duplicar detalhes ou apagar políticas concorrentes. Esta rodada não deve impedir o fechamento das aprovações já existentes nem ser confundida com autorização para mesclar uma feature.
 
@@ -242,6 +302,8 @@ Resumos para o índice global, a integrar no momento correto:
 
 > 2026-09-16 — Decisão 15 aprovada com escopo/esforço a validar: legenda fiel à fala e ao tempo real do áudio; reaproveitamento condicionado de transcrição/alinhamento, análise adicional quando necessária, correções editáveis e preservadas se ainda válidas. Integração temporal considera MR-A05/MR-V01 já previstos; compilador/referências na fatia de legendas. Nenhuma nova operação MR ou API paga obrigatória identificada. Não foi demonstrado esforço pequeno; expansão material volta ao product owner antes da implementação. Detalhes, divergência EDVID e validações em `docs/CEVRA_VISUAL_DECISIONS.md`, versão 2.
 
-Próximos temas são candidatos à discussão, não aprovações: agrupamento/legibilidade e demais detalhes de legendas; composição/layouts e inserções; B-roll/ativos; música/SFX e geração conforme dependências. Continuar a numeração real a partir de 16. Subdividir temas quando necessário para decidir um comportamento por resposta, sem inventar aprovações ou transformar o mapa em escopo automático.
+> 2026-09-16 — Decisão 16 aprovada: agrupamento legível por estilo, com pausas/pontuação/largura/tempos, evitando quebras inadequadas, texto minúsculo e palavras que apenas piscam; sem resumir a fala, trocar silenciosamente estilo ou exigir IA por quebra. Reutilizar comportamentos EDVID existentes. Implementar na fatia de legendas após a base temporal da decisão 15 e junto da integração visual. Nenhuma nova operação MR obrigatória identificada; parâmetros, consumo e paridade continuam pendentes. Detalhes em `docs/CEVRA_VISUAL_DECISIONS.md`, versão 3.
+
+Próximos temas são candidatos à discussão, não aprovações: posicionamento e demais detalhes de legendas; composição/layouts e inserções; B-roll/ativos; música/SFX e geração conforme dependências. Continuar a numeração real a partir de 17. Subdividir temas quando necessário para decidir um comportamento por resposta, sem inventar aprovações ou transformar o mapa em escopo automático.
 
 Aprovações posteriores devem ser registradas com seus detalhes e limites, e revisões materiais precisam de aprovação e marcação explícita de substituição/refinamento. Ao final da rodada, consolidar decisões, dependências, pendências e ordem de implementação em handoff autossuficiente, com localização e situação de integração. Não alegar envio automático de mensagem para outro chat.
