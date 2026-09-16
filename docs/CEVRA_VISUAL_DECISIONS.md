@@ -1,9 +1,9 @@
 # CEVRA — Decisões visuais e de produção: continuidade a partir da decisão 14
 
 **Data:** 2026-09-16, aprovação do product owner nesta rodada de continuidade.
-**Versão deste registro:** 4.
+**Versão deste registro:** 5.
 **Status:** DIREÇÃO DE PRODUTO APROVADA / IMPLEMENTAÇÃO NÃO AUTORIZADA POR ESTE REGISTRO.
-**Decisões aprovadas neste documento:** 14, 15, 16 e 17, respeitadas as condições de viabilidade e escopo abaixo. Não há aprovação implícita de uma decisão 18 ou posterior.
+**Decisões aprovadas neste documento:** 14–17 e 18 condicionada ao escopo/esforço delimitado na seção 6. Não há aprovação implícita de uma decisão 19 ou posterior.
 
 ## 0. Autoridade, localização e continuidade
 
@@ -24,7 +24,9 @@ Na atualização para a versão 2, `refs/heads/main` foi novamente consultado e 
 
 Na atualização para a versão 3, `refs/heads/main` foi conferido novamente em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` e o PR #26 permanecia aberto/draft, não mesclado, com head `428e615002ed30a82c87383f6409c98273d80a96`. O product owner aprovou a decisão 16; este registro acrescenta seus detalhes, preserva as decisões 14–15 e atualiza o handoff. Não fecha o gate de implementação nem declara a decisão 17 aprovada.
 
-Na atualização para a versão 4, `refs/heads/main` foi novamente confirmado em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` e o PR #26 estava aberto/draft, não mesclado, em `89e77c02a1e52a019cf6bf20b7f65235136affe8`. A resposta “certo.” aprovou a decisão 17. Esta atualização preserva as decisões 14–16, acrescenta o posicionamento de legendas com seus limites e atualiza o handoff. Não declara conclusão do Media Runtime, não altera sua programação e não aprova a decisão 18.
+Na atualização para a versão 4, `refs/heads/main` foi novamente confirmado em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` e o PR #26 estava aberto/draft, não mesclado, em `89e77c02a1e52a019cf6bf20b7f65235136affe8`. O product owner aprovou a decisão 17 e perguntou sobre execução local versus uso de IA. Esta atualização preserva as decisões 14–16, acrescenta o posicionamento de legendas com seus limites e atualiza o handoff. Não declara conclusão do Media Runtime, não altera sua programação e não aprova a decisão 18. A versão 5 corrige a referência anterior abreviada à resposta “certo.”, sem mudar o comportamento aprovado.
+
+Na atualização para a versão 5, o main foi novamente confirmado em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`; o PR #26 estava aberto/draft, não mesclado, com head `6f16dd5792a24903741c5a0dc3ef8f9f467301c7` e este arquivo com blob `fb6bbebfd7b3b0ceed19d6f566f4209bb6da7347`. O product owner aprovou condicionalmente a personalização, limitando-a ao catálogo EDVID e a melhorias que não exijam grande trabalho adicional para benefício pequeno. Perguntou também como o Director informará a ausência de IA externa. A seção 6 registra a decisão 18 e esclarece as políticas já existentes de execução/capacidades; não cria uma decisão 19, novo modelo ou integração. Só este documento é atualizado; nenhum código, runtime, main ou outra branch recebe alteração.
 
 ## 1. Regra desta rodada antecipada
 
@@ -255,7 +257,7 @@ O EDVID já adapta o agrupamento à apresentação. A proposta não é substitui
 
 1. **Quebras naturais e proporcionais.** Considerar pontuação, pausas e espaço disponível. Evitar separar desnecessariamente expressões como “30 segundos” ou “não é obrigatório”. Isso não impede entrada/destaque por palavra; não promete uma regra determinística capaz de compreender toda expressão.
 2. **Fazer caber sem texto minúsculo.** Quando um grupo for longo demais, buscar divisão melhor antes de reduzir excessivamente a fonte. Adicionar outra linha somente se o estilo permitir. Não converter silenciosamente karaokê de uma linha em Empilhado nem retirar o controle do usuário.
-3. **Evitar palavras que apenas piscam.** Preservar palavra isolada como recurso de ênfase, desde que haja tempo para percebê-la. Ajustar agrupamento quando necessário, sem apagar palavras, mudar a gravação ou deixar indevidamente texto preso durante uma pausa.
+3. **Evitar palavras que apenas piscam.** Preservar palavra isolada como recurso de ênfase, desde que haja tempo de percebê-la. Ajustar agrupamento quando necessário, sem apagar palavras, mudar a gravação ou deixar indevidamente texto preso durante uma pausa.
 4. **Sem IA por quebra.** Usar processamento local de texto/tempos e regras próprias de cada estilo. Dificuldade isolada não autoriza automaticamente adicionar um modelo ou uma cascata de inferência.
 5. **Fidelidade e compatibilidade.** Preservar texto, sincronismo e correções válidas conforme decisão 15, além do catálogo e escolhas da decisão 14. Não impor uma contagem ou número de linhas único a todos os estilos. Preservar ajustes editáveis no caminho canônico.
 
@@ -294,7 +296,7 @@ Registrar como **DIVERGÊNCIA EDVID** a mudança concreta de comportamento que e
 
 ## 5. Decisão 17 — Onde a legenda aparece e como acompanha mudanças de layout
 
-**APROVADA COMO DIREÇÃO DE PRODUTO em 2026-09-16.** O product owner respondeu “certo.” à proposta de posicionamento, estabilidade e ajustes por trecho. Preservar todos os limites abaixo; aprovação não equivale a função pronta, teste realizado, nova dependência autorizada ou liberação do gate do Media Runtime.
+**APROVADA COMO DIREÇÃO DE PRODUTO em 2026-09-16.** O product owner aprovou a proposta de posicionamento, estabilidade e ajustes por trecho e pediu esclarecimento sobre execução local versus uso de IA. Preservar todos os limites abaixo; aprovação não equivale a função pronta, teste realizado, nova dependência autorizada ou liberação do gate do Media Runtime. A seção 6.6 retoma esse esclarecimento sem registrar uma nova aprovação indevida.
 
 ### 5.1 Referência EDVID e evidência
 
@@ -348,9 +350,79 @@ A extensão coordenada entre estilos será registrada como **DIVERGÊNCIA EDVID*
 
 > O CEVRA posicionará as legendas conforme o estilo, o layout e as margens de entrega, mantendo estabilidade e evitando sobreposições com base nas informações disponíveis. Permitirá ajustes gerais ou por trecho, preservando escolhas explícitas do usuário. Mudanças de composição poderão reposicionar a legenda sem alterar texto ou sincronismo, sem exigir rastreamento contínuo ou novo modelo de IA.
 
-## 6. Handoff e integração documental
+## 6. Decisão 18 — Personalização limitada dos estilos existentes
 
-Antes de qualquer prompt dependente no CEVRA 3, recuperar o estado real do main e dos PRs. Até a integração, ler explicitamente PR #26 / `docs/editorial-decisions-1-8`: registro editorial v4 para decisões 1–13 e inventário MR; este documento v4 para decisões 14–17; e o registro do Director no PR #25/revisão aplicável.
+**APROVADA CONDICIONALMENTE em 2026-09-16.** O product owner determinou: “Não vamos criar novas possibilidades de legendas neste momento. Vamos usar o que o EdVideo entrega” e condicionou as melhorias propostas à ausência de grande trabalho adicional para obter apenas pequenas edições. Nesta conversa, EdVideo refere-se ao EDVID de revisão fixada, não a outro produto.
+
+Esta redação delimitada prevalece sobre uma leitura irrestrita da proposta de personalização anterior. Não transformar a aprovação em obrigação de construir um editor tipográfico completo, catálogo novo ou motor de animação genérico. Não afirmar que o esforço é pequeno antes da avaliação executável.
+
+### 6.1 Referência EDVID inspecionada
+
+Mesma referência: `fillrochaa/edvid@d8e6389db02e8de0b46ee680105c09d4250d4703`, SKILL.md e referências shortform/longform já lidas.
+
+- [StackedCaptions.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/StackedCaptions.tsx) contém escala e deslocamento configuráveis (`fontScale`, `stackedOffsetY`), composição tipográfica por funções, cores e outros detalhes fixos, além de configuração própria de SFX. A existência de parâmetros no componente não significa controle uniforme na UI nem autorização de música/SFX nesta decisão.
+- [ScatterCaptions.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/ScatterCaptions.tsx) lê tamanho, largura e posição (`scatterFontSize`, `scatterSafeWidth`, `scatterOffsetY`), preservando uma estrutura de animação e tipografia própria.
+- [SimpleCaptions.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/SimpleCaptions.tsx) define variantes estáticas com configurações próprias no código. [Main.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/Main.tsx) e o catálogo da interface complementam as escolhas descritas na decisão 14.
+
+A personalização não é uniforme entre componentes e interface. Esses fatos resultam de inspeção do código na discussão, não de novo teste de renderização. Não presumir que trocar um literal de cor entrega, sozinho, controle validado, persistência, undo/redo e equivalência preview/export.
+
+### 6.2 Escopo aprovado e limite de esforço
+
+1. **Catálogo existente como piso e limite atual.** Manter os seis estilos EDVID já identificados (Karaokê, Empilhado, Disperso, Simples, Serifada e Clássica), Nenhum e as capacidades de legendagem pertinentes, inclusive o caminho SRT já previsto. Não acrescentar novas famílias de legenda/animação por esta aprovação; não reduzir o piso de paridade para economizar trabalho.
+2. **Melhorias incrementais, condicionadas ao custo.** Preferir expor parâmetros que os componentes já oferecem. Tamanho, cor do texto/destaque e fontes compatíveis foram propostos, mas só entram quando o acréscimo total for proporcional. Não assumir autorização para biblioteca extensa de fontes, importação arbitrária, sistema genérico de estilos ou combinação irrestrita de efeitos. Contorno, sombra ou fundo só aparecem como controles se forem compatíveis com o estilo e com capacidade real implementada dentro desse limite.
+3. **Identidade preservada.** Alterar cor/tamanho não deve alterar automaticamente texto, sincronismo ou animação. Em estilos que misturam fontes, preservar suas funções, salvo pedido explícito e suportado. Mudança de fonte/tamanho pode recalcular agrupamento e ocupação conforme decisões 16–17; isso não autoriza modificar a fala. Não criar novas animações em resposta a uma simples personalização.
+4. **Restauração delimitada.** Voltar à aparência padrão do estilo sem apagar correções de texto nem refazer a montagem. Reutilizar o salvamento de combinação como preset próprio já aprovado na decisão 14, sem construir outro sistema de presets.
+5. **Controles honestos.** Não expor botões sem efeito ou opções futuras como executáveis. Preservar validação, comandos/ProjectHistory, persistência e capacidade real de renderização.
+6. **Regra de parada.** Antes do prompt dependente, separar trabalho necessário para portar/integrar corretamente o EDVID do trabalho extra de cada melhoria. Se uma personalização exigir reforma relevante, dependência nova ou grande custo para benefício pequeno, não implementá-la sob esta aprovação: manter a capacidade EDVID, explicar a alternativa mais simples e voltar ao product owner para decidir simplificação/adiamento. A condição não é dispensa de qualidade, segurança ou integração canônica e não revoga silenciosamente decisões 14–17.
+
+Exemplo discutido: escolher Empilhado e trocar o destaque laranja pelo azul da marca, diminuindo um pouco a legenda, sem reconstruir a organização/animação. O exemplo é alvo de melhoria condicionada, não prova de que todos os estilos já aceitam esses ajustes ou de que fazê-los é trivial.
+
+### 6.3 Viabilidade, alternativas e custo-benefício
+
+Baseline revalidado: `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`. Referências CEVRA inspecionadas nesta rodada: [types.ts](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/project-ir/src/types.ts), [commands.ts](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/project-ir/src/commands.ts), [Inspector.tsx](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/apps/desktop/src/components/Inspector.tsx), contrato de composição e ADRs 0010/0012/0013. Os mesmos arquivos permanecem no baseline consultado; revalidar antes do código.
+
+| Classificação | Situação / mínimo adicional |
+|---|---|
+| Primitivas | `StyleState`, identificação de estilo, cor de destaque, referências por legenda, `style.patch`, comandos de legenda e histórico. |
+| Ponta a ponta | Personalização proposta ainda não integrada. Fonte/tamanho/posição no inspetor consultado são campos de apresentação/somente leitura; isso não prova aplicação real. |
+| Extensões/integração | Parâmetros fechados por estilo, validação, ligação aos componentes de composição, controles funcionais, persistência/undo/redo e restauração do padrão. Reutilizar os contratos que representarem corretamente o necessário; não migrar o IR por antecipação. |
+| Externo / não verificado | Nenhum novo modelo ou API paga obrigatório identificado para configurar esses parâmetros. Render depende da composição e do benchmark. Nenhuma fonte, biblioteca, peso, LUT ou serviço selecionado/incorporado. |
+
+**Benefício:** personalizar identidade visual mantendo os modelos prontos. **Contrapartida:** mais combinações para testar e manter. Foram comparados estilos totalmente fechados, controles limitados e editor irrestrito; preferir controles limitados de baixo acréscimo, mantendo o padrão EDVID quando o extra não compensar.
+
+O custo incremental não é só adicionar um seletor: inclui representação, compilação, UI, histórico/persistência, compatibilidade e teste visual. Configuração determinística não requer retranscrição nem IA por alteração. Fontes, medições, amostras e render têm consumo próprio de CPU/RAM/armazenamento/espera; carregar apenas o necessário e não todas as combinações. Nenhum número de esforço, economia ou hardware mínimo foi medido nesta discussão.
+
+Qualquer fonte ou dependência efetivamente incorporada exige versão exata, licença/proveniência, redistribuição comercial, termos e privacidade investigados. A licença do repositório EDVID não comprova automaticamente a elegibilidade de cada ativo/dependência. Nenhuma auditoria jurídica concluída ou risco zero é alegado.
+
+### 6.4 Momento e validação
+
+**IMPLEMENTAR, QUANDO PROPORCIONAL, COM OS COMPONENTES VISUAIS DE LEGENDAS**, apoiados nas decisões 15–17 e no sistema de presets da 14. Definir parâmetros realmente suportados antes dos controles; testar junto do componente para evitar uma UI desconectada. Não postergar indevidamente o piso EDVID para terminar personalizações opcionais.
+
+Nenhuma nova operação obrigatória do Media Runtime foi identificada por esta decisão. A frente coordenada atual e sua sequência não se alteram. Não reabrir os motores existentes nem antecipar editor genérico de animações.
+
+Validar aparência padrão e personalizada, fontes efetivamente usadas, legibilidade, cores aplicadas, agrupamento, ocupação, sincronismo, restauração sem perda de correções, persistência e undo/redo. Comparar resultado, amostra e exportação com EDVID. Registrar como **DIVERGÊNCIA EDVID** a personalização que efetivamente ampliar comportamento, sem declarar ganho antes da comparação. A validação inclui se o benefício justifica o acréscimo de implementação/manutenção; nenhuma renderização/benchmark foi executado por este registro.
+
+### 6.5 Redação consolidada da aprovação condicionada
+
+> O CEVRA usará o catálogo e os comportamentos de legenda existentes no EDVID, sem criar novas famílias neste momento. As melhorias de aparência propostas serão adotadas somente quando puderem ser integradas com acréscimo proporcional, preservando a identidade do estilo, texto, sincronismo, correções e controles reais. Não haverá grande reforma para obter apenas pequenas personalizações; se esse custo aparecer, manter o recurso EDVID e retornar a alternativa delimitada para decisão antes de implementar. A execução ocorrerá nas fatias de legendas/composição, sem ampliar agora o Media Runtime.
+
+### 6.6 Esclarecimento solicitado — modo local, IA e transparência do Director
+
+O product owner perguntou se o usuário saberá quando o Director não tiver IA externa para consulta. Este esclarecimento aplica o [registro já aprovado do Director](https://github.com/inlifemedicina/cevra/blob/fe4c58b6d2100b95f636c4e2b07c7cf03bc95be6/docs/CEVRA_DIRECTOR_DECISIONS.md), especialmente seções 6, 8, 10, 11 e 12, relidas nesta atualização. Não é aprovação de uma decisão 19 nem escolha de provedor, modelo ou design final de interface.
+
+- **Informar capacidade e uso real.** Distinguir execução local por regras/preset, inferência local efetivamente disponível para a tarefa e consulta externa autorizada. IA externa conectada não significa IA externa consultada em toda operação; um render local pode utilizar um plano obtido externamente antes. Não rotular o fluxo inteiro como sem IA ou sem envio de dados só porque a etapa atual é local.
+- **Sem equivalência fictícia.** Ausência de IA externa não ativa automaticamente uma IA local de raciocínio geral. Transcrição/alinhamento locais não demonstram interpretação de qualquer pedido criativo ou compreensão visual universal. Nenhum modelo local geral foi escolhido nesta rodada.
+- **Limitação compreensível.** O usuário deve saber o que pode ser executado com recursos disponíveis e qual parte do pedido depende de capacidade ausente. Presets e ações determinísticas suportadas continuam úteis; pedido sem interpretação confiável não deve ser convertido silenciosamente em outra edição nem apresentado como atendido integralmente.
+- **Falha durante a operação.** Limite, erro ou desconexão exigem informar o impedimento confirmado, preservar estado e pausar a parte dependente. Continuar somente trabalho independente seguro e autorizado; não trocar provedor, cobrar API, enviar mais dados ou reduzir silenciosamente o resultado para simular sucesso. Se a causa/ quota não estiver disponível por mecanismo oficial, marcar desconhecido em vez de inventar motivo ou saldo.
+- **Exemplos de comunicação, não strings finais aprovadas:** “Execução local por preset; nenhuma consulta externa nesta etapa”; “IA local — modelo disponível para esta tarefa”; “IA externa — provedor/modelo utilizado”; “Interpretação solicitada indisponível; os ajustes locais continuam disponíveis”. Preferir informação proporcional ao impacto, sem exigir alerta modal a cada ajuste simples.
+
+Implementação pertence ao Director/aplicação, ao adapter de conexão e à UI/host: propagar capacidades/estado de conexão/resultado reais, identificar a etapa e mostrar limites. Usar metadados/eventos oficiais, não consultar o modelo para descobrir o plano do usuário nem raspar a interface de contas. Seguir atualização de capabilities por conexão, mudança, expiração justificada ou falha pertinente, sem polling pesado obrigatório.
+
+O `DirectorPanel.tsx` consultado já mostra disponibilidade geral de execução por capability, mas não demonstra esse acompanhamento completo por provedor/etapa. Logo, transparência é direção existente a integrar, não função pronta anunciada. Esforço e consumo da integração dependem do adapter real; não exigem por si um segundo motor de mídia ou novo modelo. Provar ausência de substituição silenciosa, mensagens coerentes em falha/limite e preservação do trabalho na fatia do Director. Não ampliar o inventário MR por este esclarecimento.
+
+## 7. Handoff e integração documental
+
+Antes de qualquer prompt dependente no CEVRA 3, recuperar o estado real do main e dos PRs. Até a integração, ler explicitamente PR #26 / `docs/editorial-decisions-1-8`: registro editorial v4 para decisões 1–13 e inventário MR; este documento v5 para decisões 14–18, sendo a 18 condicionada; e o registro do Director no PR #25/revisão aplicável. A seção 6.6 esclarece políticas já existentes e não equivale a nova decisão numerada.
 
 No fechamento documental autorizado, acrescentar ao Master Context um resumo curto e links para ambos os registros, o estado real dos marcos/branches e a prioridade do MR; reconciliar AGENTS sem duplicar detalhes ou apagar políticas concorrentes. Esta rodada não deve impedir o fechamento das aprovações já existentes nem ser confundida com autorização para mesclar uma feature.
 
@@ -364,6 +436,8 @@ Resumos para o índice global, a integrar no momento correto:
 
 > 2026-09-16 — Decisão 17 aprovada: posição de legenda própria do estilo/layout, estabilidade da caixa, adaptação às inserções e margens, ajustes gerais ou por trecho sem sobrescrever posições explícitas. Evitar sobreposição conforme evidência disponível, sem rastreamento contínuo obrigatório nem promessa de detectar todo objeto. Implementar com legendas/composição depois das bases 15–16; nenhuma nova operação MR obrigatória identificada. SRT não recebe promessa de layout idêntico. Detalhes, viabilidade e validação pendente em `docs/CEVRA_VISUAL_DECISIONS.md`, versão 4.
 
-Próximos temas são candidatos à discussão, não aprovações: personalização e demais detalhes dos estilos de legendas; composição/layouts e inserções; B-roll/ativos; música/SFX e geração conforme dependências. Continuar a numeração real a partir de 18. Subdividir temas quando necessário para decidir um comportamento por resposta, sem inventar aprovações ou transformar o mapa em escopo automático.
+> 2026-09-16 — Decisão 18 aprovada condicionalmente: manter catálogo EDVID, sem novas famílias de legenda, e adotar personalizações apenas se o acréscimo de implementação/manutenção for proporcional. Não realizar grande reforma para pequenas edições; custo material volta para decisão. Implementar com componentes visuais de legendas/composição; nenhuma operação MR adicional identificada. A seção 6.6 esclarece o dever já previsto do Director de distinguir regras locais, IA local realmente capaz e consulta externa, informar indisponibilidade e não degradar silenciosamente o pedido. Detalhes em `docs/CEVRA_VISUAL_DECISIONS.md`, versão 5.
+
+Próximos temas são candidatos à discussão, não aprovações: composição/layouts e inserções; B-roll/ativos; música/SFX e geração conforme dependências. Não abrir novas famílias de legendas ou personalização ampla nesta rodada sob a aprovação condicionada. Continuar a numeração real a partir de 19 quando houver nova decisão material necessária. Não transformar esclarecimentos, escolhas técnicas rotineiras ou o mapa em novas aprovações automáticas.
 
 Aprovações posteriores devem ser registradas com seus detalhes e limites, e revisões materiais precisam de aprovação e marcação explícita de substituição/refinamento. Ao final da rodada, consolidar decisões, dependências, pendências e ordem de implementação em handoff autossuficiente, com localização e situação de integração. Não alegar envio automático de mensagem para outro chat.
