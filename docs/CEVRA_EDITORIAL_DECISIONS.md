@@ -1,9 +1,9 @@
 # CEVRA — Decisões de análise editorial e montagem
 
 **Data das aprovações:** 2026-09-16, conversa do product owner.
-**Versão do registro:** 2.
+**Versão do registro:** 3.
 **Status:** DIREÇÃO DE PRODUTO / IMPLEMENTAÇÃO NÃO AUTORIZADA NESTA DISCUSSÃO. Ver o status específico de cada seção.
-**Escopo:** decisões 1–10 aprovadas, refinamentos finais, diretrizes transversais e levantamento condicionado da decisão 11 na conversa “CEVRA — Análise editorial e montagem”.
+**Escopo:** decisões 1–10 aprovadas, núcleo convencional da decisão 11 e inclusão das extensões justificadas na próxima frente de Media Runtime, refinamentos e diretrizes transversais. A seção 17 registra a revisão de viabilidade das onze decisões; código, arquitetura detalhada e novas dependências não são autorizados por este registro.
 
 ## 0. Autoridade, continuidade e situação da integração
 
@@ -225,7 +225,7 @@ A discussão aprovou comportamentos, não uma implementação monolítica. O cac
 
 O próximo estágio do roadmap é contexto/transcrição editorial compacta e evidências, seguido por estratégia/plano/validação. As decisões registradas orientam seu escopo; não exigem que todos os modelos, técnicas de corte, mobile ou estilos estejam escolhidos antes de construir uma projeção básica.
 
-**Atualização de 2026-09-16:** a discussão de conteúdo mínimo da estratégia, antes pendente na versão 1, foi resolvida pela decisão 9; cor/aparência foi aprovada na decisão 10. Ambas constam da seção 15. A decisão 11 tem levantamento e planejamento de extensões registrados na seção 16; não confundir isso com implementação ou autorização indiscriminada de restauração avançada.
+**Atualização de 2026-09-16:** a discussão de conteúdo mínimo da estratégia, antes pendente na versão 1, foi resolvida pela decisão 9; cor/aparência foi aprovada na decisão 10. Ambas constam da seção 15. A decisão 11 tem levantamento e planejamento de extensões registrados na seção 16, com inclusão do núcleo convencional na próxima frente de extensão conforme a seção 17; não confundir isso com implementação atual ou autorização indiscriminada de restauração avançada.
 
 Verificação/correções (decisão 12 candidata) e revisão da montagem/avanço de fase (decisão 13 candidata) continuam pendentes. Parâmetros exatos, QA/preview, composição e demais integrações permanecem nos respectivos gates. O mapa de discussões não exige bloqueio de trabalho seguro não dependente.
 
@@ -237,7 +237,7 @@ Antes de marcar pronto/mesclar, reconciliar com os resultados reais do PR #24 e 
 
 Resumo curto atualizado para o índice, sem copiar todo este registro:
 
-> 2026-09-16 — DIREÇÃO APROVADA / IMPLEMENTAÇÃO PENDENTE: decisões 1–10 de entrada, leitura multimodal, evidências, takes, montagem, duração, ritmo, junções, estratégia e cor. Preparação compartilhada, sem cascata obrigatória de modelos ou compressão repetida de pausas. Priorizar bons resultados sem API paga obrigatória, evidência mínima no mobile, auditoria comercial e propostas refinadas por custo total e viabilidade executável. Decisão 11: lacunas de áudio e extensões do Media Runtime reunidas para planejamento futuro, não execução automática; restauração avançada ainda depende de investigação. Registro detalhado: `docs/CEVRA_EDITORIAL_DECISIONS.md`.
+> 2026-09-16 — DIREÇÃO APROVADA / IMPLEMENTAÇÃO PENDENTE: decisões 1–11 de entrada, leitura multimodal, evidências, takes, montagem, duração, ritmo, junções, estratégia, cor e núcleo convencional de áudio, com as condições registradas. Preparação compartilhada, sem cascata obrigatória de modelos ou compressão repetida de pausas. Priorizar bons resultados sem API paga obrigatória, evidência mínima no mobile, auditoria comercial e propostas refinadas por custo total e viabilidade executável. Próxima extensão coordenada: MR-A01–MR-A06 (áudio e integração), MR-V01 (metadados) e MR-V02 (cor); reaproveitar capacidades existentes, sem reescrita das fundações. Restauração avançada e seleção de modelos continuam em investigação. Registro e revisão das onze decisões: `docs/CEVRA_EDITORIAL_DECISIONS.md`, seções 16–17. Não há código implementado por esta aprovação.
 
 ## 15. Continuidade — decisões 9 e 10
 
@@ -265,9 +265,9 @@ Priorizar metadados e amostras representativas, aprofundar mudanças relevantes,
 
 ## 16. Decisão 11 — Áudio: viabilidade e extensões a planejar
 
-**REGISTRO DE LACUNAS E PLANEJAMENTO AGRUPADO APROVADOS em 2026-09-16. Escopo técnico final, consumo e implementação permanecem sujeitos a avaliação; não registrar a proposta inteira como entregue ou como autorização irrestrita de novos motores.**
+**APROVADA A DIREÇÃO DO NÚCLEO CONVENCIONAL E SUA INCLUSÃO NA PRÓXIMA FRENTE DE EXTENSÃO, em continuidade ao registro de lacunas aprovado em 2026-09-16. A seção 17 refina o status da versão 2: não é apenas lembrete de pesquisa. Especificação técnica delimitada, validação de consumo/qualidade e autorização de implementação continuam necessárias; restauração avançada não recebe aprovação irrestrita.**
 
-Objetivo em discussão: áudio compreensível, consistente e natural, preservando timbre, dinâmica expressiva e sons relevantes; corrigir problemas proporcionalmente, sem voz de estúdio universal, tratamento cumulativo ou IA por trecho. Reutilizar o Media Runtime é a direção preferida para o núcleo convencional. O product owner determinou que o custo de implementar capacidades ausentes seja apresentado antes da adoção final do escopo.
+Objetivo: áudio compreensível, consistente e natural, preservando timbre, dinâmica expressiva e sons relevantes; corrigir problemas proporcionalmente, sem voz de estúdio universal, tratamento cumulativo ou IA por trecho. Reutilizar o Media Runtime é a direção preferida para o núcleo convencional. O product owner determinou que o custo de implementar capacidades ausentes seja apresentado antes da adoção final do escopo.
 
 ### 16.1 Base e limites verificados
 
@@ -277,9 +277,9 @@ O contrato admite `probe`, `extract-audio`, `detect-silence`, `volume`, `audio-f
 
 Não confundir disponibilidade genérica de filtro no FFmpeg com sua presença no bundle exato, exposição segura pelo CEVRA ou qualidade validada. Ampliar o Media Runtime significa primeiro contratos/adapter/worker/validação e integração; não implica automaticamente modificar o código-fonte do FFmpeg, trocar sua versão, adicionar um segundo runtime ou alterar uma fundação estável.
 
-### 16.2 Lista inicial de necessidades para a frente coordenada de Media Runtime
+### 16.2 Lista de necessidades para a próxima frente coordenada de Media Runtime
 
-Esta lista registra necessidades e candidatas, não uma especificação executável ou autorização para implementar todas. Manter aqui o levantamento enquanto esta discussão estiver aberta; um plano técnico futuro poderá detalhá-lo por referência, sem criar registros concorrentes.
+As necessidades abaixo ficam incluídas no planejamento da próxima extensão, conforme o pedido posterior consolidado na seção 17. A implementação será delimitada e testada antes do uso por funcionalidades dependentes; esta lista não autoriza código agora, filtros arbitrários nem inclusão de todos os recursos opcionais do FFmpeg. Manter o levantamento único neste registro, com detalhamento técnico futuro por referência.
 
 | ID | Necessidade identificada | Tratamento a avaliar antes da execução |
 |---|---|---|
@@ -289,6 +289,8 @@ Esta lista registra necessidades e candidatas, não uma especificação executá
 | MR-A04 | Tratamento convencional quando justificado: EQ, compressão, de-ess, limitação e redução de ruído. | Verificar filtros/capacidades do bundle, escolher apenas os necessários, expor operações fechadas e testar qualidade/consumo; não liberar filtergraph arbitrário. |
 | MR-A05 | Junções, eventual mistura de faixas e normalização coerente da saída. | Conferir requisitos conjuntos com decisão 8, distinguir mux de mistura e projetar processamento coordenado a partir das fontes. Não pressupor que toda a proposta já cabe nas primitivas atuais. |
 | MR-A06 | Entrega editável pelo aplicativo. | Mapear separadamente comandos/Project IR quando necessários, serviço de aplicação, compilação, Desktop Host e UI; não colocar lógica editorial ou novo estado canônico dentro do worker. |
+| MR-V01 | Metadados necessários à interpretação de imagem e ao planejamento temporal. | Estender o probe tipado e seu mapeamento com evidência pertinente de cor, profundidade/formato de pixel, orientação/display e precisão temporal; manter valores desconhecidos explícitos e compatibilidade dos consumidores atuais. |
+| MR-V02 | Executar interpretação/correção/estilo de cor aprovados na decisão 10. | Acrescentar a menor superfície tipada necessária, verificar transformações/filtros do bundle e coerência preview/export; ajustes não destrutivos, sem normalização ou grade aplicada duas vezes. |
 
 Ganho, fades e normalização básicos não serão reimplementados sem necessidade. O incremento é o que falta para compô-los com segurança e completar as capacidades aprovadas. Novas necessidades de cor, junções, QA ou outros pontos que efetivamente afetem o Media Runtime devem entrar no mesmo levantamento com origem, evidência, dependência e status, não ser acrescentadas silenciosamente ao código.
 
@@ -304,6 +306,62 @@ Restauração avançada não foi demonstrada como atendida pela superfície atua
 
 Manter essa investigação separada do núcleo convencional. Não tornar separação de fontes, reconstrução de fala ou remoção forte de reverberação dependências obrigatórias da edição básica. Qualquer recurso externo exige necessidade demonstrada, comparação com a alternativa interna, qualidade/recursos medidos, licença/termos comerciais exatos e aprovação antes da incorporação. Não prometer recuperação perfeita nem sintetizar/substituir a fala original sob autorização de simples melhoria do áudio.
 
-### 16.5 Fechamento desta atualização documental
+### 16.5 Fechamento da atualização documental da versão 2 — histórico
 
 Foram registradas as aprovações de estratégia/cor que ocorreram após a versão 1 e a nova exigência de viabilidade executável, com as lacunas de áudio para planejamento futuro. Nenhum código, bundle, comando, modelo, versão de FFmpeg ou fundação do runtime foi alterado; nenhum benchmark ou teste de áudio novo foi realizado por este registro. Integrar este resumo ao Master Context junto da reconciliação documental já exigida na seção 14.
+
+## 17. Revisão das onze decisões e escopo da próxima extensão — 2026-09-16
+
+**INCLUSÃO NO PLANEJAMENTO DE EXECUÇÃO FUTURA APROVADA PELO PRODUCT OWNER. Nenhuma alteração de código nesta revisão.** O pedido é efetivar, na próxima frente coordenada de Media Runtime, as funções convencionais necessárias e as outras extensões existentes que se justifiquem; não apenas guardar uma possibilidade abstrata. Manter os limites de custo, segurança, comercialização e aprovação material. A seção 16.2 é o inventário único; esta seção explica sua prioridade, vínculo com as decisões e critérios de implementação.
+
+A conferência de `refs/heads/main` permaneceu em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`. O PR #26 estava aberto/draft em `aa061398fc10b7b86065c597b96b7c5a97a68eb8` antes desta atualização. Nenhuma nova situação de PR #24/#25 ou CI é inferida. Referências adicionais da revisão: [Project IR e comandos](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/project-ir/src/types.ts), [ferramentas nativas/mux](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/engines/media-ffmpeg/worker/cevra_native_tools.py) e [build FFmpeg](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/engines/media-ffmpeg/runtime/build_ffmpeg.py), além do contrato e adaptador da seção 16.1. A revisão é focada em viabilidade; não é uma reauditoria completa das fundações ou benchmark de mídia.
+
+### 17.1 Resultado por decisão
+
+| Decisão | Reuso / lacuna relevante | Encaminhamento |
+|---|---|---|
+| 1 — Entrada | Ingest e probe básicos continuam válidos; o resultado tipado expõe largura/altura/fps, mas não carrega os metadados explícitos de display e cor necessários ao conjunto das decisões. | Preservar ingest; MR-V01 amplia evidência no limite adequado. Não transcrever automaticamente nem copiar/transcodificar originais na importação. |
+| 2 — Leitura e IA | Transcrição/alinhamento, transcripts por fonte, digests e extração de áudio/frame são bases existentes; projeção editorial compacta, seleção de evidências e modelo/retorno editorial são trabalho adicional. | Reutilizar motores. Implementar projeções/roteamento na aplicação; não embutir um LLM no Media Runtime. Amostragem visual básica pode começar com extração já existente; otimização em lote depende de medição, não é pré-requisito automático. |
+| 3 — Qualidade dos takes | Detecção de silêncio não substitui relatório temporal de nível, picos ou indícios acústicos. | MR-A02 compartilhado com áudio; confrontar indícios com transcrição/evidências, sem refazer alinhamento ou fingir interpretação semântica local. |
+| 4 — Escolha dos takes | IDs/fontes/transcripts existentes servem de âncora; comparações e propostas editoriais ainda precisam de implementação na aplicação/agente. | Nenhuma reforma de motor justificada por este critério. Reutilizar evidências e preservar alternativas por referências, sem pré-renderizar tudo. |
+| 5 — Montagem e sentido | Project IR já tem tracks/clips, intervalos de fonte/timeline e comandos de adição/trim. Isso não entrega sozinho compilação de um plano editorial nem todo ajuste de áudio/cor. | MR-A06 integra o caminho tipado. Aproveitar comandos existentes; adicionar somente comandos/representações realmente ausentes, com compatibilidade, sem migrar o IR por antecipação. |
+| 6 — Duração | Há intervalos no IR e duração de saída no probe; contabilização do plano com sobreposições pertence à aplicação/compilador. | Unificar o cálculo com MR-A05, verificar precisão e resultado; não criar motor de duração nem usar IA para aritmética. |
+| 7 — Ritmo | Plano e medições devem coordenar as pausas; ajuste editorial não pertence ao worker. | Compartilhar MR-A02/MR-A05/MR-A06. Impedir aparos cumulativos e usar um único mapeamento fonte/timeline; nenhuma nova análise pesada por pausa. |
+| 8 — Junções | Trim/concat/fades/extract/mux existem; o contrato não expõe mistura temporal de várias entradas. O mux atual mapeia faixas separadas, não implementa soma/posicionamento de um J-cut. | MR-A05 inclui execução temporal tipada com limites de áudio/vídeo, offsets, duração e mistura necessários; manter recursos úteis existentes. |
+| 9 — Estratégia | Interação, permissões e aplicação da proposta dependem das camadas de aplicação/Director/UI; Media Runtime não confirma estratégia. | Implementação dessas camadas, sem reforma do worker. Preservar aprovação por plano e permissões já decididas. |
+| 10 — Cor | O contrato e parseProbe não expõem colorimetria completa; não há operação tipada de grade/transformação de cor. Metadados internos do FFmpeg não equivalem à função disponível no aplicativo. | MR-V01 + MR-V02, com validação de perfis e antes/depois consistente. Não escolher agora espaço final, profundidade universal, LUT ou biblioteca adicional. |
+| 11 — Áudio | Ganho/fades/normalização básicos existem; áudio isolado, medições, ganho localizado, tratamentos tipados e fluxo editável ainda não estão completos. | Efetivar MR-A01–MR-A06 na frente coordenada, dentro de um escopo técnico delimitado; restauração especializada segue separada. |
+
+A revisão não identifica justificativa para refazer Local Transcription, Forced Alignment, a semântica de transcripts, Project Store/History, o supervisor desktop ou o lifecycle seguro do Media Runtime. Isso não prova que nunca precisarão de extensão: se um conflito concreto aparecer, aplicar o gate de impacto antes de alterar. Faltas em funcionalidades ainda não implementadas são desenvolvimento incremental, não regressões presumidas de marcos fechados.
+
+### 17.2 Funções a efetivar e limites do reuso de FFmpeg
+
+As funções convencionais abaixo ficam vinculadas ao escopo futuro, não à ativação de todos os filtros em todos os vídeos. A [documentação oficial de filtros do FFmpeg](https://ffmpeg.org/ffmpeg-filters.html), consultada nesta revisão, é referência de mecanismos candidatos, não evidência de presença, desempenho ou licença de cada dependência no bundle CEVRA exato.
+
+- **MR-A01/MR-A03 — áudio isolado, ganho e fades:** ampliar o caminho atual para saídas de processamento adequadas, ganho localizado limitado e transições suaves. `volume` e `afade` são referências de execução; aproveitar funções atuais e compor a menor extensão necessária, sem comandos livres nem cortes artificiais na imagem.
+- **MR-A02 — medições reutilizáveis:** relatório tipado com níveis/picos por janelas ou passagens e evidências acústicas pertinentes. `astats`, `volumedetect` e medições de loudness são candidatos. Não confundir RMS/limiar de volume com compreensão, identidade de falante ou SNR comprovada. Resumos/janelas limitados; não exigir que PCM integral ou logs por amostra permaneçam em RAM/contexto.
+- **MR-A04 — tratamento convencional de voz:** funções fechadas para filtragem/equalização, compressão, redução de sibilância, limitação e redução convencional de ruído quando úteis. Candidatos: `highpass`, `equalizer`, `acompressor`, `deesser`, `alimiter`, `afftdn`. Parametrização e intensidade dependerão de validação; não aplicar uma cadeia universal nem tornar denoise obrigatório.
+- **MR-A05 — junções/mistura/normalização:** acrescentar a capacidade temporal que faltar, reutilizando trim/concat/mux e a normalização existente. `atrim`, `asetpts`, `adelay` e `amix` são mecanismos candidatos para intervalos/offsets/mistura; `loudnorm` continua referência para a entrega. Preservar sync, palavras, margens e pausas autorizadas; calcular duração pelo plano efetivo e verificar a saída. Não somar fades/normalizações repetidos nem presumir que toda emenda exige J-cut.
+- **MR-V01/MR-V02 — cor e metadados:** expor evidência técnica relevante pelo probe e transformações de imagem tipadas; manter desconhecido o perfil que não puder ser identificado. Avaliar funções de correção/conversão/LUT do FFmpeg apenas conforme a transformação necessária. Preview, comparação e export devem usar a mesma interpretação autorizada. Uma LUT precisa de proveniência e uso permitido; não tratar troca de tags como conversão de cor.
+
+O build atual usa `--disable-autodetect`, `--disable-gpl`, `--disable-nonfree` e `--disable-network`. Portanto, não presumir bibliotecas externas automaticamente presentes. Validar os filtros reais, formatos e caminhos no bundle empacotado; se a solução de cor ou áudio exigir habilitar/incorporar uma dependência, informar necessidade, alternativa, licença, empacotamento e custo antes da mudança. Não está autorizado alterar o FFmpeg upstream, trocar sua versão ou contratar outra engine/API por conveniência.
+
+### 17.3 Mudanças fora do worker que precisam acompanhar a entrega
+
+**MR-A06 é integração, não licença para colocar o aplicativo inteiro no Media Runtime.** O Project IR já oferece `volume` por clip e `AudioState` com ganho mestre/alvo de normalização, mas o conjunto atual de `EditCommand` não oferece todos os ajustes de áudio nem um contrato específico de efeitos de cor/envelopes. Na fatia adequada, acrescentar o mínimo tipado e validado para persistir e desfazer as operações aprovadas. Avaliar reutilização dos tipos/extensões existentes antes de propor qualquer migração; não usar `extensions` como escape para objetos não validados ou segunda timeline.
+
+Planejamento editorial, cálculo de duração, análise de intenção, presets, confirmação e controles pertencem à aplicação/Director/UI. Compilação traduz somente estado/plano válido para operações permitidas; fontes originais permanecem a base do render final. Projeções/medições são derivadas, vinculadas à identidade da fonte, versão/configuração da análise e transcript digest quando pertinente. Reuso exige validade; cache de transcrição não deve receber indiscriminadamente toda análise audiovisual nem virar nova autoridade.
+
+Preservar também a distinção entre código de backend disponível e recurso distribuído: montagem dos runtimes/modelos, capacidades reais do pacote e integração desktop continuam gates próprios. Não anunciar entrega completa apenas porque um filtro foi exposto.
+
+### 17.4 Prioridade, aceite e vigilância contínua
+
+**Compensa incluir essas extensões** porque elas preenchem lacunas diretamente necessárias às decisões aprovadas — volume localizado sem alterar imagem, J-cut executável, cor corretamente interpretada e instruções editáveis — e podem compartilhar contratos/medições. O custo exato e a qualidade não foram medidos aqui; não há alegação de custo desprezível ou superioridade comprovada.
+
+Organizar a próxima frente por dependência: contratos/metadados/medições e áudio isolado; depois execução temporal e tratamentos; integração canônica/desktop e verificação de cada entrega na sua fatia. Essa ordem não obriga completar cor, modelos locais e restauração antes de uma projeção editorial básica segura. Evitar um PR gigante, atrasos indefinidos e implementações dependentes sobre capacidades inexistentes. Extensão fora destes limites volta para decisão, não entra escondida como requisito técnico.
+
+O aceite deve demonstrar funções no bundle real, compatibilidade de projetos, undo/redo, cancelamento/recovery, ausência de alteração dos originais, sync/duração, preservação de pausas e nenhuma recodificação cumulativa indevida. Medir tempo/RAM/I/O por operação completa, inclusive muitas junções e áudio ruim, com fixtures de paridade EDVID. Esses são requisitos de verificação das extensões, não aprovação antecipada do fluxo de QA/correção da futura decisão 12.
+
+Amostragem visual em lote, novos índices/caches, separação de falantes/fontes, restauração avançada e outros motores permanecem opcionais ou de pesquisa quando não necessários ao núcleo aprovado; só promover com evidência de benefício e custo aceitável. Não substituir a avaliação de inteligibilidade por uma métrica única.
+
+Daqui em diante, cada nova proposta aplica a seção 11.4: disponível hoje / falta integração / extensão interna / dependência externa ou não verificada. Acrescentar lacunas justificadas ao inventário único com decisão de origem e momento necessário; rever este plano antes do prompt dependente e reconciliar seu status com o main real. Nesta atualização somente o registro documental foi modificado; não foram executados novos testes, benchmarks ou alterações de runtime.
