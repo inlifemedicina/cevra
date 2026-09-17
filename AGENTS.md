@@ -65,3 +65,12 @@ Plan and complete the approved adjustments through testable dependency-correct s
 This dated priority refines earlier permissive scheduling guidance only for the next implementation milestone. Do not interrupt the current slice, bypass its review/CI/merge process, move its frozen base, or stop parallel product discussion and safe closeout/documentation work. No source implementation, runtime update, paid service or merge is authorized by this documentation change itself.
 
 Until PR #26 is integrated, a handoff to the prompt-building chat must explicitly reference `docs/editorial-decisions-1-8` / PR #26 and the applicable Director record from PR #25, rather than assume main contains them. Preserve this priority when reconciling AGENTS and the short Master Context index before dependent implementation. A saved repository rule is not an automatic message or event notification in another chat; do not claim that such a message was sent.
+
+
+## Product-owner acceptance test catalog
+
+`docs/CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md` is the cumulative manual acceptance catalog for approved product behavior. When an approved decision introduces testable behavior, changes a parameter, supersedes a prior expectation or adds an integration path, update that catalog in the same documentation change whenever practical.
+
+Do not merely append duplicate tests. Reuse stable test IDs, revise the action/expected result when a newer approved decision changes the requirement, and preserve traceability to the decisions involved. Before every Product Owner test build, derive the executable checklist from the catalog, identify BLOCKED tests honestly, list required fixtures, and state which prior tests must be repeated because the implementation changed. CI/unit tests complement but do not replace relevant Product Owner acceptance tests.
+
+Use the response vocabulary defined in the catalog (`PASS`, `PARTIAL`, `FAIL`, `BLOCKED`; and `APROVADO`/`REPROVADO` for subjective quality). Do not declare a feature homologated solely because it compiles or because automated tests pass.
