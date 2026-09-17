@@ -447,6 +447,15 @@ CEVRA poderá sugerir ou executar consolidação em fluxos que realmente necessi
 
 Não haverá consolidação automática silenciosa de grandes fontes sem política clara de espaço, progresso, cancelamento e autorização apropriada.
 
+### Preferência do usuário — aprovada
+A UI deverá permitir uma preferência persistente, com pelo menos estas intenções:
+
+- **Referenciar arquivos originais** — padrão conservador: mantém fontes locais no lugar de origem e consolida somente quando solicitado/necessário.
+- **Sempre consolidar novos projetos** — copia para armazenamento gerenciado as fontes elegíveis importadas, com progresso, espaço necessário, cancelamento e tratamento de falha.
+- **Perguntar conforme necessário** — CEVRA solicita decisão quando a consolidação tiver benefício material para portabilidade, backup, transferência ou outro workflow.
+
+A preferência não autoriza apagar o arquivo original, copiar silenciosamente volume desproporcional sem feedback, nem transformar ativos externos já gerenciados em duplicatas. Mudanças da preferência afetam operações futuras; não reescrevem retroativamente projetos existentes sem ação explícita.
+
 ---
 
 ## 17. Relação com EDVID e critério de melhoria
