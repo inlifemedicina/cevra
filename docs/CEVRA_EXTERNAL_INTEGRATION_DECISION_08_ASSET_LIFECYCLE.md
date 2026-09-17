@@ -339,6 +339,8 @@ Para esta decisão, registrar desde já:
 
 Essa lista deverá ser expandida por decisões futuras e apresentada ao Product Owner no marco de teste do produto.
 
+O catálogo cumulativo canônico de ações de teste, resultado esperado e resposta do Product Owner está em `docs/CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md`. A partir desta decisão, novas aprovações devem atualizar esse catálogo e também revisar testes anteriores quando mudarem parâmetros ou expectativas já registradas. A lista resumida desta seção permanece como contexto da decisão; o catálogo cumulativo é a referência operacional para homologação.
+
 ---
 
 ## 14. Retenção de ativos órfãos, Undo/Redo e Recovery
