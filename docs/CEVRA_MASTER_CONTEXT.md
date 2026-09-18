@@ -1548,6 +1548,8 @@ post-merge CI passed 5/5 jobs.
 - **CANONICAL:** prefer reuse of Project IR/domain/runtime/composition/UI packages in Creator; if host limitations require a subset, keep it versioned and convertible rather than inventing divergent audiovisual semantics.
 - **CANONICAL:** Creator Skill commercialization/licensing, exact runtime packaging, workspace implementation technology and detailed Lite/Full capability matrix are deferred implementation/product decisions, not blockers for current Vids work.
 - **CANONICAL:** publishing providers, scheduling and performance-analytics synchronization are post-V1 and require future provider audits/approvals.
+- **REVIEWED EXTERNAL AUDIT:** Claude/Fable adversarial review identified material risks that are now scheduled for validation: ProjectHistory snapshot scaling, installer/runtime size, alignment-runtime optimization benchmark, software export fallback, documentation duplication, stable-build dev-switch hardening, and explicit foundation gaps for preview/playback, final render/export, HDR/VFR, fonts, disk/cache/temp lifecycle and Windows. It did **not** invalidate Project IR, Media Runtime, Agent Protocol, D13/D23, export independence, or account/entitlement separation.
+- **CANONICAL CLARIFICATION:** Fable's proposed shared headless host is an implementation candidate for future Creator reuse only. It does not change the Bridge/Creator distinction or the requirement that Creator Full render a final video standalone.
 
 
 ---
@@ -1593,13 +1595,23 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Define and implement Transcript Cache V1 as the next dependency-correct slice; its schema, key and invalidation policy require an accepted bounded design before implementation.
-2. Do not reopen the closed Application Transcript Persistence, Local Transcription Engine V1 or Project IR v2 Slices A/B.
-3. Preserve the provider-neutral flow from authorized source through `TranscriptionEngineAdapter` and guarded Project History promotion.
-4. Validate the ADR 0015 supervised private-host path from native picker through existing application services, canonical ProjectHistory and source-scoped transcript presentation.
-5. Preserve the EDVID baseline and dependency-driven implementation order.
-6. Apply the quality/performance policy to future preview, render, composition and export work.
-7. Keep this document updated after every material decision, merge or completed research finding.
+The next sequence is constrained by the Product Owner's instruction to finish any work already underway in the principal development chat before starting another implementation milestone.
+
+1. **Close the actual in-progress main-chat work first.** Resolve its real branch/PR/review/CI state from current evidence; do not move its frozen base or interrupt an active closeout.
+2. **Gate 0 — documentation/global coherence closeout.** Reconcile the decision branches and reviewed Fable audit; remove duplicate acceptance-test sections, correct stale/misplaced records and verify obsolete stubs/branches before deletion. This is documentation/research, not a feature detour.
+3. **Gate 1 — focused technical-risk validation.** Benchmark ProjectHistory growth/persistence with realistic transcript/edit volume; measure clean-machine runtime/installer size; compare current PT alignment runtime against ONNX/smaller-model/safetensors candidates; audit export encoder fallback and stable-release dev switches. Findings require explicit approval before changing architecture/runtime/model.
+4. **Gate 2 — mandatory coordinated Media Runtime pause.** Announce **PAUSA DE AVANÇO — ajustes coordenados do Media Runtime antes da próxima etapa.** Reconcile MR-A01–MR-A06, MR-V01, MR-V02 and MR-Q01 with later approved decisions and the Fable audit. Evaluate, without pre-approving, one-pass cut-plan execution and batched frame extraction. Freeze and execute a bounded dependency-correct plan before the next functional milestone.
+5. **Gate 3 — Transcript Cache V1.** Define schema, key, invalidation, source/model identity, storage, cleanup, corruption/recovery and alignment interaction; then implement as the next dependency-correct transcript slice.
+6. **Gate 4 — technical foundation gaps.** Decide preview/playback architecture, final render/export compiler and mux ownership, HDR/VFR/iPhone media policy, font packaging, disk/proxy/cache/temp lifecycle and Windows validation. Pull a subitem earlier only when it is a direct prerequisite of the Media Runtime gate.
+7. **Gate 5 — Composition Engine benchmark/selection.** Use the full CEVRA/EDVID matrix; HyperFrames remains a candidate, not a winner. Include credible alternatives/baselines and measure visual parity, timing, deterministic seek, performance, bundle/runtime cost, security and current commercial licensing.
+8. **Gate 6 — first complete editable/exportable vertical.** Typed cut/edit commands → compiler/orchestration → deterministic execution → undo/redo/recovery → preview/review → final export, with platform validation.
+9. **Gate 7 — Agent Protocol PoC.** Only after a useful deterministic vertical exists for the agent to operate. Verify official supported mechanism, containment, capability negotiation and commercial/entitlement constraints.
+10. **Gate 8 — release closure.** Clean-machine install, measured core/packs, signing/notarization, updater signing, absence of dev bypass, rollback and core smoke.
+
+Detailed reviewed-audit authority: `docs/CEVRA_FABLE_AUDIT_REVIEW_2026-09-18.md`.
+
+Do not treat the external audit's implementation suggestions as automatically approved. The approved CEVRA policy remains `PRESERVE → EXTEND → VERIFY → MIGRATE ONLY IF NECESSARY`.
+
 
 ---
 
