@@ -1234,6 +1234,70 @@ Responder: PASS/PARTIAL/FAIL/BLOCKED.
 
 ---
 
+## I16 — External editor handoff
+
+**I16-T1 [V1/AUTO] Resolve OTIO linked handoff**  
+Ação técnica: exportar projeto representativo para `.otio` sem consolidar mídia.  
+Esperado: timeline metadata pequena, media refs válidas/relinkáveis, sem cópia desnecessária de mídia.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I16-T2 [V1/MANUAL] Resolve conform visual**  
+Ação: abrir fixture no Resolve.  
+Esperado: cuts, ordem, tracks e timing principais correspondem ao CEVRA; divergências aparecem no Handoff Report.  
+Responder: APROVADO/REPROVADO.
+
+**I16-T3 [BENCH/AUTO] Resolve linked vs portable size**  
+Ação: comparar `.otio`, consolidated package e `.otioz` em fixture com mídia grande.  
+Esperado: tamanhos/tempos registrados; metadata-first permanece default salvo ganho real do bundle.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I16-T4 [BENCH/AUTO] Premiere XML vs AAF**  
+Ação: gerar/importar os dois formatos para o mesmo subconjunto CEVRA.  
+Esperado: medir fidelidade de cuts/tracks/audio/markers/relink/timecode e tamanho; escolher profile pelo resultado, não por preferência abstrata.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I16-T5 [V1/AUTO+MANUAL] Bake seletivo de efeito**  
+Ação: exportar projeto com HeroEmphasis/motion/3D não representável nativamente.  
+Esperado: somente efeito necessário vira overlay/asset; timeline principal continua editável e resultado visual é aceitável.  
+Responder: APROVADO/REPROVADO.
+
+**I16-T6 [V1/AUTO] Handoff Report**  
+Ação: exportar projeto misto.  
+Esperado: relatório lista NATIVE/BAKED/APPROXIMATED/UNSUPPORTED, revision, adapter, media strategy e relink requirements.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I16-T7 [V1] Sem descarte silencioso**  
+Ação: incluir feature sem tradução/bake suportado.  
+Esperado: handoff informa UNSUPPORTED; feature não desaparece sem aviso.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I16-T8 [V1] Captions**  
+Ação: exportar captions simples e estilo CEVRA visual.  
+Esperado: texto/timing permanecem editáveis quando possível; aparência complexa pode ser baked sem duplicar legenda visível por padrão.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I16-T9 [V1] Consolidated handoff**  
+Ação: criar pacote portátil.  
+Esperado: usa política D8, não cria biblioteca/timeline paralela e informa tamanho estimado/final quando suportado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I16-T10 [ADV] External Import Changes**  
+Ação: quando implementado, alterar timeline externa e reimportar.  
+Esperado: mudanças suportadas viram Change Set revisável; Project IR nunca é sobrescrito diretamente.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I16-T11 [ADV] Premiere/Resolve bridge**  
+Ação: quando bridge oficial existir, testar operação por UXP/API suportada.  
+Esperado: permissões mínimas, sem shell/arbitrary code e sem tornar bridge requisito do handoff.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I16-T12 [V1/AUTO] Sem live sync**  
+Ação técnica: verificar fluxo V1.  
+Esperado: handoff é explícito/exportável; nenhum watcher/sync bidirecional permanente é necessário para usar a feature.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 # C. Testes transversais obrigatórios antes de homologar uma versão
 
 **X-T1 — Undo/Redo**  
