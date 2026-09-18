@@ -412,26 +412,46 @@ Ação: diga “não cubra meu rosto aqui” e em outro trecho “mostre isso em
 Esperado: ambas as instruções são respeitadas e persistem.  
 Responder: PASS/PARTIAL/FAIL.
 
-## D23 — Motion graphics e behind-the-subject
+## D23 — Motion graphics, registro interno e behind-the-subject
 
-**D23-T1 [V1] Componente tipado**  
+**D23-T1 [V1] Componente registrado parametrizável**  
 Ação: aplique card/seta/contador/gráfico simples disponível.  
-Esperado: parâmetros são editáveis, persistem, têm undo/redo e preview=export.  
+Esperado: instância referencia componente/versionamento estável; parâmetros suportados são editáveis, persistem, têm undo/redo e preview=export.  
 Responder: PASS/PARTIAL/FAIL.
 
-**D23-T2 [V1] Código arbitrário bloqueado**  
-Ação: tente pedir TSX/Python/shell/filtergraph personalizado para executar a edição.  
-Esperado: CEVRA não executa código arbitrário; usa componente seguro ou informa indisponibilidade.  
+**D23-T2 [V1] Novo componente sem tipo de domínio por efeito**  
+Ação técnica: incorporar um novo componente compatível com a representação genérica aprovada.  
+Esperado: não é exigida migração de Project IR apenas porque surgiu um novo efeito; qualquer extensão de schema precisa corresponder a lacuna real.  
 Responder: PASS/PARTIAL/FAIL.
 
-**D23-T3 [BENCH] Matting/behind-subject**  
+**D23-T3 [V1] Parâmetro inválido bloqueado na fronteira**  
+Ação: agente/preset tenta usar parâmetro inexistente, fora de limite ou capability não autorizada.  
+Esperado: validação rejeita antes do engine; nenhum código/estado parcial é executado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**D23-T4 [V1] Código externo arbitrário bloqueado**  
+Ação: peça ao agente TSX/JS/Python/shell/filtergraph/shader arbitrário para executar a edição.  
+Esperado: CEVRA não executa esse código; usa componente/capability registrada ou informa indisponibilidade.  
+Responder: PASS/PARTIAL/FAIL.
+
+**D23-T5 [INT/AUTO] Implementação interna rica permitida**  
+Ação técnica: executar componente first-party registrado que internamente use runtime aprovado (ex. GSAP/Three.js/Lottie).  
+Esperado: funciona atrás do compiler sem ampliar privilégios do agente e sem engine-specific state como fonte de verdade.  
+Responder: PASS/PARTIAL/FAIL.
+
+**D23-T6 [INT/AUTO] Registry upstream não executado ao vivo**  
+Ação: componente útil é encontrado em registry externo.  
+Esperado: só entra após auditoria/adaptação/versionamento; o produto não baixa e executa código upstream automaticamente por pedido do usuário.  
+Responder: PASS/PARTIAL/FAIL.
+
+**D23-T7 [BENCH] Matting/behind-subject**  
 Ação: testar cabelo, mãos, movimento rápido e fundo complexo nas opções candidatas.  
-Esperado: registrar bordas, flicker, tempo, RAM/GPU, licença/proveniência e comparar com RVM de referência.  
+Esperado: registrar bordas, flicker, tempo, RAM/GPU, licença/proveniência e comparar com referência escolhida.  
 Responder: APROVADO/REPROVADO + observação do pior caso.
 
-**D23-T4 [ADV] Recurso indisponível não bloqueia V1**  
+**D23-T8 [ADV] Matting indisponível não bloqueia edição básica**  
 Ação: executar edição básica sem motor de matting instalado/selecionado.  
-Esperado: editor básico permanece funcional e informa apenas a indisponibilidade do efeito.  
+Esperado: editor permanece funcional e informa somente a indisponibilidade do efeito.  
 Responder: PASS/PARTIAL/FAIL.
 
 ---
@@ -940,7 +960,7 @@ Responder: PASS/PARTIAL/FAIL/BLOCKED.
 ## I13 — Composition Engine
 
 **I13-T1 [BENCH/AUTO] Paridade funcional HyperFrames**  
-Ação técnica: Codex executa fixtures de captions, headlines, split, imagens, B-roll, motion graphics, alpha, SFX, música e câmera dinâmica.  
+Ação técnica: Codex executa fixtures de captions, headlines, split, imagens, B-roll, componentes registrados de motion graphics, alpha, SFX, música e câmera dinâmica.  
 Esperado: todos os recursos aprovados produzem render válido e mensurável.  
 Product Owner: recebe somente comparativos visuais pertinentes.
 
@@ -961,7 +981,7 @@ Responder: PASS/PARTIAL/FAIL.
 
 **I13-T5 [BENCH/AUTO] Performance**  
 Ação técnica: medir render time, CPU/GPU/RAM e estabilidade em projeto curto e representativo maior.  
-Esperado: números registrados; ausência de leak/processo órfão/material instability.  
+Esperado: números registrados; ausência de leak/processo órfão/instabilidade material.  
 Responder: PASS/PARTIAL/FAIL.
 
 **I13-T6 [V1] Cancelamento**  
@@ -970,16 +990,31 @@ Esperado: processo termina corretamente, projeto continua válido e não deixa m
 Responder: PASS/PARTIAL/FAIL.
 
 **I13-T7 [V1] Engine-neutral Project IR**  
-Ação: abrir projeto sem representação engine-specific persistida.  
-Esperado: estado canônico continua suficiente para recompilar o render target.  
+Ação: abrir projeto sem representação nativa de HyperFrames/Remotion como autoridade persistida.  
+Esperado: estado canônico + refs/params/versionamento necessários continuam suficientes para recompilar o target.  
 Responder: PASS/PARTIAL/FAIL.
 
-**I13-T8 [V1] Arbitrary code blocked**  
-Ação: peça ao agente HTML/JS/TSX arbitrário para criar efeito.  
-Esperado: CEVRA não executa código; usa componente tipado ou informa indisponibilidade.  
+**I13-T8 [V1] Código arbitrário vindo do agente bloqueado**  
+Ação: peça ao agente HTML/JS/TSX/Python/shader arbitrário para criar efeito.  
+Esperado: CEVRA não executa código recebido; resolve para capability/componente registrado ou informa indisponibilidade.  
 Responder: PASS/PARTIAL/FAIL.
 
-**I13-T9 [BENCH] Falha material do candidato**  
+**I13-T9 [INT/AUTO] Componente interno first-party**  
+Ação técnica: componente registrado usa código interno do engine.  
+Esperado: permitido após auditoria/versionamento, com params validados e sem expor código/engine ao agente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I13-T10 [BENCH/AUTO] Remotion-to-HyperFrames como ferramenta**  
+Ação técnica: traduzir fixture Remotion representativa e comparar render.  
+Esperado: tradução acelera desenvolvimento quando útil, mas falhas/diffs são detectados antes de incorporação; saída não vira canônica automaticamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I13-T11 [INT/AUTO] Registry auditado**  
+Ação: selecionar componente upstream do registry para possível uso.  
+Esperado: provenance/licença/deps/testes registrados e código congelado/adaptado antes da distribuição; nada executado live do upstream.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I13-T12 [BENCH] Falha material do candidato**  
 Ação técnica: documentar qualquer fixture em que HyperFrames não atinja o piso.  
 Esperado: lacuna é registrada e volta ao Product Owner antes de trocar/expandir engine.  
 Responder: APROVADO/REPROVADO sobre fallback proposto.
