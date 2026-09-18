@@ -135,6 +135,16 @@ If HyperFrames does not meet the benchmark, CEVRA may select Remotion or another
 
 Composition security uses a **typed untrusted boundary**, not one hard-coded domain type per internal effect. Agents, presets and third-party surfaces select registered capabilities/components with validated parameters. First-party registered components may internally use audited engine code behind the Composition Compiler, while engine-native state remains derived. Upstream registries are development inputs only and are never live-executed merely because a user requested an effect.
 
+## Caption placement and visual QA
+
+CEVRA V1 preserves the six EDVID caption styles plus None. Extra typographic personalization is deferred to post-V1.
+
+Caption positioning uses a progressive local planner: start with known layout/platform safe areas, escalate to face/person evidence only when needed, then to sampled subject masks for ambiguous occupancy, and reserve full temporal matting for true behind-subject effects. Placement may vary by interval while remaining visually stable; explicit user overrides are preserved.
+
+Luminance/contrast checks serve legibility and do not replace Brand Kit/preset identity. Representative composite snapshots and deterministic Caption QA should detect overflow, clipping, layout conflicts, unsafe positioning and preview/export divergence before expensive final rendering when practical.
+
+HeroEmphasis is an optional registered visual component layered on top of an existing caption style, not a new caption family. Its behind-subject form depends on an abstract SubjectMaskProvider and a later-approved matting implementation.
+
 ## Generative assets
 
 Image, video and future audio or creative generation use provider contracts. Asset planning prefers existing project assets, then stock or local resources, host-native generation covered by the user's entitlement, local models, and finally optional external or BYOK providers.
