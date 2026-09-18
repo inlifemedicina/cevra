@@ -1298,6 +1298,110 @@ Responder: PASS/PARTIAL/FAIL.
 
 ---
 
+## I17 — Account, Entitlement, Licensing & Billing
+
+**I17-T1 [DEV/AUTO] Development sem backend**  
+Ação técnica: iniciar build dev sem Paddle/auth/entitlement server.  
+Esperado: Development Entitlement autorizado permite uso de desenvolvimento; nenhuma chamada billing é obrigatória.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T2 [V1/AUTO] Stable rejeita Dev Entitlement**  
+Ação: tentar iniciar stable/release com bypass/dev entitlement.  
+Esperado: build ou runtime falha fechado; mecanismo de desenvolvimento não libera produção.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T3 [V1] Passwordless account**  
+Ação: criar/entrar em conta por e-mail/código ou magic link no staging.  
+Esperado: identidade estável sem exigir senha V1; projeto/mídia não é enviado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T4 [V1/AUTO] Signed entitlement válido**  
+Ação: fornecer entitlement corretamente assinado.  
+Esperado: app valida localmente com public key e habilita capabilities permitidas.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T5 [V1/AUTO] Signed entitlement adulterado**  
+Ação: modificar payload/signature.  
+Esperado: rejeitado sem apagar projetos/originais.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T6 [V1] Offline válido**  
+Ação: ativar online, desconectar rede e usar dentro da validade.  
+Esperado: operações licenciadas continuam conforme política; nenhum ping obrigatório por abertura.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T7 [V1] Grace → Recovery Mode**  
+Ação: simular refresh impossível até grace expirar.  
+Esperado: transição clara para Recovery Mode, sem exclusão de projeto/fontes.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T8 [V1/AUTO+MANUAL] Recovery não exporta vídeo utilizável**  
+Ação: em Recovery Mode, tentar render/exportar/salvar nova saída MP4/MOV/WebM e tentar usar preview como export.  
+Esperado: toda saída audiovisual final utilizável é bloqueada; preview de recuperação não funciona como substituto do export.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T9 [V1] Recovery preserva dados**  
+Ação: abrir projeto expirado.  
+Esperado: usuário consegue identificar projeto, acessar/localizar originais e salvar/copiar projeto/arquivos-fonte permitidos para recuperação.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T10 [V1/AUTO] Device policy configurável**  
+Ação: entitlement individual com limite configurado em 2 devices, depois alterar policy server-side em fixture.  
+Esperado: app não hardcode o número; activation/revocation respeitam policy.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T11 [V1] Troca de computador**  
+Ação: atingir limite e revogar device antigo.  
+Esperado: novo device pode ser ativado conforme policy sem suporte manual obrigatório.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T12 [INT/AUTO] Webhook duplicado/out-of-order**  
+Ação: reenviar eventos billing e inverter ordem.  
+Esperado: processamento idempotente/reconciliável; não revoga incorretamente entitlement.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T13 [INT/AUTO] Cancelamento no fim do período**  
+Ação: cancelar subscription ativa.  
+Esperado: entitlement permanece até paid-through e só depois expira/Recovery.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T14 [INT/AUTO] Billing provider indisponível**  
+Ação: simular outage do provider após entitlement local válido.  
+Esperado: editor não para imediatamente; usa entitlement/grace conforme política.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T15 [INT/AUTO] Entitlement service indisponível**  
+Ação: simular outage do CEVRA entitlement service.  
+Esperado: entitlement local válido continua até limites definidos; estado é reportado corretamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T16 [INT/AUTO] Staging e Live isolados**  
+Ação: usar credenciais/IDs de staging em production e vice-versa.  
+Esperado: ambientes são rejeitados/mantidos separados; nenhum pagamento real em staging.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T17 [SEC/AUTO] Secrets ausentes do desktop**  
+Ação: inspecionar bundle/config.  
+Esperado: sem private signing key, webhook secret, billing provider secret/admin credential.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T18 [V1] Sem metering artificial local**  
+Ação: realizar muitos renders locais sob plano ativo.  
+Esperado: uso local não consome créditos por render/minuto; somente serviços com custo variável real podem ter allowance/metering.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T19 [V1] Update + entitlement**  
+Ação: entitlement expira com patch crítico disponível.  
+Esperado: instalação pode receber correção necessária à segurança/recuperação sem liberar uso produtivo indevido.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I17-T20 [V1] Sem cloud storage implícito**  
+Ação: fazer login/ativar licença.  
+Esperado: nenhum projeto/mídia é enviado/sincronizado apenas por login/licença.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 # C. Testes transversais obrigatórios antes de homologar uma versão
 
 **X-T1 — Undo/Redo**  
