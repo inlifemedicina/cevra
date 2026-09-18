@@ -1050,6 +1050,70 @@ Responder: PASS/PARTIAL/FAIL.
 
 ---
 
+## I15 — Mobile → Desktop → Mobile e P2P
+
+**I15-T1 [INT/MANUAL] Pareamento por QR**  
+Ação: parear um mobile novo com o desktop.  
+Esperado: conexão passa a ser autorizada sem senha do SO ou acesso remoto genérico; dispositivo aparece como pareado/revogável.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15-T2 [INT/AUTO+MANUAL] P2P mesma rede**  
+Ação: enviar vídeo do mobile ao desktop na mesma rede e receber resultado.  
+Esperado: mídia trafega diretamente; hash confirma integridade; UX mostra progresso/status.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15-T3 [INT/AUTO+MANUAL] P2P redes diferentes**  
+Ação: mobile em rede móvel e desktop em outra rede, ambos online.  
+Esperado: conexão direta funciona quando NAT permitir; mídia não atravessa storage CEVRA.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15-T4 [INT] Desktop offline**  
+Ação: tente enviar com desktop desligado/CEVRA indisponível na fase P2P inicial.  
+Esperado: mobile informa indisponibilidade e mantém arquivo local; não simula job enviado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15-T5 [INT] Desktop online, P2P bloqueado**  
+Ação técnica: testar rede/NAT que impeça conexão direta.  
+Esperado: CEVRA distingue falha de conectividade; enquanto fallback não existir, informa que não foi possível conectar.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15-T6 [INT/AUTO] Segurança do canal**  
+Ação técnica: validar autenticação/criptografia/identidade por dispositivo.  
+Esperado: dispositivo não pareado não envia jobs; conexão não expõe porta pública genérica ou filesystem.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15-T7 [INT/AUTO] Transferência interrompida**  
+Ação: interromper rede durante upload/download.  
+Esperado: nenhum SourceAsset parcial; retry/retomada segue capability implementada; estado do job é claro.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15-T8 [INT/MANUAL] Mobile workflow mínimo**  
+Ação: enviar vídeo, selecionar preset, escrever instrução, iniciar, acompanhar e receber resultado.  
+Esperado: fluxo pode ser concluído sem abrir editor desktop completo no celular.  
+Responder: APROVADO/REPROVADO: motivo.
+
+**I15-T9 [INT] Cancelamento remoto**  
+Ação: cancelar job pelo mobile em fase permitida.  
+Esperado: desktop interrompe de forma segura e preserva projeto válido/estado coerente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15-T10 [ADV] Fallback storage temporário**  
+Ação: quando implementado, enviar com desktop offline ou P2P indisponível.  
+Esperado: arquivo fica criptografado apenas enquanto necessário; é removido após confirmação do destino ou TTL de segurança.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I15-T11 [ADV] Resultado via fallback**  
+Ação: quando implementado, desktop envia render para storage temporário e mobile baixa.  
+Esperado: confirmação de integridade seguida de remoção do objeto temporário.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I15-T12 [AUTO] Custo/data path**  
+Ação técnica: inspecionar transferência P2P bem-sucedida.  
+Esperado: bytes grandes não atravessam backend/storage CEVRA; somente signaling/control plane usa infraestrutura CEVRA.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 ---
 
 # C. Testes transversais obrigatórios antes de homologar uma versão
