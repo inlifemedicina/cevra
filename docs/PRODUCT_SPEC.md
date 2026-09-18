@@ -188,6 +188,16 @@ Content Intelligence preserves technically useful research, source, signal, ques
 
 Disabling or omitting Content Intelligence never blocks Vids import, edit, preview, review or export.
 
+## Account, licensing and Recovery Mode
+
+CEVRA Account, entitlement and billing are separate platform concerns. V1 prefers passwordless identity and a CEVRA-owned signed entitlement layer; a billing provider handles payment/subscription but does not become product-domain truth.
+
+Development builds do not require live account/billing infrastructure and may use a controlled Development Entitlement. Stable/release builds must reject that bypass. Pre-launch staging validates account, entitlement, device activation, offline/grace behavior and billing sandbox before any live commercial dependency is enabled.
+
+Active signed entitlement may be cached for bounded offline use. After expiry/grace, Recovery Mode preserves access needed to recover the project and original assets, but **does not allow generating, exporting or saving a new usable final video**. Login/licensing does not upload or sync projects/media by itself.
+
+Local processing is not metered per render/minute. Usage billing/credits are reserved for capabilities with genuine variable external cost.
+
 ## Marketplace
 
 The Vids core is complete and excellent; Marketplace adds specialization and expansion. Marketplace does not sell back baseline features required for the improved EDVID parity target.
