@@ -20,7 +20,7 @@ No social network, publishing platform, analytics vendor or AI vendor may be rep
 - Video generation: local provider slot
 - Music/audio generation: optional provider slot
 - Speech synthesis (TTS): optional local/external provider slot for narrated creation flows; voice cloning/digital-twin identity capabilities remain a separate future decision
-- External editor interchange: OpenTimelineIO; reserved adapters for OpenCut/Premiere/Resolve
+- External editor interchange: metadata-first handoff through ExternalEditorHandoffCompiler; Resolve prioritizes OpenTimelineIO (.otio), Premiere prioritizes XML with AAF benchmarked as secondary; consolidation/bundles are optional and live bidirectional sync is post-V1
 
 ## Agent Gateway
 
@@ -120,3 +120,12 @@ Any API requiring additional cost must be explicitly optional and clearly identi
 
 ## Reference implementations and source reuse
 External products may be studied for workflows and behavior. Code reuse is allowed only after exact license/provenance verification demonstrates compatibility with CEVRA's proprietary commercial distribution and all notice obligations are recorded. Auroq and other proprietary/UNLICENSED references remain clean-room functional references unless separately licensed.
+
+
+## External editor handoff
+
+CEVRA exports from canonical Project IR through target-specific handoff adapters. Normal handoff is metadata-first and linked to existing media to minimize size. Portable/consolidated packages reuse the approved asset-consolidation policy.
+
+Features are classified as native, baked, approximated or unsupported; every handoff produces a report. Complex CEVRA-only visual effects should be baked selectively rather than flattening the entire timeline. Resolve uses OTIO as the primary V1 path. Premiere uses XML as the first lightweight candidate with AAF evaluated against real CEVRA fixtures.
+
+Premiere UXP and Resolve scripting/workflow integrations are future bridges, not V1 requirements. External editors never become a second Project IR authority.
