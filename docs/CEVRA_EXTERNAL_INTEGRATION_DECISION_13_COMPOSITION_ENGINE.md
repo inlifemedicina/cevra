@@ -1,260 +1,278 @@
-# CEVRA — Decisão de Integração 13: Composition Engine e dependências
+# CEVRA — Decisão de Integração 13: Composition Engine, compiler e dependências
 
-**Data da decisão:** 2026-09-17.  
-**Status:** APROVADA PELO PRODUCT OWNER.  
+**Data original:** 2026-09-17.  
+**Refinamento aprovado:** 2026-09-18.  
+**Status:** APROVADA PELO PRODUCT OWNER; FRONTEIRA DE COMPONENTES REFINADA.  
 **Implementação:** NÃO AUTORIZADA por este registro.  
-**Princípio:** HyperFrames é o candidato prioritário ao Composition Engine do CEVRA; Remotion permanece referência funcional EDVID para benchmark. Só ampliar a busca se houver lacuna material comprovada.
+**Princípio:** HyperFrames é o candidato prioritário ao Composition Engine; Remotion/EDVID permanece referência funcional. A superfície não confiável é tipada/validada, enquanto componentes internos CEVRA podem usar implementações auditadas mais ricas atrás do compiler.
 
 ---
 
 ## 1. Referência e contexto
 
-O ADR 0012 já definiu:
-- Composition Engine atrás de `CompositionEngineAdapter`;
+ADR 0012 permanece aceito e **não precisa ser reaberto** por este refinamento. Ele já exige:
+- `CompositionEngineAdapter`;
 - HyperFrames como candidato preferencial, não obrigatório;
-- Remotion/EDVID como referência funcional;
-- seleção final apenas após benchmark de paridade;
-- Project IR independente do engine.
+- Remotion/EDVID como referência;
+- benchmark antes da seleção;
+- Project IR engine-neutral.
 
-Esta decisão não reabre o ADR; refina a estratégia de benchmark e seleção.
+Esta decisão refina o caminho entre Project IR e engine.
 
 ---
 
 ## 2. HyperFrames como candidato prioritário
 
-HyperFrames passa a ser o primeiro motor a provar.
-
-Razões:
-- licença Apache-2.0 na revisão consultada;
-- compatibilidade comercial favorável para produto proprietário;
+HyperFrames continua sendo o primeiro motor a provar, pelas razões já registradas:
+- licença/compatibilidade comercial da revisão consultada sujeita a auditoria exata;
 - execução local;
-- render determinístico;
-- integração com HTML/CSS/mídia e FFmpeg;
-- atividade recente e correções relevantes para portrait, preview/render e lifecycle;
-- possibilidade de evitar custo por render/licenciamento operacional associado a alternativas comerciais.
+- render determinístico/seekable;
+- HTML/CSS/mídia;
+- GSAP e runtimes de animação;
+- suporte a Three.js/WebGL e outras capacidades relevantes;
+- possibilidade de reduzir dependência/custo operacional de alternativas.
 
-Isso NÃO significa seleção final antes do benchmark.
+A descoberta de novas skills/capacidades do HyperFrames aumenta o potencial do candidato, mas **não substitui o benchmark**.
 
 ---
 
 ## 3. Remotion como referência EDVID
 
-Remotion permanece:
-- referência do comportamento visual do EDVID;
-- fonte de comparação para captions, layouts, B-roll, motion graphics, timing e efeitos;
-- fallback possível somente se HyperFrames falhar materialmente.
+Remotion continua:
+- referência visual/funcional do EDVID;
+- comparação para captions, layouts, B-roll, motion, timing e efeitos;
+- fallback apenas diante de falha material comprovada do candidato principal.
 
-Remotion não é assumido como default.
-
-Qualquer adoção comercial futura depende de:
-- versão exata;
-- termos/licença vigentes;
-- custo;
-- compatibilidade com distribuição/produto CEVRA.
+Qualquer incorporação comercial depende da versão/termos/licença/custo vigentes no momento da decisão.
 
 ---
 
-## 4. Outros engines
+## 4. Ferramentas de desenvolvimento aprovadas
 
-Motion Canvas e outros engines permanecem candidatos secundários.
+### HyperFrames Registry
 
-Não executar benchmark amplo de três ou mais engines sem necessidade.
+Pode ser pesquisado pelo time/Codex para evitar recriar efeitos existentes. Resultado upstream só entra no produto depois de:
+- auditoria;
+- licença/proveniência;
+- análise de dependências;
+- adaptação;
+- congelamento/versionamento;
+- testes CEVRA.
 
-Regra:
+Não há execução dinâmica de código arbitrário do registry no produto.
+
+### Remotion → HyperFrames
+
+A skill oficial `remotion-to-hyperframes` pode ser usada como **ferramenta de desenvolvimento** para acelerar a tradução de composições EDVID/Remotion.
+
+Fluxo esperado:
+
 ```text
-HyperFrames
-vs
-Remotion/EDVID reference
-
-se HyperFrames falhar materialmente:
-→ avaliar fallback real
-→ somente então abrir novo candidato
+referência Remotion/EDVID
+→ tradução assistida
+→ render comparativo
+→ diff/SSIM quando aplicável
+→ correção
+→ incorporação CEVRA auditada
 ```
 
-Evitar pesquisa/integração desnecessária.
+A saída não vira automaticamente estado canônico nem código de produção sem revisão.
 
 ---
 
-## 5. Escopo do benchmark
+## 5. Fronteira correta de segurança
 
-Benchmark somente com recursos realmente aprovados pelo CEVRA:
+A regra anterior “componentes/ops tipados” é refinada.
 
+### Superfície não confiável
+
+Agentes, presets, pacotes e solicitações externas só podem emitir:
+- intents/comandos tipados;
+- referência a capability/componente permitido;
+- parâmetros validados.
+
+Não podem emitir HTML/JS/TSX/Python/shader/filtergraph executável diretamente.
+
+### Interior confiável do CEVRA
+
+Um componente first-party registrado e auditado pode implementar sua função com os mecanismos suportados do Composition Engine, incluindo código interno necessário, desde que:
+- esteja versionado;
+- tenha schema/manifesto;
+- seja reprodutível;
+- seja testado;
+- não tenha privilégios não declarados;
+- não se torne nova fonte de verdade.
+
+Não criar um novo tipo rígido de domínio para cada efeito se uma representação genérica segura for suficiente.
+
+---
+
+## 6. Caminho aprovado
+
+```text
+Project IR / ProjectHistory
+→ operação/intenção CEVRA validada
+→ VisualComponentInstance / referência genérica equivalente
+→ component registry CEVRA
+→ Composition Compiler
+→ implementação interna first-party
+→ CompositionEngineAdapter
+→ HyperFrames / engine selecionado
+```
+
+O nome/tipo exato `VisualComponentInstance` é conceitual neste registro; a implementação deve primeiro tentar reutilizar as representações existentes e introduzir apenas a menor extensão comprovadamente necessária.
+
+---
+
+## 7. Escopo do benchmark
+
+Benchmark com recursos aprovados, incluindo:
 - seis estilos de legenda EDVID;
 - headlines;
-- split e split2;
-- imagens;
-- vídeo/B-roll;
-- full-screen;
+- split/split2;
+- imagens/B-roll/full-screen;
 - camera dynamic;
 - hard zoom;
 - slow push-in;
 - face tracking;
-- motion graphics tipados;
+- componentes de motion graphics registrados;
 - behind-the-subject/alpha;
-- SFX;
-- música;
+- SFX/música;
 - timing;
-- 9:16;
-- 16:9;
-- preview versus export;
-- cancelamento;
-- erro/recovery;
-- consumo de CPU/GPU/RAM;
-- tempo de render.
+- 9:16/16:9;
+- preview vs export;
+- cancelamento/recovery;
+- performance.
 
-Não criar features novas apenas para o benchmark.
+A descoberta posterior de 3D/Three.js deve ser coberta pelo benchmark específico da capability 3D quando a decisão correspondente for consolidada; não é razão para inflar o benchmark base indiscriminadamente.
 
 ---
 
-## 6. Processo de benchmark
+## 8. Processo do benchmark
 
 ### Codex/automação
-Responsável por:
-- preparar fixtures;
-- produzir a mesma cena/estado nos engines;
-- executar renders;
-- medir tempo;
-- medir RAM/CPU/GPU;
-- verificar erros/cancelamento;
-- gerar comparativos lado a lado;
-- verificar integridade/timing;
-- registrar versão/licença/dependências;
-- organizar material para homologação.
+- fixtures;
+- renders equivalentes;
+- métricas CPU/GPU/RAM/tempo;
+- cancelamento/recovery;
+- integridade/timing;
+- diff/SSIM quando útil;
+- versão/licença/dependências;
+- teste de registry/compiler;
+- material lado a lado.
 
 ### Product Owner
-Recebe somente os comparativos que exigem julgamento humano:
+Somente julgamento humano necessário:
 - aparência;
 - legibilidade;
 - fluidez;
 - timing percebido;
-- qualidade de composição;
 - naturalidade;
-- equivalência com EDVID.
-
-Resposta:
-- APROVADO
-- REPROVADO: motivo
+- equivalência/superioridade visual.
 
 ---
 
-## 7. Critério de seleção
+## 9. Critério de seleção
 
-HyperFrames será escolhido se demonstrar:
-- paridade ou melhor resultado visual/funcional nos recursos aprovados;
+HyperFrames será selecionado se demonstrar paridade/superioridade suficiente nos recursos aprovados com:
 - timing confiável;
 - preview/export coerentes;
-- performance/estabilidade adequadas;
-- lifecycle/cancelamento aceitáveis;
-- empacotamento comercial compatível;
-- ausência de regressão material em relação ao EDVID.
+- estabilidade/performance aceitáveis;
+- lifecycle/cancelamento;
+- empacotamento comercial viável;
+- compiler/registry internos sem regressão de segurança.
 
-Se falhar materialmente:
-- não forçar adaptação extensa apenas para mantê-lo;
-- apresentar falha;
-- avaliar Remotion ou outro candidato;
-- voltar ao Product Owner antes de escolha final alternativa.
+Falha material volta ao Product Owner antes de trocar engine ou ampliar drasticamente a integração.
 
 ---
 
-## 8. Segurança e execução arbitrária
+## 10. Independência do Project IR
 
-Mesmo que o engine suporte HTML/JS ou execução programática, isso não será exposto ao agente/end-user como superfície livre.
+Nenhum schema HyperFrames/Remotion é canônico.
 
-Proibido:
-```text
-IA
-→ HTML/JS/TSX arbitrário
-→ execução direta
-```
+Persistir:
+- intenção audiovisual;
+- referência estável do componente/capability;
+- parâmetros editáveis;
+- versões necessárias para reproduzir/migrar.
 
-Caminho aprovado:
-```text
-Project IR
-→ componentes/ops tipados
-→ Composition Compiler
-→ CompositionEngineAdapter
-→ HyperFrames/engine selecionado
-```
+Não persistir como autoridade:
+- HTML/JS/TSX gerado;
+- timeline nativa do engine;
+- provider-specific graph.
 
-O agente pode selecionar/parametrizar componentes permitidos, nunca fornecer código executável arbitrário.
+Representações de engine são derivadas/reconstruíveis.
 
 ---
 
-## 9. Independência do Project IR
+## 11. Atualizações de componentes e engine
 
-Nenhum schema do HyperFrames/Remotion vira estado canônico.
+O engine e os componentes first-party devem ser versionados/pinned de acordo com `UPDATE_STRATEGY.md`.
 
-Project IR/ProjectHistory permanecem a fonte audiovisual.
-
-Engine-specific representation é:
-- derivada;
-- compilada;
-- descartável/reconstruível.
-
-Trocar engine não pode exigir reescrever o modelo de projeto.
+Uma atualização de HyperFrames ou de componente:
+- não altera silenciosamente projetos existentes;
+- passa por compatibilidade/benchmark;
+- usa migração explícita quando necessário;
+- preserva rollback da infraestrutura quando seguro;
+- mantém projeto canônico engine-neutral.
 
 ---
 
-## 10. Relação com decisões anteriores
+## 12. Relação com decisões anteriores
 
-Esta decisão habilita tecnicamente:
-- captions;
-- split-screen;
-- B-roll;
-- full-screen;
-- motion graphics;
-- behind-the-subject;
-- imagens;
-- áudio/SFX;
-- assets externos.
-
-Não substitui:
-- Image Ingest;
+Esta decisão habilita composição, mas não substitui:
+- ingest;
 - Media Runtime;
-- matting engine;
+- matting;
 - asset lifecycle;
 - Director;
-- Agent Protocol.
+- Agent Protocol;
+- segurança de packages;
+- update lifecycle.
+
+Workflow Presets continuam tipados/declarativos porque são uma superfície de orquestração, não implementação interna do componente.
 
 ---
 
-## 11. Momento de implementação
+## 13. Momento
 
-Após o gate coordenado do Media Runtime e antes de expansão visual pesada dependente do Composition Engine.
+Após o gate coordenado do Media Runtime e antes da expansão visual pesada dependente do engine:
 
-Ordem:
-1. preparar fixtures;
-2. integrar/rodar HyperFrames de forma isolada;
-3. reproduzir casos EDVID;
-4. medir;
-5. homologar visualmente;
-6. selecionar motor;
-7. integrar via CompositionEngineAdapter;
-8. expandir capacidades dependentes.
+1. fixtures;
+2. HyperFrames isolado;
+3. casos EDVID;
+4. uso experimental de remotion-to-hyperframes onde economizar trabalho;
+5. medir;
+6. homologar;
+7. selecionar;
+8. integrar `CompositionEngineAdapter`;
+9. construir registry/compiler CEVRA mínimo;
+10. expandir capabilities.
 
 ---
 
-## 12. Classificação
+## 14. Classificação
 
 | Item | Estado |
 |---|---|
 | HyperFrames | candidato prioritário |
-| Remotion | referência EDVID / fallback possível |
-| Motion Canvas/outros | defer, só se necessário |
-| benchmark amplo com muitos engines | não adotar |
+| Remotion | referência/fallback possível |
+| HyperFrames Registry | ferramenta de desenvolvimento; incorporação auditada |
+| remotion-to-hyperframes | ferramenta de desenvolvimento aprovada |
 | Project IR engine-neutral | obrigatório |
-| arbitrary HTML/JS/TSX from agent | RED |
-| typed composition compiler | GREEN |
-| seleção final do engine | pendente do benchmark |
+| código arbitrário vindo de agente/preset | RED |
+| código interno first-party registrado/auditado | GREEN |
+| schema de params na fronteira | GREEN |
+| um tipo rígido novo por componente | NÃO obrigatório |
+| live download/exec de registry upstream | RED |
+| seleção final do engine | pendente de benchmark |
 
 ---
 
-## 13. Decisão final
+## 15. Decisão final refinada
 
-HyperFrames será o primeiro candidato ao Composition Engine do CEVRA. Remotion continuará como referência funcional EDVID para o benchmark.
+HyperFrames continua primeiro candidato e Remotion/EDVID continua referência.
 
-O benchmark será pequeno, direcionado e automatizado pelo Codex, cobrindo somente os recursos já aprovados. O Product Owner receberá apenas os comparativos visuais que exigirem julgamento humano.
+A segurança do CEVRA será obtida por **fronteira externa tipada e validada**, não por engessar cada implementação interna. Componentes first-party podem usar recursos ricos do engine atrás de registro, manifesto/schema, compiler, versionamento e testes.
 
-Se HyperFrames atingir paridade ou superioridade suficiente com estabilidade e custo adequados, será selecionado. Se falhar materialmente, a decisão volta antes de adotar Remotion ou outro engine.
-
-Nenhum agente poderá executar código arbitrário no engine. Toda composição será produzida por componentes/operações CEVRA tipados e compilados a partir do Project IR.
+Nenhum agente, preset ou pacote não confiável pode enviar código executável arbitrário ao engine. O Project IR permanece independente do engine e não precisa ganhar um tipo específico para cada novo efeito.
