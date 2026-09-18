@@ -59,6 +59,12 @@ Recovery Mode protects access to projects/original sources but does not permit e
 
 No media/project cloud storage is implied by identity/licensing.
 
+## Distribution and update direction
+
+Vids V1 uses direct signed desktop distribution and a core-complete installer. Orbit may later centralize package/update services across products, but Vids does not depend on an Orbit cloud service to open/edit local projects.
+
+Tauri signed update manifests are the initial Vids mechanism; artifact hosting is replaceable. Product telemetry is not required for updates. Crash diagnostics, if enabled, are opt-in and content-minimized.
+
 ## Marketplace principle
 
 Marketplace belongs to Orbit rather than exclusively to Vids.
