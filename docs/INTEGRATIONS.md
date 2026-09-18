@@ -19,6 +19,7 @@ No social network, publishing platform, analytics vendor or AI vendor may be rep
 - Image generation: local provider slot
 - Video generation: local provider slot
 - Music/audio generation: optional provider slot
+- Speech synthesis (TTS): optional local/external provider slot for narrated creation flows; voice cloning/digital-twin identity capabilities remain a separate future decision
 - External editor interchange: OpenTimelineIO; reserved adapters for OpenCut/Premiere/Resolve
 
 ## Agent Gateway
@@ -106,6 +107,8 @@ Image, video and future audio or creative generators implement provider contract
 3. native host generation covered by the user's entitlement;
 4. local models;
 5. optional external or BYOK providers.
+
+Speech synthesis follows the same provider-neutral rule. Faceless/narrated creation may use a local TTS engine, a supported user-entitlement path, BYOK or a future managed provider. No voice clone/digital-twin capability is implied by generic TTS.
 
 CEVRA Vids works without a paid generative provider. Every accepted generated result becomes a normal editable Project IR asset and timeline item with provenance.
 
