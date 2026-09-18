@@ -986,6 +986,70 @@ Responder: APROVADO/REPROVADO sobre fallback proposto.
 
 ---
 
+## I14 — Transferência externa, EvidenceRequest e Agent Playbook
+
+**I14-T1 [INT/AUTO] Sem servidor CEVRA obrigatório**  
+Ação técnica: executar Agent Round-Trip por adapter local/oficial sem backend CEVRA intermediário.  
+Esperado: contexto/evidência chegam ao agente e plano retorna sem depender de cloud CEVRA próprio.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I14-T2 [INT] Visão global primeiro**  
+Ação: usar vídeo com tema não informado, mas transcript suficiente.  
+Esperado: agente consegue inferir tema/estrutura a partir do contexto textual e só pede audiovisual adicional quando necessário.  
+Responder: APROVADO/REPROVADO.
+
+**I14-T3 [INT] EvidenceRequest de take adicional**  
+Ação: fornecer duas alternativas cuja escolha dependa de expressão/continuidade visual.  
+Esperado: agente pede exatamente os frames/clipes necessários; CEVRA não envia vídeo inteiro por padrão.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I14-T4 [INT/AUTO] Staging local restrito**  
+Ação técnica: agente solicita frame/clip.  
+Esperado: CEVRA cria artifact temporário autorizado; agente não obtém acesso ao filesystem/projeto inteiro.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I14-T5 [INT/AUTO] Upload direto ao provider**  
+Ação técnica: provider exige arquivo.  
+Esperado: quando suportado, dispositivo envia diretamente pelo mecanismo oficial; provider file ID permanece transitório.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I14-T6 [INT/AUTO] Retorno externo seguro**  
+Ação: provider devolve arquivo/URL.  
+Esperado: CEVRA baixa temporariamente, valida/hash/provenance e só então faz ingest; URL não vira SourceAsset diretamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I14-T7 [INT/AUTO] Reuso de upload**  
+Ação: agente pede o mesmo artifact em turnos sucessivos enquanto o upload permanece válido.  
+Esperado: CEVRA pode reutilizar digest/file ID sem reupload desnecessário e invalida corretamente em expiração/mudança.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I14-T8 [INT] Agent Playbook**  
+Ação: executar a mesma tarefa com playbook ativo e verificar comportamento de EvidenceRequest/plano.  
+Esperado: agente segue método/protocolo CEVRA de forma consistente, sem ganhar privilégios adicionais.  
+Responder: APROVADO/REPROVADO.
+
+**I14-T9 [INT] Playbook ausente**  
+Ação: usar adapter compatível sem suporte formal a Skill/playbook instalado.  
+Esperado: Agent Protocol continua funcionando; CEVRA fornece instruções equivalentes pelo caminho suportado ou informa limitação sem quebrar a comunicação básica.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I14-T10 [V1] Distinção Agent Playbook vs CEVRA Skill**  
+Ação técnica/revisão: inspecionar packaging/configuração.  
+Esperado: playbook interno não é exposto/tratado como o produto futuro CEVRA Skill e não cria dependência dele.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I14-T11 [BENCH/AUTO] Micro-raciocínio local**  
+Ação técnica: rodar tarefas de tema, subtemas, blocos, repetição e seleção de evidência nos candidatos locais.  
+Esperado: medir qualidade PT-BR, schema, latência, RAM/VRAM e taxa de acerto; identificar se modelo pequeno é suficiente.  
+Product Owner: recebe amostras somente quando avaliação semântica/UX for necessária.
+
+**I14-T12 [V1] Sem modelo local de micro-raciocínio**  
+Ação: desabilitar IA local leve.  
+Esperado: CEVRA continua funcionando; agente externo pode inferir tema a partir do transcript/contexto ou tema permanece desconhecido em fluxos sem IA.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 ---
 
 # C. Testes transversais obrigatórios antes de homologar uma versão
