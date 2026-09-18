@@ -1537,6 +1537,19 @@ post-merge CI passed 5/5 jobs.
 - **IMPLEMENTED/CLOSED:** Local Forced Alignment V1 merged in PR #22 at `45913175b30c42a2758820a2937fe9a0126ab739`; post-merge CI run `35005561921` passed 5/5 jobs and the feature branch was removed. ADR 0017 adds a provider-neutral `AlignmentEngineAdapter`, isolated per-canonical-segment CTC runtime and application-owned stale-digest promotion through existing `transcript.set`/`ProjectHistory`. Alignment is bounded to 30-second/1,024-token windows, preserves unknown characters through wildcard emissions, appends provenance without rewriting history, verifies a closed exact model-file allow-list and surfaces disposable-audio cleanup failures before promotion. It adapts only forced-alignment behavior from BSD-2-Clause WhisperX v3.8.6 commit `3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0`, pins Apache-2.0 PT/EN model revisions and hashes, keeps downloads disabled, and adds no cache, diarization, Project IR migration, Media Runtime operation or UI/Tauri permission. Runtime/model packaging, full PT-weight smoke, safe crash-leftover temp reclamation and the non-blocking cleanup-retry behavior remain later gates.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
+
+## 2026-09-18
+
+- **CANONICAL:** external-integration roadmap decisions 1–19 are closed at product-direction level; deferred implementation details remain explicitly tracked rather than reopened as new mandatory product decisions.
+- **CANONICAL:** CEVRA Vids local export is always independent; social publishing and social-performance analytics are post-V1 and cannot block Vids 1.0.
+- **CANONICAL:** distinguish **CEVRA Bridge Skill** from **CEVRA Creator Skill**. Bridge supports external AI used by the Vids app and depends on Agent Gateway/Vids execution.
+- **CANONICAL:** CEVRA Creator Skill is a standalone agent-native editor/creator with a visual Creator Workspace and Lite/Full profiles over one shared editorial/creative/QA core.
+- **CANONICAL:** Creator Full must complete editing, visual review, QA, render and final export without CEVRA Desktop; Desktop handoff is optional interoperability.
+- **CANONICAL:** prefer reuse of Project IR/domain/runtime/composition/UI packages in Creator; if host limitations require a subset, keep it versioned and convertible rather than inventing divergent audiovisual semantics.
+- **CANONICAL:** Creator Skill commercialization/licensing, exact runtime packaging, workspace implementation technology and detailed Lite/Full capability matrix are deferred implementation/product decisions, not blockers for current Vids work.
+- **CANONICAL:** publishing providers, scheduling and performance-analytics synchronization are post-V1 and require future provider audits/approvals.
+
+
 ---
 
 # 26. Explicitly unresolved decisions
@@ -1555,7 +1568,11 @@ Do not guess these in future chats:
 10. which public Creative Intelligence skill candidates will be incorporated vs behavior-ported;
 11. final embedded Codex/Claude commercial integration mechanisms;
 12. final Marketplace package/runtime security model implementation;
-13. mobile implementation timing.
+13. mobile implementation timing;
+14. Creator Skill runtime/workspace packaging and exact Lite/Full capability matrix;
+15. Creator Skill commercial/licensing model;
+16. post-V1 social publishing provider approvals, scheduling and exact upload/relay design;
+17. post-V1 performance-analytics synchronization and normalization strategy.
 
 ---
 
