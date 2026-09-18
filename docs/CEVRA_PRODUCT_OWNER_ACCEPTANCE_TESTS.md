@@ -814,6 +814,75 @@ Responder: APROVADO/REPROVADO por candidato.
 
 ---
 
+## I11 — Música, SFX e áudio generativo
+
+**I11-T1 [V1] SFX nativo sem rede**  
+Ação: desligue internet e aplique click/pop/whoosh nativos.  
+Esperado: efeitos funcionam localmente e não exigem API/modelo.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T2 [V1] Proveniência/licença do SFX Pack**  
+Ação: inspecione o inventário dos SFX distribuídos.  
+Esperado: cada asset possui origem/licença compatível com redistribuição comercial; nenhum banco terceiro foi copiado sem direito.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T3 [V1] Preferência Nenhuma trilha**  
+Ação: selecione Nenhuma trilha e execute edição/preset.  
+Esperado: Director não adiciona ou gera música.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T4 [V1] Música do usuário**  
+Ação: importe música local e use como trilha.  
+Esperado: entra pelo ingest/SourceAsset, original permanece intacto e mix é editável.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T5 [INT] Gerar automaticamente sem custo**  
+Ação: escolha gerar automaticamente com Local Music Pack disponível.  
+Esperado: CEVRA gera quando editorialmente apropriado sem chamada paga e registra provenance.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T6 [INT] Geração paga sem autorização**  
+Ação: desative local e deixe apenas provider pago sem autorização vigente.  
+Esperado: CEVRA não gera nem cobra; solicita autorização ou informa indisponibilidade.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T7 [V1] Perguntar antes**  
+Ação: selecione preferência Perguntar antes de gerar.  
+Esperado: toda geração musical é apresentada para decisão antes de executar.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T8 [INT] AI Music Pack opcional**  
+Ação: instalar pack local.  
+Esperado: antes do download mostra tamanho/requisitos/espaço; permite cancelar; CEVRA base continua funcional sem o pack.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T9 [INT] Remover AI Music Pack**  
+Ação: desinstale/remova o pack após criar projetos.  
+Esperado: CEVRA continua funcionando; assets já gerados permanecem nos projetos; novas gerações locais ficam indisponíveis até reinstalação.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T10 [BENCH] Benchmark do modelo musical local**  
+Ação: gerar trilhas representativas em candidatos, incluindo ACE-Step.  
+Esperado: registrar qualidade, adequação instrumental, duração, tempo, RAM/VRAM, tamanho do pack, licença/pesos e estabilidade.  
+Responder: APROVADO/REPROVADO por candidato.
+
+**I11-T11 [V1] Mix determinístico**  
+Ação: combine voz + música + SFX.  
+Esperado: ducking/fades/ganho/normalização mantêm voz inteligível e não exigem IA.  
+Responder: APROVADO/REPROVADO.
+
+**I11-T12 [V1] Geração marcada como IA**  
+Ação: gere trilha por IA e inspecione/exporte.  
+Esperado: `generated-ai` e provider/modelo disponíveis permanecem na proveniência e disclosure.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I11-T13 [V1] Voz sintética fora de escopo**  
+Ação: peça clonagem/imitação de voz dentro desta feature.  
+Esperado: função não é tratada como capability aprovada de música/SFX; informa indisponibilidade/rota futura apropriada.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 ---
 
 # C. Testes transversais obrigatórios antes de homologar uma versão
