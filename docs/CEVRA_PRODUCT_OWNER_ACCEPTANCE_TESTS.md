@@ -701,6 +701,60 @@ Ação: altere preferência de consolidação após projeto existente.
 Esperado: projetos anteriores não são copiados/reconfigurados automaticamente sem ação explícita.  
 Responder: PASS/PARTIAL/FAIL.
 
+## I9 — Geração de imagens por IA
+
+**I9-T1 [INT] Geração solicitada sem custo adicional**  
+Ação: com caminho oficial/local sem custo adicional disponível, peça explicitamente uma imagem.  
+Esperado: CEVRA gera sem exigir API key desnecessária e registra a origem como IA.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T2 [INT] Geração paga sem autorização prévia**  
+Ação: peça imagem quando só houver provider com cobrança por uso e nenhuma autorização de gasto vigente.  
+Esperado: CEVRA para antes da cobrança e solicita autorização; nenhum débito/chamada paga ocorre silenciosamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T3 [INT] Director sugere geração paga**  
+Ação: permita edição automática em trecho onde o Director considere útil uma imagem gerada, mas sem autorização de custo.  
+Esperado: geração é proposta, não executada; o restante da edição independente pode continuar.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T4 [INT] Assinatura consumidor não tratada como API**  
+Ação: conectar conta/assinatura que possua geração de imagem na interface do provedor, mas sem transporte oficial de terceiros disponível.  
+Esperado: CEVRA não automatiza UI/cookies/sessão para usar essa quota; informa que o caminho ainda não é integração oficial disponível.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T5 [V1] Proveniência generated-ai**  
+Ação: gerar imagem e inspecionar detalhes do asset.  
+Esperado: `origin=generated-ai`, provider/modelo quando conhecidos, prompt e demais metadata disponíveis ficam preservados.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T6 [V1] Disclosure de IA**  
+Ação: usar imagem gerada em projeto/export.  
+Esperado: UI identifica que foi gerada por IA e CEVRA oferece informação/texto de disclosure apropriado; não oculta a origem.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T7 [INT] Content Credentials/provenance**  
+Ação: gerar com provider que entregue C2PA/SynthID ou mecanismo equivalente.  
+Esperado: CEVRA preserva o mecanismo quando tecnicamente possível e não o remove intencionalmente sem necessidade.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T8 [V1] Reopen offline de asset gerado**  
+Ação: gerar, salvar, fechar, desconectar provider/internet e reabrir.  
+Esperado: a imagem continua disponível porque virou managed asset/SourceAsset local.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T9 [INT] Troca de provider**  
+Ação: gerar assets equivalentes por dois adapters diferentes.  
+Esperado: ambos entram no mesmo modelo canônico; Project IR/Composition Engine não dependem do schema nativo do provider.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I9-T10 [V1] CEVRA sem geração de IA**  
+Ação: desabilite todos os providers/modelos de geração.  
+Esperado: edição, ingestão, busca e composição não dependentes continuam funcionando.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 ---
 
 # C. Testes transversais obrigatórios antes de homologar uma versão
