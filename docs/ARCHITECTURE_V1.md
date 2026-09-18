@@ -128,6 +128,14 @@ The EDVID evidence is functional and technical: its public `SKILL.md` describes 
 
 The benchmark covers karaoke, static and stacked captions; headlines; split-screen; cards; images; B-roll; dynamic camera; hard zoom; slow push-in; face tracking; motion graphics; SFX; transitions; exact timing; data-driven templates; and vertical and horizontal rendering. If HyperFrames is not equivalent or better, CEVRA may select Remotion or another demonstrably suitable implementation behind the adapter. Remotion may be incorporated into commercial distribution only after review of the proposed version's then-current license and confirmation of compatibility with CEVRA's proprietary commercial model. The canon does not fix license terms, prices or thresholds.
 
+#### Composition security boundary
+
+Typed execution is mandatory at **untrusted boundaries**: agents, workflow presets, user-imported packages and other external callers select approved capabilities/components and provide schema-validated parameters. This does not require one Project IR type or command per internal visual effect.
+
+First-party CEVRA composition components may contain audited implementation code using supported engine runtimes (for example GSAP, Three.js or Lottie) behind a versioned internal registry and the Composition Compiler. Their engine-native code/timelines are derived implementation, never canonical Project IR. Prefer a generic stable component reference + validated parameters when existing Project IR primitives are insufficient; extend Project IR only for demonstrated domain needs.
+
+Upstream registries and skills are development inputs, not runtime trust roots. External component code must be audited, frozen/versioned and commercially eligible before incorporation; the product does not download and execute arbitrary registry code in response to an editing request.
+
 ### Transcription Engine
 
 - faster-whisper for standard local transcription
