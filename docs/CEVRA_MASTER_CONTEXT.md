@@ -206,6 +206,8 @@ Do not expose arbitrary:
 
 Agents and presets operate through typed validated CEVRA commands and providers.
 
+Internal first-party composition components are not required to expose their implementation as one rigid domain command/type per effect. The **untrusted boundary** remains typed/validated; behind it, registered/versioned first-party components may use audited engine code through the Composition Compiler. Engine-native code/state remains derived, never Project IR authority. See `CEVRA_COMPOSITION_DECISION_23.md` and integration decision 13.
+
 ## 2.6 CANONICAL — non-destructive editing and quality/performance
 
 CEVRA uses non-destructive editing. Original media is immutable, while cuts, crops, captions, color, audio treatment, overlays and other editorial choices remain editable Project IR instructions. Proxies, previews, caches and intermediate renders are disposable derived artifacts; they never replace an original, become a final-quality source or become a second source of truth.
@@ -240,6 +242,20 @@ A1 — voice / original audio
 ```
 
 Generated/found/imported assets become normal Project IR sources/items with provenance.
+
+
+## 3.3 APPROVED DIRECTION — V1 creation modes
+
+2026-09-18: CEVRA Vids is not limited to footage-first editing. Approved V1 directions include:
+- **Faceless Explainer**, with script/storyboard generation and provider-neutral TTS for the fully automatic narrated path;
+- **Slideshow** from photos/clips/text/music;
+- **Music-to-video**, conditional on a proportional local rhythm-analysis capability; evaluate beat/BPM/onset/energy/sections before the coordinated Media Runtime adjustment round and add MR work only if genuinely necessary;
+- **Brand Kit** for independent professionals; Figma is an optional future/import path, not a requirement;
+- Product Launch and WebGPU/TypeGPU remain post-V1;
+- voice clone/Digital Twin/avatar identity generation remains a separate future decision.
+
+All modes reuse Project IR/ProjectHistory, providers, composition and export; no separate timeline/runtime per mode. Detailed authority: `docs/CEVRA_CREATION_MODES_V1_DIRECTION.md`.
+
 
 ---
 
@@ -679,6 +695,16 @@ Benchmark must cover at least:
 - vertical and horizontal output.
 
 No product-facing claim should state that CEVRA already “uses Remotion” until selected and incorporated.
+
+## 13.3 APPROVED DIRECTION — composition component trust boundary
+
+2026-09-18 refinement:
+- agents/presets/third-party surfaces remain typed, schema-validated and incapable of injecting executable code;
+- first-party internal components use a versioned CEVRA registry/manifest and may internally use approved GSAP/Three.js/Lottie/engine mechanisms;
+- do not create one Project IR type/command per visual effect unless domain state truly requires it;
+- HyperFrames Registry is development input only: audit, freeze/adapt and test before incorporation;
+- `remotion-to-hyperframes` is approved as a development accelerator for EDVID/Remotion parity, never an automatic canonical translator;
+- D23 and integration D13 are the detailed authorities; ADR 0012 remains accepted and unchanged.
 
 ---
 
@@ -1159,17 +1185,38 @@ Future packages should be signed, versioned, capability-limited and publisher-id
 
 ---
 
+## 19.2 CANONICAL DIRECTION — managed update lifecycle
+
+2026-09-18 refinement: CEVRA uses one update architecture for app/runtime/engines/models/packs while treating external software/providers through compatibility adapters.
+
+- App, managed runtime and first-party executable components are pinned, tested and signed; V1 prefers updating executable code with the app rather than building a premature hot-plugin updater.
+- Optional large model packs may update separately with manifest, hashes, hardware/space checks, smoke test and rollback.
+- External Codex/Claude/Premiere/Resolve/Figma software is never updated by CEVRA; adapters use version/health/capability negotiation.
+- Remote provider/model lifecycle changes are handled through adapters and, later, signed non-executable compatibility metadata where justified.
+- Projects/components do not change behavior silently after upstream updates; use compatibility or explicit tested migrations.
+- Update flow is stage → signature/hash → compatibility → install → healthcheck → promote/rollback.
+- Stable/beta/dev remain reserved channels.
+- Update checking must not depend on analytics telemetry.
+
+Detailed authority: `docs/UPDATE_STRATEGY.md`.
+
 # 20. Mobile direction
 
-Mobile is later and must not delay desktop Vids.
+Mobile must not delay the complete desktop workstation, but the approved first mobile direction is a **CEVRA Companion** paired to a trusted desktop.
 
 Target principles:
 
 - same Project IR and command vocabulary;
+- desktop remains the heavy processing/render node;
+- initial remote media transfer prioritizes encrypted direct P2P, including across different networks when connectivity permits;
+- initial P2P path requires mobile and desktop/CEVRA online simultaneously;
+- signaling/auth/presence may use a small control plane, while successful direct media transfer should not consume CEVRA media bandwidth;
+- encrypted temporary storage/relay is a future fallback for desktop-offline or P2P-unavailable cases, not initial priority;
+- no public generic remote-control/shell/filesystem access;
 - native/on-device capabilities where practical;
-- paired trusted desktop node for heavy processing;
-- optional BYOK/provider paths;
 - no desktop CPython assumption on iOS.
+
+Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_15_MOBILE_DESKTOP_P2P.md`.
 
 ---
 
