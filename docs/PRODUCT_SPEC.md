@@ -151,6 +151,14 @@ Luminance/contrast checks serve legibility and do not replace Brand Kit/preset i
 
 HeroEmphasis is an optional registered visual component layered on top of an existing caption style, not a new caption family. Its behind-subject form depends on an abstract SubjectMaskProvider and a later-approved matting implementation.
 
+## External editor handoff
+
+CEVRA V1 supports explicit handoff to professional editors without making them dependencies of the product. The default export is metadata-first to minimize size and duplication.
+
+DaVinci Resolve prioritizes OpenTimelineIO `.otio`, with consolidated media or full bundles only when portability warrants the size. Adobe Premiere uses a lightweight XML route as the first candidate, with AAF benchmarked as a secondary profile.
+
+Features that cannot be represented natively are preserved through selective baked overlays/assets when practical. Every handoff reports native, baked, approximated and unsupported features. Deep Premiere UXP/Resolve bridges and controlled import-back workflows are post-V1; live bidirectional sync is not a V1 requirement.
+
 ## Generative assets
 
 Image, video and future audio or creative generation use provider contracts. Asset planning prefers existing project assets, then stock or local resources, host-native generation covered by the user's entitlement, local models, and finally optional external or BYOK providers.
