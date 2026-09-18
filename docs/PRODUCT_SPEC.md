@@ -198,6 +198,16 @@ Active signed entitlement may be cached for bounded offline use. After expiry/gr
 
 Local processing is not metered per render/minute. Usage billing/credits are reserved for capabilities with genuine variable external cost.
 
+## Distribution, updates and diagnostics
+
+CEVRA V1 is distributed directly from the CEVRA website on officially supported desktop targets. Commercial installers are signed; macOS distribution is notarized and Windows uses a per-user installer by default.
+
+A stable installer is **core-complete**: mandatory runtimes, engines, assets and minimum production models required by the advertised V1 baseline are release dependencies, not hidden post-install downloads. Heavy capabilities that are genuinely optional may use separately managed packs.
+
+Updates use the signed Tauri updater with static stable/beta/dev manifests. Cloudflare R2 is the first artifact-host candidate but is replaceable and is not a runtime dependency of the editor.
+
+V1 has no mandatory behavioral analytics. Crash diagnostics are opt-in, provider-neutral and sanitized; Sentry is the first candidate. Session replay and uploading media/project/transcript/prompt content as telemetry are prohibited. Support diagnostics are generated locally and explicitly sent by the user.
+
 ## Marketplace
 
 The Vids core is complete and excellent; Marketplace adds specialization and expansion. Marketplace does not sell back baseline features required for the improved EDVID parity target.
