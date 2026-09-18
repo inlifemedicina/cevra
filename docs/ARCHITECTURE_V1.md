@@ -37,6 +37,8 @@ CEVRA Vids is the first and highest-priority Orbit product: an AI-first video ed
 17. Orbit platform services and domain products communicate through stable contracts. Vids and future products retain independent domain boundaries and release paths.
 18. Semantic versions use `x.x.x`, but version numbers are displayed discreetly in About, Settings, diagnostics, logs and support surfaces rather than as primary branding.
 19. CEVRA editing is non-destructive: original media remains immutable; proxies, previews, caches and intermediate renders are derived artifacts rather than canonical sources. Final-quality exports use original sources and assets whenever technically applicable, while render policy balances perceptual quality, throughput, file size and target-delivery constraints.
+20. Stable commercial installers are core-complete: mandatory V1 runtimes, engines, assets and minimum required models are release dependencies; optional heavy packs may remain separate.
+21. Update checking is independent from product analytics. Behavioral telemetry is not required for V1, crash diagnostics are opt-in/content-minimized, and session replay is not permitted in V1.
 
 ## 3. CEVRA Vids experience target
 
@@ -284,6 +286,10 @@ Mobile and Vids remain useful without unimplemented Orbit services. Workflow and
 - Signed, versioned and capability-limited future packages
 - No arbitrary shell access from user or third-party-package surfaces
 - Integrity verification for downloaded components
+- Core Runtime Closure verification before stable release
+- Static signed update manifests for V1 channels where practical
+- No project/media content in default crash diagnostics
+- No session replay in V1
 
 ## 17. Licensing and intellectual property
 
