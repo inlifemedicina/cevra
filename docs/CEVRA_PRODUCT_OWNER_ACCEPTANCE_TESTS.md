@@ -30,6 +30,14 @@ Para qualidade editorial/visual subjetiva:
 - **APROVADO**
 - **REPROVADO: <motivo curto>**
 
+### Responsabilidade pela execução dos testes
+
+**Codex/automação/equipe técnica** deve executar tudo que for objetivamente automatizável: instalação de candidatos, preparação de fixtures, comandos, medições, logs, RAM/VRAM/CPU/GPU, hashes, schemas, crash/recovery controlado, geração de comparativos e verificações de licença/proveniência.
+
+**Product Owner** deve receber somente os testes em que julgamento humano agrega valor: qualidade editorial, naturalidade, aparência, flicker/bordas, legibilidade, fluidez e UX. O Product Owner não deve precisar instalar modelos, executar comandos ou preparar benchmark técnico.
+
+Antes da homologação, o material manual deve chegar pronto e identificado, com o resultado técnico automático já resumido. Um teste pode ser marcado **AUTO**, **MANUAL** ou **AUTO+MANUAL** conforme sua natureza.
+
 Classificações:
 - **[V1]** esperado para a V1 correspondente quando a função estiver no escopo.
 - **[INT]** integração/provedor.
@@ -880,6 +888,52 @@ Responder: PASS/PARTIAL/FAIL.
 Ação: peça clonagem/imitação de voz dentro desta feature.  
 Esperado: função não é tratada como capability aprovada de música/SFX; informa indisponibilidade/rota futura apropriada.  
 Responder: PASS/PARTIAL/FAIL.
+
+---
+
+## I12 — Motores locais especializados
+
+**I12-T1 [BENCH/AUTO] Face tracking leve**  
+Ação técnica: Codex executa fixtures equivalentes em OpenCV baseline e MediaPipe/finalista leve.  
+Esperado: registrar estabilidade, misses, CPU/RAM e empacotamento; selecionar solução mais simples suficiente.  
+Product Owner: recebe somente comparação visual se houver diferença perceptível.  
+Responder manualmente: APROVADO/REPROVADO quando solicitado.
+
+**I12-T2 [BENCH/AUTO] Matting — preparação técnica**  
+Ação técnica: Codex roda pequeno conjunto representativo de clipes nos finalistas e RVM de referência.  
+Esperado: material comparável pronto, com tempo/RAM/VRAM/tamanho/licença registrados.  
+Product Owner: não instala ou executa modelos.  
+Responder manualmente: APROVADO/REPROVADO após comparação pronta.
+
+**I12-T3 [BENCH/MANUAL] Matting — qualidade percebida**  
+Ação: assistir comparações prontas em cabelo, mãos, movimento, fundo complexo e baixa luz.  
+Esperado: candidato comercial permissivo atinge piso visual aceitável para behind-the-subject sem flicker/halo material.  
+Responder: APROVADO ou REPROVADO: motivo.
+
+**I12-T4 [V1] Behind-the-subject ausente não bloqueia editor**  
+Ação: usar CEVRA sem pack/motor de matting disponível.  
+Esperado: edição/composição básica continuam; apenas o efeito informa indisponibilidade.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I12-T5 [INT] Vision AI Pack opcional**  
+Ação: instalar/remover pack pesado quando existir.  
+Esperado: mostra tamanho/requisitos, permite cancelar, não é obrigatório para o app base e não apaga derivados já incorporados ao projeto.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I12-T6 [V1] Restauração explícita**  
+Ação: executar restauração/upscale quando a feature existir.  
+Esperado: exige ação explícita, apresenta comparação, preserva original e cria derivado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I12-T7 [ADV] Restauração facial não silenciosa**  
+Ação: restaurar rosto degradado.  
+Esperado: CEVRA não substitui original nem trata detalhes sintetizados como evidência original; usuário vê antes/depois.  
+Responder: APROVADO/REPROVADO.
+
+**I12-T8 [ADV] Object segmentation/tracking**  
+Ação: quando implementado, acompanhar objeto em vídeo representativo.  
+Esperado: tracking/segmentação permanecem capability separada, com persistência do resultado útil e sem estado interno do modelo no Project IR.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
 
 ---
 
