@@ -20,7 +20,7 @@ No social network, publishing platform, analytics vendor or AI vendor may be rep
 - Identity/account: CEVRA-owned Orbit identity; V1 preference is passwordless email/magic-link or one-time code
 - Entitlement/licensing: CEVRA-owned signed entitlement service with device activation and bounded offline operation
 - Billing: provider-neutral BillingProviderAdapter; Paddle is first commercial candidate and Lemon Squeezy fallback, both revalidated before live launch
-- Agent hosts: embedded Codex through an official supported mechanism when appropriate, external Codex with a CEVRA Skill, external Claude Code with a CEVRA Skill, and future local or remote agents
+- Agent hosts: embedded Codex through an official supported mechanism when appropriate; external Codex/Claude integrate with the CEVRA Bridge Skill when supporting CEVRA Vids; the standalone CEVRA Creator Skill is a separate agent-native product surface
 - Stock media: local files first; optional external stock providers
 - Image generation: local provider slot
 - Video generation: local provider slot
@@ -44,11 +44,11 @@ typed CEVRA commands
 Project IR
 ```
 
-Embedded Codex through Codex App Server or another official supported harness is distinct from external Codex using a CEVRA Skill. External Claude Code uses the same typed application surface through a CEVRA Skill. A future embedded Claude path requires an official, commercially appropriate mechanism. No claim is made that EDVID uses Codex App Server.
+Embedded Codex through Codex App Server or another official supported harness is distinct from external Codex/Claude using the **CEVRA Bridge Skill**. The Bridge Skill exists to help an external agent interpret and return valid CEVRA requests for the application; it is not a standalone editor. A future embedded Claude path requires an official, commercially appropriate mechanism. No claim is made that EDVID uses Codex App Server.
 
 Agents never bypass application commands, Project IR validation, journal/history or adapter capability checks.
 
-## CEVRA-owned skill installation
+## CEVRA-owned Bridge Skill installation
 
 After explicit user authorization, CEVRA Vids may install, update, reinstall or remove only its own skills in supported local-agent directories:
 
@@ -160,3 +160,17 @@ The installed editor is independent from update/crash services. Tauri's updater 
 The stable installer must satisfy the Core Runtime Closure defined in the approved decision: missing mandatory engines/runtimes/assets/models is a release failure. Optional heavy packs remain separately downloadable.
 
 Crash reporting uses CrashReporterAdapter and is opt-in. Sentry is a candidate implementation only. Product analytics uses TelemetryAdapter and defaults to NoOp in V1. Session replay and project/media content upload are prohibited.
+
+## CEVRA Creator Skill
+
+The CEVRA Creator Skill is distinct from the Bridge Skill. It is an agent-native standalone editor/creator inspired by the practical EDVID workflow and does not require CEVRA Vids Desktop to complete a video.
+
+The Creator family has one shared core with Lite and Full capability profiles. Full targets the maximum feasible CEVRA Vids capability set inside the agent environment and includes a visual Creator Workspace for preview, timeline/review, captions, assets, composition, QA and final render/export. Lite uses a smaller dependency/capability footprint while remaining standalone for its promised subset.
+
+Creator and Vids must share editorial/playbook/QA semantics and reusable packages wherever practical. Prefer the same Project IR/domain core; if a host cannot support the entire domain package, use a versioned convertible Creator Project Profile rather than a divergent audiovisual model.
+
+Creator-to-Vids handoff is optional. Creator Full must remain able to deliver a final video without Desktop.
+
+## Publishing and performance analytics scope
+
+Local export is core and independent. Direct social publishing and performance analytics are post-V1 integrations. Provider approvals, social tokens, scheduling or analytics services must never become prerequisites for CEVRA Vids export.
