@@ -35,6 +35,30 @@ Orbit may later provide:
 
 These services remain separate from Project IR and product-domain logic. CEVRA Vids and future apps keep independent domain boundaries, capability planning and release paths.
 
+## Identity, entitlement and billing direction
+
+Orbit owns the shared account/entitlement boundary used by CEVRA products, but not product-domain state.
+
+```text
+CEVRA Account
+→ CEVRA Entitlement
+← Billing Provider
+```
+
+V1 direction:
+- passwordless account;
+- signed CEVRA entitlement;
+- configurable device activation;
+- bounded offline operation;
+- Recovery Mode after entitlement expiry;
+- billing provider kept replaceable through adapter.
+
+Development does not require production account/billing infrastructure. A controlled Development Entitlement is allowed only in dev builds; production/stable builds must reject it.
+
+Recovery Mode protects access to projects/original sources but does not permit export/save of a newly rendered usable video.
+
+No media/project cloud storage is implied by identity/licensing.
+
 ## Marketplace principle
 
 Marketplace belongs to Orbit rather than exclusively to Vids.
