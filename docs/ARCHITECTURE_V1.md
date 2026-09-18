@@ -184,12 +184,22 @@ Project IR
 Initial integration paths are:
 
 1. embedded Codex inside CEVRA Vids when an official supported mechanism, such as Codex App Server or its supported harness, is technically and commercially appropriate;
-2. external Codex with a CEVRA Skill;
-3. external Claude Code with a CEVRA Skill.
+2. external Codex with the **CEVRA Bridge Skill**;
+3. external Claude Code with the **CEVRA Bridge Skill**.
 
-The gateway remains ready for a future official Claude embedded path and other local or remote agents. Embedded Codex and external Codex using a skill are distinct integration modes. CEVRA does not claim that EDVID uses Codex App Server without evidence.
+The gateway remains ready for a future official Claude embedded path and other local or remote agents. Embedded Codex and external Codex/Claude using the Bridge Skill are distinct integration modes. CEVRA does not claim that EDVID uses Codex App Server without evidence.
 
 Agents plan and request typed application commands. They do not mutate Project IR directly, bypass journal/history, invoke arbitrary shell commands or access engines through raw arguments.
+
+## 8A. Bridge Skill vs Creator Skill
+
+**CEVRA Bridge Skill** is part of the Vids Agent Gateway integration. It helps external Codex/Claude hosts understand capabilities, EvidenceRequest/ChangeSet semantics and typed application commands. It depends on Vids for execution and never mutates Project IR or invokes raw engines directly.
+
+**CEVRA Creator Skill** is a separate standalone agent-native editor. It has a visual Creator Workspace and shared Lite/Full capability profiles. Full must perform end-to-end editing and final render/export without Vids Desktop.
+
+The two surfaces share one CEVRA editorial/creative/QA knowledge core. Reuse Project IR/domain, composition, media, workflow and UI packages where technically viable. If a Creator host cannot consume full Project IR, use a versioned compatible subset with tested conversion; do not create a divergent audiovisual semantics.
+
+Creator→Vids handoff is optional interoperability, not an execution dependency.
 
 ## 9. CEVRA-owned skills
 
