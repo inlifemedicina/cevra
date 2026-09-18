@@ -1151,6 +1151,99 @@ Responder: PASS/PARTIAL/FAIL.
 
 ---
 
+## CM — Creation Modes V1
+
+**CM-T1 [V1] Faceless a partir de tema**  
+Ação: criar vídeo sem footage de apresentador a partir de um tema/brief.  
+Esperado: CEVRA produz roteiro/storyboard e projeto editável usando as capacidades disponíveis, sem exigir talking-head.  
+Responder: APROVADO/REPROVADO.
+
+**CM-T2 [V1/INT] TTS provider-neutral**  
+Ação: gerar narração por TTS em configuração disponível.  
+Esperado: provider passa pelo contrato CEVRA, custo/autorização respeitados e áudio entra no projeto como asset editável/provenance apropriada; nenhuma clonagem de voz é inferida.  
+Responder: PASS/PARTIAL/FAIL.
+
+**CM-T3 [V1] Faceless sem TTS disponível**  
+Ação: desabilitar providers TTS.  
+Esperado: CEVRA informa a limitação e permite caminho com áudio/narração do usuário ou criação compatível; não inicia API paga silenciosamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**CM-T4 [V1] Slideshow**  
+Ação: importar conjunto de fotos/clipes e criar slideshow.  
+Esperado: usa SourceAssets/Project IR normais, timeline editável, preview/export e nenhuma timeline paralela.  
+Responder: PASS/PARTIAL/FAIL.
+
+**CM-T5 [BENCH] Rhythm Analyzer pré-MR**  
+Ação técnica: avaliar beat/BPM/onset/energy/sections em músicas representativas.  
+Esperado: documentar menor solução local, licença, cross-platform, CPU/RAM/latência e se alguma extensão do Media Runtime é realmente necessária.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**CM-T6 [V1] Music-to-video**  
+Ação: quando analyzer aprovado estiver disponível, criar montagem com mídia sobre faixa rítmica.  
+Esperado: cortes/motion seguem evidências de ritmo de forma reproduzível, sem análise cloud obrigatória.  
+Responder: APROVADO/REPROVADO/BLOCKED.
+
+**CM-T7 [V1] Brand Kit provider-neutral**  
+Ação: configurar logo/fontes/cores sem Figma e criar vídeo.  
+Esperado: identidade é aplicada por referências/presets versionados; Figma não é requisito.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
+## UPD — Update Lifecycle
+
+**UPD-T1 [V1/AUTO] Update assinado e staged**  
+Ação técnica: simular atualização válida do app/runtime.  
+Esperado: artifact é baixado fora do active slot, assinatura/hash verificados antes da promoção.  
+Responder: PASS/PARTIAL/FAIL.
+
+**UPD-T2 [V1/AUTO] Update corrompido**  
+Ação: fornecer artifact/hash inválido.  
+Esperado: instalação ativa permanece intacta e artifact é rejeitado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**UPD-T3 [V1/AUTO] Rollback healthcheck**  
+Ação: promover bundle que falha healthcheck.  
+Esperado: retorna ao previous-known-good quando compatível, com diagnóstico.  
+Responder: PASS/PARTIAL/FAIL.
+
+**UPD-T4 [V1/AUTO] Dependência pinned**  
+Ação: upstream publica versão nova.  
+Esperado: instalação do usuário não muda automaticamente; adoção exige release/pack aprovado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**UPD-T5 [INT/AUTO] Software externo atualizado pelo fornecedor**  
+Ação: mudar versão/capabilities de Codex/Claude/outro adapter externo.  
+Esperado: CEVRA faz health/capability negotiation, desabilita apenas incompatibilidades e não tenta atualizar o software de terceiro.  
+Responder: PASS/PARTIAL/FAIL.
+
+**UPD-T6 [INT/AUTO] Provider remoto remove modelo/capability**  
+Ação: simular retirement.  
+Esperado: capability fica unavailable/fallback autorizado; nenhuma chamada paga ou modelo alternativo é escolhido silenciosamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**UPD-T7 [ADV/AUTO] Model Pack grande**  
+Ação: atualizar pack opcional.  
+Esperado: tamanho/autorização/space check, download paralelo, hash/smoke test e troca somente após sucesso.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**UPD-T8 [V1/AUTO] Projeto antigo após componente novo**  
+Ação: abrir projeto criado com versão anterior de componente.  
+Esperado: aparência/comportamento não muda silenciosamente; compat layer ou migração explícita é usada.  
+Responder: PASS/PARTIAL/FAIL.
+
+**UPD-T9 [V1/AUTO] Migração de Project IR falha**  
+Ação: forçar erro de migração.  
+Esperado: backup/original preservado; não sobrescreve projeto com estado parcial.  
+Responder: PASS/PARTIAL/FAIL.
+
+**UPD-T10 [V1] UX normal de update**  
+Ação: usuário comum atualiza CEVRA.  
+Esperado: não precisa gerenciar Python/npm/FFmpeg manualmente; detalhes técnicos ficam em diagnostics/About.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 # C. Testes transversais obrigatórios antes de homologar uma versão
 
 **X-T1 — Undo/Redo**  
