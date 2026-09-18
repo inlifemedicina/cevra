@@ -722,6 +722,22 @@ No product-facing claim should state that CEVRA already “uses Remotion” unti
 - `remotion-to-hyperframes` is approved as a development accelerator for EDVID/Remotion parity, never an automatic canonical translator;
 - D23 and integration D13 are the detailed authorities; ADR 0012 remains accepted and unchanged.
 
+
+## 13.4 APPROVED DIRECTION — 3D Scene & Camera Tracking
+
+2026-09-18:
+- 3D remains inside the CompositionEngineAdapter; no second 3D engine/timeline.
+- Tier A = authored 2.5D/3D without camera solve; Tier B = camera-tracked 3D; Tier C = tracked 3D with foreground/subject occlusion.
+- HyperFrames/Three.js is the preferred composition path to prove.
+- camera reconstruction/trajectory lives behind a separate CameraSolve3DAdapter.
+- COLMAP/PyCOLMAP is the first general benchmark candidate; DPVO is advanced/GPU candidate; DROID-SLAM is initially reference/deprioritized.
+- SubjectMaskProvider is reused for occlusion; concrete matting motor remains pending.
+- external agents never inject Three.js/shaders/solver args; first-party components may contain audited implementation.
+- WebGPU/TypeGPU advanced VFX is post-V1.
+- future CEVRA Mobile capture may consume platform-provided spatial metadata when officially available and sufficient.
+
+Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_15A_3D_SCENE_CAMERA_TRACKING.md`.
+
 ---
 
 # 14. Local Source Ingest V1 — IMPLEMENTED / CLOSED
