@@ -257,6 +257,22 @@ Generated/found/imported assets become normal Project IR sources/items with prov
 All modes reuse Project IR/ProjectHistory, providers, composition and export; no separate timeline/runtime per mode. Detailed authority: `docs/CEVRA_CREATION_MODES_V1_DIRECTION.md`.
 
 
+
+## 3.4 APPROVED DIRECTION — Caption Placement Planner
+
+2026-09-18:
+- D15 timing/fidelity remains unchanged.
+- Six EDVID caption styles + Nenhum remain V1.
+- D18 extra typographic/style personalization is post-V1.
+- Caption placement uses the least expensive sufficient level: N1 layout/safe areas → N2 face/person evidence → N3 sampled subject masks → N4 full temporal matting only for real behind-subject/occlusion.
+- Safe-zones may vary by interval; explicit user placement wins.
+- luminance validates legibility but does not override Brand Kit/preset identity.
+- representative snapshots + deterministic Caption QA run before expensive full render where useful.
+- HeroEmphasis is a separate optional component, not a seventh caption style; its editorial activation policy is still pending before implementation.
+- SubjectMaskProvider is abstract; no U2Net/PP-Matting/RVM selection is made here.
+
+Detailed authority: `docs/CEVRA_VISUAL_DECISIONS.md` D17 and `docs/CEVRA_COMPOSITION_DECISION_23.md`.
+
 ---
 
 # 4. AI-first editing: what “the AI edited the video” means
