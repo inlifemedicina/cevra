@@ -769,6 +769,23 @@ Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_16_EXTERNAL_EDITOR
 
 Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_17_ACCOUNT_LICENSING_BILLING.md`.
 
+## 13.7 APPROVED DIRECTION — distribution, updater, telemetry and crash
+
+2026-09-18:
+- direct website distribution is V1; macOS uses signed/notarized DMG and Windows uses signed NSIS per-user on officially supported targets.
+- stable installer is **core-complete**: mandatory runtime/engine/asset/minimum-model dependencies are part of release closure; missing mandatory component fails release.
+- optional heavy/advanced capabilities may use separate signed packs.
+- Tauri official updater + static signed manifests per stable/beta/dev; no custom update API required V1.
+- Cloudflare R2 is first artifact-host candidate; revalidate cost/terms before launch.
+- installed editor continues if update/crash infrastructure is unavailable.
+- behavioral telemetry is off/NoOp in V1.
+- crash reporting is opt-in and allow-list/redacted; Sentry is first candidate behind CrashReporterAdapter.
+- session replay and project/media/prompt/transcript upload for diagnostics are prohibited.
+- local diagnostics bundle is preferred for support and is inspectable before explicit send.
+- forced update is exceptional, not normal; no generic remote kill switch.
+
+Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_18_DISTRIBUTION_UPDATES_TELEMETRY_CRASH.md`.
+
 ---
 
 # 14. Local Source Ingest V1 — IMPLEMENTED / CLOSED
