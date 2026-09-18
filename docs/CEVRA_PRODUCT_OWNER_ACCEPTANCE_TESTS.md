@@ -2,7 +2,7 @@
 
 **Data inicial:** 2026-09-17  
 **Status:** DOCUMENTO VIVO / TESTES A EXECUTAR NOS MARCOS CORRETOS.  
-**Escopo atual:** decisões funcionais 1–23 + decisões de integração aprovadas até a 18, incluindo 15A.  
+**Escopo atual:** decisões funcionais 1–23 + decisões de integração aprovadas até a 19, incluindo 15A.  
 **Implementação:** este documento NÃO afirma que qualquer teste abaixo já pode ser executado.
 
 ## Regra de manutenção
@@ -1515,6 +1515,75 @@ Esperado: runtime/components retornam quando suportado; app preserva artifact an
 Responder: PASS/PARTIAL/FAIL.
 
 ---
+## I19 — Export, Publishing/Analytics scope & dual Skill architecture
+
+**I19-T1 [V1] Export independente**  
+Ação: exportar com todos os social providers/Content Intelligence/cloud indisponíveis.  
+Esperado: CEVRA Vids gera arquivo final local normalmente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I19-T2 [V1/AUTO] Publishing não é dependência do core**  
+Ação técnica: build V1 sem adapters/tokens sociais.  
+Esperado: import/edit/preview/render/export continuam completos; nenhuma aprovação social bloqueia release.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I19-T3 [INT] Bridge Skill — typed support**  
+Ação: enviar pedido pelo CEVRA Vids a host externo com Bridge Skill.  
+Esperado: host retorna EvidenceRequest/ChangeSet/requests compatíveis com Agent Protocol; execução continua no CEVRA Vids.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I19-T4 [SEC/AUTO] Bridge não vira executor externo**  
+Ação: tentar mutar Project IR, usar shell/raw engine ou acessar secrets pela Bridge.  
+Esperado: rejeitado; Bridge permanece suporte tipado ao app.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I19-T5 [INT/AUTO] Bridge host parity**  
+Ação: mesmo pedido/capabilities em dois hosts suportados.  
+Esperado: diferenças de wrapper não alteram semanticamente a operação CEVRA solicitada.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I19-T6 [ADV] Creator Lite standalone**  
+Ação: em ambiente sem CEVRA Desktop, usar Lite no workflow prometido.  
+Esperado: interface/revisão suficiente e vídeo final entregue dentro do subset anunciado.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I19-T7 [ADV] Creator Full standalone**  
+Ação: em ambiente sem CEVRA Desktop/Bridge/remote desktop, executar ingest→edit→Workspace→QA→render.  
+Esperado: vídeo final utilizável é entregue integralmente.  
+Responder: APROVADO/REPROVADO/BLOCKED.
+
+**I19-T8 [ADV] Creator Full Workspace**  
+Ação: revisar e alterar cuts/captions/assets/composição antes do render.  
+Esperado: interface visual permite edição prática e estado permanece estruturado/reversível conforme o profile suportado.  
+Responder: APROVADO/REPROVADO/BLOCKED.
+
+**I19-T9 [INT/AUTO] Shared editorial core**  
+Ação técnica: rodar fixtures de regra editorial/QA em Vids e Creator para capacidades equivalentes.  
+Esperado: intenção/regra compartilhada não diverge silenciosamente; executor pode diferir sem mudar semântica.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I19-T10 [INT/AUTO] Creator Project interoperability**  
+Ação: salvar projeto Creator e abrir/converter no CEVRA Vids.  
+Esperado: constructs suportados preservam sources, cuts, transcript, captions/assets/metadata; perdas são explicitamente relatadas.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I19-T11 [ADV] Creator handoff é opcional**  
+Ação: concluir projeto Creator sem abrir CEVRA Vids.  
+Esperado: handoff não é requisito para render/export standalone.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I19-T12 [ADV] Publishing confirmation**  
+Ação: quando publishing existir, agente prepara publicação.  
+Esperado: publicação pública exige confirmação humana conforme política vigente; Skill não recebe token social.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I19-T13 [ADV] Analytics fora do Project IR**  
+Ação: quando performance analytics existir, sincronizar métricas.  
+Esperado: observations ficam no Content Intelligence/camada analítica; Project IR não incorpora schema provider-native.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+---
+
 # C. Testes transversais obrigatórios antes de homologar uma versão
 
 **X-T1 — Undo/Redo**  
