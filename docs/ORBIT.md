@@ -65,6 +65,17 @@ Vids V1 uses direct signed desktop distribution and a core-complete installer. O
 
 Tauri signed update manifests are the initial Vids mechanism; artifact hosting is replaceable. Product telemetry is not required for updates. Crash diagnostics, if enabled, are opt-in and content-minimized.
 
+## Skill product surfaces
+
+Orbit distinguishes two CEVRA-owned Skill surfaces:
+
+- **CEVRA Bridge Skill:** supports CEVRA Vids when the app delegates interpretation/planning to an external agent; execution remains inside Vids through the Agent Gateway.
+- **CEVRA Creator Skill:** standalone agent-native editing/creation product surface with Lite and Full profiles. Creator Full includes a visual workspace and must be able to deliver a final video without CEVRA Desktop.
+
+Both share CEVRA editorial/creative knowledge, workflow semantics and reusable packages; they are not separate editorial brains. Creator-to-Vids handoff is optional interoperability.
+
+Publishing and social-performance analytics remain post-V1 Orbit/provider capabilities and are not prerequisites for local export.
+
 ## Marketplace principle
 
 Marketplace belongs to Orbit rather than exclusively to Vids.
