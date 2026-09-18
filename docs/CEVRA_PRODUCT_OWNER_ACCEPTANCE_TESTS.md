@@ -755,6 +755,65 @@ Responder: PASS/PARTIAL/FAIL.
 
 ---
 
+## I10 — Geração de vídeo por IA
+
+**I10-T1 [INT] Geração solicitada sem custo adicional**  
+Ação: com caminho oficial/local sem custo adicional disponível, peça explicitamente um vídeo.  
+Esperado: CEVRA gera pelo adapter autorizado, sem exigir API paga desnecessária.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T2 [INT] Geração paga sem autorização**  
+Ação: peça vídeo quando só houver provider pago e nenhuma autorização de gasto vigente.  
+Esperado: CEVRA para antes da cobrança e solicita confirmação.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T3 [INT] Director sugere geração paga**  
+Ação: permita edição automática sem autorização de custo.  
+Esperado: Director pode propor vídeo gerado, mas não executa chamada paga automaticamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T4 [V1] Proveniência generated-ai**  
+Ação: gere um vídeo e inspecione o asset.  
+Esperado: origem IA, provider/modelo e demais metadata disponíveis permanecem registradas.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T5 [V1] B-roll gerado mudo**  
+Ação: use vídeo gerado com áudio próprio como B-roll sobre fala principal.  
+Esperado: áudio do B-roll fica desativado por padrão.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T6 [INT] Cena gerada com áudio autorizado**  
+Ação: peça explicitamente uma cena completa com som.  
+Esperado: áudio pode ser preservado quando o provider/capability e o plano autorizarem.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T7 [INT] Provenance do provider**  
+Ação: gerar com provider que entregue C2PA/SynthID ou equivalente.  
+Esperado: CEVRA preserva quando tecnicamente possível e não remove sem necessidade.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T8 [V1] Reopen offline**  
+Ação: gerar, salvar, fechar, desconectar internet/provider e reabrir.  
+Esperado: vídeo continua disponível como managed asset/SourceAsset local.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T9 [V1] App sem geração de vídeo**  
+Ação: desabilite todos os providers/modelos de geração.  
+Esperado: edição, B-roll real, composição e export não dependentes continuam funcionando.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T10 [INT] Provider-neutral**  
+Ação: gerar por dois adapters diferentes.  
+Esperado: ambos convergem para o mesmo modelo canônico; Project IR/Composition Engine não dependem do schema do provider.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I10-T11 [BENCH] Benchmark geração de vídeo**  
+Ação: rodar corpus representativo em candidatos atuais.  
+Esperado: registrar qualidade temporal, resolução, latência, custo, RAM/VRAM, download, licença/pesos, estabilidade e adequação comercial.  
+Responder: APROVADO/REPROVADO por candidato.
+
+---
+
 ---
 
 # C. Testes transversais obrigatórios antes de homologar uma versão
