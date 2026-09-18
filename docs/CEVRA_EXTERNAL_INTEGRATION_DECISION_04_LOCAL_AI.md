@@ -469,3 +469,31 @@ Se a qualidade local não atingir o piso necessário, a funcionalidade pode perm
 **Nenhuma alteração imediata do gate coordenado do Media Runtime.**
 
 Esta decisão não autoriza download, runtime, pesos, benchmark ou código. Ela apenas fixa a independência estrutural do CEVRA e a forma futura correta de avaliar e integrar modelos locais quando isso se tornar prioritário.
+
+
+---
+
+## Refinamento aprovado em 2026-09-17 — micro-raciocínio editorial local
+
+O Product Owner aprovou ampliar o benchmark de IA local com um perfil explícito de **micro-raciocínio editorial leve**, sem alterar o princípio de opcionalidade desta decisão.
+
+Além de raciocínio/visão local genéricos, avaliar se um modelo relativamente pequeno consegue executar bem:
+
+- inferência de tema e subtemas a partir do transcript/contexto;
+- identificação de blocos temáticos;
+- classificação do tipo de conteúdo;
+- detecção de ideias/takes potencialmente equivalentes;
+- sumarização de contexto para agente externo;
+- priorização de trechos/frames relevantes;
+- indicação de quando EvidenceRequest adicional parece necessário;
+- tags/contexto editorial simples.
+
+Essa capability pode preparar contexto melhor para agentes externos e reduzir custo, upload e latência, mas:
+- não é requisito para funcionamento do CEVRA;
+- não vira fonte de verdade;
+- não aplica mutações destrutivas;
+- não substitui automaticamente um modelo externo mais capaz;
+- não cria cascata obrigatória;
+- deve ser desativável e compatível com hardware detectado.
+
+O benchmark CEVRA-specific deverá incluir essas tarefas explicitamente, pois um modelo menor pode ser suficiente para esse perfil mesmo quando não for adequado para raciocínio editorial completo.
