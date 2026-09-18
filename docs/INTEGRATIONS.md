@@ -14,6 +14,9 @@ No social network, publishing platform, analytics vendor or AI vendor may be rep
 - disconnect
 
 ## Existing categories
+- Identity/account: CEVRA-owned Orbit identity; V1 preference is passwordless email/magic-link or one-time code
+- Entitlement/licensing: CEVRA-owned signed entitlement service with device activation and bounded offline operation
+- Billing: provider-neutral BillingProviderAdapter; Paddle is first commercial candidate and Lemon Squeezy fallback, both revalidated before live launch
 - Agent hosts: embedded Codex through an official supported mechanism when appropriate, external Codex with a CEVRA Skill, external Claude Code with a CEVRA Skill, and future local or remote agents
 - Stock media: local files first; optional external stock providers
 - Image generation: local provider slot
@@ -129,3 +132,20 @@ CEVRA exports from canonical Project IR through target-specific handoff adapters
 Features are classified as native, baked, approximated or unsupported; every handoff produces a report. Complex CEVRA-only visual effects should be baked selectively rather than flattening the entire timeline. Resolve uses OTIO as the primary V1 path. Premiere uses XML as the first lightweight candidate with AAF evaluated against real CEVRA fixtures.
 
 Premiere UXP and Resolve scripting/workflow integrations are future bridges, not V1 requirements. External editors never become a second Project IR authority.
+
+
+## Account, entitlement and billing
+
+Identity, entitlement and billing are separate boundaries.
+
+```text
+CEVRA Account → CEVRA Entitlement ← Billing Provider
+```
+
+Billing provider events update the CEVRA entitlement projection through verified/idempotent webhook handling. Provider-native subscription objects do not enter Project IR.
+
+Development builds may run on a local Development Entitlement with no billing/backend dependency. Staging introduces account/auth, entitlement service and billing sandbox. Production introduces live account/entitlement/billing.
+
+Stable/release builds must never accept Development Entitlement or licensing bypasses.
+
+Signed entitlement cache permits bounded offline use. On expiry after the configured grace policy, CEVRA enters Recovery Mode: project/source recovery remains possible but no new usable final video may be rendered/exported/saved.
