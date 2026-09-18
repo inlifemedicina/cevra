@@ -1,8 +1,8 @@
-# CEVRA Update Strategy v2
+# CEVRA Update Strategy v3
 
 **Refinamento aprovado pelo Product Owner:** 2026-09-18.  
 **Status:** direção arquitetural aprovada; implementação incremental conforme roadmap.  
-**Objetivo:** manter CEVRA, engines, runtimes, modelos, skills, components e providers atualizáveis sem transformar o computador do usuário em um ambiente de desenvolvimento, sem upgrades cegos e sem quebrar projetos antigos.
+**Objetivo:** manter CEVRA, engines, runtimes, modelos, skills, components e providers atualizáveis sem transformar o computador do usuário em um ambiente de desenvolvimento, sem upgrades cegos, sem quebrar projetos antigos e sem distribuir uma instalação incompleta.
 
 ---
 
@@ -551,3 +551,45 @@ Prioridade:
 5. só depois update independente de packs/components, quando a infraestrutura de packages justificar.
 
 A futura decisão de distribuição/telemetry/crash deve usar este documento como baseline e não reabrir princípios já aprovados sem evidência nova.
+
+## 24. Installer Core Closure
+
+A V1 stable deve ser core-complete. Todo componente necessário às capacidades básicas prometidas precisa constar no release manifest e estar presente/verificado na instalação.
+
+O closure inclui, conforme o scope final: app, Media Runtime/FFmpeg, managed runtimes, Composition Engine obrigatório, transcription/alignment runtime e modelo mínimo de produção, assets/fontes/licenças e demais dependências indispensáveis.
+
+Um release com mandatory artifact ausente falha no CI/release gate. Downloads separados são reservados a packs opcionais/avançados. Tornar um componente obrigatório um first-run download exige benchmark e nova aprovação explícita.
+
+## 25. Distribution V1
+
+- direct download;
+- macOS DMG assinado/notarizado;
+- Windows NSIS per-user assinado;
+- App Stores pós-V1;
+- Cloudflare R2 como primeiro candidato de artifact host;
+- GitHub artifacts/releases permitidos para dev/staging;
+- installer principal pode ser público.
+
+## 26. Tauri updater V1
+
+Usar Tauri 2 official updater com manifestos estáticos por stable, beta e dev.
+
+Update artifacts e manifests seguem assinatura/integridade. A chave privada fica em secret storage/CI e possui backup offline seguro. A public key fica no app.
+
+Update normal não reinicia durante render/save crítico. Forced update não é regra e remote kill switch genérico não é aprovado.
+
+## 27. Telemetry e crash
+
+- TelemetryAdapter com NoOpTelemetry na V1;
+- sem behavioral analytics obrigatório;
+- CrashReporterAdapter separado;
+- crash reporting opt-in;
+- Sentry é primeiro candidato, não domínio;
+- session replay proibido;
+- allowlist/redaction de payload;
+- diagnostics bundle local com envio explícito;
+- update checking independente de telemetry.
+
+## 28. Resiliência
+
+Falha do artifact host/crash backend não bloqueia app já instalado. Update check e crash upload degradam graciosamente sem afetar edição local.
