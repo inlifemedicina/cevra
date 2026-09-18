@@ -135,6 +135,12 @@ If HyperFrames does not meet the benchmark, CEVRA may select Remotion or another
 
 Composition security uses a **typed untrusted boundary**, not one hard-coded domain type per internal effect. Agents, presets and third-party surfaces select registered capabilities/components with validated parameters. First-party registered components may internally use audited engine code behind the Composition Compiler, while engine-native state remains derived. Upstream registries are development inputs only and are never live-executed merely because a user requested an effect.
 
+## 3D and spatial composition
+
+CEVRA may create 2.5D/3D authored scenes through the normal Composition Engine without camera solve. When an effect must remain anchored to the filmed environment, a provider-neutral CameraSolve3DAdapter supplies derived camera trajectory/intrinsics/quality evidence to registered 3D components. Foreground-aware 3D additionally reuses SubjectMaskProvider.
+
+HyperFrames/Three.js is the preferred path to benchmark, not an already selected production dependency. COLMAP/PyCOLMAP is the first camera-solve candidate to evaluate; neural/GPU alternatives are considered only when they offer a material benefit. Agents never submit executable Three.js/shaders/raw solver arguments.
+
 ## Caption placement and visual QA
 
 CEVRA V1 preserves the six EDVID caption styles plus None. Extra typographic personalization is deferred to post-V1.
