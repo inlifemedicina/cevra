@@ -1,9 +1,9 @@
 # CEVRA — Decisões visuais e de produção: continuidade a partir da decisão 14
 
 **Data:** 2026-09-16, aprovação do product owner nesta rodada de continuidade.
-**Versão deste registro:** 5.
+**Versão deste registro:** 6.
 **Status:** DIREÇÃO DE PRODUTO APROVADA / IMPLEMENTAÇÃO NÃO AUTORIZADA POR ESTE REGISTRO.
-**Decisões aprovadas neste documento:** 14–17 e 18 condicionada ao escopo/esforço delimitado na seção 6. Não há aprovação implícita de uma decisão 19 ou posterior.
+**Decisões aprovadas neste documento:** 14–17. A decisão 18 permanece registrada como direção histórica, mas sua avaliação/implementação adicional foi explicitamente adiada para pós‑V1 em 2026-09-18. Não há aprovação implícita de uma decisão 19 ou posterior.
 
 ## 0. Autoridade, localização e continuidade
 
@@ -27,6 +27,8 @@ Na atualização para a versão 3, `refs/heads/main` foi conferido novamente em 
 Na atualização para a versão 4, `refs/heads/main` foi novamente confirmado em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` e o PR #26 estava aberto/draft, não mesclado, em `89e77c02a1e52a019cf6bf20b7f65235136affe8`. O product owner aprovou a decisão 17 e perguntou sobre execução local versus uso de IA. Esta atualização preserva as decisões 14–16, acrescenta o posicionamento de legendas com seus limites e atualiza o handoff. Não declara conclusão do Media Runtime, não altera sua programação e não aprova a decisão 18. A versão 5 corrige a referência anterior abreviada à resposta “certo.”, sem mudar o comportamento aprovado.
 
 Na atualização para a versão 5, o main foi novamente confirmado em `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`; o PR #26 estava aberto/draft, não mesclado, com head `6f16dd5792a24903741c5a0dc3ef8f9f467301c7` e este arquivo com blob `fb6bbebfd7b3b0ceed19d6f566f4209bb6da7347`. O product owner aprovou condicionalmente a personalização, limitando-a ao catálogo EDVID e a melhorias que não exijam grande trabalho adicional para benefício pequeno. Perguntou também como o Director informará a ausência de IA externa. A seção 6 registra a decisão 18 e esclarece as políticas já existentes de execução/capacidades; não cria uma decisão 19, novo modelo ou integração. Só este documento é atualizado; nenhum código, runtime, main ou outra branch recebe alteração.
+
+Na atualização para a versão 6, em 2026-09-18, o product owner aprovou o refinamento da decisão 17 com um **Caption Placement Planner local e progressivo**, safe-zones por intervalo, análise proporcional do sujeito, luminância/legibilidade, preview amostrado e Caption QA. A decisão 15 permanece intacta. A personalização adicional da decisão 18 foi adiada para pós-V1, sem retirar os seis estilos EDVID do piso V1. HeroEmphasis/behind-subject passa a ser capability visual independente, vinculada à decisão 23 e condicionada ao matting adequado. Nenhum código, modelo, download ou mudança do Media Runtime é autorizado por este registro.
 
 ## 1. Regra desta rodada antecipada
 
@@ -294,65 +296,362 @@ Registrar como **DIVERGÊNCIA EDVID** a mudança concreta de comportamento que e
 
 > O CEVRA organizará as palavras em grupos legíveis conforme o estilo escolhido, respeitando a fala, os tempos e o espaço disponível. Evitará quebras inadequadas, redução excessiva do texto e palavras exibidas rápido demais, sem resumir a fala nem trocar silenciosamente o estilo. Reutilizará os comportamentos úteis do EDVID, com processamento local e validação por estilo.
 
-## 5. Decisão 17 — Onde a legenda aparece e como acompanha mudanças de layout
+## 5. Decisão 17 — Caption Placement Planner, safe-zones e QA de legendas
 
-**APROVADA COMO DIREÇÃO DE PRODUTO em 2026-09-16.** O product owner aprovou a proposta de posicionamento, estabilidade e ajustes por trecho e pediu esclarecimento sobre execução local versus uso de IA. Preservar todos os limites abaixo; aprovação não equivale a função pronta, teste realizado, nova dependência autorizada ou liberação do gate do Media Runtime. A seção 6.6 retoma esse esclarecimento sem registrar uma nova aprovação indevida.
+**APROVADA originalmente em 2026-09-16 e REFINADA em 2026-09-18.** Este refinamento preserva a decisão de posicionamento estável/adaptativo e acrescenta uma estratégia local progressiva inspirada nas capacidades úteis observadas no HyperFrames `embedded-captions`, sem importar seu catálogo de 35 estilos, seu U2Net ou sua arquitetura de legendas como nova fonte de verdade.
 
-### 5.1 Referência EDVID e evidência
+A decisão 15 — fidelidade, origem e sincronização — **não é reaberta**. Texto e timing continuam vindo da base temporal canônica já aprovada. Esta decisão trata de **onde e como a legenda é apresentada e validada visualmente**.
 
-Referência fixa: `fillrochaa/edvid@d8e6389db02e8de0b46ee680105c09d4250d4703`, considerada com SKILL.md e referências shortform/longform já consultadas.
+### 5.1 O que foi reaproveitado da investigação HyperFrames
 
-- [Main.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/Main.tsx), `CaptionShell`: o karaokê utiliza `captions.windows` para reposicionar a legenda durante intervalos, inclusive na junção da tela dividida; resolve a janela conforme o frame em exibição, não apenas no começo da linha.
-- [references/shortform.md](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/references/shortform.md): posições próprias para as duas variantes de tela dividida, indicação de limpar janelas obsoletas ao voltar ao estilo Limpa e orientação de não colocar o Disperso sobre o rosto de um apresentador.
-- [SimpleCaptions.tsx](https://github.com/fillrochaa/edvid/blob/d8e6389db02e8de0b46ee680105c09d4250d4703/assets/shortform/src/SimpleCaptions.tsx): os três estilos estáticos inspecionados usam posição inferior fixa do componente. Não inferir que o reposicionamento do karaokê esteja integrado de forma equivalente em todos os estilos.
+A revisão do `embedded-captions` mostrou capacidades técnicas úteis:
 
-O EDVID já prevê posicionamento por apresentação e mudanças de composição. As evidências são instruções e código inspecionado, não um teste de renderização realizado nesta consulta. Valores de exemplo da referência não são medidas universais para todo vídeo CEVRA.
+- safe-zones calculadas a partir da silhueta real, e não apenas de bounding box;
+- zonas por intervalo temporal, considerando movimento do sujeito;
+- áreas limpas à esquerda/direita/topo;
+- regiões próximas à silhueta quando esteticamente útil;
+- medição de luminância/risco de washout;
+- preview rápido de frames compostos antes do render completo;
+- QA de oclusão/overflow/legibilidade;
+- possibilidade de texto hero atrás do sujeito.
 
-### 5.2 Comportamento aprovado e limites
+O CEVRA adotará **os princípios que melhoram qualidade e eficiência**, não o pipeline inteiro.
 
-**Recomendação:** posicionamento adequado ao estilo e à composição, sem movimentação desnecessária da caixa de legenda.
+Não adotar automaticamente:
+- os 35 estilos/identidades do HyperFrames;
+- U2Net como motor obrigatório;
+- transcrição própria do workflow HyperFrames;
+- regras de paleta que substituam Brand Kit/preset;
+- blur/óptica/iluminação avançados na V1;
+- qualquer segunda timeline/estado audiovisual.
 
-1. **Posição característica por estilo/layout.** Preservar a apresentação de cada estilo, sem colocar todas as legendas na mesma altura. O preset define uma posição inicial apropriada; tela dividida, título e inserções são considerados para evitar sobreposições inadequadas. Usar margens de segurança pertinentes ao formato de entrega, não uma medida fixa universal.
-2. **Estabilidade.** Manter a caixa de legenda estável enquanto a composição não exigir mudança. A animação das palavras permanece conforme o estilo; estabilidade da caixa não significa eliminar animações internas ou fazer o texto perseguir continuamente o apresentador.
-3. **Ajuste geral ou localizado.** Permitir reposicionar no vídeo inteiro ou somente em um trecho. Uma posição explicitamente fixada não será sobrescrita silenciosamente pelo automático; conflitos relevantes devem ser sinalizados. Preservar ajustes válidos e a referência da versão assistida conforme decisões anteriores.
-4. **Adaptação coordenada.** Uma mudança de layout pode reposicionar a legenda sem alterar texto, áudio ou sincronismo. Ao terminar a inserção, retornar à posição apropriada anterior, sem carregar deslocamentos de um layout que já não existe.
-5. **Evidência visual proporcional.** Evitar rosto, produto ou demonstração conforme as informações realmente disponíveis. Não presumir que cálculos geométricos sobre elementos do projeto identificam todos os objetos ou rostos na imagem. Na dúvida relevante, usar amostra visual ou revisão; não declarar a área livre sem evidência. Não exigir reconhecimento/rastreamento contínuo de todos os objetos, quadro a quadro, para posicionar legendas.
-6. **Escopo da apresentação.** Esta decisão refere-se à legenda desenhada no vídeo. Para SRT separado, a apresentação depende do reprodutor; não prometer transporte do mesmo layout visual. Não escolher aqui um novo formato ou motor de legendagem.
+### 5.2 Caption Placement Planner
 
-Exemplo apresentado e aprovado: apresentador em tela cheia com legenda abaixo do rosto; entrada de uma imagem em tela dividida leva a legenda à região prevista; ao terminar a inserção, ela retorna à posição anterior sem alterar texto ou sincronismo. O exemplo não impõe esse posicionamento a todo tipo de conteúdo ou estilo.
+O CEVRA terá um planejador local de posicionamento que combine, conforme disponibilidade:
 
-### 5.3 Viabilidade, alternativas e custos
+```text
+Caption style/layout defaults
++ delivery safe areas
++ title/headline
++ split/B-roll/known overlays
++ explicit user position
++ face/person evidence
++ sampled subject mask when justified
++ luminance/legibility
+→ Caption Placement Plan por intervalo
+```
 
-Baseline consultado: `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`, confirmado novamente antes do registro. Referências CEVRA: [types.ts](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/project-ir/src/types.ts), [commands.ts](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/project-ir/src/commands.ts), [Inspector.tsx](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/apps/desktop/src/components/Inspector.tsx), [contrato de composição](https://github.com/inlifemedicina/cevra/blob/099a88ceed9a274254d0ffc7e9fd457f7d63d5ae/packages/contracts/src/composition.ts) e ADRs aplicáveis. Não confundir contrato ou controle de apresentação com recurso integrado.
+O resultado é determinístico/derivado. Não exige IA externa para cálculos geométricos ou avaliação básica de ocupação.
 
-| Classificação | Situação / acréscimo necessário |
-|---|---|
-| Primitivas existentes | Regiões de layout, estilos, intervalos, comandos de legenda e ProjectHistory. Reutilizar essa base canônica. |
-| Extensões e integração | Regras de posicionamento, ajustes por trecho, verificação de sobreposição entre elementos conhecidos, representação validada dos parâmetros ausentes e ligação aplicação/host/UI/compilador/render. Não criar uma segunda timeline ou guardar estado audiovisual apenas na UI. |
-| Ponta a ponta | Não disponível conforme proposto. O inspetor apresenta posição de legenda em campo somente de leitura; os tipos e comandos básicos não implementam toda a adaptação visual e seus controles. |
-| Dependências externas/não verificadas | Nenhum novo modelo ou API paga identificado como obrigatório para o núcleo geométrico local. A apresentação final depende da composição. Nenhuma biblioteca/modelo novo escolhido; evidência visual contextual não equivale a rastreamento automático já entregue. |
+O usuário pode:
+- manter posição automática;
+- fixar posição geral;
+- fixar posição apenas em um trecho.
 
-**Benefício esperado:** menos sobreposições e ajustes manuais. **Contrapartida:** testar combinações de estilos/layouts e preservar decisões explícitas. Uma posição fixa universal é mais simples, mas perde adaptação útil do EDVID; rastreamento contínuo obrigatório acrescenta custo e complexidade não justificados. Recomenda-se adaptação por composição, com evidência proporcional onde necessária.
+Posição explicitamente fixada tem prioridade e não é sobrescrita silenciosamente. Conflito real deve ser informado.
 
-Cálculos sobre elementos conhecidos podem ser locais. Processamento, RAM, armazenamento dos parâmetros, espera de preview/render e manutenção têm custo ainda não medido. Não exigir cópias de vídeo, nova transcrição ou análise completa por reposicionamento. Não prometer latência, custo desprezível, ausência universal de colisões ou equivalência visual antes de testar. Qualquer dependência futura requer versão/proveniência/licença/termos/privacidade e compatibilidade comercial verificadas.
+### 5.3 Escalonamento progressivo em quatro níveis
 
-Director impact: pedidos textuais podem propor ajustes; ações explícitas e cálculos geométricos não exigem novo raciocínio de IA. O Director respeita posições fixadas, versões e permissões; não usa um indício de conflito como autorização para alterar conteúdo ou o layout inteiro fora do pedido.
+Não executar análise pesada por padrão. O Planner sobe de nível somente quando a informação disponível é insuficiente para uma decisão segura/útil.
 
-### 5.4 Momento e validação
+#### Nível 1 — layout e geometria conhecidas
 
-**IMPLEMENTAR NA INTEGRAÇÃO DE LEGENDAS COM COMPOSIÇÃO**, apoiada na base temporal e nos agrupamentos das decisões 15–16. Nenhuma nova operação obrigatória de Media Runtime foi identificada. O gate atual e o inventário coordenado permanecem inalterados; não mover posicionamento tipográfico para o worker nem exigir todo o rastreamento/QA/editor para fechar o MR.
+Usa:
+- aspecto/formato;
+- platform safe areas;
+- posição característica do estilo;
+- título/headline;
+- split-screen;
+- B-roll/overlays conhecidos;
+- posições explicitamente configuradas.
 
-Validar todos os estilos entregues em tela cheia e dividida, com títulos, inserções e ajustes manuais. Incluir linha de legenda que atravessa a troca de layout, retorno sem janela obsoleta, estabilidade da caixa, sincronismo, margens e preservação de posição explicitamente fixada. Usar evidência do conteúdo real para testar casos de rosto/produto/demonstração; não converter ausência de análise em PASS. Comparar escolha/configuração/preview/exportação com as referências EDVID pertinentes e medir consumo.
+É o default.
 
-A extensão coordenada entre estilos será registrada como **DIVERGÊNCIA EDVID** quando efetivamente alterar o comportamento, com validação proporcional de paridade/melhoria. Não declarar superioridade nem teste aprovado por este registro. Expansão material de escopo, dependências ou custo volta ao product owner antes do código.
+**Permanece em N1** quando a região calculada é válida e não existe risco relevante conhecido de conflito com sujeito/conteúdo.
 
-### 5.5 Redação objetiva aprovada
+#### Nível 2 — evidência leve de face/pessoa
 
-> O CEVRA posicionará as legendas conforme o estilo, o layout e as margens de entrega, mantendo estabilidade e evitando sobreposições com base nas informações disponíveis. Permitirá ajustes gerais ou por trecho, preservando escolhas explícitas do usuário. Mudanças de composição poderão reposicionar a legenda sem alterar texto ou sincronismo, sem exigir rastreamento contínuo ou novo modelo de IA.
+Ativa quando:
+- a região preferida pode colidir com o apresentador;
+- há tracking/face/person evidence já disponível;
+- composição muda e a posição do sujeito importa;
+- confiança geométrica do N1 não é suficiente.
 
-## 6. Decisão 18 — Personalização limitada dos estilos existentes
+Usa tracking leve/região aproximada, evitando matting completo.
 
-**APROVADA CONDICIONALMENTE em 2026-09-16.** O product owner determinou: “Não vamos criar novas possibilidades de legendas neste momento. Vamos usar o que o EdVideo entrega” e condicionou as melhorias propostas à ausência de grande trabalho adicional para obter apenas pequenas edições. Nesta conversa, EdVideo refere-se ao EDVID de revisão fixada, não a outro produto.
+**Encerra em N2** quando a região livre fica suficientemente clara.
+
+#### Nível 3 — máscara amostrada / occupancy map
+
+Ativa quando:
+- bounding/face region é insuficiente;
+- sujeito ocupa geometria irregular;
+- posição muda ao longo do intervalo;
+- há risco material de cobrir rosto/produto/demonstração;
+- decisão entre zonas candidatas continua ambígua.
+
+Usa somente frames representativos/necessários e um `SubjectMaskProvider` abstrato para produzir occupancy/safe zones.
+
+Não exige máscara de todos os frames.
+
+#### Nível 4 — matting temporal completo
+
+Ativa somente quando o efeito necessita oclusão frame a frame, por exemplo:
+- HeroEmphasis atrás do sujeito;
+- texto/elemento realmente passando por trás da pessoa;
+- composição behind-the-subject.
+
+N4 **não é necessário para legenda comum**.
+
+### 5.4 Critério de escalada
+
+A escolha do nível não é uma decisão criativa arbitrária do agente.
+
+O Planner avalia sinais objetivos, por exemplo:
+- interseção com safe areas proibidas;
+- interseção com overlays conhecidos;
+- região estimada do sujeito;
+- baixa confiança/alta variabilidade da ocupação;
+- mudança de layout no intervalo;
+- luminância/contraste inadequados;
+- pedido explícito de behind-subject.
+
+Os thresholds numéricos finais de confiança, interseção e variabilidade **não são fixados por esta decisão**. Devem ser calibrados em fixtures reais durante implementação/benchmark e permanecer versionados/testáveis.
+
+Princípio:
+
+```text
+usar o menor nível que resolve o problema
+→ escalar somente por necessidade concreta
+```
+
+### 5.5 Safe-zones por intervalo
+
+Safe zones podem variar ao longo do vídeo.
+
+Exemplo:
+
+```text
+00:00–00:08  lower-third padrão
+00:08–00:14  split entra → legenda reposiciona
+00:14–00:24  volta à posição anterior
+00:24–00:30  sujeito ocupa a região → ajuste localizado
+```
+
+Não movimentar a caixa continuamente sem necessidade. Mudanças devem ocorrer em pontos compreensíveis, estáveis e coerentes com a composição.
+
+Ao encerrar um layout temporário, remover seu override e retornar à posição apropriada anterior; não carregar janela obsoleta.
+
+### 5.6 SubjectMaskProvider
+
+Safe-zone/matting não deve depender de um modelo específico.
+
+Contrato conceitual:
+
+```text
+SubjectMaskProvider
+→ mask/occupancy evidence
+→ Caption Placement Planner / Behind-subject compositor
+```
+
+O provider concreto será decidido no marco de matting/segmentation já aprovado.
+
+Isso permite usar futuramente PP-Matting/PP-MattingV2 ou outro candidato validado sem acoplar legendas ao U2Net do HyperFrames.
+
+Para N3, provider pode ser chamado apenas em amostras.  
+Para N4, precisa fornecer sequência temporal adequada.
+
+### 5.7 Luminância e legibilidade
+
+Após escolher uma região, o CEVRA pode medir luminância/contraste local para validar leitura.
+
+Hierarquia visual:
+
+```text
+Brand Kit
+→ preset/estilo
+→ preferência explícita do usuário
+→ fallback automático de legibilidade
+```
+
+A cena **não redefine automaticamente a identidade da marca**.
+
+Ações permitidas, somente quando suportadas pelo estilo:
+- variante clara/escura;
+- sombra/contorno/fundo já previstos;
+- mudança para outra zona;
+- aviso de conflito.
+
+Não criar novas famílias de legenda para resolver contraste.
+
+### 5.8 Paleta, óptica e iluminação
+
+**V1:** não usar análise de paleta da cena para substituir Brand Kit/preset.
+
+Paleta automática pode ser fallback posterior quando nenhuma identidade foi definida.
+
+Análise avançada de:
+- profundidade/blur;
+- integração óptica;
+- direção de iluminação;
+- sombras “fisicamente” coerentes;
+
+fica **pós‑V1**, para discussão no bloco Advanced Embedded/3D Effects, quando matting e 3D básicos já estiverem validados.
+
+### 5.9 Preview rápido por snapshots
+
+Antes de render completo, CEVRA poderá gerar snapshots compostos em tempos representativos.
+
+A seleção deve priorizar:
+- início/final de intervalos;
+- mudança de layout;
+- captions visualmente densas;
+- HeroEmphasis;
+- splits;
+- regiões sinalizadas pelo QA;
+- amostras distribuídas quando necessário.
+
+Objetivo:
+- verificar qualidade com custo muito menor que render completo;
+- alimentar QA automático/Codex;
+- gerar material pronto quando julgamento humano for realmente necessário.
+
+Isso não cria nova fonte audiovisual; snapshots são derivados descartáveis.
+
+### 5.10 Caption QA
+
+Adicionar QA local/determinístico, conforme capacidades entregues, para detectar:
+
+- texto fora do frame;
+- violação de delivery/platform safe area;
+- overflow/clipping;
+- grupos simultâneos indevidos;
+- conflito com headline;
+- conflito com split/B-roll/overlay conhecido;
+- sobreposição relevante com sujeito quando houver evidência;
+- contraste/legibilidade inadequados;
+- override de layout que não retornou ao fim do intervalo;
+- posição fixa do usuário sobrescrita;
+- divergência material preview/export.
+
+QA gera PASS/WARN/FAIL/UNKNOWN conforme evidência; não ganha autoridade para alterar silenciosamente o projeto.
+
+### 5.11 HeroEmphasis
+
+`HeroEmphasis` é uma capability visual independente, **não um sétimo estilo de legenda**.
+
+Exemplo:
+
+```text
+estilo de legenda = Empilhado
++
+palavra-chave seletiva = HeroEmphasis behind-subject
+```
+
+O efeito pode:
+- usar uma palavra/frase curta de alto impacto;
+- aparecer grande;
+- ficar parcialmente atrás do sujeito;
+- coexistir com o estilo EDVID normal.
+
+Requer N4/temporal matting para behind-subject verdadeiro.
+
+A decisão de **quando sugerir/ativar HeroEmphasis** será feita no momento imediatamente anterior à implementação dessa capability, depois de Caption Placement/QA estarem fechados. Essa decisão deverá considerar:
+- importância semântica;
+- viabilidade visual;
+- preset/Brand Kit;
+- autonomia autorizada do Director;
+- escassez/densidade máxima;
+- opção do usuário para forçar/desligar.
+
+Não banalizar o efeito.
+
+### 5.12 Relação com os seis estilos EDVID
+
+Os seis estilos EDVID permanecem o catálogo V1:
+
+- Karaokê;
+- Empilhado;
+- Disperso;
+- Simples;
+- Serifada;
+- Clássica;
+- Nenhum.
+
+Placement, safe-zones, QA e HeroEmphasis são capacidades auxiliares, não novas famílias.
+
+### 5.13 Custo/viabilidade
+
+Benefício:
+- menos sobreposições;
+- menos renders desperdiçados;
+- posicionamento mais robusto;
+- melhor legibilidade;
+- reaproveitamento do mesmo matting/segmentation planejado para outras funções.
+
+Controle de custo:
+- N1 por padrão;
+- reutilizar tracking/masks já válidos;
+- N2/N3 somente quando necessário;
+- N4 somente para efeito que realmente exija matte temporal;
+- snapshots seletivos, não render de todas as combinações.
+
+Nenhuma API paga é necessária para o núcleo. Nenhum novo modelo é escolhido aqui.
+
+### 5.14 Momento de implementação
+
+**IMPLEMENTAR NA FATIA DE LEGENDAS + COMPOSIÇÃO.**
+
+Dependências:
+- base temporal D15;
+- estilos/caption compiler;
+- layout/composition state;
+- Composition Engine;
+- tracking/matting somente nos níveis que deles dependem.
+
+Nenhuma nova operação obrigatória do Media Runtime foi identificada por esta decisão.
+
+Caption Placement/QA não deve bloquear o gate coordenado do MR. Se, durante a especificação executável, surgir necessidade real de nova primitive MR, ela deve ser apresentada antes da rodada coordenada, não inserida silenciosamente.
+
+### 5.15 Validação
+
+Testar:
+- 9:16 e 16:9;
+- full-screen/split;
+- headline + caption;
+- rosto central/lateral;
+- sujeito se movendo;
+- mãos/objetos;
+- fundo claro/escuro;
+- mudanças de layout;
+- posição fixa pelo usuário;
+- N1→N2→N3 escalation;
+- N4/behind-subject quando disponível;
+- preview vs export;
+- custo/latência de cada nível;
+- ausência de análise pesada desnecessária.
+
+### 5.16 Redação consolidada
+
+> O CEVRA utilizará um Caption Placement Planner local e progressivo. O posicionamento começa por layout, estilo e safe areas conhecidos e só escala para tracking, máscaras amostradas ou matting temporal quando a evidência disponível não for suficiente ou o efeito realmente exigir oclusão. Safe-zones serão calculadas por intervalos quando necessário; Brand Kit/preset terão prioridade sobre sugestões de cor da cena; luminância servirá à legibilidade. Preview amostrado e Caption QA verificarão conflitos antes do render completo. HeroEmphasis será uma capability independente, condicionada a matting adequado e a decisão posterior de uso editorial.
+
+---
+
+## 6. Decisão 18 — Personalização limitada dos estilos existentes — PÓS‑V1
+
+**APROVADA CONDICIONALMENTE em 2026-09-16 e ADIADA PARA REAVALIAÇÃO PÓS‑V1 em 2026-09-18.** O product owner determinou: “Não vamos criar novas possibilidades de legendas neste momento. Vamos usar o que o EdVideo entrega” e condicionou as melhorias propostas à ausência de grande trabalho adicional para obter apenas pequenas edições. Nesta conversa, EdVideo refere-se ao EDVID de revisão fixada, não a outro produto.
+
+### 6.0 Refinamento de prioridade em 2026-09-18
+
+O Product Owner decidiu não gastar escopo V1 com personalização adicional dos estilos. Portanto:
+
+- **os seis estilos EDVID + Nenhum continuam V1** por paridade e pertencem às decisões 14/17;
+- controles extras de cor, tamanho, fonte, contorno, sombra, fundo e outras personalizações da decisão 18 ficam para **pós‑V1**;
+- não implementar essas personalizações apenas porque algum componente upstream já expõe parâmetros;
+- Brand Kit V1 pode escolher preset/identidade já suportada e parâmetros estritamente necessários para capacidades V1, mas não reabre o editor tipográfico da D18;
+- após a V1, reavaliar benefício, demanda, manutenção e compatibilidade com Brand Kit antes de escolher quais controles entram.
+
+A decisão permanece registrada para não perder pesquisa anterior, mas **não é requisito de implementação/homologação da V1**.
 
 Esta redação delimitada prevalece sobre uma leitura irrestrita da proposta de personalização anterior. Não transformar a aprovação em obrigação de construir um editor tipográfico completo, catálogo novo ou motor de animação genérico. Não afirmar que o esforço é pequeno antes da avaliação executável.
 
@@ -396,7 +695,7 @@ Qualquer fonte ou dependência efetivamente incorporada exige versão exata, lic
 
 ### 6.4 Momento e validação
 
-**IMPLEMENTAR, QUANDO PROPORCIONAL, COM OS COMPONENTES VISUAIS DE LEGENDAS**, apoiados nas decisões 15–17 e no sistema de presets da 14. Definir parâmetros realmente suportados antes dos controles; testar junto do componente para evitar uma UI desconectada. Não postergar indevidamente o piso EDVID para terminar personalizações opcionais.
+**PÓS‑V1 — REAVALIAR ANTES DE IMPLEMENTAR.** Se aprovada novamente após a V1, implementar de forma proporcional com os componentes visuais de legendas, apoiados nas decisões 15–17 e no sistema de presets da 14. Definir parâmetros realmente suportados antes dos controles; testar junto do componente para evitar uma UI desconectada. Não postergar indevidamente o piso EDVID para terminar personalizações opcionais.
 
 Nenhuma nova operação obrigatória do Media Runtime foi identificada por esta decisão. A frente coordenada atual e sua sequência não se alteram. Não reabrir os motores existentes nem antecipar editor genérico de animações.
 
