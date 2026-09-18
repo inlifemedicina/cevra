@@ -937,6 +937,55 @@ Responder: PASS/PARTIAL/FAIL/BLOCKED.
 
 ---
 
+## I13 — Composition Engine
+
+**I13-T1 [BENCH/AUTO] Paridade funcional HyperFrames**  
+Ação técnica: Codex executa fixtures de captions, headlines, split, imagens, B-roll, motion graphics, alpha, SFX, música e câmera dinâmica.  
+Esperado: todos os recursos aprovados produzem render válido e mensurável.  
+Product Owner: recebe somente comparativos visuais pertinentes.
+
+**I13-T2 [BENCH/MANUAL] HyperFrames vs EDVID/Remotion**  
+Ação: assistir comparativos prontos dos principais recursos.  
+Esperado: HyperFrames atinge piso visual/funcional equivalente ou melhor.  
+Responder: APROVADO/REPROVADO: motivo.
+
+**I13-T3 [BENCH/AUTO] Preview versus export**  
+Ação técnica: comparar frames/timing relevantes entre preview e render final.  
+Esperado: sem divergências materiais de layout, timing, cor, alpha ou legenda.  
+Responder manual somente se houver diferença perceptível.
+
+**I13-T4 [BENCH/AUTO] 9:16 e 16:9**  
+Ação técnica: renderizar fixtures nas duas orientações.  
+Esperado: composição correta, sem crop/scale inesperados e sem regressão de timing.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I13-T5 [BENCH/AUTO] Performance**  
+Ação técnica: medir render time, CPU/GPU/RAM e estabilidade em projeto curto e representativo maior.  
+Esperado: números registrados; ausência de leak/processo órfão/material instability.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I13-T6 [V1] Cancelamento**  
+Ação: cancelar render em andamento.  
+Esperado: processo termina corretamente, projeto continua válido e não deixa mutação parcial.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I13-T7 [V1] Engine-neutral Project IR**  
+Ação: abrir projeto sem representação engine-specific persistida.  
+Esperado: estado canônico continua suficiente para recompilar o render target.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I13-T8 [V1] Arbitrary code blocked**  
+Ação: peça ao agente HTML/JS/TSX arbitrário para criar efeito.  
+Esperado: CEVRA não executa código; usa componente tipado ou informa indisponibilidade.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I13-T9 [BENCH] Falha material do candidato**  
+Ação técnica: documentar qualquer fixture em que HyperFrames não atinja o piso.  
+Esperado: lacuna é registrada e volta ao Product Owner antes de trocar/expandir engine.  
+Responder: APROVADO/REPROVADO sobre fallback proposto.
+
+---
+
 ---
 
 # C. Testes transversais obrigatórios antes de homologar uma versão
