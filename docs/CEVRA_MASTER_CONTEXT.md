@@ -738,6 +738,20 @@ No product-facing claim should state that CEVRA already “uses Remotion” unti
 
 Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_15A_3D_SCENE_CAMERA_TRACKING.md`.
 
+## 13.5 APPROVED DIRECTION — external editor handoff
+
+2026-09-18:
+- V1 uses explicit metadata-first handoff rather than live bidirectional sync.
+- Resolve prioritizes OpenTimelineIO `.otio`; consolidated media or `.otioz` is optional for portability because bundles can become large.
+- Premiere uses lightweight XML as first candidate; AAF is benchmarked as secondary against actual CEVRA fixtures.
+- unsupported complex CEVRA effects use selective bake/overlay where practical, not whole-timeline flattening.
+- every export has a Handoff Report classifying native/baked/approximated/unsupported features.
+- media consolidation reuses D8; no second asset system.
+- Premiere UXP, Resolve scripting bridges and controlled Import Changes are post-V1.
+- external editor state never supersedes Project IR.
+
+Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_16_EXTERNAL_EDITORS_HANDOFF.md`.
+
 ---
 
 # 14. Local Source Ingest V1 — IMPLEMENTED / CLOSED
