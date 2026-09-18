@@ -752,6 +752,23 @@ Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_15A_3D_SCENE_CAMER
 
 Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_16_EXTERNAL_EDITORS_HANDOFF.md`.
 
+## 13.6 APPROVED DIRECTION — account, entitlement and billing
+
+2026-09-18:
+- CEVRA Account, CEVRA Entitlement and Billing Provider are separate.
+- V1 prefers passwordless account (email + magic link/one-time code); password is not required.
+- Paddle is first billing candidate and Lemon Squeezy fallback, but provider choice is revalidated before live commercialization.
+- development does **not** require Paddle/backend live: dev builds use Development Entitlement local; stable/release must reject all dev-license bypasses.
+- staging adds auth/entitlement service + billing sandbox; live is introduced only for commercialization.
+- commercial entitlement is signed by CEVRA and cached locally for bounded offline operation.
+- after expiry/grace, Recovery Mode preserves project/source recovery but **cannot render/export/save a new usable final video**.
+- project/media are not uploaded merely because the user logged in.
+- device policy is server-configurable; initial individual default proposed as two computers, not hardcoded.
+- local rendering is not metered per render/minute; credits only for real variable-cost services.
+- billing webhooks are idempotent/reconciled and provider schemas never become Project IR/domain truth.
+
+Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_17_ACCOUNT_LICENSING_BILLING.md`.
+
 ---
 
 # 14. Local Source Ingest V1 — IMPLEMENTED / CLOSED
