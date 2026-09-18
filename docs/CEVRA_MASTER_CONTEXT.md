@@ -441,12 +441,12 @@ CEVRA Vids UI
 Maintain three initial modes:
 
 1. embedded Codex in CEVRA when an official supported commercial mechanism is appropriate (e.g. Codex App Server/harness if suitable);
-2. external Codex + CEVRA skill;
-3. external Claude Code + CEVRA skill.
+2. external Codex + **CEVRA Bridge Skill**;
+3. external Claude Code + **CEVRA Bridge Skill**.
 
 Prepare the architecture for a future embedded Claude path, but do not assume an unsupported mechanism.
 
-EDVID does **not** provide evidence of using Codex App Server; its public `agents/openai.yaml` is skill metadata for an external host.
+EDVID does **not** provide evidence of using Codex App Server; its public `agents/openai.yaml` is skill metadata for an external host. The term **Bridge Skill** is now reserved for the CEVRA-owned skill that supports CEVRA Vids when using an external agent.
 
 ## 7.3 CANONICAL — skill installation policy
 
@@ -467,6 +467,22 @@ Rules:
 - no admin when user-scoped install is possible.
 
 ---
+
+## 7.4 CANONICAL — CEVRA Creator Skill
+
+2026-09-18:
+- **Bridge Skill** and **Creator Skill** are different products/surfaces.
+- Bridge Skill supports commands sent by CEVRA Vids to external Codex/Claude and depends on the app/Agent Gateway for execution.
+- Creator Skill is standalone and behaves like an agent-native editor/creator, with its own visual Creator Workspace.
+- Creator has one shared core with Lite and Full profiles; do not fork two editorial brains.
+- Full must complete ingest → analysis → edit → visual review/editing → QA → render/export and deliver a final usable video without CEVRA Desktop.
+- Lite targets a smaller footprint/subset but remains standalone for that promised subset.
+- share Project IR/domain packages, editorial/creative playbooks, composition/QA/UI components and other CEVRA packages wherever practical.
+- prefer the same Project IR; if host constraints prevent full reuse, use a versioned convertible Creator Project Profile.
+- optional Creator → CEVRA Vids handoff should preserve editability progressively, but is never required for Full to render.
+- Creator commercialization/licensing is unresolved and intentionally deferred.
+
+Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_19_PUBLISHING_ANALYTICS_SKILLS.md`.
 
 # 8. Model/agent usage policy for development
 
@@ -785,6 +801,20 @@ Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_17_ACCOUNT_LICENSI
 - forced update is exceptional, not normal; no generic remote kill switch.
 
 Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_18_DISTRIBUTION_UPDATES_TELEMETRY_CRASH.md`.
+
+## 13.8 APPROVED DIRECTION — export, publishing/analytics and Skills
+
+2026-09-18:
+- local export is mandatory, independent and cannot depend on social APIs/providers/cloud.
+- social publishing and performance analytics are post-V1; Vids 1.0 is not blocked by provider app review.
+- social performance data belongs outside Project IR, in Content Intelligence/future analytics.
+- distinguish CEVRA Bridge Skill from CEVRA Creator Skill.
+- Bridge supports external AI used by the app and returns typed CEVRA requests; it is not a standalone editor.
+- Creator is standalone with visual Workspace and Lite/Full profiles; Full must deliver final video without Desktop.
+- Creator and Vids share one editorial/creative/QA knowledge core and reuse domain/runtime/UI packages where practical.
+- optional Creator→Vids handoff is planned but never required for standalone completion.
+
+Detailed authority: `docs/CEVRA_EXTERNAL_INTEGRATION_DECISION_19_PUBLISHING_ANALYTICS_SKILLS.md`.
 
 ---
 
