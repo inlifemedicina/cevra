@@ -26,6 +26,8 @@ CEVRA Vids is not a traditional manual editor with a chatbot attached. Manual mo
 
 Every AI edit is inspectable, editable, journaled and reversible. Project IR remains the audiovisual source of truth for AI-first and manual workflows.
 
+CEVRA Vids also supports approved creation-mode direction beyond footage-first editing: Faceless Explainer, Slideshow and Music-to-video. These are workflows on the same Project IR/timeline/composition foundations, not separate products or runtimes. Faceless may generate a script and provider-neutral TTS narration; Music-to-video remains conditional on validating a proportional local rhythm-analysis capability. Brand Kit is a V1 direction; Figma may later act as an optional importer.
+
 ## Independence requirement
 
 CEVRA Vids remains completely usable without:
@@ -115,6 +117,10 @@ After explicit user authorization, CEVRA Vids may detect supported local agents 
 
 Managed skills carry owner, version, hash, minimum and maximum compatibility, provenance and rollback data. CEVRA does not modify third-party skills, follow destructive symlinks, overwrite Git checkouts blindly or remove user settings and secrets. User-scoped installation should avoid administrator privileges. Embedded agents may use an internal control surface without a global skill installation.
 
+## CEVRA update lifecycle
+
+CEVRA-managed executables, runtimes, engines and models are version-pinned, signed/verified and promoted only after compatibility tests. V1 should update first-party executable components through the signed app/runtime release rather than invent a premature hot-plugin updater. Large optional model packs may have managed independent downloads. External user software is never upgraded by CEVRA; adapters negotiate version, health and capabilities. Detailed policy lives in `UPDATE_STRATEGY.md`.
+
 ## Workflow and Production Presets
 
 Workflow Presets are versioned application-level orchestration, not Project IR state or executable scripts. They may combine transcription, cleanup, reframing, audio normalization, captions, overlays, composition choices, QA and export profiles through approved typed steps.
@@ -126,6 +132,8 @@ Preset execution preserves Project IR, journal/history, cancellation, recovery, 
 Composition implementations remain behind `CompositionEngineAdapter`. HyperFrames is a preferred candidate only if it reaches or exceeds the Remotion-based behavior documented by the public [`fillrochaa/edvid` `SKILL.md`](https://github.com/fillrochaa/edvid/blob/main/SKILL.md) for captions, headlines, split-screen, cards, images, B-roll, camera movement, zooms, face tracking, motion graphics, SFX, transitions, exact timing, data-driven templates and horizontal and vertical rendering. EDVID's documented Phase 2/3 Remotion path, Phase 2 Remotion-only rule, FFmpeg/Remotion pipeline, `remotion/` layout and `remotion-best-practices` setup provide functional and technical evidence; they do not establish license compatibility for CEVRA.
 
 If HyperFrames does not meet the benchmark, CEVRA may select Remotion or another demonstrably suitable engine behind the adapter. Remotion is neither mandatory nor prohibited and is not currently incorporated. Selection for commercial distribution requires review of the proposed version's then-current license and confirmation of compatibility with CEVRA's proprietary commercial model. The canon does not assume license terms, prices or thresholds, and engine preference does not override quality, automation or editorial capability.
+
+Composition security uses a **typed untrusted boundary**, not one hard-coded domain type per internal effect. Agents, presets and third-party surfaces select registered capabilities/components with validated parameters. First-party registered components may internally use audited engine code behind the Composition Compiler, while engine-native state remains derived. Upstream registries are development inputs only and are never live-executed merely because a user requested an effect.
 
 ## Generative assets
 
