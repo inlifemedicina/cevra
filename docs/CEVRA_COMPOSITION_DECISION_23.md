@@ -163,6 +163,29 @@ Podem ser avaliados, em decisão própria:
 
 A escolha final será registrada na revisão de legendas antes da implementação dependente.
 
+## 8A. HeroEmphasis e Caption Placement Planner
+
+O refinamento da decisão visual 17 em 2026-09-18 acrescenta duas relações formais:
+
+### SubjectMaskProvider
+
+Caption Placement e behind-the-subject compartilharão uma fronteira abstrata de máscara/ocupação:
+
+```text
+SubjectMaskProvider
+→ mask/occupancy evidence
+→ Caption Placement Planner
+→ behind-subject / HeroEmphasis quando necessário
+```
+
+O contrato não seleciona U2Net, PP-Matting, RVM ou outro motor. N3 do Caption Planner pode usar apenas máscaras amostradas; N4/behind-subject exige sequência temporal adequada.
+
+### HeroEmphasis
+
+HeroEmphasis é componente/capability visual registrada, não nova família de legenda. Pode promover seletivamente uma palavra/frase e, quando behind-subject, depende de N4/matting temporal.
+
+A política editorial de sugestão/ativação será decidida antes da implementação do HeroEmphasis, após Caption Placement/QA, cobrindo importância semântica, viabilidade visual, preset/Brand Kit, autonomia do Director, escassez e controles force/off.
+
 ## 9. Viabilidade e momento
 
 O Project IR já possui `GraphicItem` para texto, imagem, vídeo, shape e Lottie, além de layouts/intervalos. Isso é uma base, não prova de motion graphics ponta a ponta.
