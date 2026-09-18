@@ -39,3 +39,16 @@ AI models, social APIs, content-source providers, analytics providers and publis
 
 ## Release requirement
 Commercial releases must include the required third-party notices, license texts and any source/source-offer obligations applicable to redistributed components.
+
+
+## Product licensing and entitlement
+
+CEVRA product licensing is distinct from third-party dependency licensing.
+
+CEVRA Vids commercial access uses a CEVRA-owned entitlement layer. Billing provider state is projected into CEVRA entitlements rather than becoming application-domain state.
+
+Development may use a local Development Entitlement with no live billing/backend dependency, but production/stable builds must reject development bypasses. Commercial/staging activation uses signed entitlements, device policy and provider-neutral billing integration.
+
+Expired commercial entitlement enters Recovery Mode: users retain access to projects/original sources for recovery, but cannot generate/export/save a new usable final video.
+
+The entitlement service does not require storage of user project media. Private signing keys, billing secrets and webhook secrets never ship in the desktop application.
