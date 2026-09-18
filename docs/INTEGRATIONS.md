@@ -14,6 +14,9 @@ No social network, publishing platform, analytics vendor or AI vendor may be rep
 - disconnect
 
 ## Existing categories
+- Distribution/update: signed Tauri updater with static stable/beta/dev manifests; Cloudflare R2 is first production artifact-host candidate
+- Crash diagnostics: provider-neutral CrashReporterAdapter; Sentry is first candidate, opt-in only
+- Product telemetry: TelemetryAdapter with NoOp default in V1; no mandatory behavioral analytics/session replay
 - Identity/account: CEVRA-owned Orbit identity; V1 preference is passwordless email/magic-link or one-time code
 - Entitlement/licensing: CEVRA-owned signed entitlement service with device activation and bounded offline operation
 - Billing: provider-neutral BillingProviderAdapter; Paddle is first commercial candidate and Lemon Squeezy fallback, both revalidated before live launch
@@ -149,3 +152,11 @@ Development builds may run on a local Development Entitlement with no billing/ba
 Stable/release builds must never accept Development Entitlement or licensing bypasses.
 
 Signed entitlement cache permits bounded offline use. On expiry after the configured grace policy, CEVRA enters Recovery Mode: project/source recovery remains possible but no new usable final video may be rendered/exported/saved.
+
+## Distribution, crash diagnostics and telemetry
+
+The installed editor is independent from update/crash services. Tauri's updater handles signed update artifacts behind static channel manifests in V1. Artifact hosting is replaceable; Cloudflare R2 is the first candidate.
+
+The stable installer must satisfy the Core Runtime Closure defined in the approved decision: missing mandatory engines/runtimes/assets/models is a release failure. Optional heavy packs remain separately downloadable.
+
+Crash reporting uses CrashReporterAdapter and is opt-in. Sentry is a candidate implementation only. Product analytics uses TelemetryAdapter and defaults to NoOp in V1. Session replay and project/media content upload are prohibited.
