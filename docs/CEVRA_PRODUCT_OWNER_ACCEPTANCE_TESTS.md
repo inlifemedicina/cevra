@@ -1175,6 +1175,65 @@ Responder: PASS/PARTIAL/FAIL.
 
 ---
 
+## I15A — 3D Scene & Camera Tracking
+
+**I15A-T1 [V1/BENCH] Tier A sem camera solve**  
+Ação: criar cena 2.5D/3D authored com perspectiva/profundidade/câmera virtual.  
+Esperado: render válido sem iniciar CameraSolve3D desnecessariamente.  
+Responder: APROVADO/REPROVADO.
+
+**I15A-T2 [BENCH/AUTO] CameraSolve3D — COLMAP/PyCOLMAP**  
+Ação técnica: rodar fixtures smartphone representativas.  
+Esperado: registrar solve success, drift/quality evidence, tempo, CPU/GPU/RAM, deps, platform e licença/proveniência.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15A-T3 [BENCH/AUTO] DPVO somente por necessidade**  
+Ação: quando COLMAP mostrar lacuna material ou comparação for justificada, testar DPVO nas mesmas fixtures.  
+Esperado: ganho/custo documentados; não adotar por novidade.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I15A-T4 [MANUAL] Anchor espacial**  
+Ação: fixar texto/plano em parede/ambiente e observar movimento de câmera.  
+Esperado: anchor parece estável, sem drift visual material inaceitável.  
+Responder: APROVADO/REPROVADO.
+
+**I15A-T5 [V1] Falha de solve**  
+Ação: usar clip difícil/insuficiente.  
+Esperado: CEVRA não inventa tracking; informa indisponibilidade e permite Tier A quando apropriado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15A-T6 [ADV] Occlusion-aware 3D**  
+Ação: com SubjectMaskProvider temporal disponível, objeto/texto passa atrás do sujeito.  
+Esperado: foreground occlusion coerente e sem segunda timeline.  
+Responder: APROVADO/REPROVADO/BLOCKED.
+
+**I15A-T7 [INT/AUTO] Stale solve**  
+Ação: alterar materialmente source interval após solve.  
+Esperado: derivação é invalidada/marcada stale; tracking antigo não é aplicado silenciosamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15A-T8 [INT/AUTO] Código 3D arbitrário bloqueado**  
+Ação: agente tenta enviar Three.js/JS/shader/raw solver args.  
+Esperado: rejeitado; somente component/capability registrada + params validados chegam ao compiler.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15A-T9 [BENCH/AUTO] 9:16 e 16:9**  
+Ação técnica: tracked 3D em vertical e horizontal.  
+Esperado: camera/anchor/composição corretos nas duas orientações.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15A-T10 [BENCH/AUTO] Performance e cleanup**  
+Ação: executar solve e render, cancelar no meio e repetir.  
+Esperado: métricas registradas, processos/artifacts temporários limpos, projeto canônico intacto.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I15A-T11 [ADV] Metadata espacial mobile**  
+Ação: quando captura CEVRA Mobile compatível existir, fornecer pose/intrinsics de plataforma.  
+Esperado: CEVRA consegue consumir metadata autorizada sem solver redundante quando comprovadamente suficiente.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+---
+
 # C. Testes transversais obrigatórios antes de homologar uma versão
 
 **X-T1 — Undo/Redo**  
