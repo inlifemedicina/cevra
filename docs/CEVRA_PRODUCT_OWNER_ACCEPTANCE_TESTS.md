@@ -2,7 +2,7 @@
 
 **Data inicial:** 2026-09-17  
 **Status:** DOCUMENTO VIVO / TESTES A EXECUTAR NOS MARCOS CORRETOS.  
-**Escopo inicial:** decisões funcionais 1–23 + decisões de integração 1–8.  
+**Escopo atual:** decisões funcionais 1–23 + decisões de integração aprovadas até a 18, incluindo 15A.  
 **Implementação:** este documento NÃO afirma que qualquer teste abaixo já pode ser executado.
 
 ## Regra de manutenção
@@ -1402,6 +1402,119 @@ Responder: PASS/PARTIAL/FAIL.
 
 ---
 
+## I18 — Distribution, Updater, Telemetry & Crash
+
+**I18-T1 [V1/AUTO] Core Runtime Closure**  
+Ação técnica: remover individualmente cada mandatory artifact do release fixture.  
+Esperado: CI/release closure falha e stable não é promovido.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T2 [V1/AUTO] Clean-install core smoke**  
+Ação: instalar stable em máquina/VM limpa e sem ferramentas dev.  
+Esperado: capacidades core anunciadas funcionam com runtimes/engines/assets/modelos mínimos presentes; nenhuma instalação manual de Python/FFmpeg/npm é exigida.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T3 [V1] Optional pack ausente**  
+Ação: instalar somente core, sem packs avançados.  
+Esperado: editor core funciona; somente capability do pack fica indisponível e é informada.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T4 [V1/AUTO] Download oculto obrigatório bloqueado**  
+Ação: simular core dependency ausente após instalação.  
+Esperado: release é considerado inválido; app não baixa silenciosamente mandatory runtime/model.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T5 [V1/AUTO] macOS signing/notarization**  
+Ação técnica: validar build de target macOS suportado.  
+Esperado: assinatura/notarização/stapling conforme release policy e instalação sem bypass inseguro.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T6 [V1/AUTO] Windows signed per-user install**  
+Ação técnica: validar NSIS no target Windows suportado.  
+Esperado: instalação per-user sem admin por default e assinatura válida.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED até target estar suportado.
+
+**I18-T7 [V1/AUTO] Updater signature invalid**  
+Ação: fornecer update/manifests adulterados.  
+Esperado: rejeitados; instalação ativa permanece íntegra.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T8 [V1/AUTO] Canais isolados**  
+Ação: stable consulta endpoint stable enquanto beta/dev publicam versões diferentes.  
+Esperado: stable não recebe dev/beta automaticamente e chaves/configs não cruzam ambientes.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T9 [V1] Update durante render/save**  
+Ação: update fica pronto durante operação crítica.  
+Esperado: download pode concluir, mas restart/install é adiado até ponto seguro.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T10 [V1/AUTO] Partial/corrupt download**  
+Ação: interromper/corromper download.  
+Esperado: active install não é substituída; retry/resume ou falha segura.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T11 [V1] Host de update indisponível**  
+Ação: bloquear artifact host.  
+Esperado: app instalado abre/edita normalmente; apenas update/packs ficam indisponíveis.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T12 [V1] Installer público**  
+Ação: baixar installer sem login.  
+Esperado: download funciona; entitlement é exigido no app conforme D17, não no arquivo.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T13 [V1/AUTO] Telemetry NoOp**  
+Ação: usar stable com crash consent OFF.  
+Esperado: nenhuma behavioral analytics/session replay network call é feita.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T14 [V1/AUTO] Crash payload allowlist**  
+Ação: provocar erro com projeto contendo paths, prompt/transcript e nomes sensíveis.  
+Esperado: payload enviado contém somente campos técnicos permitidos; conteúdo/path/secrets são redacted/ausentes.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T15 [V1] Crash reporting opt-in**  
+Ação: alternar consentimento em Settings.  
+Esperado: OFF bloqueia upload; ON permite somente payload sanitizado; alteração tem efeito previsível.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T16 [V1/AUTO] Session replay inexistente**  
+Ação técnica: inspecionar configuração/dependências/network.  
+Esperado: nenhuma captura/replay de tela/sessão está ativa.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T17 [V1] Diagnostics Bundle local**  
+Ação: gerar bundle.  
+Esperado: usuário consegue inspecionar lista/conteúdo; inclui versões/health/logs sanitizados e exclui mídia/transcript/prompt/project content por default.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T18 [V1/AUTO] Logs locais sanitizados**  
+Ação: operar com paths/tokens/erros.  
+Esperado: rotação/limite funcionam; secrets e conteúdo sensível não aparecem nos logs normais.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T19 [V1/AUTO] Symbols/source maps**  
+Ação: gerar crash da build e simbolicar com artifacts correspondentes.  
+Esperado: stack útil sem enviar projeto/conteúdo ao serviço.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T20 [V1] Sem forced update comum**  
+Ação: disponibilizar nova stable não crítica.  
+Esperado: usuário pode adiar; versão antiga não é desligada remotamente.  
+Responder: PASS/PARTIAL/FAIL.
+
+**I18-T21 [ADV] Critical update policy**  
+Ação: simular advisory crítico futuro.  
+Esperado: qualquer bloqueio segue política excepcional, preserva dados/recovery e não depende de kill switch genérico.  
+Responder: PASS/PARTIAL/FAIL/BLOCKED.
+
+**I18-T22 [V1/AUTO] Previous-known-good**  
+Ação: update falha healthcheck.  
+Esperado: runtime/components retornam quando suportado; app preserva artifact anterior e nunca abre projeto com schema incompatível sem proteção.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
 # C. Testes transversais obrigatórios antes de homologar uma versão
 
 **X-T1 — Undo/Redo**  
