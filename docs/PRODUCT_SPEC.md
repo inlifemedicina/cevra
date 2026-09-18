@@ -107,7 +107,7 @@ EDVID remains the functional and editorial baseline. The non-destructive quality
 
 CEVRA Vids uses an Agent Gateway between the UI and agent hosts. The gateway exposes typed CEVRA application commands, which preserve Project IR validation, journal/history and recovery.
 
-Initial integration paths are embedded Codex through an official supported mechanism when appropriate, external Codex with a CEVRA Skill and external Claude Code with a CEVRA Skill. The product remains prepared for a future official Claude embedded path and local or other agents. Embedded Codex and an external Codex skill are separate product modes. No claim is made that EDVID uses Codex App Server.
+Initial CEVRA Vids integration paths are embedded Codex through an official supported mechanism when appropriate, external Codex with the **CEVRA Bridge Skill** and external Claude Code with the **CEVRA Bridge Skill**. The product remains prepared for a future official Claude embedded path and local or other agents. Embedded Codex and an external Bridge Skill are separate integration modes. No claim is made that EDVID uses Codex App Server.
 
 The core editor does not require an agent. Manual editing and review functions supported by the UI remain available without one.
 
@@ -181,6 +181,20 @@ CEVRA Creative Intelligence
 A router selects only the skills and playbooks relevant to the task. Potential categories include Cinematic, Product, Fashion, Property, Food, Social Hook, Motion Graphics, Music, Anime, Cartoon and 3D/CGI.
 
 External skills require source, version, license and commercial-compatibility review. MIT, Apache and BSD are preferred. Paid or proprietary skills, including BUDOSKILL, are not copied or redistributed without an explicit license. Public descriptions may inform independent implementation.
+
+## CEVRA Creator Skill
+
+The **CEVRA Creator Skill** is separate from the Bridge Skill. It is a standalone agent-native editor/creator that does not require CEVRA Vids Desktop to produce the final video.
+
+The Creator family has a shared core with Lite and Full profiles. Lite targets common workflows with a smaller dependency/interface footprint. Full targets the maximum feasible CEVRA Vids capability set in an agent environment and includes a visual Creator Workspace with preview, structured editing/timeline controls, captions/assets/composition, QA and final render/export.
+
+Creator and Vids share editorial/creative playbooks, QA semantics and reusable packages wherever practical. Prefer the same Project IR/domain implementation; host-constrained environments may use a versioned convertible subset rather than a divergent project model.
+
+Opening a Creator project in CEVRA Vids is an optional interoperability feature, never a requirement for Creator Full to deliver a finished video.
+
+## Export and publishing scope
+
+Local file export is an independent core capability. Social publishing and social-performance analytics are post-V1 and cannot block CEVRA Vids 1.0. Future publishing uses provider adapters; performance analytics belongs outside Project IR.
 
 ## Content Intelligence
 
