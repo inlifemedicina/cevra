@@ -255,3 +255,27 @@ Rules:
 - a candidate must not force avoidable lossy intermediates into the final-quality path.
 
 No other benchmark scope is reduced or replaced.
+
+
+## 13. Product Owner decision K5 — APPROVED
+
+**Date:** 2026-09-18.
+
+Official V1 desktop platform targets are intentionally limited to the simplest commercially useful matrix:
+
+- **macOS Apple Silicon / arm64**
+- **Windows x64**
+
+Deferred from the official V1 support promise:
+- macOS Intel/x64;
+- Linux x64/arm64;
+- Windows ARM.
+
+Rules:
+- do not remove existing cross-platform abstractions or already-pinned artifacts merely because a platform is not an official V1 target;
+- do not spend V1 release effort on Linux/Windows ARM/macOS Intel unless adding one becomes demonstrably low-cost and does not delay the two primary targets;
+- macOS arm64 and Windows x64 must each pass clean-machine Core Runtime Closure, import/edit/preview/audio/captions/render/export, HDR→SDR and update validation before V1 release;
+- macOS Intel may be reconsidered near launch only if the incremental compatibility/testing cost proves small;
+- future platform expansion must preserve the same Project IR and product semantics.
+
+This platform decision narrows release scope; it does not authorize removing portability from domain/application code.
