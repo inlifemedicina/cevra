@@ -191,3 +191,21 @@ Windows V1 H.264 strategy:
 - never silently substitute AV1/VP9 for universal H.264 delivery.
 
 Implementation is not authorized by this documentation entry. Real Windows runner/clean-machine validation remains required before release.
+
+
+## 10. Product Owner decision K2 — APPROVED
+
+**Date:** 2026-09-18.
+
+V1 HDR/SDR policy:
+- CEVRA V1 must handle common HDR source media without making the normal user workflow fail.
+- When the selected output profile is SDR, CEVRA should automatically perform a validated HDR→SDR conversion rather than require the user to disable HDR recording or preprocess externally.
+- The first implementation candidate is a single cross-platform FFmpeg path using `zscale`/z.lib plus FFmpeg tone-mapping and BT.709 output, because it avoids separate macOS/Windows color pipelines.
+- The exact zimg version/build, license, quality, performance and bundle impact must be audited/benchmarked before incorporation. Current upstream zimg uses a permissive WTFPL-style license, but release provenance still requires exact-version review.
+- Required V1 input recognition includes rotation/orientation, color primaries, transfer, matrix/range, pixel format/bit depth and VFR indicators.
+- Common HLG/HDR10 and iPhone HDR/Dolby Vision sources should be accepted where FFmpeg can decode the underlying video and converted to SDR for normal SDR delivery.
+- End-to-end HDR preservation and advanced Dolby Vision metadata preservation are not V1 requirements.
+- Fail-closed remains a last-resort safety behavior only when a source cannot be converted correctly; silent washed-out/incorrect color export is prohibited.
+- No user-visible requirement to understand HDR/color science is introduced.
+
+Implementation is not authorized by this documentation entry; benchmark/fixture validation is required in Gate 1C/Gate 4.
