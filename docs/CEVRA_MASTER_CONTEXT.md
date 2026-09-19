@@ -1550,6 +1550,7 @@ post-merge CI passed 5/5 jobs.
 - **CANONICAL:** publishing providers, scheduling and performance-analytics synchronization are post-V1 and require future provider audits/approvals.
 - **REVIEWED EXTERNAL AUDIT:** Claude/Fable adversarial review identified material risks that are now scheduled for validation: ProjectHistory snapshot scaling, installer/runtime size, alignment-runtime optimization benchmark, software export fallback, documentation duplication, stable-build dev-switch hardening, and explicit foundation gaps for preview/playback, final render/export, HDR/VFR, fonts, disk/cache/temp lifecycle and Windows. It did **not** invalidate Project IR, Media Runtime, Agent Protocol, D13/D23, export independence, or account/entitlement separation.
 - **CANONICAL CLARIFICATION:** Fable's proposed shared headless host is an implementation candidate for future Creator reuse only. It does not change the Bridge/Creator distinction or the requirement that Creator Full render a final video standalone.
+- **TARGETED EXTERNAL AUDIT — Media/History/Preview/Export:** measured ProjectHistory behavior changed the prior risk classification to a confirmed blocker: realistic transcript-heavy histories can become unsaveable because full transcript payload is duplicated across snapshots and the entire archive is cloned/serialized. Before high-volume edit commands, remediate and remeasure. The same audit confirmed Windows private-Python path defects, no guaranteed Windows H.264 export path, missing J-cut/stream-offset execution, dropped probe rotation/color/VFR metadata, under-specified preview/render boundaries and incomplete disk/cache/temp policy. Detailed evidence is in `docs/CEVRA_FABLE_TARGETED_AUDIT_MEDIA_HISTORY_PREVIEW_EXPORT_2026-09-18.md`.
 
 
 ---
@@ -1595,22 +1596,26 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-The next sequence is constrained by the Product Owner's instruction to finish any work already underway in the principal development chat before starting another implementation milestone.
+The sequence below is authoritative until materially changed by later evidence. Work already underway in the principal development chat closes first.
 
-1. **Close the actual in-progress main-chat work first.** Resolve its real branch/PR/review/CI state from current evidence; do not move its frozen base or interrupt an active closeout.
-2. **Gate 0 — documentation/global coherence closeout.** Reconcile the decision branches and reviewed Fable audit; remove duplicate acceptance-test sections, correct stale/misplaced records and verify obsolete stubs/branches before deletion. This is documentation/research, not a feature detour.
-3. **Gate 1 — focused technical-risk validation.** Benchmark ProjectHistory growth/persistence with realistic transcript/edit volume; measure clean-machine runtime/installer size; compare current PT alignment runtime against ONNX/smaller-model/safetensors candidates; audit export encoder fallback and stable-release dev switches. Findings require explicit approval before changing architecture/runtime/model.
-4. **Gate 2 — mandatory coordinated Media Runtime pause.** Announce **PAUSA DE AVANÇO — ajustes coordenados do Media Runtime antes da próxima etapa.** Reconcile MR-A01–MR-A06, MR-V01, MR-V02 and MR-Q01 with later approved decisions and the Fable audit. Evaluate, without pre-approving, one-pass cut-plan execution and batched frame extraction. Freeze and execute a bounded dependency-correct plan before the next functional milestone.
-5. **Gate 3 — Transcript Cache V1.** Define schema, key, invalidation, source/model identity, storage, cleanup, corruption/recovery and alignment interaction; then implement as the next dependency-correct transcript slice.
-6. **Gate 4 — technical foundation gaps.** Decide preview/playback architecture, final render/export compiler and mux ownership, HDR/VFR/iPhone media policy, font packaging, disk/proxy/cache/temp lifecycle and Windows validation. Pull a subitem earlier only when it is a direct prerequisite of the Media Runtime gate.
-7. **Gate 5 — Composition Engine benchmark/selection.** Use the full CEVRA/EDVID matrix; HyperFrames remains a candidate, not a winner. Include credible alternatives/baselines and measure visual parity, timing, deterministic seek, performance, bundle/runtime cost, security and current commercial licensing.
-8. **Gate 6 — first complete editable/exportable vertical.** Typed cut/edit commands → compiler/orchestration → deterministic execution → undo/redo/recovery → preview/review → final export, with platform validation.
-9. **Gate 7 — Agent Protocol PoC.** Only after a useful deterministic vertical exists for the agent to operate. Verify official supported mechanism, containment, capability negotiation and commercial/entitlement constraints.
-10. **Gate 8 — release closure.** Clean-machine install, measured core/packs, signing/notarization, updater signing, absence of dev bypass, rollback and core smoke.
+1. **Close the actual in-progress main-chat work first.** Resolve real branch/PR/review/CI state; do not interrupt active closeout or move frozen bases.
+2. **Gate 0 — documentation/global coherence.** Deduplicate the Product Owner acceptance catalog, reconcile stale/misplaced records, register the two Fable audits and validate obsolete stubs/branches before deletion.
+3. **Gate 1A — ProjectHistory correctness blocker.** Before high-volume edit/timeline commands, remove the measured failure mode caused by transcript-heavy full snapshots/whole-archive serialization while preserving ProjectHistory semantics. First candidate is content-addressed transcript storage/reference by existing digest. Re-run measured A/B/C scenarios and persistence/checkpoint benchmarks before closeout.
+4. **Gate 1B — bounded cross-platform correctness fixes.** Resolve platform-aware private-Python paths, preserve already-emitted rotation/color/VFR metadata into contracts/ingest, add bounded production render timeout/watchdog where appropriate, and prepare real Windows smoke validation.
+5. **Gate 1C — evidence for Product Owner decisions K1–K5.** Validate Windows hardware encoders; assess H.264 software fallback only if necessary; benchmark/audit HDR→SDR path; benchmark final composition→encode/mux ownership; decide V1 platform targets; extend the Composition benchmark with live-WebView and original-source/intermediate criteria.
+6. **Gate 2 — mandatory coordinated Media Runtime pause.** Announce **PAUSA DE AVANÇO — ajustes coordenados do Media Runtime antes da próxima etapa.** Reconcile MR-A01–MR-A06, MR-V01/MR-V02 and MR-Q01 with all later decisions and both Fable audits. Close concat/loss minimization and per-stream temporal placement/J-cut gaps; compare incremental-preview and one-pass-final execution rather than pre-approving one giant operation.
+7. **Gate 3 — Transcript Cache V1.** Complete schema/key/invalidation/source/model identity/storage/cleanup/recovery with the new history/transcript-storage strategy reconciled.
+8. **Gate 4 — preview/playback and render foundation.** Decide preview architecture, resolved Render Plan/Compiler boundary, final encode/mux ownership, HDR/VFR handling, fonts, disk/proxy/cache/temp policy and Windows validation.
+9. **Gate 5 — Composition Engine benchmark/selection.** Use full CEVRA/EDVID matrix plus live-WebView preview compatibility and original-media/intermediate-generation criteria.
+10. **Gate 6 — first complete editable/exportable vertical.** Typed edits/cuts → compiler/orchestration → deterministic execution → undo/redo/recovery → preview/review → final export, with real platform fixtures.
+11. **Gate 7 — Agent Protocol PoC.** Only after a useful deterministic vertical exists. Verify supported mechanism, containment, capability negotiation and commercial constraints.
+12. **Gate 8 — release closure.** Clean-machine installs, measured core/packs, code signing/notarization, updater signing, no dev bypass, rollback and core smoke.
 
-Detailed reviewed-audit authority: `docs/CEVRA_FABLE_AUDIT_REVIEW_2026-09-18.md`.
+Detailed audit authorities:
+- `docs/CEVRA_FABLE_AUDIT_REVIEW_2026-09-18.md`
+- `docs/CEVRA_FABLE_TARGETED_AUDIT_MEDIA_HISTORY_PREVIEW_EXPORT_2026-09-18.md`
 
-Do not treat the external audit's implementation suggestions as automatically approved. The approved CEVRA policy remains `PRESERVE → EXTEND → VERIFY → MIGRATE ONLY IF NECESSARY`.
+Do not treat audit implementation suggestions as automatically approved. Product Owner approval remains required for material architecture/runtime/model/provider changes.
 
 
 ---
