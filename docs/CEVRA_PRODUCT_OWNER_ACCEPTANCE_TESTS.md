@@ -1609,6 +1609,25 @@ Responder: PASS/PARTIAL/FAIL.
 
 ---
 
+## K5 — V1 official platform matrix
+
+**K5-T1 [V1/AUTO+MANUAL] macOS Apple Silicon clean-machine closure**  
+Ação: instalar a build candidate em macOS arm64 limpo, sem ferramentas de desenvolvimento globais.  
+Esperado: Core Runtime Closure passa; import/edit/preview/audio/captions/render/export/HDR→SDR/update funcionam dentro do escopo V1 sem dependências manuais.  
+Responder: PASS/PARTIAL/FAIL.
+
+**K5-T2 [V1/AUTO+MANUAL] Windows x64 clean-machine closure**  
+Ação: instalar a build candidate em Windows x64 limpo, sem Python/FFmpeg/Node de usuário.  
+Esperado: Core Runtime Closure passa; import/edit/preview/audio/captions/render/export/HDR→SDR/update funcionam dentro do escopo V1, incluindo o caminho H.264 aprovado.  
+Responder: PASS/PARTIAL/FAIL.
+
+**K5-T3 [V1/AUTO] No accidental unsupported-platform promise**  
+Ação técnica: verificar manifests, website/release metadata e installer targets da V1.  
+Esperado: somente macOS arm64 e Windows x64 são anunciados como targets oficiais; Linux/macOS Intel/Windows ARM não aparecem como suporte garantido sem homologação específica.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 # C. Testes transversais obrigatórios antes de homologar uma versão
 
 **X-T1 — Undo/Redo**  
