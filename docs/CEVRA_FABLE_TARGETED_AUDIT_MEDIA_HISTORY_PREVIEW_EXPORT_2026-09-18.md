@@ -209,3 +209,31 @@ V1 HDR/SDR policy:
 - No user-visible requirement to understand HDR/color science is introduced.
 
 Implementation is not authorized by this documentation entry; benchmark/fixture validation is required in Gate 1C/Gate 4.
+
+
+## 11. Product Owner decision K3 — APPROVED
+
+**Date:** 2026-09-18.
+
+V1 render/export ownership uses the simplest viable path:
+
+```text
+Project IR
+→ application coordinates
+   ├─ Composition Engine → final visual video without final audio
+   └─ Media Runtime → final audio
+→ Media Runtime muxes visual + audio by stream copy when technically valid
+→ final file
+```
+
+Rules:
+- do not introduce a large Render Orchestrator/Planner subsystem before it is needed;
+- Composition Engine renders the visual result once;
+- Media Runtime owns audio assembly/treatment and final mux;
+- final mux should avoid re-encoding the already-rendered visual stream when container/codec constraints permit;
+- no intermediate lossy video should be re-encoded again merely to attach audio;
+- application remains owner of Project IR, timing and editorial decisions;
+- Composition Engine must not become a second source of truth;
+- if benchmark evidence later shows that frame/pipe streaming gives a material benefit, CEVRA may evolve the internal transport without changing Project IR or product semantics.
+
+This is the V1 default because it is simpler to implement and sufficient to preserve the non-destructive/single-final-visual-encode objective.
