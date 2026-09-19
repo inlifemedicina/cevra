@@ -176,3 +176,18 @@ These are pending approval, not auto-approved:
 - publishing/performance analytics remain post-V1.
 - no arbitrary shell/raw FFmpeg/filtergraph from untrusted surfaces.
 - no mandatory paid AI API for core editing.
+
+## 9. Product Owner decision K1 — APPROVED
+
+**Date:** 2026-09-18.
+
+Windows V1 H.264 strategy:
+- approve `h264_mf` / Microsoft Media Foundation as the first official Windows H.264 path after real Windows validation;
+- smoke-test capability before advertising/using it;
+- prefer native Media Foundation path and use hardware acceleration when available/validated;
+- do not make NVENC/QSV/AMF separate V1 requirements;
+- do not add OpenH264 now;
+- if the native Media Foundation path proves materially inadequate in real fixtures, reopen a software fallback evaluation with licensing/patent/compatibility review;
+- never silently substitute AV1/VP9 for universal H.264 delivery.
+
+Implementation is not authorized by this documentation entry. Real Windows runner/clean-machine validation remains required before release.
