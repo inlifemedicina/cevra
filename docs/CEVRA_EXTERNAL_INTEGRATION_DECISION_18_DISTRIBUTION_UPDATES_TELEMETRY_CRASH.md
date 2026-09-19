@@ -49,6 +49,16 @@ Default per-user para evitar privilégios administrativos desnecessários.
 Assinar instalador/executáveis com mecanismo/certificado Windows adequado antes do lançamento.
 MSI/per-machine fica disponível para Enterprise/futuro.
 
+## 2A. Official V1 target matrix
+
+For V1 release/homologation, the official desktop targets are:
+- macOS Apple Silicon / arm64;
+- Windows x64.
+
+macOS Intel/x64, Linux and Windows ARM are deferred from the initial support promise. Existing artifacts/abstractions may remain for future expansion.
+
+Each official target must independently pass Core Runtime Closure and clean-machine end-to-end smoke before stable release.
+
 ### Stores
 Mac App Store e Microsoft Store não são requisito V1. Podem ser avaliadas depois para aquisição/distribuição.
 
