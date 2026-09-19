@@ -222,6 +222,15 @@ Updates use the signed Tauri updater with static stable/beta/dev manifests. Clou
 
 V1 has no mandatory behavioral analytics. Crash diagnostics are opt-in, provider-neutral and sanitized; Sentry is the first candidate. Session replay and uploading media/project/transcript/prompt content as telemetry are prohibited. Support diagnostics are generated locally and explicitly sent by the user.
 
+
+### V1 official desktop platforms
+
+The initial commercial V1 support matrix is deliberately narrow:
+- macOS Apple Silicon / arm64;
+- Windows x64.
+
+macOS Intel, Linux and Windows ARM are not official V1 promises. Existing portability abstractions may remain, but release engineering and clean-machine homologation prioritize the two primary targets. An additional platform may be added near launch only if its incremental cost is low and it does not delay the validated core flow.
+
 ## Marketplace
 
 The Vids core is complete and excellent; Marketplace adds specialization and expansion. Marketplace does not sell back baseline features required for the improved EDVID parity target.
