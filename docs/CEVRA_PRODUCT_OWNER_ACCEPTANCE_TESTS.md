@@ -1584,6 +1584,31 @@ Responder: PASS/PARTIAL/FAIL/BLOCKED.
 
 ---
 
+## K2 — HDR / SDR media compatibility
+
+**K2-T1 [V1/AUTO+MANUAL] iPhone HDR → SDR export**  
+Ação: importar fixture real de iPhone em Dolby Vision/HDR, selecionar perfil SDR e exportar.  
+Esperado técnico: HDR/orientation/VFR metadata são identificados; export conclui em BT.709 SDR por caminho validado; nenhum preprocess externo é solicitado.  
+Esperado visual: sem aparência lavada, escura, clipping grosseiro ou mudança material indevida de cor/pele.  
+Responder: PASS/PARTIAL/FAIL + APROVADO/REPROVADO.
+
+**K2-T2 [V1/AUTO+MANUAL] HLG/HDR10 → SDR**  
+Ação: exportar fixtures HLG e HDR10 para SDR.  
+Esperado: conversão determinística, tags SDR corretas e resultado visual aceitável nos targets macOS e Windows suportados.  
+Responder: PASS/PARTIAL/FAIL + APROVADO/REPROVADO.
+
+**K2-T3 [V1/AUTO] HDR metadata preservation at ingest**  
+Ação técnica: importar sources com rotation, color primaries/transfer/matrix/range, bit depth e VFR.  
+Esperado: contract/ingest preserva os dados necessários e não confunde dimensões codificadas com orientação apresentada.  
+Responder: PASS/PARTIAL/FAIL.
+
+**K2-T4 [V1] Unsupported HDR safety**  
+Ação: fornecer source HDR/Dolby Vision que o caminho homologado não consiga converter corretamente.  
+Esperado: operação falha explicitamente antes do final export; CEVRA não entrega arquivo com cor sabidamente incorreta.  
+Responder: PASS/PARTIAL/FAIL.
+
+---
+
 # C. Testes transversais obrigatórios antes de homologar uma versão
 
 **X-T1 — Undo/Redo**  
