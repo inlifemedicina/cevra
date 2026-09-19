@@ -237,3 +237,21 @@ Rules:
 - if benchmark evidence later shows that frame/pipe streaming gives a material benefit, CEVRA may evolve the internal transport without changing Project IR or product semantics.
 
 This is the V1 default because it is simpler to implement and sufficient to preserve the non-destructive/single-final-visual-encode objective.
+
+
+## 12. Product Owner decision K4 — APPROVED
+
+**Date:** 2026-09-18.
+
+The Composition Engine benchmark keeps its existing full CEVRA/EDVID matrix and adds only two mandatory evaluation criteria:
+
+1. **Live Preview Compatibility** — whether the candidate can support practical visual preview inside the CEVRA WebView/application surface, directly or through a sufficiently equivalent shared component path.
+2. **Original Media Path** — whether final rendering can use original/best source media without forcing a lossy intermediate or unnecessary extra generation.
+
+Rules:
+- this does not require the selected engine to perform every preview effect directly in the WebView;
+- proxies/approximations are acceptable for preview if final export returns to original/best source media and editorial semantics remain identical;
+- a candidate must not be selected without a viable preview path;
+- a candidate must not force avoidable lossy intermediates into the final-quality path.
+
+No other benchmark scope is reduced or replaced.
