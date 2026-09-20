@@ -86,7 +86,7 @@ import raw media
 → export
 ```
 
-Manual editing remains available for refinement, correction, fallback and advanced control, but routine production work should not be shifted back to the user.
+Direct manual editing is first-class and remains available in the Normal surface for adjustment, refinement, correction and creative control. AI editing and direct manipulation operate on the same project/timeline; routine production work should not be shifted back to the user.
 
 ## 1.3 CANONICAL — independence requirements
 
@@ -240,6 +240,69 @@ A1 — voice / original audio
 ```
 
 Generated/found/imported assets become normal Project IR sources/items with provenance.
+
+## 3.3 CANONICAL — Normal / More Controls / Advanced
+
+CEVRA Vids uses **one editor, one Project IR, one project and one timeline** with progressive disclosure of controls. There are not separate Normal and Advanced project states.
+
+### Normal — default editing surface
+
+The Normal surface must be approximately as direct and easy to understand as the observed EDVID editing surface while retaining original CEVRA visual identity and avoiding EDVID branding/trade dress.
+
+Normal keeps the timeline visible and directly editable. The user may freely touch and edit it from the start.
+
+Default Normal characteristics:
+
+- large preview;
+- clear compact timeline;
+- direct trim, move, delete, duplicate and drag/drop interactions;
+- simple visible categories such as media, captions, text, images/B-roll, audio and effects;
+- contextual inspector exposing only relevant controls for the selected item;
+- presets and visual choices;
+- natural-language CEVRA command field available in the same editing experience;
+- immediate visible result in the same preview/timeline;
+- no requirement to understand Project IR, Director internals, provider choice, engine choice, QA internals or technical track structures.
+
+### More Controls
+
+Contextual progressive disclosure may expose additional controls for the selected element without forcing the full Advanced surface.
+
+### Advanced — optional full exposure
+
+Advanced exposes the deeper editing complexity available for the same project/timeline, including as capabilities mature:
+
+- expanded/separated tracks;
+- precise timing;
+- keyframes;
+- transform/crop/position/opacity;
+- detailed caption properties;
+- layered audio controls;
+- transitions/effect parameters;
+- B-roll/overlay details;
+- animation/composition controls;
+- deeper technical project/render controls where appropriate.
+
+Advanced capability must never force Advanced complexity onto the Normal surface.
+
+## 3.4 CANONICAL — unified AI + direct editing interaction
+
+CEVRA must not force a choice between “automatic” and “manual” editing.
+
+Target interaction:
+
+```text
+CEVRA edits
+→ user directly adjusts
+→ user asks by natural language
+→ CEVRA changes the same project
+→ user refines again
+```
+
+All paths mutate the same validated Project IR through the same typed command/history system.
+
+Product constraint:
+
+> Internal sophistication must not leak into default UX complexity. A new feature should either improve the resulting video or direct user control; if it mainly adds visible complexity, keep it behind contextual/progressive disclosure or defer it.
 
 ---
 
@@ -1103,6 +1166,25 @@ The following files were present in the working context during the 2026-09-12 to
 
 Where exact product/file mapping has not yet been written into the canonical record, **do not guess**. Re-open/analyze the media or recover the associated chat before assigning a product name.
 
+## 17.6 2026-09-19 EDVID usability recording
+
+Reference: `ScreenRecording_09-19-2026 18-54-47_1.mp4`
+
+Status: **CANONICAL usability reference / observed behavior**.
+
+Observed product lesson:
+
+- EDVID presents a direct editing surface where preview, timeline and simple action categories coexist;
+- AI interaction and direct visual editing coexist instead of being separate workflows;
+- substantial internal complexity is hidden from the default user.
+
+Decision derived from this reference:
+
+- EDVID remains the functional/usability floor, not a visual identity to copy;
+- CEVRA Normal must meet or improve this level of directness;
+- CEVRA may be substantially more sophisticated internally without becoming more confusing externally;
+- the full editing depth remains available through progressive disclosure / Advanced over the same Project IR and timeline.
+
 ---
 
 # 18. Public skills / repositories to evaluate
@@ -1248,6 +1330,8 @@ This schedule is directional, not a promise. Architecture correctness and a work
 
 # 23. Roadmap
 
+Compact sequencing reference: `docs/CEVRA_ORGANOGRAMA.md`.
+
 ## Track A — CEVRA Vids
 
 ```text
@@ -1268,7 +1352,8 @@ Foundation / Media Runtime       [CLOSED]
 → missing typed Project IR edit commands
 → cut compiler
 → numeric QA
-→ native preview + layered timeline
+→ UX Surface Contract: Normal / More Controls / Advanced
+→ native preview + one shared layered timeline
 → captions
 → composition benchmark
 → shortform/longform composition
@@ -1380,6 +1465,17 @@ post-merge CI passed 5/5 jobs.
 - **IMPLEMENTED/CLOSED:** Local Forced Alignment V1 merged in PR #22 at `45913175b30c42a2758820a2937fe9a0126ab739`; post-merge CI run `35005561921` passed 5/5 jobs and the feature branch was removed. ADR 0017 adds a provider-neutral `AlignmentEngineAdapter`, isolated per-canonical-segment CTC runtime and application-owned stale-digest promotion through existing `transcript.set`/`ProjectHistory`. Alignment is bounded to 30-second/1,024-token windows, preserves unknown characters through wildcard emissions, appends provenance without rewriting history, verifies a closed exact model-file allow-list and surfaces disposable-audio cleanup failures before promotion. It adapts only forced-alignment behavior from BSD-2-Clause WhisperX v3.8.6 commit `3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0`, pins Apache-2.0 PT/EN model revisions and hashes, keeps downloads disabled, and adds no cache, diarization, Project IR migration, Media Runtime operation or UI/Tauri permission. Runtime/model packaging, full PT-weight smoke, safe crash-leftover temp reclamation and the non-blocking cleanup-retry behavior remain later gates.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
+## 2026-09-19 — editing-surface simplification
+
+- **CANONICAL:** Normal is the default CEVRA Vids editing surface and should be approximately as direct/simple as the observed EDVID editor behavior.
+- **CANONICAL:** the timeline remains visible and directly editable in Normal; it is not hidden behind an expert-only mode.
+- **CANONICAL:** “More Controls” and Advanced use progressive disclosure over the same project, Project IR, timeline, history and typed command system; no duplicate editor state.
+- **CANONICAL:** Advanced exposes the full available editing complexity when requested by the user.
+- **CANONICAL:** natural-language AI editing and direct timeline manipulation coexist and mutate the same project.
+- **CANONICAL:** internal sophistication must not leak into default UX complexity.
+- **CANONICAL:** this decision does not require an architecture reset or restart of the dependency roadmap; it adds an explicit UX Surface Contract before Native Preview + Timeline is considered complete.
+- **RESEARCH:** `ScreenRecording_09-19-2026 18-54-47_1.mp4` is retained as an EDVID usability reference for this decision.
+
 ---
 
 # 26. Explicitly unresolved decisions
@@ -1426,6 +1522,9 @@ When the user shows a new video/product:
 5. Preserve the EDVID baseline and dependency-driven implementation order.
 6. Apply the quality/performance policy to future preview, render, composition and export work.
 7. Keep this document updated after every material decision, merge or completed research finding.
+8. Before Native Preview + Timeline is considered complete, define and validate the **Normal Surface Contract**, **Advanced Exposure Contract** and **Progressive Disclosure Contract**.
+9. Do not interrupt current dependency-critical technical work merely to build the UX surface early; apply this contract when the roadmap reaches the preview/timeline surface.
+10. Treat `docs/CEVRA_ORGANOGRAMA.md` as the compact sequencing view and keep it synchronized when material roadmap ordering changes.
 
 ---
 
