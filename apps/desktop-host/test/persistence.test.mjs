@@ -148,6 +148,43 @@ test("invalid current recovers previous, quarantines evidence, and surfaces reco
   await verified.persistence.close();
 });
 
+test("tampered V2 transcript blob is classified as corruption and recovers previous-known-good", async (t) => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options());
+  opened.history.commit({ type: "source.add", source: {
+    id: "blob-source", kind: "video", uri: "/media/blob.mov", displayName: "blob.mov", durationMs: 1_000
+  } });
+  const transcript = {
+    sourceId: "blob-source", wordTiming: "model", speakerState: "none",
+    transcript: {
+      words: [{ id: "word", text: "exact", startMs: 0, endMs: 500, confidence: 0.95 }],
+      segments: [{ id: "segment", text: "exact", startMs: 0, endMs: 500, wordIds: ["word"] }]
+    },
+    provenance: { stages: [{ kind: "transcription", executionId: "blob-exec", engineId: "test", engineVersion: "1", engineApiVersion: "1", modelId: "test", createdAt: now }] },
+    transcriptDigest: ""
+  };
+  transcript.transcriptDigest = computeTranscriptDigest(transcript);
+  opened.history.commit({ type: "transcript.set", transcript });
+  await opened.persistence.checkpoint(opened.history);
+  await opened.persistence.close();
+
+  const currentPath = resolve(root, "active-project.current.cevra.json");
+  const wrapper = JSON.parse(await readFile(currentPath, "utf8"));
+  const blobPath = Object.keys(wrapper.files).find((path) => path.startsWith("history/transcript-blobs/"));
+  assert.ok(blobPath);
+  const blob = JSON.parse(wrapper.files[blobPath]);
+  blob.transcript.transcript.words[0].confidence = 0.1;
+  wrapper.files[blobPath] = JSON.stringify(blob);
+  await writeFile(currentPath, `${JSON.stringify(wrapper)}\n`, "utf8");
+
+  const recovered = await DesktopProjectPersistence.open(root, options());
+  assert.equal(recovered.persistence.state, "local-recovered");
+  assert.equal(recovered.history.current.sources.length, 0);
+  assert.equal(recovered.history.current.sourceTranscripts.length, 0);
+  await readFile(resolve(root, "active-project.invalid-current.cevra.json"), "utf8");
+  await recovered.persistence.close();
+});
+
 test("a supervisor-declared host restart surfaces recovery even when current is valid", async (t) => {
   const root = await temporaryRoot(t);
   const initial = await DesktopProjectPersistence.open(root, options());

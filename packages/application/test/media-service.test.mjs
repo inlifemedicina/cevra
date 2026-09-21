@@ -417,3 +417,46 @@ test("recovery preserves outputs referenced by a reachable redo snapshot", async
   assert.equal(context.history.redo().sources[0].uri, trim.outputUri);
   assert.equal(recovered[0].status, "failed");
 });
+
+test("cleanup uses retained metadata without materializing snapshots and protects undo and redo artifacts", async () => {
+  const undoUri = "/media/undo-only.mp4";
+  const redoUri = "/media/redo-only.mp4";
+  const artifacts = new MemoryArtifacts();
+  const repository = new InMemoryMediaExecutionRepository();
+  const engine = new FakeEngine(async () => {
+    throw new Error("recovery retry intentionally fails");
+  });
+  const context = fixture(engine, artifacts, repository);
+  context.history.commit({
+    type: "source.add",
+    source: { id: "undo-source", kind: "video", uri: undoUri, displayName: "Undo only" }
+  });
+  context.history.commit({ type: "source.remove", sourceId: "undo-source" });
+  context.history.commit({
+    type: "source.add",
+    source: { id: "redo-source", kind: "video", uri: redoUri, displayName: "Redo only" }
+  });
+  context.history.undo();
+  Object.defineProperty(context.history, "snapshots", {
+    configurable: true,
+    get: () => assert.fail("cleanup must not materialize full history snapshots")
+  });
+  artifacts.files.add(undoUri);
+  artifacts.files.add(redoUri);
+  artifacts.files.add(trim.outputUri);
+  await repository.save({
+    id: "metadata-cleanup", projectId: "project-1", locale: "pt-BR", operation: trim, mutation: sourceMutation,
+    actor: { type: "system" }, status: "running", createdAt: now,
+    attempts: [{ number: 1, jobId: "metadata-cleanup:1", status: "running", requestedAt: now, startedAt: now,
+      outputUris: [undoUri, redoUri, trim.outputUri], preexistingOutputUris: [], removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 2 }]
+  });
+
+  const recovered = await context.service.recoverPending();
+
+  assert.equal(artifacts.files.has(undoUri), true);
+  assert.equal(artifacts.files.has(redoUri), true);
+  assert.equal(artifacts.files.has(trim.outputUri), false);
+  assert.deepEqual(artifacts.removed, [trim.outputUri]);
+  assert.equal(context.history.canRedo, true);
+  assert.equal(recovered[0].status, "failed");
+});

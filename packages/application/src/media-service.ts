@@ -278,10 +278,7 @@ export class MediaApplicationService {
 
   private async cleanup(outputUris: readonly string[], preexisting: readonly string[]): Promise<{ removed: string[]; failed: string[] }> {
     const protectedUris = new Set(preexisting);
-    for (const snapshot of this.history.snapshots) {
-      for (const source of snapshot.project.sources) protectedUris.add(source.uri);
-      for (const record of snapshot.project.exports) if (record.outputUri) protectedUris.add(record.outputUri);
-    }
+    for (const uri of this.history.retainedMediaUris()) protectedUris.add(uri);
     const removed: string[] = [];
     const failed: string[] = [];
     for (const uri of outputUris) {
