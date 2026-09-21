@@ -2,6 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
+**Last decision reconciliation:** 2026-09-21, based on `origin/main` `83a66d47c48d07811b9a79b2eeb217d5a0813e95`
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1346,7 +1347,11 @@ Foundation / Media Runtime       [CLOSED]
 → Desktop Runtime Integration V1 [CLOSED]
 → Project Persistence V1         [CLOSED]
 → Local Forced Alignment V1      [CLOSED]
-→ Transcript Cache V1
+→ decision/document reconciliation
+→ ProjectHistory scalability/correctness remediation
+→ small cross-platform/runtime correctness prerequisites
+→ coordinated Media Runtime adjustment gate
+→ Transcript Cache V1 reconciliation/final closeout
 → editorial transcript / analysis
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
@@ -1363,6 +1368,8 @@ Foundation / Media Runtime       [CLOSED]
 → Vids 1.0 hardening
 ```
 
+The measured ProjectHistory failure changes dependency priority but does not pre-approve a storage design. The preferred first candidate is transcript payload deduplication/reference by canonical digest; journal, undo/redo, recovery, version identity and existing-project compatibility remain mandatory. Revalidate the exact interaction between ProjectHistory remediation and Transcript Cache V1 before either implementation plan is frozen.
+
 ## Track B — Orbit Platform
 
 Package format → identity/licensing → entitlements → Marketplace → recommendations/shared services.
@@ -1377,18 +1384,40 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ---
 
+## 23.1 Canonical decision records and technical evidence
+
+Detailed approved product direction lives in dedicated records rather than being copied into this ledger:
+
+- [CEVRA Director decisions](CEVRA_DIRECTOR_DECISIONS.md) — coordination, context, providers, permissions, plan validation, bidirectional impact and early round-trip proof.
+- [Editorial decisions](CEVRA_EDITORIAL_DECISIONS.md) — D1–D13: ingest/editorial-start, evidence, takes, meaning, duration, pacing, junctions, strategy, color, audio, QA and version-linked review.
+- [Visual decisions](CEVRA_VISUAL_DECISIONS.md) — D14–D18: presets, captions, placement/QA, EDVID styles and post-V1 personalization boundary.
+- [Composition decisions](CEVRA_COMPOSITION_DECISIONS.md) — D19–D23: split, supporting media, external assets, B-roll and registered first-party components.
+- [Integration decisions](CEVRA_INTEGRATION_DECISIONS.md) — I1–I19, Creation Modes, provider-neutral boundaries, assets, distribution/update/account and Bridge versus Creator Skill.
+- [Product Owner acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md) — stable behavioral cases, future status and division between automation and human review.
+- [Fable adversarial audit](CEVRA_FABLE_AUDIT_REVIEW_2026-09-18.md) and [targeted audit](CEVRA_FABLE_TARGETED_AUDIT_MEDIA_HISTORY_PREVIEW_EXPORT_2026-09-18.md) — technical evidence, blocker wording and approved K1–K5 directions.
+- [PR #25/#26 reconciliation inventory](CEVRA_RECONCILIATION_INVENTORY_2026-09.md) — incorporated, superseded, omitted and unresolved unique material; no branch closure authorization.
+
+Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The records above do not claim implementation merely because a direction is approved.
+
+### Current cross-cutting decisions
+
+- **Product simplicity:** POWER INSIDE → SIMPLE BY DEFAULT → DIRECT MANUAL CONTROL AVAILABLE → FULL COMPLEXITY WHEN THE USER ASKS. Normal, More Controls and Advanced use the same project, Project IR, timeline, selection/playhead, history and command system.
+- **Multi-source:** source-scoped evidence/transcripts support semantic comparison, narrative organization and best-take selection into one final project/timeline; this is approved direction, not completed behavior.
+- **Provider boundary:** consumer subscription, official embedded mechanism, coding agent, SDK and API are distinct until verified. No provider-native schema becomes core domain state.
+- **Fix-now/defer:** minimize total rework using impact, current bounded risk and future migration/compatibility/test/integration cost; do not justify speculative optimization.
+- **Fable K1–K5:** first Windows H.264 candidate `h264_mf`; validated automatic HDR→SDR for SDR targets; V1 render ownership split between Composition visual output and Media Runtime audio/mux; two added composition benchmark criteria; official V1 targets macOS arm64 and Windows x64.
+
+---
+
 # 24. Current repository state
 
 ## 24.1 `main`
 
-Implementation-bearing canonical `main` after Local Forced Alignment V1 and
-before its documentation-only closeout:
+Canonical remote `main` at the start of this reconciliation:
 
-`45913175b30c42a2758820a2937fe9a0126ab739`
+`83a66d47c48d07811b9a79b2eeb217d5a0813e95`
 
-This normal merge commit has parents
-`95df49a9788e509be19e8dfe63d2a7ca668258a5` and
-`1340583a77c7d26f1431a0614aca7ee0662f522f`.
+The documentation reconciliation branch is `docs/cevra-decision-reconciliation-2026-09`, created from that exact commit. It changes policy/documentation only and does not make a product milestone implemented.
 
 ## 24.2 Important merged milestones
 
@@ -1412,14 +1441,17 @@ This normal merge commit has parents
 
 ## 24.3 Active work
 
-No product feature branch is active. Transcript Cache V1 is the next
-dependency-correct slice, but it has not started.
+**Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
-The proposal, both Project IR v2 Slice A/B, Application Transcript Persistence
-and Desktop UI Shell branches were removed after their merges. Desktop Runtime
-Integration V1 was removed after merge. Project Persistence V1 was also removed
-after merge. Local Forced Alignment V1 was removed after PR #22 merged and its
-post-merge CI passed 5/5 jobs.
+Final remote CI is not evidence of code failure: runs `35625696820` and `35625702675` failed before jobs executed because of the account payment/Actions spending-limit condition. A final focused independent review and normal remote CI remain required before merge. No merge has occurred, and this documentation branch does not modify PR #24.
+
+Current dependency blockers/gates:
+
+1. reconcile approved decisions and evidence without merging PR #25/#26 wholesale;
+2. remediate the measured ProjectHistory correctness/scalability failure before high-volume edit commands;
+3. close bounded cross-platform/runtime correctness prerequisites;
+4. complete the approved coordinated Media Runtime adjustment gate;
+5. reconcile and close Transcript Cache V1, revalidating its relationship to history/storage.
 
 ---
 
@@ -1476,6 +1508,17 @@ post-merge CI passed 5/5 jobs.
 - **CANONICAL:** this decision does not require an architecture reset or restart of the dependency roadmap; it adds an explicit UX Surface Contract before Native Preview + Timeline is considered complete.
 - **RESEARCH:** `ScreenRecording_09-19-2026 18-54-47_1.mp4` is retained as an EDVID usability reference for this decision.
 
+## 2026-09-21 — decision/governance reconciliation
+
+- **CANONICAL:** PR #25 Director direction is incorporated in the dedicated Director record without its stale branch handoff.
+- **CANONICAL:** PR #26 decision families D1–D23 and I1–I19 are reconciled into dedicated editorial, visual, composition and integration records; provider-specific claims remain implementation-time verification gates.
+- **CANONICAL:** Bridge Skill supports Vids through the typed Agent Protocol; Creator Skill is a standalone agent-native product surface. Lite/Full share one editorial core, and Creator Full must deliver final output without Desktop.
+- **CANONICAL:** the fix-now/defer, execution-feasibility, Product Owner pause, coordinated Media Runtime, acceptance-catalog and Director-impact rules are permanent agent policy in `AGENTS.md`.
+- **BLOCKED:** measured ProjectHistory failure around hundreds of commits with large word-level transcripts is a correctness/scaling blocker before high-volume editing. Candidate solution is not pre-approved.
+- **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
+- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, paused for dependency reconciliation; CI billing failures are infrastructure, not test evidence.
+- **PROCESS:** PR #25 and PR #26 remain evidence branches and are not merged or closed by this task. Closure/branch cleanup requires a later proof that no valuable unique content remains.
+
 ---
 
 # 26. Explicitly unresolved decisions
@@ -1485,7 +1528,7 @@ Do not guess these in future chats:
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
 2. **SUPERSEDED / RESOLVED by PR #14:** the finalized bounded Project IR v2 implementation plan merged before Slice A began;
 3. **RESOLVED by ADR 0017 and PR #22:** provider-neutral local CTC forced-alignment adapter, PT/EN model pins and stale-digest application integration; packaging/model-manager distribution remains unresolved;
-4. final transcript cache schema, key and invalidation policy;
+4. final Transcript Cache V1 closeout after dependency reconciliation and focused review; PR #24 remains draft/unmerged;
 5. final transcription model default for production quality;
 6. production transcription-runtime assembly/update mechanism;
 7. production model-asset identity, update and distribution mechanism;
@@ -1495,6 +1538,11 @@ Do not guess these in future chats:
 11. final embedded Codex/Claude commercial integration mechanisms;
 12. final Marketplace package/runtime security model implementation;
 13. mobile implementation timing.
+14. exact compatible ProjectHistory remediation; digest-addressed transcript storage is only the first candidate;
+15. exact Windows fallback if validated `h264_mf` is materially inadequate;
+16. exact HDR→SDR dependency/build and quality/performance profile;
+17. Preview V1 ADR and final resolved composition-plan boundary;
+18. final provider mechanisms, entitlements and commercial terms for every external integration.
 
 ---
 
@@ -1515,16 +1563,14 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Define and implement Transcript Cache V1 as the next dependency-correct slice; its schema, key and invalidation policy require an accepted bounded design before implementation.
-2. Do not reopen the closed Application Transcript Persistence, Local Transcription Engine V1 or Project IR v2 Slices A/B.
-3. Preserve the provider-neutral flow from authorized source through `TranscriptionEngineAdapter` and guarded Project History promotion.
-4. Validate the ADR 0015 supervised private-host path from native picker through existing application services, canonical ProjectHistory and source-scoped transcript presentation.
-5. Preserve the EDVID baseline and dependency-driven implementation order.
-6. Apply the quality/performance policy to future preview, render, composition and export work.
-7. Keep this document updated after every material decision, merge or completed research finding.
-8. Before Native Preview + Timeline is considered complete, define and validate the **Normal Surface Contract**, **Advanced Exposure Contract** and **Progressive Disclosure Contract**.
-9. Do not interrupt current dependency-critical technical work merely to build the UX surface early; apply this contract when the roadmap reaches the preview/timeline surface.
-10. Treat `docs/CEVRA_ORGANOGRAMA.md` as the compact sequencing view and keep it synchronized when material roadmap ordering changes.
+1. Merge no feature from this documentation task; obtain normal review/CI for the reconciliation PR first.
+2. Plan and implement a bounded ProjectHistory correctness remediation, preserving journal/undo/redo/recovery and existing-project compatibility, then remeasure realistic transcript/edit loads.
+3. Close the small cross-platform/runtime correctness prerequisites supported by the targeted audit, including platform-aware Python resolution, media metadata propagation and watchdog policy.
+4. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
+5. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
+6. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
+7. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
+8. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
 
 ---
 
