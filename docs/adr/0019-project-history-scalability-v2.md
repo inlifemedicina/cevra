@@ -1,6 +1,6 @@
 # ADR 0019 — ProjectHistory Scalability V2
 
-**Status:** Accepted for implementation — IN DEVELOPMENT
+**Status:** Accepted by this implementation
 **Date:** 2026-09-21
 
 ## Context
@@ -60,6 +60,24 @@ opened V1 package may be written as V2 at its next checkpoint without changing
 the Project IR schema. Existing history IDs, revisions, journal entries and
 cursor semantics are preserved.
 
+## Implementation closeout
+
+The implementation merged in PR #30 by normal merge commit
+`b6f201afa73aae0aa85f8a3d4187a568ab749e72`. Post-merge CI run
+`35668351461` passed all five required jobs.
+
+Compact snapshots plus exact per-source content-addressed transcript blobs are
+now the canonical `ProjectHistory` implementation. V1 history archives and
+Project Package V1 remain readable, while the next successful checkpoint writes
+V2. The Project IR schema remains unchanged.
+
+Before merge, independent Claude review identified a HIGH cleanup
+materialization path and a MEDIUM redundant commit path. Both were corrected:
+cleanup uses metadata-only retained-URI lookup, and commit compacts and returns
+the already-validated detached Project IR without rematerializing it. The
+inherited Desktop Host supervisor recovery race was fixed separately in PR #29
+before ProjectHistory merged.
+
 ## Preserved invariants
 
 - Project IR schema and public `sourceTranscripts` shape are unchanged.
@@ -99,8 +117,8 @@ permission is introduced.
 
 ## Deferred
 
-Incremental checkpoints, journal replay, periodic snapshots and complex blob
-garbage collection remain deferred. They should be reconsidered only if
-post-deduplication measurements demonstrate a new concrete safety or
-proportionality problem. This ADR and its implementation are not CLOSED until
-the feature is independently reviewed and merged.
+Abandoned in-memory transcript blob garbage collection and inherited V1 archive
+invariant strengthening remain deferred. Incremental checkpoints, journal
+replay and periodic snapshots also remain deferred and should be reconsidered
+only if post-deduplication evidence demonstrates a new concrete safety or
+proportionality problem.
