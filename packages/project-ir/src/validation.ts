@@ -4,6 +4,7 @@ import {
   PROJECT_IR_SCHEMA_VERSION_V1,
   type ProjectIR,
   type ProjectIRv2,
+  type SourceAsset,
   type SourceTranscript,
   type TranscriptSpeakerState
 } from "./types.js";
@@ -591,6 +592,14 @@ export function assertValidProjectIR(value: unknown): ProjectIR {
 export function assertValidSourceTranscriptForCreation(value: SourceTranscript): SourceTranscript {
   const issues: ValidationIssue[] = [];
   validateSourceTranscriptValue(value, 0, issues, undefined, false);
+  if (issues.length > 0) throwValidation(issues);
+  return value;
+}
+
+/** Validates a persisted transcript with its owning source, including migration-only historical states. */
+export function assertValidSourceTranscriptInProject(value: SourceTranscript, source: SourceAsset): SourceTranscript {
+  const issues: ValidationIssue[] = [];
+  validateSourceTranscriptValue(value, 0, issues, new Map([[source.id, source]]), true);
   if (issues.length > 0) throwValidation(issues);
   return value;
 }

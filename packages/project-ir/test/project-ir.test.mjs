@@ -8,6 +8,7 @@ import {
   ProjectCommandError,
   ProjectHistory,
   V1_UNASSIGNED_TRANSCRIPT_EXTENSION,
+  computeHistoryTranscriptBlobDigest,
   computeTranscriptDigest,
   createEmptyProject,
   createSourceTranscript,
@@ -570,6 +571,126 @@ test("history archive round-trips v2 snapshots and an active redo cursor", () =>
   assert.equal(restored.canRedo, true);
   assert.equal(restored.redo().project.name, "C");
   assert.equal(restored.restoreSnapshot(restored.snapshots[0].id).project.name, "A");
+});
+
+test("history blob identity preserves exact transcript state beyond editorial transcriptDigest", () => {
+  let sequence = 0;
+  const initial = sourceTranscript();
+  const confidenceUpdate = clone(initial);
+  confidenceUpdate.transcript.words[0].confidence = 0.42;
+  confidenceUpdate.provenance.stages[0].executionId = "confidence-refresh";
+  confidenceUpdate.extensions = { review: { exact: true } };
+
+  assert.equal(initial.transcriptDigest, confidenceUpdate.transcriptDigest);
+  assert.notEqual(computeHistoryTranscriptBlobDigest(initial), computeHistoryTranscriptBlobDigest(confidenceUpdate));
+
+  const history = new ProjectHistory(v2ProjectWith(initial), {
+    idGenerator: () => `exact-${++sequence}`,
+    clock: () => fixedTime
+  });
+  history.commit({
+    type: "transcript.set",
+    transcript: confidenceUpdate,
+    expectedCurrentTranscriptDigest: initial.transcriptDigest
+  });
+
+  const archive = history.toArchive();
+  assert.equal(archive.version, 2);
+  assert.equal(archive.transcriptBlobs.length, 2);
+  assert.deepEqual(history.undo().sourceTranscripts[0], initial);
+  assert.deepEqual(history.redo().sourceTranscripts[0], confidenceUpdate);
+
+  const restored = ProjectHistory.fromArchive(archive);
+  assert.deepEqual(restored.current.sourceTranscripts[0], confidenceUpdate);
+  assert.deepEqual(restored.undo().sourceTranscripts[0], initial);
+  assert.deepEqual(restored.redo().sourceTranscripts[0], confidenceUpdate);
+});
+
+test("compact history structurally reuses transcript blobs across 500 unrelated commits", () => {
+  let sequence = 0;
+  const transcript = sourceTranscript();
+  const history = new ProjectHistory(v2ProjectWith(transcript), {
+    idGenerator: () => `scale-${++sequence}`,
+    clock: () => fixedTime
+  });
+
+  for (let index = 0; index < 500; index += 1) {
+    history.commit({ type: "project.rename", name: `Rename ${index}` });
+  }
+  const archive = history.toArchive();
+  assert.equal(archive.snapshots.length, 501);
+  assert.equal(archive.transcriptBlobs.length, 1);
+  assert.equal(archive.snapshots.every((snapshot) => !Object.hasOwn(snapshot.project, "sourceTranscripts")), true);
+  assert.equal(new Set(archive.snapshots.map((snapshot) => snapshot.sourceTranscriptRefs[0].digest)).size, 1);
+  assert.deepEqual(history.restoreSnapshot(archive.snapshots[0].id).sourceTranscripts, [transcript]);
+  assert.equal(history.redo().project.name, "Rename 0");
+});
+
+test("branching after undo excludes abandoned transcript blobs from the V2 archive", () => {
+  let sequence = 0;
+  const initial = sourceTranscript();
+  const replacement = sourceTranscript({
+    transcript: wordTranscript({
+      words: [{ id: "w1", text: "replacement", startMs: 0, endMs: 500 }],
+      segments: [{ id: "s1", text: "replacement", startMs: 0, endMs: 500, wordIds: ["w1"] }]
+    })
+  });
+  const history = new ProjectHistory(v2ProjectWith(initial), {
+    idGenerator: () => `branch-${++sequence}`,
+    clock: () => fixedTime
+  });
+  history.commit({ type: "transcript.set", transcript: replacement, expectedCurrentTranscriptDigest: initial.transcriptDigest });
+  history.undo();
+  history.commit({ type: "project.rename", name: "Replacement branch" });
+
+  const archive = history.toArchive();
+  assert.equal(history.canRedo, false);
+  assert.equal(archive.transcriptBlobs.length, 1);
+  assert.equal(archive.transcriptBlobs[0].digest, computeHistoryTranscriptBlobDigest(initial));
+  assert.deepEqual(history.current.sourceTranscripts, [initial]);
+});
+
+test("V1 full history archives remain readable and invalid archive versions fail closed", () => {
+  let sequence = 0;
+  const history = new ProjectHistory(v2ProjectWith(sourceTranscript()), {
+    idGenerator: () => `legacy-archive-${++sequence}`,
+    clock: () => fixedTime
+  });
+  history.commit({ type: "project.rename", name: "Changed" });
+  history.undo();
+  const fullSnapshots = history.snapshots;
+  const legacyArchive = {
+    version: 1,
+    entries: history.entries,
+    snapshots: fullSnapshots,
+    cursorSnapshotId: fullSnapshots[0].id
+  };
+  const restored = ProjectHistory.fromArchive(legacyArchive);
+  assert.deepEqual(restored.current, history.current);
+  assert.equal(restored.canRedo, true);
+  assert.equal(restored.redo().project.name, "Changed");
+  assert.throws(() => ProjectHistory.fromArchive({ ...legacyArchive, version: 99 }), /Unsupported history archive version 99/);
+});
+
+test("history transcript digest rejects unsupported non-JSON state instead of normalizing it", () => {
+  const undefinedExtension = sourceTranscript({ extensions: { unsupported: undefined } });
+  assert.throws(() => computeHistoryTranscriptBlobDigest(undefinedExtension), /unsupported non-JSON state/);
+
+  const circular = sourceTranscript({ extensions: {} });
+  circular.extensions.self = circular.extensions;
+  assert.throws(() => computeHistoryTranscriptBlobDigest(circular), /circular reference/);
+});
+
+test("V2 history archive rejects duplicate and tampered transcript blobs", () => {
+  const history = new ProjectHistory(v2ProjectWith(sourceTranscript()), { clock: () => fixedTime });
+  const duplicate = clone(history.toArchive());
+  duplicate.transcriptBlobs.push(clone(duplicate.transcriptBlobs[0]));
+  duplicate.transcriptBlobs[1].transcript.extensions = { conflict: true };
+  assert.throws(() => ProjectHistory.fromArchive(duplicate), /Duplicate transcript blob digest/);
+
+  const tampered = clone(history.toArchive());
+  tampered.transcriptBlobs[0].transcript.provenance.stages[0].executionId = "tampered";
+  assert.throws(() => ProjectHistory.fromArchive(tampered), /digest mismatch/);
 });
 
 test("transcript.set creates, replaces semantics, updates same-digest metadata, and accepts a current consumer", () => {
