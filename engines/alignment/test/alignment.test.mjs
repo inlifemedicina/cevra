@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import fs from "node:fs";
-import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rename, rm, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -14,6 +14,7 @@ import {
   CtcForcedAlignmentAdapter,
   LocalAlignmentError,
   NodeAlignmentAudioWorkspace,
+  PinnedAlignmentModelVerifier,
   ProcessAlignmentWorkerRunner,
   assertModelRootIsolated,
   normalizeAlignmentRequest,
@@ -41,6 +42,40 @@ function controlledPython(delay = false) {
   return { root, environmentRoot, pythonExecutable };
 }
 
+async function preparedModel(context, language = "pt", root) {
+  const modelRoot = root ?? await mkdtemp(join(tmpdir(), "cevra-attested-model-"));
+  if (!root) context.after(() => fs.rmSync(modelRoot, { recursive: true, force: true }));
+  const pin = ALIGNMENT_MODELS[language];
+  const modelPath = join(modelRoot, pin.directoryName);
+  await mkdir(modelPath, { recursive: true });
+  const fixtureHashes = {};
+  for (const name of Object.keys(pin.files)) {
+    const bytes = Buffer.from(`fixture:${language}:${name}:verified-content`, "utf8");
+    await writeFile(join(modelPath, name), bytes);
+    fixtureHashes[name] = createHash("sha256").update(bytes).digest("hex");
+  }
+  return { modelRoot, modelPath, pin, fixtureHashes };
+}
+
+function fixtureVerifier(expectedByPath, counters = { strong: 0, state: 0, memo: 0, weightBytesHashed: 0 }, options = {}) {
+  const verifier = new PinnedAlignmentModelVerifier({
+    async strongVerifier(modelPath, pin) {
+      counters.strong += 1;
+      const files = expectedByPath.get(modelPath);
+      assert.ok(files, `missing fixture inventory for ${modelPath}`);
+      await verifyPinnedModel(modelPath, files);
+      const principalDigest = pin.modelDigest.replace(/^sha256:/, "");
+      const principalWeight = Object.entries(files).find(([, digest]) => digest === principalDigest)?.[0]
+        ?? Object.keys(files).find((name) => name.endsWith(".bin") || name.endsWith(".safetensors"));
+      if (principalWeight) counters.weightBytesHashed += Number((await stat(join(modelPath, principalWeight))).size);
+    },
+    disableMemoization: options.disableMemoization,
+    onStateCheck() { counters.state += 1; },
+    onMemoHit() { counters.memo += 1; }
+  });
+  return { counters, verify: verifier.ensureVerified.bind(verifier) };
+}
+
 test("provider-neutral adapter identity and capability IDs use alignment kind", async () => {
   const value = adapter();
   assert.deepEqual(await value.identity(), { id: "cevra.alignment.ctc", kind: "alignment", displayName: "CEVRA Local Forced Alignment", version: "0.1.0", apiVersion: 1 });
@@ -56,16 +91,189 @@ test("adapter sends a closed local-only protocol request and propagates pinned i
   assert.equal(result.modelRevision, ALIGNMENT_MODELS.pt.revision);
 });
 
-test("alignment execution identity and execution each retain authoritative model verification", async () => {
+test("alignment execution identity is immutable and model-free while execution verifies before and after", async () => {
   let verificationCalls = 0;
   const value = adapter(runner(), async () => { verificationCalls++; });
   const request = { inputUri: "/tmp/audio.wav", language: "pt", transcript: transcript() };
-  assert.ok(await value.describeAlignmentExecution(request));
-  assert.equal(verificationCalls, 1);
+  for (const language of ["pt", "en"]) {
+    const identity = await value.describeAlignmentExecution({ ...request, language, transcript: { ...transcript(), language } });
+    assert.equal(identity.modelId, ALIGNMENT_MODELS[language].modelId);
+    assert.equal(identity.modelRevision, ALIGNMENT_MODELS[language].revision);
+    assert.equal(identity.modelDigest, ALIGNMENT_MODELS[language].modelDigest);
+  }
+  assert.equal(verificationCalls, 0, "cache identity description must not read or hash local model artifacts");
   await value.align(request, { jobId: "job", locale: "pt-BR" });
-  assert.equal(verificationCalls, 2, "align() independently verifies the model before execution");
+  assert.equal(verificationCalls, 2, "align() verifies immediately before and after execution");
   assert.ok(await value.describeAlignmentExecution(request));
-  assert.equal(verificationCalls, 3, "post-execution identity verification performs another authoritative pass");
+  assert.equal(verificationCalls, 2, "identity description remains independent of local model availability");
+});
+
+test("execution identity remains available when the pinned local model is missing or corrupt", async () => {
+  let verificationCalls = 0;
+  const value = adapter(runner(), async () => { verificationCalls += 1; throw new LocalAlignmentError("ALIGNMENT_MODEL_UNAVAILABLE", "injected"); });
+  const request = { inputUri: "/tmp/audio.wav", language: "pt", transcript: transcript() };
+  const identity = await value.describeAlignmentExecution(request);
+  assert.equal(identity.modelId, ALIGNMENT_MODELS.pt.modelId);
+  assert.equal(identity.modelRevision, ALIGNMENT_MODELS.pt.revision);
+  assert.equal(identity.modelDigest, ALIGNMENT_MODELS.pt.modelDigest);
+  assert.equal(verificationCalls, 0);
+  await assert.rejects(value.align(request, { jobId: "fresh-miss", locale: "pt-BR" }), (error) => error.code === "ALIGNMENT_MODEL_UNAVAILABLE");
+  assert.equal(verificationCalls, 1, "a fresh execution still fails closed before worker launch");
+});
+
+test("process-local attestation performs one full hash then reuses exact unchanged model state", async (context) => {
+  const fixture = await preparedModel(context);
+  const attestation = fixtureVerifier(new Map([[fixture.modelPath, fixture.fixtureHashes]]));
+  const fake = runner();
+  const value = new CtcForcedAlignmentAdapter({ runtime: { mode: "development", pythonExecutable: python }, profile: { modelRoot: fixture.modelRoot, allowModelDownload: false }, runner: fake, modelVerifier: attestation.verify });
+  const request = { inputUri: "/tmp/audio.wav", language: "pt", transcript: transcript() };
+  assert.ok(await value.describeAlignmentExecution(request));
+  assert.equal(attestation.counters.strong, 0);
+  assert.equal(attestation.counters.weightBytesHashed, 0, "cache identity description hashes zero model-weight bytes");
+  await value.align(request, { jobId: "first", locale: "pt-BR" });
+  assert.equal(attestation.counters.strong, 1, "post-execution check must reuse the first cryptographic proof");
+  assert.ok(attestation.counters.weightBytesHashed > 0, "the first real execution hashes the fixture weight once");
+  await value.align(request, { jobId: "second", locale: "pt-BR" });
+  assert.equal(attestation.counters.strong, 1, "unchanged process-local state must not rehash weights");
+  assert.equal(fake.calls.length, 2);
+  assert.ok(attestation.counters.memo >= 3);
+});
+
+test("weak filesystem metadata fallback disables memoization and repeats full verification", async (context) => {
+  const fixture = await preparedModel(context);
+  const attestation = fixtureVerifier(new Map([[fixture.modelPath, fixture.fixtureHashes]]), undefined, { disableMemoization: true });
+  await attestation.verify(fixture.modelPath, fixture.pin);
+  await attestation.verify(fixture.modelPath, fixture.pin);
+  assert.equal(attestation.counters.strong, 2, "a non-memoizable filesystem state must establish cryptographic proof every time");
+  assert.equal(attestation.counters.memo, 0);
+});
+
+test("a new verifier process-equivalent instance must establish a new cryptographic proof", async (context) => {
+  const fixture = await preparedModel(context);
+  let full = 0;
+  const strongVerifier = async (modelPath) => { full += 1; await verifyPinnedModel(modelPath, fixture.fixtureHashes); };
+  const first = new PinnedAlignmentModelVerifier({ strongVerifier });
+  await first.ensureVerified(fixture.modelPath, fixture.pin);
+  await first.ensureVerified(fixture.modelPath, fixture.pin);
+  assert.equal(full, 1);
+  const restarted = new PinnedAlignmentModelVerifier({ strongVerifier });
+  await restarted.ensureVerified(fixture.modelPath, fixture.pin);
+  assert.equal(full, 2, "attestation must not survive process/verifier lifetime");
+});
+
+test("attestation detects same-size content replacement even when mtime is restored", async (context) => {
+  const fixture = await preparedModel(context);
+  const attestation = fixtureVerifier(new Map([[fixture.modelPath, fixture.fixtureHashes]]));
+  const fake = runner();
+  const value = new CtcForcedAlignmentAdapter({ runtime: { mode: "development", pythonExecutable: python }, profile: { modelRoot: fixture.modelRoot }, runner: fake, modelVerifier: attestation.verify });
+  const request = { inputUri: "/tmp/audio.wav", language: "pt", transcript: transcript() };
+  await value.align(request, { jobId: "baseline", locale: "pt-BR" });
+  const weight = join(fixture.modelPath, "pytorch_model.bin");
+  const before = await stat(weight);
+  const original = await readFile(weight);
+  await writeFile(weight, Buffer.alloc(original.length, 0x78));
+  await utimes(weight, before.atime, before.mtime);
+  await assert.rejects(value.align(request, { jobId: "tampered", locale: "pt-BR" }), (error) => error.code === "ALIGNMENT_MODEL_UNAVAILABLE");
+  assert.equal(attestation.counters.strong, 2);
+  assert.equal(fake.calls.length, 1);
+});
+
+test("attestation detects atomic expected-file replacement even with matching size and mtime", async (context) => {
+  const fixture = await preparedModel(context);
+  const attestation = fixtureVerifier(new Map([[fixture.modelPath, fixture.fixtureHashes]]));
+  const fake = runner();
+  const value = new CtcForcedAlignmentAdapter({ runtime: { mode: "development", pythonExecutable: python }, profile: { modelRoot: fixture.modelRoot }, runner: fake, modelVerifier: attestation.verify });
+  const request = { inputUri: "/tmp/audio.wav", language: "pt", transcript: transcript() };
+  await value.align(request, { jobId: "baseline", locale: "pt-BR" });
+  const weight = join(fixture.modelPath, "pytorch_model.bin");
+  const before = await stat(weight);
+  const original = await readFile(weight);
+  const replacement = join(fixture.modelRoot, "replacement.bin");
+  await writeFile(replacement, Buffer.alloc(original.length, 0x79));
+  await utimes(replacement, before.atime, before.mtime);
+  await rename(replacement, weight);
+  await assert.rejects(value.align(request, { jobId: "replaced", locale: "pt-BR" }), (error) => error.code === "ALIGNMENT_MODEL_UNAVAILABLE");
+  assert.equal(attestation.counters.strong, 2);
+  assert.equal(fake.calls.length, 1);
+});
+
+test("model directory identity replacement invalidates attestation and requires a new full proof", async (context) => {
+  const fixture = await preparedModel(context);
+  const attestation = fixtureVerifier(new Map([[fixture.modelPath, fixture.fixtureHashes]]));
+  const fake = runner();
+  const value = new CtcForcedAlignmentAdapter({ runtime: { mode: "development", pythonExecutable: python }, profile: { modelRoot: fixture.modelRoot }, runner: fake, modelVerifier: attestation.verify });
+  const request = { inputUri: "/tmp/audio.wav", language: "pt", transcript: transcript() };
+  await value.align(request, { jobId: "baseline", locale: "pt-BR" });
+  const previous = `${fixture.modelPath}-previous`;
+  await rename(fixture.modelPath, previous);
+  await mkdir(fixture.modelPath);
+  for (const name of Object.keys(fixture.pin.files)) await writeFile(join(fixture.modelPath, name), await readFile(join(previous, name)));
+  await value.align(request, { jobId: "replacement-directory", locale: "pt-BR" });
+  assert.equal(attestation.counters.strong, 2, "a new directory identity must not inherit the old proof");
+  assert.equal(fake.calls.length, 2);
+});
+
+test("post-execution attestation rejects a model mutated while the worker runs", async (context) => {
+  const fixture = await preparedModel(context);
+  const attestation = fixtureVerifier(new Map([[fixture.modelPath, fixture.fixtureHashes]]));
+  const weight = join(fixture.modelPath, "pytorch_model.bin");
+  const fake = runner(async (request) => {
+    const original = await readFile(weight);
+    await writeFile(weight, Buffer.alloc(original.length, 0x7a));
+    return raw(request);
+  });
+  const value = new CtcForcedAlignmentAdapter({ runtime: { mode: "development", pythonExecutable: python }, profile: { modelRoot: fixture.modelRoot }, runner: fake, modelVerifier: attestation.verify });
+  await assert.rejects(value.align({ inputUri: "/tmp/audio.wav", language: "pt", transcript: transcript() }, { jobId: "mutated-during-worker", locale: "pt-BR" }), (error) => error.code === "ALIGNMENT_MODEL_UNAVAILABLE");
+  assert.equal(attestation.counters.strong, 2);
+  assert.equal(fake.calls.length, 1);
+});
+
+test("state mutation during full cryptographic verification is never attested", async (context) => {
+  const fixture = await preparedModel(context);
+  const weight = join(fixture.modelPath, "pytorch_model.bin");
+  let full = 0;
+  const verifier = new PinnedAlignmentModelVerifier({
+    async strongVerifier(modelPath) {
+      full += 1;
+      await verifyPinnedModel(modelPath, fixture.fixtureHashes);
+      const original = await readFile(weight);
+      await writeFile(weight, Buffer.alloc(original.length, 0x7b));
+    }
+  });
+  await assert.rejects(verifier.ensureVerified(fixture.modelPath, fixture.pin), (error) => error.code === "ALIGNMENT_MODEL_UNAVAILABLE");
+  assert.equal(full, 1);
+});
+
+test("attested inventory fails closed for unexpected files, missing files, and symlinks", async (context) => {
+  for (const attack of ["unexpected", "alternate-weight", "missing", "symlink"]) {
+    const fixture = await preparedModel(context);
+    const attestation = fixtureVerifier(new Map([[fixture.modelPath, fixture.fixtureHashes]]));
+    await attestation.verify(fixture.modelPath, fixture.pin);
+    const config = join(fixture.modelPath, "config.json");
+    if (attack === "unexpected") await writeFile(join(fixture.modelPath, "injected.json"), "{}");
+    if (attack === "alternate-weight") await writeFile(join(fixture.modelPath, "model.safetensors"), "unverified alternate weight");
+    if (attack === "missing") await unlink(config);
+    if (attack === "symlink") {
+      const target = join(fixture.modelRoot, "external-config.json");
+      await writeFile(target, await readFile(config));
+      await unlink(config);
+      await symlink(target, config);
+    }
+    await assert.rejects(attestation.verify(fixture.modelPath, fixture.pin), (error) => error.code === "ALIGNMENT_MODEL_UNAVAILABLE", attack);
+  }
+});
+
+test("capability checks reuse process-local attestations while retaining exact integrity", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "cevra-capability-models-"));
+  context.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const pt = await preparedModel(context, "pt", root);
+  const en = await preparedModel(context, "en", root);
+  const attestation = fixtureVerifier(new Map([[pt.modelPath, pt.fixtureHashes], [en.modelPath, en.fixtureHashes]]));
+  const value = new CtcForcedAlignmentAdapter({ runtime: { mode: "development", pythonExecutable: python }, profile: { modelRoot: root }, runner: runner(), modelVerifier: attestation.verify });
+  assert.deepEqual((await value.capabilities()).map(({ available }) => available), [true, true]);
+  assert.equal(attestation.counters.strong, 2);
+  assert.deepEqual((await value.capabilities()).map(({ available }) => available), [true, true]);
+  assert.equal(attestation.counters.strong, 2);
 });
 
 test("unsupported language, remote URI, missing context and unexpected request fields fail closed", async () => {

@@ -115,6 +115,29 @@ state and current result validation to pass. It bypasses Media Runtime PCM
 extraction and alignment engine execution, but never the stale digest guard or
 canonical promotion path.
 
+Alignment execution identity and installed-model integrity are intentionally
+separate. The adapter describes the existing cache-key identity fields from
+immutable CEVRA pins and constants—engine, protocol, model
+ID/revision/principal-weight digest and algorithm versions—without reading the
+local model directory. A valid cache hit therefore hashes zero model bytes and
+remains usable when that model is not installed or is corrupt, because no local
+model code or weight is executed. A fresh miss still fails closed unless the
+installed prepared model verifies.
+
+Actual alignment execution calls a process-local pinned-model attestor before
+and after the worker. The first execution performs the existing exact
+allow-list and per-file SHA-256 verification. Reuse is allowed only while a
+cheap exact-state detector remains unchanged: logical path, canonical resolved
+identity, device/inode, byte size, nanosecond mtime and nanosecond ctime for the
+directory and every expected file, bound to the complete expected pin,
+inventory and hashes. Every check still enumerates the exact directory and
+rejects missing/unexpected files, directories and symlinks. A detector change,
+atomic replacement or same-size mutation forces another complete hash pass;
+state mutation during that pass fails closed. Filesystems that cannot provide
+all strong detector fields receive no memoized attestation and perform full
+verification every time. Attestation exists only in the current process,
+survives neither restart nor pin change, and is also used by capability checks.
+
 ## Envelope, storage and corruption
 
 The closed JSON envelope uses format `cevra-transcript-cache`, format version 1,
@@ -164,18 +187,16 @@ termination/reaping.
 ## Consequences and deferred work
 
 Hits avoid the expensive engine path, but an application-level hit still pays
-for strong source hashing, exact execution/model identity, filesystem lookup
-and current application validation. Raw cache-file lookup latency is therefore
-not the complete hit latency. Miss overhead includes pre-execution source/model
-identity plus post-execution stability verification. Source hashing remains
-proportional in time but not memory to source size. Alignment V1's current
-identity description performs authoritative full prepared-model verification;
-the application calls it once on a hit and twice around a fresh execution,
-while `align()` independently verifies once before loading the model. This I/O
-is intentionally not memoized here because weakening the closed allow-list and
-per-file hash verification is outside this bounded remediation. The cache is
-cross-project reusable and bounded, yet remains strictly subordinate to current
-application validation and canonical state.
+for strong source hashing, immutable execution identity, filesystem lookup and
+current application validation. Raw cache-file lookup latency is therefore not
+the complete hit latency. Source hashing remains proportional in time but not
+memory to source size. An alignment hit reads/hashes zero local model bytes;
+fresh execution pays one complete model verification per unchanged process
+state and cheap exact-state checks immediately before and after the worker.
+This avoids repeated 377 MiB/1.26 GiB weight hashing without weakening the
+closed allow-list or cryptographic proof. The cache is cross-project reusable
+and bounded, yet remains strictly subordinate to current application
+validation and canonical state.
 
 Cache format evolution uses version invalidation: an old key/envelope becomes a
 miss and may later be evicted. It requires no Project IR or Project Store

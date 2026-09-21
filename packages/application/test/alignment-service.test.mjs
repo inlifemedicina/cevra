@@ -305,6 +305,45 @@ test("alignment cache MISS writes and HIT bypasses PCM extraction and alignment 
   assert.equal(reused.sourceTranscript.provenance.stages.at(-1).createdAt, now);
 });
 
+test("alignment cache HIT remains usable with absent, unavailable, or corrupt local models while a MISS fails closed", async () => {
+  const cache = new AlignmentMemoryCache();
+  const sourceIdentity = { identify: async () => structuredClone(alignmentSourceIdentity) };
+  const seed = setup({
+    engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)),
+    media: cacheableMedia({ calls: 0 }),
+    additions: { cache, sourceIdentity }
+  });
+  await seed.service.alignSource({ sourceId: "source-1", id: "cached-producer" });
+
+  for (const condition of ["absent", "unavailable", "corrupt"]) {
+    const hitMedia = { calls: 0 };
+    const unavailable = cacheableAlignmentEngine(async () => { throw new Error(`local model ${condition}`); });
+    const hit = setup({ engine: unavailable, media: cacheableMedia(hitMedia), additions: { cache, sourceIdentity } });
+    const reused = await hit.service.alignSource({ sourceId: "source-1", id: `cached-consumer-${condition}` });
+    assert.equal(reused.cacheStatus, "hit");
+    assert.equal(unavailable.executionIdentityCalls, 1);
+    assert.equal(unavailable.calls.length, 0, "cache identity lookup must not execute or verify local model artifacts");
+    assert.equal(hitMedia.calls, 0);
+  }
+
+  const unavailable = cacheableAlignmentEngine(async () => { throw new Error("local model corrupt"); });
+  const miss = setup({ engine: unavailable, media: cacheableMedia({ calls: 0 }), additions: { cache: new AlignmentMemoryCache(), sourceIdentity } });
+  await assert.rejects(miss.service.alignSource({ sourceId: "source-1", id: "fresh-consumer" }), (error) => error.code === "ALIGNMENT_APP_ENGINE_FAILED");
+  assert.equal(unavailable.calls.length, 1, "a fresh miss must reach fail-closed execution verification");
+  assert.equal(miss.history.current.history.revision, 0);
+});
+
+test("post-execution model integrity rejection writes no cache and promotes no transcript", async () => {
+  const cache = new AlignmentMemoryCache(); const mediaCalls = { calls: 0 };
+  const engine = cacheableAlignmentEngine(async () => { throw new Error("post-execution model integrity rejection"); });
+  const fixture = setup({ engine, media: cacheableMedia(mediaCalls), additions: { cache, sourceIdentity: { identify: async () => structuredClone(alignmentSourceIdentity) } } });
+  await assert.rejects(fixture.service.alignSource({ sourceId: "source-1", id: "mutated-model" }), (error) => error.code === "ALIGNMENT_APP_ENGINE_FAILED");
+  assert.equal(engine.calls.length, 1);
+  assert.equal(mediaCalls.calls, 1);
+  assert.equal(cache.writes, 0);
+  assert.equal(fixture.history.current.history.revision, 0);
+});
+
 test("fresh alignment timestamps the cleaned producer result and cache HIT preserves that producer time", async () => {
   const cache = new AlignmentMemoryCache();
   const producedAt = "2026-09-15T12:02:00.000Z";
