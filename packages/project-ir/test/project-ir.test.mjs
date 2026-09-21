@@ -626,6 +626,47 @@ test("compact history structurally reuses transcript blobs across 500 unrelated 
   assert.equal(history.redo().project.name, "Rename 0");
 });
 
+test("compact history refreshes only transcript-affecting source refs", () => {
+  let sequence = 0;
+  const initial = sourceTranscript();
+  const history = new ProjectHistory(v2ProjectWith(initial), {
+    idGenerator: () => `classification-${++sequence}`,
+    clock: () => fixedTime
+  });
+  const initialRef = history.toArchive().snapshots[0].sourceTranscriptRefs[0];
+
+  history.commit({ type: "project.rename", name: "Unrelated" });
+  assert.deepEqual(history.toArchive().snapshots.at(-1).sourceTranscriptRefs[0], initialRef);
+
+  const exactUpdate = clone(initial);
+  exactUpdate.transcript.words[0].confidence = 0.57;
+  exactUpdate.provenance.stages[0].executionId = "classification-update";
+  exactUpdate.extensions = { classification: "exact-version" };
+  history.commit({
+    type: "transcript.set",
+    transcript: exactUpdate,
+    expectedCurrentTranscriptDigest: initial.transcriptDigest
+  });
+  const updatedArchive = history.toArchive();
+  const updatedRef = updatedArchive.snapshots.at(-1).sourceTranscriptRefs[0];
+  assert.notEqual(updatedRef.digest, initialRef.digest);
+  assert.equal(updatedArchive.transcriptBlobs.length, 2);
+
+  history.commit({
+    type: "transcript.remove",
+    sourceId: "source-1",
+    expectedTranscriptDigest: exactUpdate.transcriptDigest
+  });
+  assert.deepEqual(history.toArchive().snapshots.at(-1).sourceTranscriptRefs, []);
+
+  const sourceRemoval = new ProjectHistory(v2ProjectWith(initial), {
+    idGenerator: () => `source-classification-${++sequence}`,
+    clock: () => fixedTime
+  });
+  sourceRemoval.commit({ type: "source.remove", sourceId: "source-1" });
+  assert.deepEqual(sourceRemoval.toArchive().snapshots.at(-1).sourceTranscriptRefs, []);
+});
+
 test("branching after undo excludes abandoned transcript blobs from the V2 archive", () => {
   let sequence = 0;
   const initial = sourceTranscript();

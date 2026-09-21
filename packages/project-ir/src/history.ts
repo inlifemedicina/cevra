@@ -186,11 +186,7 @@ export class ProjectHistory {
       createdAt: now,
       snapshotId
     };
-    const changedTranscriptSourceId = command.type === "transcript.set"
-      ? command.transcript.sourceId
-      : command.type === "transcript.remove" || command.type === "source.remove"
-        ? command.sourceId
-        : undefined;
+    const changedTranscriptSourceId = transcriptMutationSource(command);
     const snapshot = this.compactSnapshot(
       snapshotId,
       revision,
@@ -264,6 +260,34 @@ export class ProjectHistory {
 function defaultId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
   return `cevra_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function transcriptMutationSource(command: EditCommand): Id | undefined {
+  switch (command.type) {
+    case "source.remove":
+    case "transcript.remove":
+      return command.sourceId;
+    case "transcript.set":
+      return command.transcript.sourceId;
+    case "project.rename":
+    case "source.add":
+    case "track.add":
+    case "track.remove":
+    case "clip.add":
+    case "clip.remove":
+    case "clip.trim":
+    case "caption.upsert":
+    case "caption.remove":
+    case "style.patch":
+    case "export.add":
+      return undefined;
+    default:
+      return assertNever(command);
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported edit command ${JSON.stringify(value)}.`);
 }
 
 function clone<T>(value: T): T {

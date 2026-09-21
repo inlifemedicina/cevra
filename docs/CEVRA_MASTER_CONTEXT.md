@@ -1368,7 +1368,7 @@ Foundation / Media Runtime       [CLOSED]
 → Vids 1.0 hardening
 ```
 
-The measured ProjectHistory failure changes dependency priority. ADR 0018 now selects exact per-`SourceTranscript` content-addressed deduplication inside ProjectHistory on the active feature branch. Its history blob digest covers complete stored state and is explicitly distinct from the editorial `transcriptDigest`; journal, undo/redo, recovery, version identity and V1 read compatibility remain mandatory. Transcript Cache remains a separate disposable derived-data system and is not history storage.
+The measured ProjectHistory failure changes dependency priority. ADR 0019 now selects exact per-`SourceTranscript` content-addressed deduplication inside ProjectHistory on the active feature branch. Its history blob digest covers complete stored state and is explicitly distinct from the editorial `transcriptDigest`; journal, undo/redo, recovery, version identity and V1 read compatibility remain mandatory. Transcript Cache remains a separate disposable derived-data system and is not history storage.
 
 ## Track B — Orbit Platform
 
@@ -1442,11 +1442,11 @@ PR #27 merged the first decision reconciliation at that exact commit. The final 
 
 ## 24.3 Active work
 
-**ProjectHistory Scalability/Correctness Remediation — IN DEVELOPMENT.** Branch `feat/project-history-scalability-v2` starts from `main` `27d072b0b75e4e7c356ca8ffac41ffa6655b4981`. The blocker is measured O(commits × transcript payload) snapshot/package growth, including the prior `RangeError: Invalid string length`. ADR 0018 selects compact snapshots plus per-source exact transcript blobs, HistoryArchive V2 and Project Package V2, with V1 read → V2 write compatibility. Project IR schema remains unchanged. Realistic before/after resource and checkpoint measurement plus independent review are required before merge.
+**ProjectHistory Scalability/Correctness Remediation — IN DEVELOPMENT.** Branch `feat/project-history-scalability-v2` starts from `main` `27d072b0b75e4e7c356ca8ffac41ffa6655b4981`. The blocker is measured O(commits × transcript payload) snapshot/package growth, including the prior `RangeError: Invalid string length`. ADR 0019 selects compact snapshots plus per-source exact transcript blobs, HistoryArchive V2 and Project Package V2, with V1 read → V2 write compatibility. Project IR schema remains unchanged. Realistic before/after resource and checkpoint measurement plus independent review are required before merge.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
-Final remote CI is not evidence of code failure: runs `35625696820` and `35625702675` failed before jobs executed because of the account payment/Actions spending-limit condition. A final focused independent review and normal remote CI remain required before merge. No merge has occurred, and this documentation branch does not modify PR #24.
+GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.
 
 Current dependency blockers/gates:
 
@@ -1517,10 +1517,10 @@ Current dependency blockers/gates:
 - **CANONICAL:** PR #26 decision families D1–D23 and I1–I19 are reconciled into dedicated editorial, visual, composition and integration records; provider-specific claims remain implementation-time verification gates.
 - **CANONICAL:** Bridge Skill supports Vids through the typed Agent Protocol; Creator Skill is a standalone agent-native product surface. Lite/Full share one editorial core, and Creator Full must deliver final output without Desktop.
 - **CANONICAL:** the fix-now/defer, execution-feasibility, Product Owner pause, coordinated Media Runtime, acceptance-catalog and Director-impact rules are permanent agent policy in `AGENTS.md`.
-- **IN DEVELOPMENT:** ADR 0018 selects exact content-addressed per-source transcript blobs within ProjectHistory, explicitly not editorial `transcriptDigest` and not Transcript Cache. The branch must preserve Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility, then pass realistic remeasurement and independent review before merge.
+- **IN DEVELOPMENT:** ADR 0019 selects exact content-addressed per-source transcript blobs within ProjectHistory, explicitly not editorial `transcriptDigest` and not Transcript Cache. The branch must preserve Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility, then pass realistic remeasurement and independent review before merge.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
-- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, paused for dependency reconciliation; CI billing failures are infrastructure, not test evidence.
+- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, paused for dependency reconciliation. GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS; focused independent review and reconciliation against the changed history baseline remain required.
 - **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
 
 ---
@@ -1542,7 +1542,7 @@ Do not guess these in future chats:
 11. final embedded Codex/Claude commercial integration mechanisms;
 12. final Marketplace package/runtime security model implementation;
 13. mobile implementation timing.
-14. final independent review and merge decision for the ADR 0018 ProjectHistory remediation; the bounded design is implemented only on its active feature branch;
+14. final independent review and merge decision for the ADR 0019 ProjectHistory remediation; the bounded design is implemented only on its active feature branch;
 15. exact Windows fallback if validated `h264_mf` is materially inadequate;
 16. exact HDR→SDR dependency/build and quality/performance profile;
 17. Preview V1 ADR and final resolved composition-plan boundary;
@@ -1568,7 +1568,7 @@ When the user shows a new video/product:
 # 28. Immediate next actions
 
 1. Merge no feature from this documentation task; obtain normal review/CI for the reconciliation PR first.
-2. Independently review the bounded ADR 0018 ProjectHistory remediation and its realistic before/after measurements; merge only after all compatibility, corruption, recovery and CI gates pass.
+2. Independently review the bounded ADR 0019 ProjectHistory remediation and its realistic before/after measurements; merge only after all compatibility, corruption, recovery and CI gates pass.
 3. Close the small cross-platform/runtime correctness prerequisites supported by the targeted audit, including platform-aware Python resolution, media metadata propagation and watchdog policy.
 4. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
 5. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.

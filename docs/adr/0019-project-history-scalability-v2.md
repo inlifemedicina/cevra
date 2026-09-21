@@ -1,4 +1,4 @@
-# ADR 0018 — ProjectHistory Scalability V2
+# ADR 0019 — ProjectHistory Scalability V2
 
 **Status:** Accepted for implementation — IN DEVELOPMENT
 **Date:** 2026-09-21
