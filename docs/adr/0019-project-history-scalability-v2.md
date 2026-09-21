@@ -87,6 +87,12 @@ compact `toArchive()` representation directly. Abandoned redo blobs may remain
 in the process-local map, but archive generation emits only blobs reachable
 from retained snapshots.
 
+Production cleanup obtains retained source and export URIs through a narrow
+metadata-only history query rather than materializing full snapshots. The
+commit path compacts already-validated Project IR and returns that detached
+validated command result without rematerializing the new snapshot. These are
+bounded hot-path corrections and do not change the selected architecture.
+
 No database, cloud storage, second history authority, arbitrary filesystem
 reference, Project IR migration, new dependency, cache coupling or WebView
 permission is introduced.

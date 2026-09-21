@@ -88,10 +88,10 @@ export class ProjectHistory {
     const snapshotId = this.idGenerator();
     const revision = project.history.revision;
     const headEntryId = project.history.headEntryId;
-    const withSnapshot = clone({
+    const withSnapshot = assertValidProjectIR(clone({
       ...project,
       history: { revision, ...(headEntryId ? { headEntryId } : {}), headSnapshotId: snapshotId }
-    });
+    }));
     this.snapshotsInternal.push(this.compactSnapshot(snapshotId, revision, now, withSnapshot));
   }
 
@@ -119,6 +119,15 @@ export class ProjectHistory {
       createdAt: snapshot.createdAt,
       project: this.materialize(snapshot)
     }));
+  }
+
+  retainedMediaUris(): readonly string[] {
+    const uris = new Set<string>();
+    for (const snapshot of this.snapshotsInternal) {
+      for (const source of snapshot.project.sources) uris.add(source.uri);
+      for (const record of snapshot.project.exports) if (record.outputUri) uris.add(record.outputUri);
+    }
+    return [...uris];
   }
 
   toArchive(): HistoryArchiveV2 {
@@ -203,7 +212,7 @@ export class ProjectHistory {
     this.entriesInternal = [...retainedEntries, entry];
     this.snapshotsInternal = [...retainedSnapshots, snapshot];
     this.cursor = this.snapshotsInternal.length - 1;
-    return this.current;
+    return validated;
   }
 
   undo(): ProjectIR {
@@ -233,16 +242,15 @@ export class ProjectHistory {
     reusableRefs: readonly HistoryTranscriptRef[] = [],
     changedTranscriptSourceId?: Id
   ): CompactProjectSnapshot {
-    const project = assertValidProjectIR(input);
     const reusableBySourceId = new Map(reusableRefs.map((ref) => [ref.sourceId, ref]));
-    const sourceTranscriptRefs = project.sourceTranscripts.map((transcript) => {
+    const sourceTranscriptRefs = input.sourceTranscripts.map((transcript) => {
       const reusable = reusableBySourceId.get(transcript.sourceId);
       if (reusable && transcript.sourceId !== changedTranscriptSourceId) return clone(reusable);
       const digest = computeHistoryTranscriptBlobDigest(transcript);
       if (!this.transcriptBlobs.has(digest)) this.transcriptBlobs.set(digest, clone(transcript));
       return { sourceId: transcript.sourceId, digest };
     });
-    const { sourceTranscripts: _sourceTranscripts, ...projectWithoutSourceTranscripts } = project;
+    const { sourceTranscripts: _sourceTranscripts, ...projectWithoutSourceTranscripts } = input;
     return { id, revision, createdAt, project: clone(projectWithoutSourceTranscripts), sourceTranscriptRefs };
   }
 

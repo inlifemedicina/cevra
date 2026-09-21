@@ -667,6 +667,64 @@ test("compact history refreshes only transcript-affecting source refs", () => {
   assert.deepEqual(sourceRemoval.toArchive().snapshots.at(-1).sourceTranscriptRefs, []);
 });
 
+test("retained media URIs cover undo and redo history without retaining a truncated branch", () => {
+  let sequence = 0;
+  const project = createEmptyProject({ id: "retained-media-project", now: fixedTime });
+  project.sources.push(source("undo-source", "video", { uri: "file:///history/undo.mp4" }));
+  project.exports.push({
+    id: "historical-export",
+    presetId: "delivery",
+    status: "completed",
+    outputUri: "file:///history/export.mp4",
+    createdAt: fixedTime,
+    completedAt: fixedTime
+  });
+  const history = new ProjectHistory(project, {
+    idGenerator: () => `retained-media-${++sequence}`,
+    clock: () => fixedTime
+  });
+
+  history.commit({ type: "source.remove", sourceId: "undo-source" });
+  history.commit({
+    type: "source.add",
+    source: source("redo-source", "video", { uri: "file:///history/redo.mp4" })
+  });
+  history.undo();
+
+  const retained = history.retainedMediaUris();
+  assert.deepEqual(retained, [
+    "file:///history/undo.mp4",
+    "file:///history/export.mp4",
+    "file:///history/redo.mp4"
+  ]);
+  retained.push("file:///external-mutation.mp4");
+  assert.equal(history.retainedMediaUris().includes("file:///external-mutation.mp4"), false);
+
+  history.commit({ type: "project.rename", name: "Branched" });
+  assert.equal(history.canRedo, false);
+  assert.deepEqual(history.retainedMediaUris(), [
+    "file:///history/undo.mp4",
+    "file:///history/export.mp4"
+  ]);
+});
+
+test("commit return remains detached from compact snapshot and transcript storage", () => {
+  let sequence = 0;
+  const history = new ProjectHistory(v2ProjectWith(sourceTranscript()), {
+    idGenerator: () => `detached-return-${++sequence}`,
+    clock: () => fixedTime
+  });
+
+  const returned = history.commit({ type: "project.rename", name: "Committed" });
+  returned.project.name = "Externally mutated";
+  returned.sourceTranscripts[0].transcript.words[0].text = "mutated";
+
+  const current = history.current;
+  assert.equal(current.project.name, "Committed");
+  assert.equal(current.sourceTranscripts[0].transcript.words[0].text, "ação");
+  assert.equal(history.toArchive().transcriptBlobs[0].transcript.transcript.words[0].text, "ação");
+});
+
 test("branching after undo excludes abandoned transcript blobs from the V2 archive", () => {
   let sequence = 0;
   const initial = sourceTranscript();
