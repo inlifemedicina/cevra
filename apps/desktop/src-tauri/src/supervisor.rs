@@ -358,13 +358,13 @@ impl SupervisorCore {
             && self.restart_count.load(Ordering::Relaxed) == 0
         {
             self.process.lock().ok().map(|mut process| process.take());
+            self.set_state(Lifecycle::Recoverable);
             self.pending.lock().ok().map(|mut pending| {
                 pending.reject_all(DesktopCommandError::new(
                     "HOST_PROCESS_EXITED",
                     "Desktop host exited unexpectedly; durable recovery is available.",
                 ))
             });
-            self.set_state(Lifecycle::Recoverable);
         } else if self.state() != Lifecycle::Failed {
             self.fail(DesktopCommandError::new(
                 "HOST_UNAVAILABLE",
