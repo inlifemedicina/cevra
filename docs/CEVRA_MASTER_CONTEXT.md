@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-21, based on `origin/main` `83a66d47c48d07811b9a79b2eeb217d5a0813e95`
+**Last decision reconciliation:** 2026-09-21, final residual pass based on merged PR #27 / `origin/main` `a8e7546332a56075aab5a6ea88081e34a29cf53f`
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1393,9 +1393,10 @@ Detailed approved product direction lives in dedicated records rather than being
 - [Visual decisions](CEVRA_VISUAL_DECISIONS.md) — D14–D18: presets, captions, placement/QA, EDVID styles and post-V1 personalization boundary.
 - [Composition decisions](CEVRA_COMPOSITION_DECISIONS.md) — D19–D23: split, supporting media, external assets, B-roll and registered first-party components.
 - [Integration decisions](CEVRA_INTEGRATION_DECISIONS.md) — I1–I19, Creation Modes, provider-neutral boundaries, assets, distribution/update/account and Bridge versus Creator Skill.
+- [Update Strategy v3](UPDATE_STRATEGY.md) — canonical managed-update authority: controller, component classes/manifests, compatibility, promotion/rollback, distribution, diagnostics and resilience.
 - [Product Owner acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md) — stable behavioral cases, future status and division between automation and human review.
 - [Fable adversarial audit](CEVRA_FABLE_AUDIT_REVIEW_2026-09-18.md) and [targeted audit](CEVRA_FABLE_TARGETED_AUDIT_MEDIA_HISTORY_PREVIEW_EXPORT_2026-09-18.md) — technical evidence, blocker wording and approved K1–K5 directions.
-- [PR #25/#26 reconciliation inventory](CEVRA_RECONCILIATION_INVENTORY_2026-09.md) — incorporated, superseded, omitted and unresolved unique material; no branch closure authorization.
+- [PR #25/#26 reconciliation inventory](CEVRA_RECONCILIATION_INVENTORY_2026-09.md) — first and final residual audits, including closure criteria for the superseded evidence branches.
 
 Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The records above do not claim implementation merely because a direction is approved.
 
@@ -1413,11 +1414,11 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` at the start of this reconciliation:
+Canonical remote `main` at the start of the final residual reconciliation:
 
-`83a66d47c48d07811b9a79b2eeb217d5a0813e95`
+`a8e7546332a56075aab5a6ea88081e34a29cf53f`
 
-The documentation reconciliation branch is `docs/cevra-decision-reconciliation-2026-09`, created from that exact commit. It changes policy/documentation only and does not make a product milestone implemented.
+PR #27 merged the first decision reconciliation at that exact commit. The final residual pass restores the approved Update Strategy v3 on `docs/final-residual-decision-reconciliation`; it changes policy/documentation only and does not make a product milestone implemented.
 
 ## 24.2 Important merged milestones
 
@@ -1516,8 +1517,9 @@ Current dependency blockers/gates:
 - **CANONICAL:** the fix-now/defer, execution-feasibility, Product Owner pause, coordinated Media Runtime, acceptance-catalog and Director-impact rules are permanent agent policy in `AGENTS.md`.
 - **BLOCKED:** measured ProjectHistory failure around hundreds of commits with large word-level transcripts is a correctness/scaling blocker before high-volume editing. Candidate solution is not pre-approved.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
+- **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
 - **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, paused for dependency reconciliation; CI billing failures are infrastructure, not test evidence.
-- **PROCESS:** PR #25 and PR #26 remain evidence branches and are not merged or closed by this task. Closure/branch cleanup requires a later proof that no valuable unique content remains.
+- **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
 
 ---
 
