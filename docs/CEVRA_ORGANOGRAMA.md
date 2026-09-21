@@ -11,11 +11,10 @@ CEVRA VIDS
 │   ├─ Project IR + transcript architecture
 │   ├─ Desktop shell/runtime integration
 │   ├─ persistence / recovery
-│   └─ forced alignment
+│   ├─ forced alignment
+│   └─ ProjectHistory Scalability V2
 │
 ├─ 2. CURRENT RECONCILIATION / CORRECTNESS GATES
-│   ├─ canonical documentation reconciliation
-│   ├─ ProjectHistory scalability/correctness blocker
 │   ├─ small cross-platform/runtime correctness prerequisites
 │   ├─ approved coordinated Media Runtime adjustment gate
 │   └─ Transcript Cache V1 reconciliation/final closeout
@@ -90,4 +89,4 @@ The dependency roadmap was **not reset**. The explicit new checkpoint is **UX Su
 
 ## Reconciliation note — 2026-09-21
 
-The measured ProjectHistory failure is now a correctness blocker before high-volume edit-command work. The order above follows the reviewed Fable evidence: bounded ProjectHistory remediation and small cross-platform/runtime prerequisites precede the coordinated Media Runtime gate, which precedes Transcript Cache V1 final reconciliation. Revalidate the exact cache/history storage interaction in the bounded technical plan; do not invent a shared implementation or mark either item complete from this sequencing document.
+ProjectHistory Scalability V2 is closed and preserved as a foundation after PR #30. The measured O(commits × transcript payload) failure was removed with compact snapshots and exact transcript blobs while preserving Project IR and V1 compatibility. The next active gate is the small cross-platform/runtime correctness prerequisites, followed by the approved coordinated Media Runtime adjustment gate and then Transcript Cache V1 reconciliation/final closeout. Revalidate the cache/history storage relationship during that later cache closeout; the two systems remain separate.

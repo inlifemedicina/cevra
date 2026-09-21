@@ -1347,8 +1347,8 @@ Foundation / Media Runtime       [CLOSED]
 → Desktop Runtime Integration V1 [CLOSED]
 → Project Persistence V1         [CLOSED]
 → Local Forced Alignment V1      [CLOSED]
-→ decision/document reconciliation
-→ ProjectHistory scalability/correctness remediation
+→ decision/document reconciliation [CLOSED]
+→ ProjectHistory Scalability V2  [CLOSED]
 → small cross-platform/runtime correctness prerequisites
 → coordinated Media Runtime adjustment gate
 → Transcript Cache V1 reconciliation/final closeout
@@ -1368,7 +1368,12 @@ Foundation / Media Runtime       [CLOSED]
 → Vids 1.0 hardening
 ```
 
-The measured ProjectHistory failure changes dependency priority. ADR 0019 now selects exact per-`SourceTranscript` content-addressed deduplication inside ProjectHistory on the active feature branch. Its history blob digest covers complete stored state and is explicitly distinct from the editorial `transcriptDigest`; journal, undo/redo, recovery, version identity and V1 read compatibility remain mandatory. Transcript Cache remains a separate disposable derived-data system and is not history storage.
+ADR 0019 and PR #30 closed the measured ProjectHistory failure with exact
+per-`SourceTranscript` content-addressed deduplication and compact snapshots.
+The history blob digest covers complete stored state and remains explicitly
+distinct from the editorial `transcriptDigest`; journal, undo/redo, recovery,
+version identity and V1 compatibility are preserved. Transcript Cache remains a
+separate disposable derived-data system and is not history storage.
 
 ## Track B — Orbit Platform
 
@@ -1414,11 +1419,12 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` at the start of the final residual reconciliation:
+Canonical remote `main` after ProjectHistory Scalability V2 merged:
 
-`a8e7546332a56075aab5a6ea88081e34a29cf53f`
+`b6f201afa73aae0aa85f8a3d4187a568ab749e72`
 
-PR #27 merged the first decision reconciliation at that exact commit. The final residual pass restores the approved Update Strategy v3 on `docs/final-residual-decision-reconciliation`; it changes policy/documentation only and does not make a product milestone implemented.
+PR #30 merged the implementation by normal merge commit. Post-merge CI run
+`35668351461` passed all five required jobs.
 
 ## 24.2 Important merged milestones
 
@@ -1439,10 +1445,18 @@ PR #27 merged the first decision reconciliation at that exact commit. The final 
 | Desktop Runtime Integration V1 | #19 | `1c6e512e54e49bbec18b8b1afee6f96afc544d7c` | CLOSED |
 | Project Persistence V1 | #20 | `a36c5c56d5b0791cf4732550aac7f6adffed2bfa` | CLOSED |
 | Local Forced Alignment V1 | #22 | `45913175b30c42a2758820a2937fe9a0126ab739` | CLOSED |
+| ProjectHistory Scalability V2 | #30 | `b6f201afa73aae0aa85f8a3d4187a568ab749e72` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
-**ProjectHistory Scalability/Correctness Remediation — IN DEVELOPMENT.** Branch `feat/project-history-scalability-v2` starts from `main` `27d072b0b75e4e7c356ca8ffac41ffa6655b4981`. The blocker is measured O(commits × transcript payload) snapshot/package growth, including the prior `RangeError: Invalid string length`. ADR 0019 selects compact snapshots plus per-source exact transcript blobs, HistoryArchive V2 and Project Package V2, with V1 read → V2 write compatibility. Project IR schema remains unchanged. Claude's conditional adversarial review completed; its bounded cleanup-materialization and redundant commit-path work findings are corrected on the feature branch, with final review still required before merge.
+**ProjectHistory Scalability V2 — IMPLEMENTED / CLOSED.** PR #30 merged at
+`b6f201afa73aae0aa85f8a3d4187a568ab749e72`. Compact snapshots plus exact
+per-source transcript blobs removed the measured O(commits × transcript
+payload) failure: the representative package fell from approximately 294.98
+MiB to 3.15 MiB and no longer produced the observed `RangeError`. Retained-media
+cleanup uses the metadata-only path, and the corrected commit hot path avoids
+redundant rematerialization. Project IR schema is unchanged; V1 read → V2 write
+compatibility, journal, undo/redo and recovery are preserved.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
@@ -1450,11 +1464,9 @@ GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remainin
 
 Current dependency blockers/gates:
 
-1. reconcile approved decisions and evidence without merging PR #25/#26 wholesale;
-2. remediate the measured ProjectHistory correctness/scalability failure before high-volume edit commands;
-3. close bounded cross-platform/runtime correctness prerequisites;
-4. complete the approved coordinated Media Runtime adjustment gate;
-5. reconcile and close Transcript Cache V1, revalidating its relationship to history/storage.
+1. close bounded cross-platform/runtime correctness prerequisites;
+2. complete the approved coordinated Media Runtime adjustment gate;
+3. reconcile and close Transcript Cache V1, revalidating its relationship to history/storage.
 
 ---
 
@@ -1517,7 +1529,7 @@ Current dependency blockers/gates:
 - **CANONICAL:** PR #26 decision families D1–D23 and I1–I19 are reconciled into dedicated editorial, visual, composition and integration records; provider-specific claims remain implementation-time verification gates.
 - **CANONICAL:** Bridge Skill supports Vids through the typed Agent Protocol; Creator Skill is a standalone agent-native product surface. Lite/Full share one editorial core, and Creator Full must deliver final output without Desktop.
 - **CANONICAL:** the fix-now/defer, execution-feasibility, Product Owner pause, coordinated Media Runtime, acceptance-catalog and Director-impact rules are permanent agent policy in `AGENTS.md`.
-- **IN DEVELOPMENT:** ADR 0019 selects exact content-addressed per-source transcript blobs within ProjectHistory, explicitly not editorial `transcriptDigest` and not Transcript Cache. The branch must preserve Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility, then pass realistic remeasurement and independent review before merge.
+- **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
 - **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, paused for dependency reconciliation. GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS; focused independent review and reconciliation against the changed history baseline remain required.
@@ -1542,7 +1554,7 @@ Do not guess these in future chats:
 11. final embedded Codex/Claude commercial integration mechanisms;
 12. final Marketplace package/runtime security model implementation;
 13. mobile implementation timing.
-14. final independent review and merge decision for the ADR 0019 ProjectHistory remediation; the bounded design is implemented only on its active feature branch;
+14. **RESOLVED by ADR 0019 and PR #30:** ProjectHistory Scalability V2 is implemented and closed;
 15. exact Windows fallback if validated `h264_mf` is materially inadequate;
 16. exact HDR→SDR dependency/build and quality/performance profile;
 17. Preview V1 ADR and final resolved composition-plan boundary;
@@ -1567,14 +1579,12 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Merge no feature from this documentation task; obtain normal review/CI for the reconciliation PR first.
-2. Independently review the bounded ADR 0019 ProjectHistory remediation and its realistic before/after measurements; merge only after all compatibility, corruption, recovery and CI gates pass.
-3. Close the small cross-platform/runtime correctness prerequisites supported by the targeted audit, including platform-aware Python resolution, media metadata propagation and watchdog policy.
-4. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
-5. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
-6. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
-7. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
-8. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
+1. Close the small cross-platform/runtime correctness prerequisites supported by the targeted audit, including platform-aware Python resolution, media metadata propagation and watchdog policy.
+2. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
+3. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
+4. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
+5. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
+6. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
 
 ---
 
