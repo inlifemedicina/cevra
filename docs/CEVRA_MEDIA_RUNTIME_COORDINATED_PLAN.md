@@ -254,8 +254,8 @@ with one internal graph. Each cut was exactly 100 ms (three video frames at
 
 | Topology | Processes | Wall | Max per-process RSS | Intermediates | Output | Duration |
 |---|---:|---:|---:|---:|---:|---:|
-| Per-cut encode + copy concat | 25 | 0.6003 s | 26,116,096 B | 286,068 B | 255,639 B | 2.400 s |
-| One fixed multi-input graph | 1 | 0.0352 s | 32,423,936 B | 0 B | 255,639 B | 2.400 s |
+| Per-cut encode + copy concat | 25 | 0.6123 s | 26,050,560 B | 286,068 B | 255,639 B | 2.400 s |
+| One fixed multi-input graph | 1 | 0.0356 s | 32,358,400 B | 0 B | 255,639 B | 2.400 s |
 
 This A/V comparison is standalone process-topology evidence, not an end-to-end
 CEVRA or audio-only performance comparison. The single pass used more peak
