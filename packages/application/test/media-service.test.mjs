@@ -12,6 +12,16 @@ import {
 const now = "2026-09-12T12:00:00.000Z";
 const trim = { type: "trim", inputUri: "/media/in.mp4", outputUri: "/media/out.mp4", startMs: 0, endMs: 1000 };
 const sourceMutation = { type: "source.add", source: { id: "source-out", kind: "video", displayName: "Output" } };
+const audioSequence = {
+  type: "render-audio-sequence", version: 1,
+  sources: [{ id: "a", uri: "/media/a.wav" }, { id: "b", uri: "/media/b.wav" }, { id: "c", uri: "/media/c.wav" }],
+  items: [
+    { sourceId: "a", sourceStartMs: 0, sourceEndMs: 1500, timelineStartMs: 0 },
+    { sourceId: "b", sourceStartMs: 0, sourceEndMs: 2500, timelineStartMs: 1500 },
+    { sourceId: "c", sourceStartMs: 0, sourceEndMs: 500, timelineStartMs: 3500 }
+  ],
+  outputUri: "/media/staging/audio.wav", outputDurationMs: 4000, outputChannelLayout: "stereo"
+};
 
 class MemoryArtifacts {
   files = new Set();
@@ -28,6 +38,20 @@ function completedFile(outputUri, durationMs = 1000) {
     type: "file", outputUri, durationMs,
     probe: { uri: outputUri, durationMs, width: 1920, height: 1080, frameRate: 30, hasVideo: true, hasAudio: true, videoCodec: "h264", audioCodec: "aac" },
     effectiveProfile: { container: "mp4", videoCodec: "h264", audioCodec: "aac", videoEncoder: "h264_videotoolbox", audioEncoder: "aac" }
+  };
+}
+
+function completedAudioSequence(operation = audioSequence) {
+  const channels = operation.outputChannelLayout === "mono" ? 1 : 2;
+  const maximumSimultaneousItemCount = Math.max(...operation.items.map((candidate) => operation.items.filter((item) => {
+    const end = item.timelineStartMs + item.sourceEndMs - item.sourceStartMs;
+    return item.timelineStartMs <= candidate.timelineStartMs && candidate.timelineStartMs < end;
+  }).length));
+  return {
+    type: "file", outputUri: operation.outputUri, durationMs: operation.outputDurationMs,
+    probe: { uri: operation.outputUri, durationMs: operation.outputDurationMs, sizeBytes: operation.outputDurationMs * 48 * channels * 4 + 114, hasVideo: false, hasAudio: true, audioCodec: "pcm_f32le", sampleRate: 48000, channels },
+    effectiveProfile: { container: "wav", audioCodec: "pcm", audioEncoder: "pcm_f32le" },
+    audioSequence: { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: operation.outputChannelLayout, distinctSourceCount: operation.sources.length, itemCount: operation.items.length, maximumSimultaneousItemCount, outputSampleCount: operation.outputDurationMs * 48, estimatedDataBytes: operation.outputDurationMs * 48 * channels * 4, graphBytes: 1024 }
   };
 }
 
@@ -459,4 +483,107 @@ test("cleanup uses retained metadata without materializing snapshots and protect
   assert.deepEqual(artifacts.removed, [trim.outputUri]);
   assert.equal(context.history.canRedo, true);
   assert.equal(recovered[0].status, "failed");
+});
+
+test("audio sequence succeeds as a derived PCM artifact without mutating Project IR", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(audioSequence.outputUri);
+    return completedAudioSequence();
+  });
+  const { service, history, repository } = fixture(engine, artifacts);
+  const outcome = await service.execute({ id: "audio-derived", operation: audioSequence, mutation: { type: "none" } });
+  assert.equal(outcome.record.status, "succeeded");
+  assert.equal(outcome.record.attempts[0].result.audioSequence.itemCount, 3);
+  assert.equal(history.current.history.revision, 0);
+  assert.equal(history.entries.length, 0);
+  assert.equal(artifacts.files.has(audioSequence.outputUri), true);
+  assert.equal((await repository.get("audio-derived")).status, "succeeded");
+});
+
+test("audio sequence cannot be promoted as hidden editable Project IR state", async () => {
+  const engine = new FakeEngine(async () => assert.fail("invalid mutation must fail before execution"));
+  const { service } = fixture(engine);
+  await assert.rejects(
+    service.execute({ id: "audio-hidden-state", operation: audioSequence, mutation: sourceMutation }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_INVALID_REQUEST"
+  );
+  assert.equal(engine.calls.length, 0);
+});
+
+test("audio sequence EACCES, ENOSPC and worker-exit failures remove only their owned partial output", async () => {
+  for (const detail of ["EACCES: permission denied", "ENOSPC: no space left", "WorkerProcessExitedError: worker exited"]) {
+    const artifacts = new MemoryArtifacts();
+    const engine = new FakeEngine(async () => {
+      artifacts.files.add(audioSequence.outputUri);
+      throw new Error(detail);
+    });
+    const { service, history, repository } = fixture(engine, artifacts);
+    await assert.rejects(
+      service.execute({ id: `audio-failure-${detail.slice(0, 6)}`, operation: audioSequence, mutation: { type: "none" } }),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED"
+    );
+    assert.equal(artifacts.files.has(audioSequence.outputUri), false);
+    assert.deepEqual(artifacts.removed, [audioSequence.outputUri]);
+    assert.equal(history.current.history.revision, 0);
+    const record = await repository.get(`audio-failure-${detail.slice(0, 6)}`);
+    assert.equal(record.attempts[0].technicalError, detail);
+  }
+});
+
+test("audio sequence cleanup failure remains visible and never becomes success", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.remove = async () => { throw new Error("injected cleanup failure"); };
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(audioSequence.outputUri);
+    throw new Error("ENOSPC: injected write failure");
+  });
+  const { service, repository } = fixture(engine, artifacts);
+  await assert.rejects(
+    service.execute({ id: "audio-cleanup-failure", operation: audioSequence, mutation: { type: "none" } }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED"
+  );
+  const record = await repository.get("audio-cleanup-failure");
+  assert.equal(record.status, "failed");
+  assert.deepEqual(record.attempts[0].cleanupFailedOutputUris, [audioSequence.outputUri]);
+  assert.equal(artifacts.files.has(audioSequence.outputUri), true);
+});
+
+test("audio sequence rejects pre-existing and symlink outputs at the Application boundary", async () => {
+  for (const kind of ["file", "symlink"]) {
+    const artifacts = new MemoryArtifacts();
+    (kind === "file" ? artifacts.files : artifacts.symlinks).add(audioSequence.outputUri);
+    const engine = new FakeEngine(async () => assert.fail("protected output must fail before execution"));
+    const { service } = fixture(engine, artifacts);
+    await assert.rejects(
+      service.execute({ id: `audio-${kind}`, operation: audioSequence, mutation: { type: "none" } }),
+      (error) => error instanceof MediaApplicationError && error.code === (kind === "file" ? "MEDIA_OUTPUT_EXISTS" : "MEDIA_INVALID_REQUEST")
+    );
+    assert.equal(engine.calls.length, 0);
+    assert.deepEqual(artifacts.removed, []);
+  }
+});
+
+test("audio sequence postcondition rejects clipped-format substitution or wrong duration", async () => {
+  for (const mutate of [
+    (result) => { result.probe.audioCodec = "pcm_s16le"; },
+    (result) => { result.durationMs -= 1; },
+    (result) => { result.audioSequence.maximumSimultaneousItemCount -= 1; },
+    (result) => { result.audioSequence.estimatedDataBytes -= 4; }
+  ]) {
+    const artifacts = new MemoryArtifacts();
+    const engine = new FakeEngine(async () => {
+      artifacts.files.add(audioSequence.outputUri);
+      const result = completedAudioSequence();
+      mutate(result);
+      return result;
+    });
+    const { service, history } = fixture(engine, artifacts);
+    await assert.rejects(
+      service.execute({ operation: audioSequence, mutation: { type: "none" } }),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED"
+    );
+    assert.equal(artifacts.files.has(audioSequence.outputUri), false);
+    assert.equal(history.current.history.revision, 0);
+  }
 });

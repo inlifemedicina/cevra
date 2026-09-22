@@ -242,7 +242,7 @@ test("close cancels and reaps an active subprocess without leaving the worker al
 test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async () => {
   const runtime = createRuntime();
   const tools = await runtime.client.listTools();
-  const expectedTools = ["cut", "cevra-extract-frame", "cevra-mux-audio", "cevra-overlay-media", "cevra-scale", "cevra-speed", "cevra-transcode"];
+  const expectedTools = ["cut", "cevra-extract-frame", "cevra-mux-audio", "cevra-overlay-media", "cevra-render-audio-sequence", "cevra-scale", "cevra-speed", "cevra-transcode"];
   assert.deepEqual(tools.map((tool) => tool.name), expectedTools);
   const health = await runtime.client.health();
   assert.equal(Object.hasOwn(health.tools, "redact"), false);

@@ -1,6 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MAX_MEDIA_DURATION_MS, MAX_MEDIA_FPS, MAX_MEDIA_HEIGHT, MAX_MEDIA_INPUTS, MAX_MEDIA_URI_LENGTH, MAX_MEDIA_WIDTH, MEDIA_DELIVERY_MATRIX, resolveAudioDelivery, resolveAudioMutationDelivery, resolveStandardAvDelivery, resolveTranscodeDelivery, validateCopyCompatibility, validateMediaOperation } from "../dist/index.js";
+import { MAX_AUDIO_SEQUENCE_ITEMS, MAX_MEDIA_DURATION_MS, MAX_MEDIA_FPS, MAX_MEDIA_HEIGHT, MAX_MEDIA_INPUTS, MAX_MEDIA_URI_LENGTH, MAX_MEDIA_WIDTH, MEDIA_DELIVERY_MATRIX, resolveAudioDelivery, resolveAudioMutationDelivery, resolveStandardAvDelivery, resolveTranscodeDelivery, validateCopyCompatibility, validateMediaOperation } from "../dist/index.js";
+
+function audioSequence(overrides = {}) {
+  return {
+    type: "render-audio-sequence",
+    version: 1,
+    sources: [
+      { id: "a", uri: "/media/a.wav" },
+      { id: "b", uri: "/media/b.mov" },
+      { id: "c", uri: "/media/c.wav" }
+    ],
+    items: [
+      { sourceId: "a", sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 0 },
+      { sourceId: "b", sourceStartMs: 500, sourceEndMs: 1500, timelineStartMs: 1000, gainDb: -3, fadeInMs: 100 },
+      { sourceId: "a", sourceStartMs: 2000, sourceEndMs: 2500, timelineStartMs: 2000 },
+      { sourceId: "c", sourceStartMs: 0, sourceEndMs: 500, timelineStartMs: 2500, fadeOutMs: 100 }
+    ],
+    outputUri: "/media/staging/audio.wav",
+    outputDurationMs: 3500,
+    outputChannelLayout: "stereo",
+    ...overrides
+  };
+}
 
 test("valid typed trim operation is accepted", () => {
   const operation = validateMediaOperation({ type: "trim", inputUri: "in.mp4", outputUri: "out.mp4", startMs: 0, endMs: 1000 });
@@ -93,4 +115,35 @@ test("numeric contracts reject non-finite, fractional pixel and misaligned speed
   assert.throws(() => validateMediaOperation({ type: "crop", inputUri: "in.mp4", outputUri: "out.mp4", x: 0.5, y: 0, width: 100, height: 100 }), /non-negative integer/);
   assert.throws(() => validateMediaOperation({ type: "transcode", inputUri: "in.mp4", outputUri: "out.mp4", width: 1920.5 }), /positive integer/);
   assert.throws(() => validateMediaOperation({ type: "speed", inputUri: "in.mp4", outputUri: "out.mp4", factor: 0.01 }), /between/);
+});
+
+test("audio sequence V1 accepts general multi-source placement and repeated non-contiguous source use", () => {
+  const operation = validateMediaOperation(audioSequence());
+  assert.equal(operation.type, "render-audio-sequence");
+  assert.equal(operation.sources.length, 3);
+  assert.deepEqual(operation.items.filter((item) => item.sourceId === "a").map((item) => item.sourceStartMs), [0, 2000]);
+});
+
+test("audio sequence V1 has no two-source special case", () => {
+  const sources = Array.from({ length: 32 }, (_, index) => ({ id: `s${index}`, uri: `/media/source-${index}.wav` }));
+  const items = sources.map((source, index) => ({ sourceId: source.id, sourceStartMs: 0, sourceEndMs: 10, timelineStartMs: index * 10 }));
+  assert.doesNotThrow(() => validateMediaOperation(audioSequence({ sources, items, outputDurationMs: 320 })));
+});
+
+test("audio sequence V1 rejects malformed nested fields, unsafe timing, aliasing and unused sources", () => {
+  assert.throws(() => validateMediaOperation(audioSequence({ version: 2 })), /version must be 1/);
+  assert.throws(() => validateMediaOperation(audioSequence({ outputUri: "relative.wav" })), /absolute local WAV/);
+  assert.throws(() => validateMediaOperation(audioSequence({ outputUri: "/media/a.wav" })), /alias outputUri/);
+  assert.throws(() => validateMediaOperation(audioSequence({ items: [{ sourceId: "a", sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 3000 }] })), /extends beyond/);
+  assert.throws(() => validateMediaOperation(audioSequence({ items: [{ sourceId: "a", sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 0, filtergraph: "evil" }] })), /Forbidden execution field/);
+  assert.throws(() => validateMediaOperation(audioSequence({ items: [{ sourceId: "a", sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 0, fadeInMs: 600, fadeOutMs: 500 }] })), /fades overlap/);
+  assert.throws(() => validateMediaOperation(audioSequence({ sources: [...audioSequence().sources, { id: "unused", uri: "/media/unused.wav" }] })), /declared but unused/);
+  assert.throws(() => validateMediaOperation(audioSequence({ items: Array(MAX_AUDIO_SEQUENCE_ITEMS + 1).fill(audioSequence().items[0]) })), /items must contain/);
+});
+
+test("audio sequence V1 enforces ordinary RIFF size before execution", () => {
+  assert.throws(
+    () => validateMediaOperation(audioSequence({ outputDurationMs: 4 * 60 * 60 * 1000 })),
+    /RIFF\/WAV data-size boundary/
+  );
 });
