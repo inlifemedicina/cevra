@@ -1419,9 +1419,9 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` after the cross-platform/runtime prerequisites implementation merge:
+Canonical remote `main` at the start of Audio Sequence Runtime V1:
 
-`13dc11a869fdb103be609a66d312ea49966cc0df`
+`21e7cce26af6b1bb744fe8f47f9b34461426bd61`
 
 PR #30 merged the implementation by normal merge commit. Post-merge CI run
 `35668351461` passed all five required jobs.
@@ -1472,6 +1472,20 @@ the existing configurable timeout, liveness, cancellation, settlement,
 worker-exit and artifact-cleanup mechanisms satisfy this bounded prerequisite.
 Real Windows runtime/export execution remains a later validation gate. Windows
 H.264/export, HDR-to-SDR and the coordinated Media Runtime gate are not closed.
+
+**Audio Sequence Runtime V1 — IN DEVELOPMENT.** The Product Owner approved the
+first bounded coordinated Media Runtime production slice: a general typed
+multi-source `render-audio-sequence` operation producing explicit-duration,
+48 kHz interleaved float32 mono/stereo WAV. It preserves channels when layouts
+match, duplicates mono to stereo, uses `0.5L + 0.5R` for stereo to mono, and
+applies only supplied gain, fades and linear overlap. It does not impose a
+two-video project model, edit Project IR/history, perform mastering, or deliver
+the full J-cut workflow. [ADR 0020](adr/0020-audio-sequence-runtime-v1.md)
+records the contract, execution safeguards, artifact ownership and exact-runtime
+validation gate. The implementation reuses
+the corrected research evidence at
+`4cf2e3d6fd74d8a1111b0d8c6ba9e559170f48ef`; the coordinated Media Runtime gate
+remains open.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
