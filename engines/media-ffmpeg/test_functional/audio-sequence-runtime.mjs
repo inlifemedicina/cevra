@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { closeSync, fstatSync, ftruncateSync, mkdtempSync, openSync, readFileSync, readSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { closeSync, fstatSync, ftruncateSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, statSync, writeFileSync, writeSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -9,6 +9,8 @@ import { InMemoryMediaExecutionRepository, MediaApplicationService } from "@cevr
 import { FfmpegMediaEngine, NodeMediaArtifactStore, PersistentMediaWorkerClient, ProcessMediaWorkerTransport } from "../dist/index.js";
 
 const SAMPLE_RATE = 48_000;
+const PROCESS_COUNT_CEILING = 2;
+const RSS_KIB_CEILING = 768 * 1024;
 const root = mkdtempSync(path.join(os.tmpdir(), "cevra-audio-sequence-functional-"));
 const runtimeRoot = path.resolve(required("CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT"));
 const releaseMode = process.env.CEVRA_AUDIO_SEQUENCE_RELEASE === "1";
@@ -39,11 +41,13 @@ let execution = 0;
 async function main() {
 try {
   await runJcut();
+  await runAudioCoverageFixtures();
   await runChannelsGainFadeAndHeadroom();
   for (const count of [3, 8, 16, 32]) await runDistinctSources(count);
   for (const count of [64, 256]) await runItemCount(count);
   for (const count of [2, 4, 8]) await runOverlap(count);
   await runLateThirtyMinuteSources();
+  await runCompressedLongFormReorderedSource();
   await runLongOutput();
   await runAudioBearingVideo();
   await runCancellation();
@@ -87,10 +91,41 @@ async function runJcut() {
   assert.ok(Math.max(...errors) <= toleranceSamples, `J-cut sample error ${Math.max(...errors)} > ${toleranceSamples}`);
   assert.ok(Math.abs(wav.sampleAt(msToFrame(1_490), 0) - 0.01) < 0.002, "A audio disappeared before its authorized end");
   assert.ok(Math.abs(wav.sampleAt(msToFrame(1_510), 0) - (-0.02)) < 0.003, "B audio did not begin at its authorized placement");
-  const oldWrongVideoSchedule = [2_600, 3_200, 3_800, 4_400];
-  const negativeErrorsMs = observed.slice(expectedA.length).map((frame, index) => Math.abs(frame / 48 - oldWrongVideoSchedule[index]));
-  assert.ok(Math.max(...negativeErrorsMs) >= 499, "mandatory old 500 ms mapping negative control did not fail");
-  measurements.push({ name: "jcut-oracle", status: "PASS", toleranceSamples, toleranceMs: toleranceSamples / 48, maximumObservedErrorSamples: Math.max(...errors), maximumObservedErrorMs: Math.max(...errors) / 48, oldMappingMinimumErrorMs: Math.min(...negativeErrorsMs) });
+  const wrongOutput = path.join(root, "jcut-wrong-placement.wav");
+  await execute(sequence({ sources: [{ id: "a", uri: a }, { id: "b", uri: b }], items: [
+    item("a", 0, 1_500, 0), item("b", 0, 2_000, 2_000)
+  ], output: wrongOutput, outputDurationMs: 4_000, layout: "stereo" }), "jcut-wrong-placement-negative-control");
+  const wrongWav = new Wav(wrongOutput);
+  const wrongObserved = expectedB.slice(0, 3).map((ms) => wrongWav.peakNear(msToFrame(ms + 500), 0, 8));
+  const negativeErrorsMs = wrongObserved.map((frame, index) => Math.abs(frame / 48 - expectedB[index]));
+  assert.ok(Math.min(...negativeErrorsMs) >= 499, "executed wrong-placement negative control did not fail the positive timing oracle");
+  measurements.push({ name: "jcut-oracle", status: "PASS", toleranceSamples, toleranceMs: toleranceSamples / 48, maximumObservedErrorSamples: Math.max(...errors), maximumObservedErrorMs: Math.max(...errors) / 48, executedWrongPlacementMinimumErrorMs: Math.min(...negativeErrorsMs) });
+}
+
+async function runAudioCoverageFixtures() {
+  const shortAudioVideo = path.join(root, "long-container-short-audio.mp4");
+  runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=black:s=64x64:r=10:d=10", "-f", "lavfi", "-i", "sine=frequency=700:sample_rate=48000:duration=2", "-map", "0:v:0", "-map", "1:a:0", "-c:v", "mpeg4", "-c:a", "aac", shortAudioVideo]);
+  await assert.rejects(
+    execute(sequence({ sources: [{ id: "short", uri: shortAudioVideo }], items: [item("short", 7_000, 8_000, 0)], output: path.join(root, "beyond-audio.wav"), outputDurationMs: 1_000, layout: "mono" }), "reject-range-beyond-audio"),
+    /proven audio timeline coverage/u
+  );
+  await assert.rejects(
+    execute(sequence({ sources: [{ id: "short", uri: shortAudioVideo }], items: [item("short", 1_500, 2_500, 0)], output: path.join(root, "partial-beyond-audio.wav"), outputDurationMs: 1_000, layout: "mono" }), "reject-partial-range-beyond-audio"),
+    /proven audio timeline coverage/u
+  );
+
+  const silence = path.join(root, "recorded-silence.wav");
+  writeFloatWav(silence, { sampleRate: SAMPLE_RATE, channels: 1, durationMs: 3_000 });
+  const silenceOutput = path.join(root, "recorded-silence-output.wav");
+  await execute(sequence({ sources: [{ id: "silence", uri: silence }], items: [item("silence", 1_000, 2_000, 0)], output: silenceOutput, outputDurationMs: 1_000, layout: "mono" }), "genuine-recorded-silence");
+  assert.equal(new Wav(silenceOutput).maximumAbsolute(0, 1_000), 0);
+
+  const late = path.join(root, "late-audio-start.mp4");
+  runFfmpeg(["-y", "-f", "lavfi", "-i", "color=c=black:s=64x64:r=10:d=5", "-itsoffset", "2", "-f", "lavfi", "-i", "sine=frequency=900:sample_rate=48000:duration=1", "-map", "0:v:0", "-map", "1:a:0", "-c:v", "mpeg4", "-c:a", "aac", late]);
+  const lateOutput = path.join(root, "late-audio-start-output.wav");
+  await execute(sequence({ sources: [{ id: "late", uri: late }], items: [item("late", 2_000, 3_000, 0)], output: lateOutput, outputDurationMs: 1_000, layout: "mono" }), "late-nonzero-audio-start");
+  assert.ok(new Wav(lateOutput).maximumAbsolute(0, 1_000) > 0.03);
+  measurements.push({ name: "audio-stream-coverage", status: "PASS", longContainerShortAudioRejected: true, partialCoverageRejected: true, genuineRecordedSilenceAccepted: true, lateAudioStartAccepted: true });
 }
 
 async function runChannelsGainFadeAndHeadroom() {
@@ -181,6 +216,27 @@ async function runLateThirtyMinuteSources() {
   for (const expected of [50, 150, 250]) assert.ok(Math.abs(wav.sampleAt(msToFrame(expected), 0)) > 0.2);
 }
 
+async function runCompressedLongFormReorderedSource() {
+  const sourceWav = path.join(root, "compressed-long-form-source.wav");
+  writeFloatWav(sourceWav, { sampleRate: SAMPLE_RATE, channels: 1, durationMs: 120_000, segments: [
+    { startMs: 1_000, endMs: 1_250, values: [0.2] },
+    { startMs: 60_000, endMs: 60_250, values: [0.45] },
+    { startMs: 118_000, endMs: 118_250, values: [0.75] }
+  ] });
+  const compressed = path.join(root, "compressed-long-form.m4a");
+  runFfmpeg(["-y", "-i", sourceWav, "-c:a", "aac", "-b:a", "192k", compressed]);
+  const output = path.join(root, "compressed-reordered.wav");
+  await execute(sequence({ sources: [{ id: "compressed", uri: compressed }], items: [
+    item("compressed", 118_000, 118_250, 0),
+    item("compressed", 1_000, 1_250, 300),
+    item("compressed", 60_000, 60_250, 500)
+  ], output, outputDurationMs: 800, layout: "mono" }), "compressed-long-form-reordered");
+  const wav = new Wav(output);
+  const observed = [wav.meanAbsolute(50, 200), wav.meanAbsolute(350, 500), wav.meanAbsolute(550, 700)];
+  assert.ok(observed[0] > observed[2] && observed[2] > observed[1], `compressed reordered contributions are wrong: ${observed}`);
+  measurements.push({ name: "compressed-long-form-order", status: "PASS", sourceDurationMs: 120_000, sourceBytes: statSync(compressed).size, observedMeanAbsolute: observed });
+}
+
 async function runLongOutput() {
   const uri = path.join(root, "long-source.wav");
   writeFloatWav(uri, { sampleRate: SAMPLE_RATE, channels: 1, durationMs: 100, events: [{ ms: 10, values: [0.5] }] });
@@ -226,8 +282,12 @@ async function measure(name, sourceCount, itemCount, output, action) {
     const value = await action();
     const wallMs = performance.now() - started;
     const resource = sampler.stop();
+    assert.ok(resource.processCountPeak <= PROCESS_COUNT_CEILING, `${name} process topology ${resource.processCountPeak} exceeds ${PROCESS_COUNT_CEILING}`);
+    assert.ok(resource.rssKiBPeak <= RSS_KIB_CEILING, `${name} peak RSS ${resource.rssKiBPeak} KiB exceeds ${RSS_KIB_CEILING} KiB`);
+    const stagingArtifactCount = readdirSync(path.dirname(output)).filter((entry) => entry.startsWith(".cevra-audio-sequence-")).length;
+    assert.equal(stagingArtifactCount, 0, `${name} left owned staging artifacts`);
     const outputBytes = exists(output) ? statSync(output).size : 0;
-    measurements.push({ name, status: "PASS", cold: measurements.length === 0, distinctSourceCount: sourceCount, itemCount, maximumOpenInputDecoders: sourceCount, processCountPeak: resource.processCountPeak, peakProcessTreeRssKiB: resource.rssKiBPeak, peakSampledCpuPercent: resource.cpuPercentPeak, wallMs: round(wallMs), outputBytes });
+    measurements.push({ name, status: "PASS", cold: measurements.length === 0, distinctSourceCount: sourceCount, itemCount, configuredInputDecoderCount: sourceCount, processCountPeak: resource.processCountPeak, processCountCeiling: PROCESS_COUNT_CEILING, peakProcessTreeRssKiB: resource.rssKiBPeak, peakProcessTreeRssKiBCeiling: RSS_KIB_CEILING, peakSampledCpuPercent: resource.cpuPercentPeak, wallMs: round(wallMs), outputBytes, ownedStagingArtifactCount: stagingArtifactCount, ownedStagingArtifactCountCeiling: 0 });
     return { value, wallMs };
   } catch (error) {
     sampler.stop();
@@ -270,8 +330,9 @@ function exists(value) { try { statSync(value); return true; } catch { return fa
 function round(value) { return Math.round(value * 1000) / 1000; }
 function firstLine(value) { return value.split(/\r?\n/u)[0]; }
 function required(name) { const value = process.env[name]; if (!value) throw new Error(`${name} is required`); return value; }
+function runFfmpeg(args) { const result = spawnSync(ffmpeg, ["-hide_banner", "-loglevel", "error", ...args], { encoding: "utf8" }); assert.equal(result.status, 0, result.stderr); }
 
-function writeFloatWav(file, { sampleRate, channels, durationMs, base = 0, events = [] }) {
+function writeFloatWav(file, { sampleRate, channels, durationMs, base = 0, events = [], segments = [] }) {
   const frames = Math.round(durationMs * sampleRate / 1000);
   const dataBytes = frames * channels * 4;
   const header = Buffer.alloc(44);
@@ -284,12 +345,19 @@ function writeFloatWav(file, { sampleRate, channels, durationMs, base = 0, event
     writeSync(fd, header, 0, header.length, 0);
     ftruncateSync(fd, 44 + dataBytes);
     const baseValues = Array.isArray(base) ? base : Array(channels).fill(base);
-    if (baseValues.some((value) => value !== 0)) {
+    if (baseValues.some((value) => value !== 0) || segments.length) {
       const blockFrames = 8_192;
       const block = Buffer.alloc(blockFrames * channels * 4);
-      for (let frame = 0; frame < blockFrames; frame += 1) for (let channel = 0; channel < channels; channel += 1) block.writeFloatLE(baseValues[channel] ?? baseValues[0], (frame * channels + channel) * 4);
       for (let frame = 0; frame < frames; frame += blockFrames) {
         const count = Math.min(blockFrames, frames - frame);
+        for (let relative = 0; relative < count; relative += 1) {
+          const ms = (frame + relative) * 1000 / sampleRate;
+          const segment = segments.find((candidate) => candidate.startMs <= ms && ms < candidate.endMs);
+          for (let channel = 0; channel < channels; channel += 1) {
+            const values = segment?.values ?? baseValues;
+            block.writeFloatLE(values[channel] ?? values[0], (relative * channels + channel) * 4);
+          }
+        }
         writeSync(fd, block, 0, count * channels * 4, 44 + frame * channels * 4);
       }
     }
@@ -345,6 +413,12 @@ class Wav {
     const fd = openSync(this.file, "r"); const buffer = Buffer.alloc((end - start) * this.channels * 4);
     try { readSync(fd, buffer, 0, buffer.length, this.dataOffset + start * this.channels * 4); } finally { closeSync(fd); }
     let peak = 0; for (let offset = 0; offset < buffer.length; offset += 4) peak = Math.max(peak, Math.abs(buffer.readFloatLE(offset))); return peak;
+  }
+  meanAbsolute(startMs, endMs) {
+    const start = msToFrame(startMs); const end = Math.min(this.frames, msToFrame(endMs));
+    const fd = openSync(this.file, "r"); const buffer = Buffer.alloc((end - start) * this.channels * 4);
+    try { readSync(fd, buffer, 0, buffer.length, this.dataOffset + start * this.channels * 4); } finally { closeSync(fd); }
+    let sum = 0; for (let offset = 0; offset < buffer.length; offset += this.channels * 4) sum += Math.abs(buffer.readFloatLE(offset)); return sum / Math.max(1, end - start);
   }
 }
 

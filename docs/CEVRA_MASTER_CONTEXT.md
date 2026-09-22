@@ -1488,7 +1488,14 @@ the corrected research evidence at
 remains open. Branch CI run `35742354475` passed the five normal jobs plus the
 additional exact managed-runtime catalog on native macOS arm64; this is
 implementation evidence, not merge/closeout or delivery of the full editable
-J-cut workflow.
+J-cut workflow. Targeted pre-PR remediation now makes selected audio-stream
+timeline coverage authoritative instead of container duration, measures output
+sample/data counts from RIFF chunks, preserves race-winning or crash-ambiguous
+destinations unless successful worker publication proves attempt ownership,
+executes an actually wrong placement through the timing oracle, adds compressed
+long-form/resource regression evidence, and keeps exact-runtime CI durable for
+relevant future changes on `main`. Media Worker identity advances to 0.2.1;
+final feature-head CI remains the review gate.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 

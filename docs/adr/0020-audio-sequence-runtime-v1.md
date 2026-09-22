@@ -33,8 +33,11 @@ The output is ordinary RIFF/WAV containing interleaved `pcm_f32le` at 48 kHz.
 Integer milliseconds therefore map to exactly 48 output samples. The output
 timeline is `[0, outputDurationMs)`: uncovered intervals are deliberate
 silence, and an item that would cross the explicit end is rejected rather than
-truncated. The worker also rejects a source range beyond the probed source
-duration.
+truncated. Container duration is not proof of audio coverage. The selected
+audio stream's `start_pts`/`time_base` and `duration_ts`, with bounded stream
+timestamp/duration fallback, must prove every requested source interval; when
+stream coverage cannot be proven, execution fails closed. Recorded zero-valued
+samples inside proven coverage remain valid audio.
 
 Channel semantics are fixed:
 
@@ -90,9 +93,18 @@ temporary directory beside the requested output. After probe/postcondition
 validation, a same-filesystem hard link publishes the staged file atomically
 and fails if another writer created the destination. On worker failure or
 cancellation, only the staged file, a successfully promoted output known to be
-owned by the attempt, and the owned graph file may be removed. Pre-existing,
-race-winning and foreign paths remain untouched; cleanup failure is reported
-rather than hidden.
+owned by the attempt, and the owned graph file may be removed. Application
+cleanup treats a destination as attempt-owned only after the worker returns a
+matching successful file result. A destination observed after engine failure,
+cancellation, or a crash before that evidence is persisted is ambiguous and is
+preserved. Future recovery may flag such a leftover rather than destroy it;
+cleanup failure for known-owned artifacts is reported rather than hidden.
+
+Output verification parses the actual RIFF chunks instead of assuming a fixed
+header size. Measured sample-frame and data-byte counts must equal the explicit
+duration, sample rate, channel count and estimated data size before publication.
+`outputSampleCount` is measured artifact evidence; `estimatedDataBytes` remains
+a request-derived preflight value.
 
 Runtime identity advances with this CEVRA-owned operation. The pinned FFmpeg,
 private Python, signature, manifest-integrity, release isolation, one-active-job,
@@ -113,12 +125,14 @@ and cancellation without output publication. The compiler is also tested at
 the 2,048-item structural bound.
 
 Local macOS arm64 characterization uses a development Homebrew FFmpeg and is
-not release proof. A branch-restricted normal-CI job builds FFmpeg 9.0.1 from
+not release proof. A dedicated path-filtered CI workflow builds FFmpeg 9.0.1 from
 the pinned signature-verified source, assembles the exact managed private
-runtime and runs the same catalog on the standard macOS arm64 runner. Branch
-CI run `35742354475` passed all five normal jobs and the additional exact-runtime
-job; that job executed the catalog successfully with CEVRA Media Worker 0.2.0,
-FFmpeg 9.0.1 and private CPython 3.12.14 on macOS arm64. The slice remains in
+runtime and runs the same catalog on the standard macOS arm64 runner. It runs
+for relevant pull requests, the implementation branch, and relevant changes
+merged to `main`; unrelated docs-only changes do not rebuild FFmpeg. The
+remediation advances the CEVRA Media Worker identity to 0.2.1 because source
+coverage and artifact-evidence semantics changed. Final remediation CI evidence
+is recorded on the feature branch before re-review. The slice remains in
 development until independent review and merge.
 
 ## Consequences and compatibility
