@@ -1,6 +1,6 @@
 # ADR 0020 — Audio Sequence Runtime V1
 
-**Status:** Accepted for implementation — IN DEVELOPMENT
+**Status:** Accepted by this implementation — IMPLEMENTED / CLOSED
 **Date:** 2026-09-22
 
 ## Context
@@ -113,8 +113,11 @@ Existing `extract-audio` and Alignment PCM preparation semantics are unchanged.
 
 ## Implementation and validation status
 
-Implementation is in development on `feat/audio-sequence-runtime-v1` from
-canonical main `21e7cce26af6b1bb744fe8f47f9b34461426bd61`.
+Implementation merged in PR #36 by normal merge commit
+`a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
+`35762551155` passed all five required jobs, and post-merge exact managed macOS
+arm64 runtime run `35762551203` passed the functional audio catalog. The CEVRA
+Media Worker runtime identity is `0.2.1`.
 
 The production-path acceptance catalog exercises distinct source counts 3, 8,
 16 and 32; 64 and 256 items; 2, 4 and 8 simultaneous items; 44.1/48 kHz input;
@@ -131,9 +134,14 @@ runtime and runs the same catalog on the standard macOS arm64 runner. It runs
 for relevant pull requests, the implementation branch, and relevant changes
 merged to `main`; unrelated docs-only changes do not rebuild FFmpeg. The
 remediation advances the CEVRA Media Worker identity to 0.2.1 because source
-coverage and artifact-evidence semantics changed. Final remediation CI evidence
-is recorded on the feature branch before re-review. The slice remains in
-development until independent review and merge.
+coverage and artifact-evidence semantics changed. Final feature-head and
+post-merge evidence close this bounded slice.
+
+The delivered executor remains general rather than a two-video special case.
+One request is bounded to 128 distinct sources and 2,048 items; exact-runtime
+evidence exercised 3, 8, 16 and 32 distinct sources, 64 and 256 items, and 2,
+4 and 8 simultaneous items. These are operation safeguards and tested evidence,
+not project video limits.
 
 ## Consequences and compatibility
 
@@ -158,3 +166,15 @@ identity/profile. Generated PCM is not Transcript Cache or history content.
 - general cache, quota, crash-leftover or garbage-collection systems.
 
 None of these broader gates is closed by this ADR.
+
+## Deferred non-blocking hardening
+
+- fail closed if the resource sampler produces no measurement;
+- retain the conservative fail-closed treatment of negative-start or
+  codec-priming tail ambiguity unless stronger evidence justifies a change;
+- tighten `WAVE_FORMAT_EXTENSIBLE` GUID validation if later compatibility
+  evidence makes it useful.
+
+These notes do not reproduce a current correctness failure, block dependent
+production work or require migration of Project IR or runtime semantics. They
+remain deferred rather than changing the independently reviewed implementation.

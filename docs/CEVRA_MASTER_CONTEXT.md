@@ -1419,12 +1419,13 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` at the start of Audio Sequence Runtime V1:
+Canonical remote `main` after the Audio Sequence Runtime V1 feature merge:
 
-`21e7cce26af6b1bb744fe8f47f9b34461426bd61`
+`a18f19a06b33669c149c58f57bc74f385c0a02f2`
 
-PR #30 merged the implementation by normal merge commit. Post-merge CI run
-`35668351461` passed all five required jobs.
+PR #36 merged the Audio Sequence Runtime V1 implementation by normal merge
+commit. Post-merge CI run `35762551155` passed all five required jobs and exact
+managed-runtime run `35762551203` passed on macOS arm64.
 
 ## 24.2 Important merged milestones
 
@@ -1446,6 +1447,7 @@ PR #30 merged the implementation by normal merge commit. Post-merge CI run
 | Project Persistence V1 | #20 | `a36c5c56d5b0791cf4732550aac7f6adffed2bfa` | CLOSED |
 | Local Forced Alignment V1 | #22 | `45913175b30c42a2758820a2937fe9a0126ab739` | CLOSED |
 | ProjectHistory Scalability V2 | #30 | `b6f201afa73aae0aa85f8a3d4187a568ab749e72` | IMPLEMENTED / CLOSED |
+| Audio Sequence Runtime V1 | #36 | `a18f19a06b33669c149c58f57bc74f385c0a02f2` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1473,29 +1475,35 @@ worker-exit and artifact-cleanup mechanisms satisfy this bounded prerequisite.
 Real Windows runtime/export execution remains a later validation gate. Windows
 H.264/export, HDR-to-SDR and the coordinated Media Runtime gate are not closed.
 
-**Audio Sequence Runtime V1 — IN DEVELOPMENT.** The Product Owner approved the
-first bounded coordinated Media Runtime production slice: a general typed
-multi-source `render-audio-sequence` operation producing explicit-duration,
-48 kHz interleaved float32 mono/stereo WAV. It preserves channels when layouts
-match, duplicates mono to stereo, uses `0.5L + 0.5R` for stereo to mono, and
-applies only supplied gain, fades and linear overlap. It does not impose a
-two-video project model, edit Project IR/history, perform mastering, or deliver
-the full J-cut workflow. [ADR 0020](adr/0020-audio-sequence-runtime-v1.md)
-records the contract, execution safeguards, artifact ownership and exact-runtime
-validation gate. The implementation reuses
-the corrected research evidence at
-`4cf2e3d6fd74d8a1111b0d8c6ba9e559170f48ef`; the coordinated Media Runtime gate
-remains open. Branch CI run `35742354475` passed the five normal jobs plus the
-additional exact managed-runtime catalog on native macOS arm64; this is
-implementation evidence, not merge/closeout or delivery of the full editable
-J-cut workflow. Targeted pre-PR remediation now makes selected audio-stream
-timeline coverage authoritative instead of container duration, measures output
-sample/data counts from RIFF chunks, preserves race-winning or crash-ambiguous
-destinations unless successful worker publication proves attempt ownership,
-executes an actually wrong placement through the timing oracle, adds compressed
-long-form/resource regression evidence, and keeps exact-runtime CI durable for
-relevant future changes on `main`. Media Worker identity advances to 0.2.1;
-final feature-head CI remains the review gate.
+**Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
+merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
+`35762551155` passed all five required jobs, and exact managed macOS arm64
+runtime run `35762551203` passed the functional catalog on the merge SHA. The
+general typed `render-audio-sequence` executor produces explicit-duration,
+48 kHz interleaved float32 mono/stereo WAV with independent source/timeline
+timing, supplied gain/fades and linear overlap. Runtime identity is `0.2.1`.
+
+This is not a two-video project limitation. One request is bounded to 128
+distinct sources and 2,048 items; exact-runtime execution covered 3, 8, 16 and
+32 distinct sources, 64 and 256 items, and 2, 4 and 8 simultaneous items. Source
+audio coverage fails closed from selected-stream timing evidence rather than
+being replaced by the global silence base. Output sample/data counts are
+measured from actual RIFF/WAV chunks. Owner-scoped staging, exclusive
+publication and Application ownership evidence preserve race-winning or
+crash-ambiguous foreign destinations. [ADR 0020](adr/0020-audio-sequence-runtime-v1.md)
+records the closed scope and the research lineage at
+`4cf2e3d6fd74d8a1111b0d8c6ba9e559170f48ef`.
+
+Resource-sampler no-measurement fail-closed hardening, conservative
+negative-start/codec-priming tail behavior and stricter
+`WAVE_FORMAT_EXTENSIBLE` GUID validation remain non-blocking LOW/NOTE work.
+No current correctness failure is reproduced, dependent work is not blocked,
+and later correction needs no Project IR or runtime-semantic migration. The
+complete editable J-cut workflow, measurement/mastering, Composition, Windows
+H.264, HDR and other coordinated Media Runtime slices remain open; the
+coordinated Media Runtime adjustment gate is not closed. The next active slice
+inside that gate is typed audio measurement (MR-A02), which must establish
+measurement evidence before automatic audio policy or mastering decisions.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
