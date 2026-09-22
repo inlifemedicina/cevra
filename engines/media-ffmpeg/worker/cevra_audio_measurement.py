@@ -17,6 +17,7 @@ from cevra_streaming_process import reduce_lines
 
 METHOD = "cevra.audio-measurement.native-swr4.v1"
 MAX_MS = 7 * 24 * 60 * 60 * 1000
+TRUE_PEAK_GUARD_MS = 50
 # Covers the pinned meter's common native-rate range, with integral 100 ms hops.
 RATES = {8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 88200, 96000, 176400, 192000}
 # ebur128 uses sample_rate / 10 (integer) internally. Do not claim exact 100 ms
@@ -52,7 +53,8 @@ def sample_boundary(ms: int, rate: int) -> int:
     return (ms * rate + 999) // 1000
 
 
-def graph(index: int, rate: int, channels: int, start: int, end: int) -> str:
+def graph(index: int, rate: int, channels: int, start: int, end: int,
+          guard_start: int, guard_end: int) -> str:
     layout = "mono" if channels == 1 else "stereo"
     raw_stats = "Peak_level+RMS_level+Number_of_NaNs+Number_of_Infs"
     def stats(measures: str, label: str) -> str:
@@ -62,14 +64,19 @@ def graph(index: int, rate: int, channels: int, start: int, end: int) -> str:
     # 0 = exact zero; 1 = nonzero; 3 = reaches full scale; 7 = exceeds it.
     # This predicate runs in native double precision, BEFORE any text rounding.
     flags = "|".join(f"not(eq(val({ch}),0))+2*gte(abs(val({ch})),1)+4*gt(abs(val({ch})),1)" for ch in range(channels))
+    peak_start = (start - guard_start) * 4
+    peak_end = peak_start + (end - start) * 4
     return (
-        f"[0:{index}]asettb=1/{rate},atrim=start_pts={start}:end_pts={end},"
+        f"[0:{index}]asettb=1/{rate},aformat=sample_fmts=dbl,asplit=2[core][context];"
+        f"[core]atrim=start_pts={start}:end_pts={end},"
         "aformat=sample_fmts=dbl,ametadata=mode=delete," + stats("none", "coverage") + ","
-        "ametadata=mode=delete,asetpts=N/SR/TB,asplit=3[r][p][f];"
+        "ametadata=mode=delete,asetpts=N/SR/TB,asplit=2[r][f];"
         "[r]ebur128=metadata=1:peak=none:dualmono=false," + stats(raw_stats, "raw") + "[measured];"
-        f"[p]aresample={rate * 4}:resampler=swr:filter_size=32:phase_shift=10:exact_rational=1:linear_interp=1,"
-        + stats("Peak_level", "truepeak") + ",anullsink;"
         f"[f]aeval='{flags}':c={layout}," + stats("Max_level", "scale") + ",anullsink"
+        f";[context]atrim=start_pts={guard_start}:end_pts={guard_end},asetpts=N/SR/TB,"
+        f"aresample={rate * 4}:resampler=swr:filter_size=32:phase_shift=10:exact_rational=1:linear_interp=1,"
+        f"atrim=start_sample={peak_start}:end_sample={peak_end},asetpts=N/SR/TB,"
+        + stats("Peak_level", "truepeak") + ",anullsink"
     )
 
 
@@ -130,8 +137,8 @@ class Reduction:
         if label != "raw" or "lavfi.r128.M" not in frame:
             return
         count = self.number(frame, "lavfi.astats.Overall.Number_of_samples")
-        momentary = self.number(frame, "lavfi.r128.M")
-        if count >= self.rate * 0.4:
+        momentary = self.r128_window(frame, "lavfi.r128.M")
+        if momentary is not None and count >= self.rate * 0.4:
             if momentary > -70:
                 self.eligible += 1
                 self.integrated = self.number(frame, "lavfi.r128.I")
@@ -140,11 +147,29 @@ class Reduction:
             if momentary >= 9.999:
                 self.upper_range = True  # native integrated histogram ends at +10 LUFS
         if count >= self.rate * 3:
-            short = self.number(frame, "lavfi.r128.S")
-            floor = -0.691 + 10 * math.log10(1e-12 / (3 * self.rate))
-            if short > floor + 0.001:
-                self.short_max = short if self.short_max is None else max(self.short_max, short)
-                self.short_count += 1
+            short = self.r128_window(frame, "lavfi.r128.S")
+            if short is not None:
+                floor = -0.691 + 10 * math.log10(1e-12 / (3 * self.rate))
+                if short > floor + 0.001:
+                    self.short_max = short if self.short_max is None else max(self.short_max, short)
+                    self.short_count += 1
+
+    @staticmethod
+    def r128_window(frame: dict[str, str], key: str) -> float | None:
+        """Ignore only FFmpeg's known negative-residue NaN in M/S windows.
+
+        Infinity, malformed metadata, and non-finite decoded samples remain
+        fail-closed through this parser and astats respectively.
+        """
+        try:
+            value = float(frame[key])
+        except (KeyError, ValueError):
+            raise MeasurementError("INVALID_METADATA") from None
+        if math.isnan(value):
+            return None
+        if not math.isfinite(value):
+            raise MeasurementError("INVALID_METADATA")
+        return value
 
     @staticmethod
     def number(frame: dict[str, str], key: str) -> float:
@@ -234,7 +259,7 @@ def run(common: Any, args: dict[str, Any]) -> dict[str, Any]:
     ffprobe = str(Path(ffmpeg).with_name("ffprobe.exe" if str(ffmpeg).endswith(".exe") else "ffprobe"))
     try:
         reduce_lines([ffprobe, "-v", "error", "-select_streams", str(args["stream_index"]),
-                      "-show_entries", "stream=index,codec_type,sample_rate,channels,channel_layout,start_pts,start_time,time_base,duration_ts,duration",
+                      "-show_entries", "stream=index,codec_type,sample_rate,channels,channel_layout,start_pts,start_time,time_base,duration_ts,duration:stream_tags=DURATION",
                       "-of", "json", str(path)], collect_probe, timeout=30)
     except MeasurementError:
         raise
@@ -245,6 +270,14 @@ def run(common: Any, args: dict[str, Any]) -> dict[str, Any]:
     try:
         streams = json.loads("\n".join(probe_text))["streams"]
         audio = streams[0]
+        tags = audio.pop("tags", None)
+        if tags is not None:
+            if not isinstance(tags, dict) or not set(tags).issubset({"DURATION"}):
+                raise ValueError()
+            if "DURATION" in tags:
+                if not isinstance(tags["DURATION"], str):
+                    raise ValueError()
+                audio["duration_tag"] = tags["DURATION"]
         rate = int(audio["sample_rate"])
         channels = audio["channels"]
         if len(streams) != 1 or audio["index"] != args["stream_index"] or audio["codec_type"] != "audio":
@@ -259,20 +292,30 @@ def run(common: Any, args: dict[str, Any]) -> dict[str, Any]:
         origin_samples = coverage_start * rate / 1000
         if origin_samples.denominator != 1:
             raise ValueError()
+        coverage_start_sample = coverage_start * rate / 1000
+        coverage_end_sample = coverage_end * rate / 1000
         if args["start_ms"] < coverage_start or args["end_ms"] > coverage_end:
             raise ValueError()
     except (ValueError, KeyError, ZeroDivisionError):
         raise MeasurementError("UNPROVEN_COVERAGE") from None
     start, end = (sample_boundary(args[k], rate) for k in ("start_ms", "end_ms"))
+    # Fifty milliseconds exceeds the fixed SWR filter support by a wide margin.
+    # Real context is clipped to proven stream coverage; no synthetic padding is
+    # invented when the request touches a genuine source boundary.
+    guard = rate * TRUE_PEAK_GUARD_MS // 1000
+    guard_start = max(math.ceil(coverage_start_sample), start - guard)
+    guard_end = min(math.floor(coverage_end_sample), end + guard)
+    if guard_start > start or guard_end < end:
+        raise MeasurementError("UNPROVEN_COVERAGE")
     reduction = Reduction(rate, channels, start, end)
     # Bounded input preroll; decoding only the selected audio stream. Contiguous
     # actual PTS + frame counts after trim independently prove sample coverage.
     seek_ms = max(0, args["start_ms"] - 1000)
     command = [ffmpeg, "-hide_banner", "-nostdin", "-nostats", "-v", "error", "-xerror",
                "-filter_complex_threads", "1", "-threads", "1", "-copyts",
-               *(["-seek_timestamp", "1", "-ss", f"{seek_ms / 1000:.3f}"] if seek_ms else []),
+               *(["-seek_timestamp", "1", "-ss", f"{seek_ms / 1000:.3f}", "-noaccurate_seek"] if seek_ms else []),
                "-i", str(path), "-filter_complex",
-               graph(args["stream_index"], rate, channels, start, end),
+               graph(args["stream_index"], rate, channels, start, end, guard_start, guard_end),
                "-map", "[measured]", "-map_metadata", "-1", "-vn", "-sn", "-dn", "-c:a", "pcm_f64le", "-f", "null", "-"]
     timeout = float(os.environ.get("CEVRA_MEDIA_RENDER_TIMEOUT_SECONDS", "0"))
     if not math.isfinite(timeout) or timeout < 0:

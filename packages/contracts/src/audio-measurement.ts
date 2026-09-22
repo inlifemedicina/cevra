@@ -1,5 +1,7 @@
 /** Read-only acoustic evidence, never a QA verdict or a canonical project asset. */
 export const AUDIO_MEASUREMENT_METHOD = "cevra.audio-measurement.native-swr4.v1" as const;
+/** Covers six-decimal dB serialization plus native float fixture quantization near 1.0. */
+export const AUDIO_MEASUREMENT_LINEAR_TOLERANCE = 0.000002;
 export const AUDIO_MEASUREMENT_RATES = [8000, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 88200, 96000, 176400, 192000] as const;
 export const AUDIO_MEASUREMENT_ERROR_CODES = ["INVALID_REQUEST", "INVALID_STREAM", "UNSUPPORTED_STREAM", "UNPROVEN_COVERAGE", "INCOMPLETE_COVERAGE", "INVALID_METADATA", "INCOMPLETE_COLLECTION", "NON_FINITE_SAMPLES", "NUMERICAL_RANGE", "INPUT_CHANGED", "TIMEOUT", "DECODE_OR_COLLECTION_FAILED"] as const;
 export type AudioMeasurementErrorCode = typeof AUDIO_MEASUREMENT_ERROR_CODES[number];
@@ -70,6 +72,7 @@ export function validateAudioMeasurementReport(value: unknown, operation: Measur
   const count = report.channelLayout === "mono" ? 1 : 2;
   if (!Array.isArray(report.channels) || report.channels.length !== count) invalid();
   let silent = true;
+  let maximumSamplePeak = 0;
   for (const [index, value] of report.channels.entries()) {
     const channel = object(value, ["channelIndex", "rmsLinear", "samplePeakLinear", "reachesFullScale", "exceedsFullScale"]);
     if (channel.channelIndex !== index) invalid();
@@ -78,10 +81,16 @@ export function validateAudioMeasurementReport(value: unknown, operation: Measur
     if (rms > peak * 1.000001 || (peak === 0) !== (rms === 0)) invalid();
     if (typeof channel.reachesFullScale !== "boolean" || typeof channel.exceedsFullScale !== "boolean" || (channel.exceedsFullScale && !channel.reachesFullScale)) invalid();
     if (peak === 0 && (channel.reachesFullScale || channel.exceedsFullScale)) invalid();
+    if (channel.reachesFullScale && peak < 1 - AUDIO_MEASUREMENT_LINEAR_TOLERANCE) invalid();
+    if (!channel.reachesFullScale && peak > 1 + AUDIO_MEASUREMENT_LINEAR_TOLERANCE) invalid();
+    if (channel.exceedsFullScale && peak < 1 - AUDIO_MEASUREMENT_LINEAR_TOLERANCE) invalid();
+    if (!channel.exceedsFullScale && peak > 1 + AUDIO_MEASUREMENT_LINEAR_TOLERANCE) invalid();
+    maximumSamplePeak = Math.max(maximumSamplePeak, peak);
     silent &&= peak === 0;
   }
   const truePeak = nonnegative(report.truePeakLinear);
   if ((truePeak === 0) !== silent) invalid();
+  if (truePeak + AUDIO_MEASUREMENT_LINEAR_TOLERANCE * Math.max(1, maximumSamplePeak) < maximumSamplePeak) invalid();
   const integrated = loudness(report.integratedLufs, true);
   const short = loudness(report.shortTermMaxLufs, false);
   const observations = nonnegative(report.shortTermValidObservations);

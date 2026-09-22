@@ -2,8 +2,42 @@
 
 Base: `8aea564b7cdfd7d235fa72964f07eeed961c1bbc`.
 Branch: `feat/typed-audio-measurement-v1`.
-Status: IN DEVELOPMENT / implementation validated; independent review pending.
+Status: IN DEVELOPMENT / independent remediation review pending.
 Contract/method authority: [ADR 0021](adr/0021-audio-measurement-v1.md).
+
+## Independent adversarial findings and remediation
+
+The independent review of initial HEAD `772b5d84611064b3e23bc7e41a45afbae83967cd`
+validated five bounded correctness findings. All production fixes preserve the
+typed read-only operation, `mutation: none`, zero media artifacts, runtime
+identity 0.3.0 and method identity `cevra.audio-measurement.native-swr4.v1`;
+this method has not yet been published or merged.
+
+| Finding | Before | Bounded correction / current evidence |
+|---|---|---|
+| FFmpeg 9.0.1 R128 M/S NaN after signal → exact zero | A valid speech-like/sine clip followed by ≥500 ms zero aborted as `AUDIO_MEASUREMENT_INVALID_METADATA` | Only NaN M/S windows are skipped for their respective gated/short-term update. Prior valid integrated evidence survives. Infinity and decoded NaN/Inf remain fail-closed. Signal→zero, fade→zero, clip→1 s gap→clip and Audio Sequence with a real 500 ms gap all pass locally. |
+| MPEG-TS input seek | `-copyts -seek_timestamp 1 -ss` permitted FFmpeg accurate-seek to apply container start time again | `-noaccurate_seek` is an input option before `-i`; exact selection remains typed `atrim` plus PTS/frame coverage validation. Two windows in a generated non-zero-start MPEG-TS each produced 48,000 frames and expected RMS locally; existing MP4/AAC cases remain passing. |
+| Matroska/WebM duration fallback | `_audio_coverage_ms` understood `duration_tag`, but the closed ffprobe request never requested it | Probe requests only `stream_tags=DURATION`, validates the bounded tag object and maps that field to `duration_tag`. MKV/AAC, MKV/FLAC and WebM/Vorbis fixtures prove 182,400 frames over 100..3,900 ms locally. Missing/malformed evidence remains fail-closed. |
+| True-peak excerpt edge | Cutting before SWR made an internal boundary look like a physical source edge | The SWR branch receives up to 50 ms of proven real context on both sides, drains, then selects only the requested center at 4×. Guards do not affect other metrics or the reported peak. At real source boundaries the available guard is clipped, never padded. |
+| Acoustically contradictory reports | Structurally valid but impossible peak/full-scale combinations passed contract validation | `truePeakLinear`, sample peaks and exact full-scale predicates now obey cross-field invariants with an explicit `2e-6` linear tolerance. This is rounding tolerance, not clipping inference. |
+
+The worst deterministic local edge reproduction used a 48 kHz stable sine at
+0.45×Nyquist, amplitude 0.8, phase π/4, measured over the internal 1..2 s
+excerpt. Before correction true peak was **1.571228869** (**+5.863 dB** versus
+the analytic amplitude). With real context it is **0.790150738**, equal to the
+sample peak and **-0.108 dB** versus the continuous amplitude. Across the bounded
+44.1/48/96 kHz frequency/phase matrix, the estimate stayed at or above sample
+peak within `2e-6` and within `0.011` linear (about 0.12 dB) of the analytic
+stable-sine amplitude. First-sample, last-sample/tail, impulse and near-real-edge
+fixtures retain the deterministic no-padding boundary behavior. These results
+characterize this native SWR4 method; they are not complete EBU/ITU certification.
+
+Codec/container priming is deliberately narrower than decoded timeline
+coverage. PTS, sample counts and selected-stream duration can prove that the
+requested decoded interval was fully analyzed, but ADTS/TS AAC priming can
+still present a coherent yet semantically shifted source timeline. Generic
+priming resolution is **DEFERRED / non-blocking for MR-A02**; the prior broader
+claim that every ambiguity is necessarily rejected conservatively is withdrawn.
 
 ## Feasibility before contract consolidation
 
@@ -67,8 +101,9 @@ measured (development evidence, separate from exact CI below):
   of dB rounding. Saturated-signal evidence does not diagnose distortion.
 - Representative 30-minute compressed source late 1 s excerpt: ~74–75 ms per
   warm repeated call; long 120 s analysis ~1.11 s; reports ~0.7–0.9 KiB;
-  sampled worker-tree RSS ≤57.2 MiB; ≤2 processes; 31,536,682 fixture bytes
-  (~30.1 MiB, including the 20 s EBU reference).
+  post-remediation sampled worker-tree RSS ≤57.02 MiB; ≤2 processes; maximum
+  report 898 bytes; 41,622,466 fixture bytes (~39.7 MiB, now including bounded
+  TS/MKV/WebM/guard fixtures).
   These are observations, not latency/product guarantees. CPU is sampled
   percent, not integrated CPU time; I/O traffic is not measured.
 
@@ -91,10 +126,12 @@ Normal CI and exact-runtime CI are separate gates. The existing exact workflow
 builds FFmpeg once and runs both catalogs. Relevant feature pushes, PRs and
 main changes remain covered; docs-only changes do not rebuild FFmpeg.
 
-## Validated implementation checkpoint
+## Historical pre-remediation implementation checkpoint
 
-Implementation SHA: `bca975e6690c14d560a0881d2fbe1dc7548f5692`.
-Subsequent evidence-only documentation does not change this tested code tree.
+Initial implementation checkpoint: `bca975e6690c14d560a0881d2fbe1dc7548f5692`.
+Independent remediation code requires a fresh exact managed-runtime checkpoint;
+the earlier runs below remain historical pre-remediation evidence and are not
+reused as proof for the corrected code.
 
 - [Normal CI 35777894595](https://github.com/inlifemedicina/cevra/actions/runs/35777894595):
   **5/5 SUCCESS** — Monorepo, Tauri desktop shell, Media Runtime reproducibility,
@@ -147,9 +184,10 @@ Exact-run resource observations (sampled every 20 ms, not OS peak guarantees):
   structural memory bounds. These are not project duration/video limits.
 
 Remaining limitations are explicit in ADR 0021: common mono/stereo rates only,
-conservative ambiguous timeline/tiny-drain rejection, no complete EBU/ITU
-certification, and no native Windows process-tree validation. No independent
-review has yet approved this implementation.
+unresolved semantic ADTS/TS priming despite proven decoded coverage,
+conservative tiny-drain rejection, no complete EBU/ITU certification, and no
+native Windows process-tree validation. No independent remediation review has
+yet approved this implementation.
 
 No claim of independent approval, complete D11-T1/D11-T3 workflow, certified
 meter conformity, Windows runtime validation, merge or CLOSED status is made.

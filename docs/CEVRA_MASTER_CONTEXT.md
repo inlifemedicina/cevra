@@ -1505,7 +1505,7 @@ coordinated Media Runtime adjustment gate is not closed. The next active slice
 inside that gate is typed audio measurement (MR-A02), which must establish
 measurement evidence before automatic audio policy or mastering decisions.
 
-**Audio Measurement V1 (MR-A02) — IN DEVELOPMENT / independent review pending.**
+**Audio Measurement V1 (MR-A02) — IN DEVELOPMENT / independent remediation review pending.**
 Branch `feat/typed-audio-measurement-v1` extends the existing read-only typed
 Media execution path with one explicitly selected stream/interval, native-rate
 RMS/sample peak, eligible loudness, drained true-peak estimate and unrounded
@@ -1516,10 +1516,15 @@ local characterization from exact managed runtime CI. CEVRA worker identity
 advances to 0.3.0; third-party pins and Alignment's existing PCM profile remain
 unchanged. Director receives compatible evidence, not worker editorial authority.
 
-Implementation checkpoint `bca975e6690c14d560a0881d2fbe1dc7548f5692`: normal CI
-`35777894595` passed 5/5; exact managed macOS arm64 run `35777894541` passed
-both Audio Sequence and Audio Measurement catalogs with FFmpeg 9.0.1/private
-Python 3.12.14. **Independent review pending; no PR/merge or CLOSED claim.**
+Initial implementation checkpoint `bca975e6690c14d560a0881d2fbe1dc7548f5692`:
+normal CI `35777894595` passed 5/5 and exact managed macOS arm64 run
+`35777894541` passed both catalogs. Independent review then reproduced bounded
+R128 signal→silence, MPEG-TS seek, Matroska/WebM duration-tag, true-peak excerpt
+edge and report-invariant defects. The same feature branch now applies the
+bounded remediations with no dependency, Project IR, runtime-identity or method-
+identity change; fresh managed-runtime validation and independent remediation
+review are required. Semantic ADTS/TS codec priming remains explicitly deferred
+despite proven decoded timeline coverage. **No PR/merge or CLOSED claim.**
 
 **Permanent progress-prompt rule:** CEVRA Vids progress toward a fully usable
 functional version has Product Owner baseline **48%**. Carry that baseline in

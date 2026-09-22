@@ -49,6 +49,23 @@ class AudioMeasurementTests(unittest.TestCase):
             with self.assertRaises(measure.MeasurementError):
                 self.fixture(**{key: value}).result()
 
+    def test_r128_window_nan_is_skipped_but_infinity_is_invalid(self):
+        r = measure.Reduction(48000, 1, 0, 192000)
+        valid = {"lavfi.astats.Overall.Number_of_samples": 144000,
+                 "lavfi.r128.M": "-10", "lavfi.r128.I": "-12", "lavfi.r128.S": "-11"}
+        self.frame(r, "raw", 0, valid)
+        r.flush()
+        self.assertEqual(r.integrated, -12)
+        self.assertEqual((r.short_max, r.short_count), (-11, 1))
+        self.frame(r, "raw", 144000, {"lavfi.astats.Overall.Number_of_samples": 148800,
+                                      "lavfi.r128.M": "nan", "lavfi.r128.I": "-12", "lavfi.r128.S": "nan"})
+        r.flush()
+        self.assertEqual(r.integrated, -12)
+        self.assertEqual((r.short_max, r.short_count), (-11, 1))
+        for key in ("lavfi.r128.M", "lavfi.r128.S"):
+            with self.assertRaisesRegex(measure.MeasurementError, "INVALID_METADATA"):
+                measure.Reduction.r128_window({key: "inf"}, key)
+
     def test_missing_count_or_output_drain_is_incomplete(self):
         r = self.fixture()
         r.pending["lavfi.astats.Overall.Number_of_samples"] = "19136"
@@ -92,13 +109,15 @@ class AudioMeasurementTests(unittest.TestCase):
             worker._call_tool_in_process("cevra-measure-audio", args)
 
     def test_fixed_graph_is_audio_only_and_removes_untrusted_metadata(self):
-        graph = measure.graph(3, 44100, 2, 45, 397)
+        graph = measure.graph(3, 44100, 2, 45, 397, 0, 4410)
         self.assertTrue(graph.startswith("[0:3]"))
         self.assertIn("ametadata=mode=delete", graph)
         self.assertIn("aresample=176400", graph)
         self.assertNotIn("apad", graph)
         self.assertNotIn("pan=", graph)
         self.assertNotIn("loudnorm", graph)
+        self.assertIn("[context]atrim=start_pts=0:end_pts=4410", graph)
+        self.assertIn("atrim=start_sample=180:end_sample=1588", graph)
 
 
 if __name__ == "__main__":

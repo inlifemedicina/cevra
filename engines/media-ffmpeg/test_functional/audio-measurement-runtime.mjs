@@ -12,6 +12,7 @@ const root = mkdtempSync(path.join(os.tmpdir(), "cevra-measurement-functional-")
 const runtimeRoot = path.resolve(required("CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT"));
 const release = process.env.CEVRA_AUDIO_SEQUENCE_RELEASE === "1";
 const ffmpeg = path.resolve(process.env.CEVRA_AUDIO_SEQUENCE_FFMPEG || path.join(runtimeRoot, "bin/ffmpeg"));
+const ffprobe = path.join(path.dirname(ffmpeg), process.platform === "win32" ? "ffprobe.exe" : "ffprobe");
 const options = {
   mode: release ? "release" : "development",
   pythonExecutable: required("CEVRA_AUDIO_SEQUENCE_PYTHON"),
@@ -30,6 +31,11 @@ function required(key) { assert.ok(process.env[key], `${key} required`); return 
 function run(args) {
   const result = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-threads", "1", "-filter_threads", "1", ...args], { encoding: "utf8", timeout: 120000, maxBuffer: 65536 });
   assert.equal(result.status, 0, result.stderr || String(result.error));
+}
+function probeAudio(file, streamIndex = 0) {
+  const result = spawnSync(ffprobe, ["-v", "error", "-select_streams", String(streamIndex), "-show_entries", "stream=index,start_pts,start_time,time_base,duration_ts,duration:stream_tags=DURATION", "-of", "json", file], { encoding: "utf8", timeout: 30000, maxBuffer: 65536 });
+  assert.equal(result.status, 0, result.stderr || String(result.error));
+  return JSON.parse(result.stdout).streams[0];
 }
 function near(actual, expected, tolerance, label) { assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} != ${expected} +/- ${tolerance}`); }
 function request(inputUri, startMs, endMs, streamIndex = 0) { return { type: "measure-audio", version: 1, inputUri, streamIndex, startMs, endMs }; }
@@ -118,6 +124,15 @@ try {
   const levels = wav("levels", 48000, 1, 4, n => tone(48000, n < 96000 ? 0.25 : 0.5)(n));
   const lv = await measure("amplitude-change", request(levels, 0, 4000));
   near(lv.channels[0].rmsLinear, Math.sqrt((0.25 ** 2 + 0.5 ** 2) / 4), 2e-6, "piecewise RMS");
+  const signalThenZero = wav("signal-then-zero", 48000, 1, 5, n => n < 96000 ? tone(48000, 0.4)(n) : 0);
+  const signalZero = await measure("r128-signal-then-zero", request(signalThenZero, 0, 5000));
+  assert.equal(signalZero.integratedLufs.status, "available"); assert.equal(signalZero.shortTermMaxLufs.status, "available");
+  const fadeThenZero = wav("fade-then-zero", 48000, 1, 5, n => n < 96000 ? tone(48000, 0.4)(n) * Math.max(0, 1 - n / 96000) : 0);
+  const fadeZero = await measure("r128-fade-then-zero", request(fadeThenZero, 0, 5000));
+  assert.equal(fadeZero.integratedLufs.status, "available");
+  const clipGapClip = wav("clip-gap-clip", 48000, 1, 5, n => (n < 72000 || n >= 120000) ? tone(48000, 0.4)(n) : 0);
+  const gapReport = await measure("r128-clip-gap-clip", request(clipGapClip, 0, 5000));
+  assert.equal(gapReport.integratedLufs.status, "available"); assert.ok(gapReport.shortTermValidObservations > 0);
   for (const [name, amplitude, reason] of [["silence", 0, "digital-silence"], ["below-gate", 1e-5, "no-eligible-blocks"]]) {
     const file = wav(name, 48000, 1, 4, tone(48000, amplitude));
     const r = await measure(name, request(file, 0, 4000));
@@ -135,6 +150,25 @@ try {
   near(ip.channels[0].samplePeakLinear, 0.8 / Math.sqrt(2), 2e-6, "phase-offset samples");
   near(ip.truePeakLinear, 0.8, 0.01, "continuous sine peak with tapered boundaries");
   assert.ok(ip.truePeakLinear > ip.channels[0].samplePeakLinear * 1.35);
+  const peakCases = [
+    [48000, 0.10, 0], [48000, 0.25, Math.PI / 4], [48000, 0.35, Math.PI / 2], [48000, 0.45, Math.PI / 4],
+    [44100, 0.10, Math.PI / 4], [44100, 0.25, Math.PI / 2], [44100, 0.35, 3 * Math.PI / 4], [44100, 0.45, 0],
+    [96000, 0.35, Math.PI / 4]
+  ];
+  for (const [rate, ratio, phase] of peakCases) {
+    const file = wav(`guarded-peak-${rate}-${ratio}-${phase}`, rate, 1, 3, n => 0.8 * Math.sin(2 * Math.PI * ratio * n + phase));
+    const r = await measure(`guarded-true-peak-${rate}-${ratio}-${phase}`, request(file, 1000, 2000));
+    assert.ok(r.truePeakLinear + 2e-6 >= r.channels[0].samplePeakLinear, "true peak below sample peak");
+    near(r.truePeakLinear, 0.8, 0.011, "guarded stable-signal peak");
+  }
+  const internalImpulse = wav("internal-impulse", 48000, 1, 3, n => n === 72000 ? 1 : 0);
+  const internalImpulseReport = await measure("guarded-internal-impulse", request(internalImpulse, 1000, 2000));
+  assert.ok(internalImpulseReport.truePeakLinear >= internalImpulseReport.channels[0].samplePeakLinear - 2e-6);
+  const firstImpulse = wav("first-sample-impulse", 48000, 1, 1, n => n === 0 ? 1 : 0);
+  const firstImpulseReport = await measure("source-start-first-sample", request(firstImpulse, 0, 500));
+  assert.ok(firstImpulseReport.truePeakLinear >= firstImpulseReport.channels[0].samplePeakLinear - 2e-6);
+  const nearEnd = await measure("source-end-nearby", request(firstImpulse, 500, 1000));
+  assert.equal(nearEnd.truePeakLinear, 0);
   for (const [name, value, reaches, exceeds] of [["below-one", 1 - 2 ** -24, false, false], ["one", 1, true, false], ["above-one", 1 + 2 ** -23, true, true]]) {
     const f = wav(name, 48000, 1, 0.1, () => value);
     const r = await measure(name, request(f, 0, 100));
@@ -164,6 +198,31 @@ try {
   run(["-f", "lavfi", "-i", "color=c=black:s=64x64:r=10:d=5", "-itsoffset", "2", "-i", silence, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "mpeg4", "-c:a", "aac", late]);
   const lateReport = await measure("nonzero-stream-start", request(late, 2100, 2900, 1));
   near(lateReport.channels[0].rmsLinear, 0.25 / Math.sqrt(2), 0.005, "late AAC signal");
+  const transportStream = path.join(root, "nonzero-start.ts");
+  run(["-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=6", "-c:a", "aac", "-b:a", "128k",
+    "-muxdelay", "0", "-muxpreload", "0", "-output_ts_offset", "5", "-f", "mpegts", transportStream]);
+  const tsMetadata = probeAudio(transportStream);
+  const tsStartMs = Math.ceil(Number(tsMetadata.start_time) * 1000) + 1000;
+  assert.ok(tsStartMs > 1000 && Number(tsMetadata.start_time) > 0);
+  for (const offset of [0, 2500]) {
+    const start = tsStartMs + offset;
+    const r = await measure(`mpeg-ts-noaccurate-seek-${offset}`, request(transportStream, start, start + 1000));
+    assert.equal(r.sampleFrames, 48000); assert.equal(r.coverageStartSample, start * 48);
+    near(r.channels[0].rmsLinear, 0.125 / Math.sqrt(2), 0.005, "MPEG-TS AAC signal");
+  }
+  const taggedContainers = [
+    ["matroska-aac.mkv", ["-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=4", "-c:a", "aac"]],
+    ["matroska-flac.mkv", ["-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=4", "-c:a", "flac"]],
+    ["webm-vorbis.webm", ["-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=4", "-ac", "2", "-c:a", "vorbis", "-strict", "experimental"]]
+  ];
+  for (const [name, args] of taggedContainers) {
+    const file = path.join(root, name); run([...args, file]);
+    const metadata = probeAudio(file); assert.equal(typeof metadata.tags?.DURATION, "string");
+    const r = await measure(`duration-tag-${name}`, request(file, 100, 3900));
+    assert.equal(r.sampleFrames, 182400);
+    const expectedRms = name.endsWith(".webm") ? 0.125 / 2 : 0.125 / Math.sqrt(2);
+    for (const channel of r.channels) near(channel.rmsLinear, expectedRms, 0.006, `${name} signal`);
+  }
   for (const value of [NaN, Infinity, -Infinity]) {
     const file = wav(`nonfinite-${String(value)}`, 48000, 1, 0.1, n => n === 4000 ? value : 0.25);
     await assert.rejects(engine.execute(request(file, 0, 100), { jobId: `invalid-${++serial}`, locale: "en-US" }));
@@ -176,6 +235,13 @@ try {
   await engine.execute({ type: "render-audio-sequence", version: 1, sources: [{ id: "a", uri: headroom }],
     items: [{ sourceId: "a", sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 0 }], outputUri: sequenceOutput, outputDurationMs: 1200, outputChannelLayout: "mono" }, { jobId: "sequence-prerequisite", locale: "en-US" });
   const derived = await measure("sequence-then-measure", request(sequenceOutput, 0, 1200)); assert.equal(derived.channels[0].exceedsFullScale, true);
+  const sequenceGapOutput = path.join(root, "sequence-with-gap.wav");
+  await engine.execute({ type: "render-audio-sequence", version: 1, sources: [{ id: "a", uri: signalThenZero }],
+    items: [{ sourceId: "a", sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 0 },
+      { sourceId: "a", sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 1500 }],
+    outputUri: sequenceGapOutput, outputDurationMs: 3000, outputChannelLayout: "mono" }, { jobId: "sequence-gap-prerequisite", locale: "en-US" });
+  const measuredGap = await measure("audio-sequence-real-500ms-gap", request(sequenceGapOutput, 0, 3000));
+  assert.equal(measuredGap.sampleFrames, 144000); assert.equal(measuredGap.integratedLufs.status, "available");
   const history = new ProjectHistory(createEmptyProject({ id: "measure", name: "Measurement", locale: "en-US", now: "2026-09-22T00:00:00Z" }));
   const original = JSON.stringify(history.current);
   const service = new MediaApplicationService({ engine, history, executions: new InMemoryMediaExecutionRepository(), artifacts: new NodeMediaArtifactStore() });

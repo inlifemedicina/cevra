@@ -1,6 +1,6 @@
 # ADR 0021 — Audio Measurement V1
 
-**Status:** Accepted for implementation — IN DEVELOPMENT / independent review pending
+**Status:** Accepted for implementation — IN DEVELOPMENT / independent remediation review pending
 **Date:** 2026-09-22
 
 ## Authority and scope
@@ -31,18 +31,28 @@ boundaries are `ceil(startMs × r / 1000)` and `ceil(endMs × r / 1000)`, not al
 48 samples/ms. The stream origin must be representable on this sample grid.
 
 Input seeking uses at most one second of preroll, with original timestamps
-retained; no seek is issued at zero because explicit `-ss 0` can discard AAC
-priming-adjacent samples. Trimmed decoded-frame PTS and cumulative native sample
-counts independently prove contiguous coverage. Missing/truncated samples,
+retained. Non-zero seeks use `-noaccurate_seek` so FFmpeg's input seek cannot
+apply a second container-start-time adjustment; the typed `atrim` remains the
+exact authority. No seek is issued at zero because explicit `-ss 0` can discard
+AAC priming-adjacent samples. Trimmed decoded-frame PTS and cumulative native
+sample counts independently prove contiguous decoded coverage. Missing/truncated samples,
 timestamp gaps/duplicates, format reinitialization or incomplete reduction may
 not become planned silence. There is no `apad` or async stretching.
+
+`duration_ts × time_base` remains preferred. The only fallback is the selected
+audio stream's validated duration or its explicitly requested Matroska/WebM
+`DURATION` tag; container duration and arbitrary tags are never authorities.
+Decoded timeline coverage does not, by itself, fully resolve semantic
+codec/container priming for ADTS/TS AAC. That ambiguity is explicitly deferred
+and is not described as universally rejected by this V1 method.
 
 V1 supports unambiguous mono/stereo at explicitly enumerated common rates
 8–192 kHz whose 100 ms meter hop is an integer sample count. Other layouts/rates
 are explicitly unsupported, not downmixed or resampled into a supported source.
 The normal media bound of seven days and URI limit remain request safeguards,
-not project/video limits. This does not promise every codec's priming/tail can
-be measured: ambiguous coverage is rejected conservatively.
+not project/video limits. This does not promise every codec's priming/tail maps
+to semantic source time without ambiguity; decoded coverage validation and
+codec-priming interpretation are distinct guarantees.
 
 ## Method `cevra.audio-measurement.native-swr4.v1`
 
@@ -55,13 +65,22 @@ remapping, rate change or dual-mono compensation. Fixed native branches provide:
    numerical tolerance; zero is returned only for proven digital silence.
 2. `ebur128`, metadata enabled, `dualmono=false`, no peak mode: integrated LUFS
    using its 400 ms blocks/100 ms hop and native gated histogram, plus the maximum
-   short-term LUFS over complete 3 s windows and valid observation count.
+   short-term LUFS over complete 3 s windows and valid observation count. FFmpeg
+   9.0.1 can emit an isolated NaN M/S window after non-zero signal falls to exact
+   zero because of negative floating-point residue in its moving sum. Such a NaN
+   window is unusable and is skipped only for its corresponding M or S update;
+   prior valid integrated evidence remains. Infinity is invalid, and decoded
+   NaN/Infinity remains rejected independently by `astats`.
 3. `aresample`/libswresample at **4× native rate**, double precision, native
    32-tap filter, phase shift 10, exact rational/linear interpolation enabled;
-   `astats` observes the fully drained oversampled stream. The output is a
-   declared **true-peak estimate**, not sample peak or a certified conformance
-   claim. Edge interpolation/ringing is part of this versioned method. Its
-   measured frame count must be 4× the source count, including the drained tail.
+   its input is the requested interval plus up to 50 ms of proven real stream
+   context on each side. After full drain, only the oversampled center that maps
+   to `[startMs, endMs)` enters `astats`; guard samples never enter the reported
+   peak. At a genuine stream boundary, the guard is clipped to real coverage and
+   no silence is invented. The output is a declared **true-peak estimate**, not
+   sample peak or a certified conformance claim. Its measured center frame count
+   must be exactly 4× the requested native frame count. RMS, sample peak,
+   full-scale predicates and loudness continue to see only the requested interval.
 4. A separate native `aeval` predicate branch tests exact zero, `abs(x) >= 1`
    and `abs(x) > 1` before textual rounding. These are full-scale facts, **not a
    clipping/distortion diagnosis**. `Peak_count` is not used as clipping count.
@@ -123,14 +142,23 @@ never deleted. Stat identity is checked before/after measurement to reject
 observed source changes, not advertised as a durable content digest. The
 report remains execution evidence, not cached source truth.
 
+At the typed boundary, `truePeakLinear` must not be materially below the largest
+channel sample peak, and exact native full-scale predicates must agree with the
+text-derived sample peak. A linear tolerance of `2e-6` covers the six-decimal dB
+serialization and float fixture quantization around 1.0; it is not a clipping
+threshold and does not weaken the native unrounded predicates.
+
 ## Validation and status
 
 The [functional catalog](../../engines/media-ffmpeg/test_functional/audio-measurement-runtime.mjs)
 includes analytical RMS/peaks, phase-offset intersample peaks, headroom around
-and above full scale, silence/gating/short windows, 44.1/48 kHz, stereo phase and
-imbalance, video/multiple audio streams, coverage/truncation, non-finite data,
+and above full scale, signal/fade/clip followed by exact-zero gaps,
+silence/gating/short windows, 44.1/48/96 kHz, stereo phase and imbalance,
+video/multiple audio streams, MPEG-TS non-zero timestamps, Matroska/WebM stream
+duration tags, coverage/truncation, non-finite data,
 late compressed excerpts, repeated execution, long measurement, cancellation,
-timeout/worker death, unchanged history and sequence → measurement.
+timeout/worker death, unchanged history and Audio Sequence output with a real
+500 ms gap → measurement.
 
 Representative guards: ≤2 sampled worker-tree processes, <768 MiB sampled RSS,
 <4 KiB reports for catalog inputs, and zero new measurement artifacts. These
@@ -154,13 +182,18 @@ original-preservation and resource evidence, not blanket workflow PASS.
 
 ## FIX NOW / DEFER
 
-- **FIX NOW:** native peak tail/precision, measured coverage, bounded metadata,
-  unrounded full-scale predicates, and worker-death child cleanup. False evidence
+- **FIX NOW:** isolated R128 M/S NaN windows, MPEG-TS seek semantics,
+  selected-stream duration-tag fallback, real-context true-peak boundaries,
+  acoustic report invariants, native peak tail/precision, measured coverage,
+  bounded metadata, unrounded full-scale predicates, and worker-death child cleanup. False evidence
   or stranded work affects MR-A02 immediately; correcting before dependent QA
   consumes reports avoids compatibility/review churn. Native filters and the
   existing transport suffice; no engine/dependency/Project IR migration.
 - **DEFER:** certified meter conformance, broader layout/rate support,
-  ambiguous codec timelines, native Windows death evidence and policy/mastering.
+  semantic ADTS/TS codec priming, tiny-interval error classification, periodic-WAV
+  demux auto-detection, stdout/stderr separation, residual low short-term windows,
+  timeout/cancel error refinements, gate quantization, native Windows death
+  evidence and policy/mastering.
   These require specific new evidence or scope, not guessed values or hidden
   transforms. Closed ADR 0020 LOW/NOTE hardening is not reopened opportunistically.
 

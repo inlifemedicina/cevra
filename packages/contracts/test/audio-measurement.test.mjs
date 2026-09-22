@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AUDIO_MEASUREMENT_METHOD, validateMediaOperation, validateAudioMeasurementReport } from "../dist/index.js";
+import { AUDIO_MEASUREMENT_LINEAR_TOLERANCE, AUDIO_MEASUREMENT_METHOD, validateMediaOperation, validateAudioMeasurementReport } from "../dist/index.js";
 
 const op = { type: "measure-audio", version: 1, inputUri: "/media/source.wav", streamIndex: 2, startMs: 0, endMs: 4000 };
 function report() { return { version: 1, method: AUDIO_MEASUREMENT_METHOD, executionId: "job", inputUri: op.inputUri, streamIndex: 2, startMs: 0, endMs: 4000,
@@ -33,4 +33,25 @@ test("digital silence is measured zero, not a fabricated finite loudness value",
   value.integratedLufs = value.shortTermMaxLufs = { status: "unavailable", reason: "digital-silence" }; value.shortTermValidObservations = 0;
   validateAudioMeasurementReport(value, op, "job");
   value.integratedLufs = { status: "available", value: -69 }; assert.throws(() => validateAudioMeasurementReport(value, op, "job"));
+});
+test("peak and exact full-scale predicates remain acoustically consistent within declared rounding tolerance", () => {
+  for (const patch of [
+    { samplePeakLinear: 0.8, truePeakLinear: 0.7 },
+    { samplePeakLinear: 0.9, reachesFullScale: true },
+    { samplePeakLinear: 1.1, reachesFullScale: false },
+    { samplePeakLinear: 1.1, reachesFullScale: true, exceedsFullScale: false },
+    { samplePeakLinear: 1, reachesFullScale: false, exceedsFullScale: true }
+  ]) {
+    const value = report();
+    const { truePeakLinear, ...channelPatch } = patch;
+    Object.assign(value.channels[0], channelPatch);
+    if (truePeakLinear !== undefined) value.truePeakLinear = truePeakLinear;
+    else value.truePeakLinear = Math.max(value.truePeakLinear, value.channels[0].samplePeakLinear);
+    assert.throws(() => validateAudioMeasurementReport(value, op, "job"), JSON.stringify(patch));
+  }
+  for (const delta of [-AUDIO_MEASUREMENT_LINEAR_TOLERANCE, AUDIO_MEASUREMENT_LINEAR_TOLERANCE]) {
+    const value = report(); Object.assign(value.channels[0], { samplePeakLinear: 1 + delta, reachesFullScale: delta <= 0, exceedsFullScale: false });
+    value.truePeakLinear = 1 + delta;
+    validateAudioMeasurementReport(value, op, "job");
+  }
 });
