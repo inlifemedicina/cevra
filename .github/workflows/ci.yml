@@ -134,15 +134,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: 3.12.14
       - name: Report native toolchain and verify signature tool
         run: |
           sw_vers
           uname -m
           cc --version
           gpg --version
+          python3 --version
       - run: npm ci
       - name: Build the typed Media execution path
         run: |
@@ -153,18 +151,18 @@ jobs:
           npm run build -w @cevra/media-ffmpeg
       - name: Prepare signature-verified release inputs
         run: |
-          python engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "${RUNNER_TEMP}/ffmpeg-source"
-          python engines/media-ffmpeg/runtime/prepare_vendor.py "${RUNNER_TEMP}/ffmpeg-skill"
-          python engines/media-ffmpeg/runtime/prepare_python_runtime.py "${RUNNER_TEMP}/cevra-python"
+          python3 engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "${RUNNER_TEMP}/ffmpeg-source"
+          python3 engines/media-ffmpeg/runtime/prepare_vendor.py "${RUNNER_TEMP}/ffmpeg-skill"
+          python3 engines/media-ffmpeg/runtime/prepare_python_runtime.py "${RUNNER_TEMP}/cevra-python"
       - name: Build pinned FFmpeg 9.0.1 for macOS arm64
         run: >-
-          python engines/media-ffmpeg/runtime/build_ffmpeg.py
+          python3 engines/media-ffmpeg/runtime/build_ffmpeg.py
           "${RUNNER_TEMP}/ffmpeg-source/ffmpeg-9.0.1"
           "${RUNNER_TEMP}/cevra-ffmpeg"
           --jobs 3
       - name: Assemble and verify the exact managed runtime
         run: >-
-          python engines/media-ffmpeg/runtime/assemble_runtime.py
+          python3 engines/media-ffmpeg/runtime/assemble_runtime.py
           "${RUNNER_TEMP}/cevra-media-runtime"
           --python-root "${RUNNER_TEMP}/cevra-python"
           --ffmpeg-prefix "${RUNNER_TEMP}/cevra-ffmpeg"
