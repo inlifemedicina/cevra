@@ -61,14 +61,19 @@ def platform_key() -> str:
     return f"{system}-{arch}"
 
 
-def artifact_for_host() -> tuple[str, dict[str, str]]:
-    key = platform_key()
+def artifact_for_target(key: str) -> dict[str, str]:
     artifact = PIN.get("artifacts", {}).get(key)
     if not isinstance(artifact, dict):
         raise SystemExit(f"managed CPython artifact is not pinned for {key}")
     for field in ("url", "sha256", "executable"):
         if not isinstance(artifact.get(field), str) or not artifact[field]:
             raise SystemExit(f"managed CPython artifact {key} is missing {field}")
+    return artifact
+
+
+def artifact_for_host() -> tuple[str, dict[str, str]]:
+    key = platform_key()
+    artifact = artifact_for_target(key)
     return key, artifact
 
 

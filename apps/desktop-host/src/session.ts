@@ -17,7 +17,7 @@ import {
   type SupportedTranscriptionModelId
 } from "@cevra/transcription-faster-whisper";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
-import { basename, isAbsolute, resolve } from "node:path";
+import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { DesktopPersistenceError, DesktopProjectPersistence } from "./persistence.js";
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
 
@@ -181,11 +181,15 @@ async function createMediaServices(history: ProjectHistory, environment: NodeJS.
   const configuredRoot = environment.CEVRA_MEDIA_RUNTIME_ROOT;
   if (!configuredRoot) return { capability: unavailable("runtime-not-configured") };
   try {
-    const root = validatedMediaRuntimeRoot(configuredRoot);
+    const runtime = resolveMediaRuntimePaths(configuredRoot);
+    const root = runtime.root;
     const mode = environment.CEVRA_MEDIA_RUNTIME_MODE === "development" ? "development" : "release";
-    const pythonExecutable = resolve(root, "python", "bin", "python3");
-    const workerScript = resolve(root, "worker", "cevra_media_worker.py");
-    const transport = new ProcessMediaWorkerTransport({ mode, pythonExecutable, workerScript, env: environment });
+    const transport = new ProcessMediaWorkerTransport({
+      mode,
+      pythonExecutable: runtime.pythonExecutable,
+      workerScript: runtime.workerScript,
+      env: environment
+    });
     const worker = new PersistentMediaWorkerClient(transport);
     const engine = new FfmpegMediaEngine(worker);
     const health = await engine.healthcheck();
@@ -256,16 +260,46 @@ async function createTranscriptionServices(history: ProjectHistory, environment:
   }
 }
 
-function validatedMediaRuntimeRoot(value: string): string {
+export function resolveMediaRuntimePaths(value: string): { root: string; pythonExecutable: string; workerScript: string } {
   if (!isAbsolute(value) || !existsSync(value) || lstatSync(value).isSymbolicLink()) throw new Error("Invalid Media Runtime root.");
   const root = realpathSync(value);
   const manifestPath = resolve(root, "manifest.json");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
   if (manifest.format !== "cevra-media-runtime" || manifest.formatVersion !== 1) throw new Error("Invalid Media Runtime manifest.");
-  for (const required of [resolve(root, "python", "bin", "python3"), resolve(root, "worker", "cevra_media_worker.py")]) {
-    if (!existsSync(required) || !lstatSync(required).isFile()) throw new Error("Incomplete Media Runtime.");
+  const python = manifest.python;
+  const worker = manifest.worker;
+  if (!isRecord(python) || python.root !== "python" || !isRecord(worker) || worker.root !== "worker") {
+    throw new Error("Invalid Media Runtime component manifest.");
   }
-  return root;
+  const pythonExecutable = runtimeComponent(root, python.executable, "python/");
+  const workerScript = runtimeComponent(root, worker.entrypoint, "worker/");
+  return { root, pythonExecutable, workerScript };
+}
+
+function runtimeComponent(root: string, value: unknown, requiredPrefix: string): string {
+  if (typeof value !== "string" || !value.startsWith(requiredPrefix) || value.includes("\\")) {
+    throw new Error("Invalid Media Runtime component path.");
+  }
+  const parts = value.split("/");
+  if (parts.some((part) => !part || part === "." || part === "..")) throw new Error("Invalid Media Runtime component path.");
+  const candidate = resolve(root, ...parts);
+  const rootRelative = relative(root, candidate);
+  if (!rootRelative || rootRelative === ".." || rootRelative.startsWith(`..${sep}`) || isAbsolute(rootRelative)) {
+    throw new Error("Media Runtime component escapes its root.");
+  }
+  if (!existsSync(candidate) || lstatSync(candidate).isSymbolicLink() || !lstatSync(candidate).isFile()) {
+    throw new Error("Incomplete Media Runtime.");
+  }
+  const real = realpathSync(candidate);
+  const realRelative = relative(root, real);
+  if (!realRelative || realRelative === ".." || realRelative.startsWith(`..${sep}`) || isAbsolute(realRelative)) {
+    throw new Error("Media Runtime component escapes its root.");
+  }
+  return real;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function modelSnapshotPresent(cacheRoot: string, modelId: string): boolean {
