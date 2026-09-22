@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -9,6 +10,17 @@ import cevra_media_worker as worker
 
 
 class AudioMeasurementTests(unittest.TestCase):
+    def test_sealed_manifest_cardinality_matches_worker_inventory(self):
+        runtime = Path(__file__).resolve().parents[1] / "runtime"
+        sys.path.insert(0, str(runtime))
+        from build_worker import WORKER_FILES
+        from runtime_integrity import CRITICAL_WORKER_FILES
+        schema = json.loads((runtime / "manifest.schema.json").read_text())
+        files = schema["properties"]["worker"]["properties"]["files"]
+        self.assertEqual(files["minItems"], len(WORKER_FILES))
+        self.assertEqual(files["maxItems"], len(WORKER_FILES))
+        self.assertEqual(set(CRITICAL_WORKER_FILES), {"worker/" + name for name in WORKER_FILES})
+
     def frame(self, reduction, label, pts, fields):
         reduction.consume(f"frame:0    pts:{pts}    pts_time:0")
         for key, value in fields.items():
