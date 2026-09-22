@@ -2,7 +2,7 @@
 
 Base: `8aea564b7cdfd7d235fa72964f07eeed961c1bbc`.
 Branch: `feat/typed-audio-measurement-v1`.
-Status: IN DEVELOPMENT / independent remediation review pending.
+Status: IN DEVELOPMENT / final review complete, PR pending.
 Contract/method authority: [ADR 0021](adr/0021-audio-measurement-v1.md).
 
 ## Independent adversarial findings and remediation
@@ -20,6 +20,7 @@ this method has not yet been published or merged.
 | Matroska/WebM duration fallback | `_audio_coverage_ms` understood `duration_tag`, but the closed ffprobe request never requested it | Probe requests only `stream_tags=DURATION`, validates the bounded tag object and maps that field to `duration_tag`. MKV/AAC, MKV/FLAC and WebM/Vorbis fixtures prove 182,400 frames over 100..3,900 ms locally. Missing/malformed evidence remains fail-closed. |
 | True-peak excerpt edge | Cutting before SWR made an internal boundary look like a physical source edge | The SWR branch receives up to 50 ms of proven real context on both sides, drains, then selects only the requested center at 4×. Guard samples are not requested sample evidence, but their contribution to the band-limited reconstruction may influence intersample values inside the requested boundary. Other metrics remain core-only. At real source boundaries the available guard is clipped, never padded. |
 | Acoustically contradictory reports | Structurally valid but impossible peak/full-scale combinations passed contract validation | `truePeakLinear`, sample peaks and exact full-scale predicates now obey cross-field invariants with an explicit `2e-6` linear tolerance. This is rounding tolerance, not clipping inference. |
+| Non-finite true-peak context | A NaN/Infinity in real guard context could propagate through SWR while peak-maximum reduction still emitted a finite value | The true-peak `astats` branch now emits per-channel `Number_of_NaNs` and `Number_of_Infs`; each must exist and equal zero. Positive evidence rejects as `AUDIO_MEASUREMENT_NON_FINITE_SAMPLES`, while absent/malformed metadata remains `INVALID_METADATA`. Core checks are unchanged. |
 
 The final focused re-review found one additional coupling defect: the reduction
 used the core's digital-silence classification while parsing the independent
@@ -30,6 +31,15 @@ maps to zero; a finite peak is converted normally regardless of core silence;
 NaN/Infinity remain invalid. The contract likewise allows zero or positive true
 peak for a silent core while continuing to require zero core RMS/sample peak,
 false full-scale predicates and digital-silence loudness.
+
+Final bounded hardening adds the complementary non-finite authority without
+changing that semantics. Deterministic float fixtures place NaN, +Infinity and
+-Infinity one native sample before the core and immediately after it, within the
+real 50 ms guard. All six executions reject specifically as
+`AUDIO_MEASUREMENT_NON_FINITE_SAMPLES`; the existing three inside-core fixtures
+continue to reject with the same code. A finite neighboring impulse still
+produces the valid contextual true peak below. Missing/malformed true-peak
+counters are unit-tested as `INVALID_METADATA`.
 
 Bounded local development evidence on FFmpeg 9.0.2 (not release proof):
 
@@ -65,11 +75,15 @@ claim that every ambiguity is necessarily rejected conservatively is withdrawn.
 
 Matroska/WebM seek granularity is also **DEFERRED / non-blocking for MR-A02**.
 Independent evidence observed approximately eight samples of decoded-content
-shift in a 48 kHz fixture even though the reported PTS and sample count remained
-internally coherent. This is consistent with container/packet time granularity;
-current RMS/loudness impact is low, but MR-A02 does not claim sample-exact seek
-identity for these containers. Re-evaluate before any transient/boundary QA or
-policy consumer requires sample-exact excerpts. No report-schema change is made.
+shift in one 48 kHz fixture even though the reported PTS and sample count
+remained internally coherent. **Eight samples is a fixture observation, not a
+bound.** Container/packet timestamp granularity may permit larger shifts. At a
+nominal 1 ms granularity, half a unit is approximately ±0.5 ms, or ±24 samples
+at 48 kHz and ±96 samples at 192 kHz; these values express scale, not a universal
+maximum or guarantee. Current RMS/loudness impact is low, but MR-A02 does not
+claim sample-exact Matroska/WebM seeking. Re-evaluate before any transient/
+boundary QA or policy consumer requires sample-exact excerpts. No report-schema
+change is made.
 
 ## Feasibility before contract consolidation
 
@@ -133,10 +147,10 @@ measured (development evidence, separate from exact CI below):
   of dB rounding. Saturated-signal evidence does not diagnose distortion.
 - Representative 30-minute compressed source late 1 s excerpt: ~74–75 ms per
   warm repeated call; long 120 s analysis ~1.11 s; reports ~0.7–0.9 KiB;
-  final-focused local run late excerpts **75.14 / 72.91 / 73.03 ms** and long
-  120 s analysis **1,120.24 ms**; sampled worker-tree RSS ≤57.41 MiB; ≤2
-  processes; selected new reports 732–775 bytes; 42,268,446 fixture bytes
-  (40.31 MiB, including bounded TS/MKV/WebM/guard fixtures).
+  final-hardening local run late excerpts **94.99 / 94.29 / 95.43 ms** and long
+  120 s analysis **1,196.53 ms**; sampled worker-tree RSS ≤57.52 MiB; ≤2
+  processes; largest report 898 bytes; 45,724,710 fixture bytes (43.61 MiB,
+  including bounded TS/MKV/WebM/non-finite-guard fixtures).
   These are observations, not latency/product guarantees. CPU is sampled
   percent, not integrated CPU time; I/O traffic is not measured.
 

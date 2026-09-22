@@ -1,6 +1,6 @@
 # ADR 0021 — Audio Measurement V1
 
-**Status:** Accepted for implementation — IN DEVELOPMENT / independent remediation review pending
+**Status:** Accepted for implementation — IN DEVELOPMENT / final review complete, PR pending
 **Date:** 2026-09-22
 
 ## Authority and scope
@@ -85,7 +85,11 @@ remapping, rate change or dual-mono compensation. Fixed native branches provide:
    invented. The output is a declared **true-peak estimate**, not sample peak or
    a certified conformance claim. Its measured center frame count must be exactly
    4× the requested native frame count. All non-true-peak metrics continue to see
-   only the requested interval.
+   only the requested interval. Per-channel NaN/Infinity counters cover every
+   oversampled value consumed by the central true-peak reduction, complementing
+   the native core counters: a non-finite guard sample that propagates into the
+   reconstruction fails closed as `NON_FINITE_SAMPLES`, even if the finite peak
+   maximum itself would otherwise remain usable.
 4. A separate native `aeval` predicate branch tests exact zero, `abs(x) >= 1`
    and `abs(x) > 1` before textual rounding. These are full-scale facts, **not a
    clipping/distortion diagnosis**. `Peak_count` is not used as clipping count.
@@ -111,7 +115,9 @@ Loudness is `{status: available, value}` or `{status: unavailable, reason}`:
   range, or values indistinguishable from the short-term meter's numerical floor.
 
 The native -70 integrated initial value and unfilled-window -120.691 value are
-never promoted as valid evidence. Non-finite samples, arithmetic failure,
+never promoted as valid evidence. Per-channel `astats` counters reject non-finite
+samples independently in both the native requested core and the consumed SWR4
+true-peak reconstruction. Non-finite samples, arithmetic failure,
 missing/different stream, unproven coverage, incomplete drain/collection,
 timeout or decoder failure do not produce a fully valid report. Very short
 intervals for which the native resampler cannot prove a full drain fail closed.
@@ -194,8 +200,9 @@ original-preservation and resource evidence, not blanket workflow PASS.
 
 - **FIX NOW:** isolated R128 M/S NaN windows, MPEG-TS seek semantics,
   selected-stream duration-tag fallback, real-context true-peak boundaries,
-  independent silent-core/contextual-true-peak semantics, acoustic report
-  invariants, native peak tail/precision, measured coverage,
+  independent silent-core/contextual-true-peak semantics, contextual SWR4
+  NaN/Infinity rejection, acoustic report invariants, native peak tail/precision,
+  measured coverage,
   bounded metadata, unrounded full-scale predicates, and worker-death child cleanup. False evidence
   or stranded work affects MR-A02 immediately; correcting before dependent QA
   consumes reports avoids compatibility/review churn. Native filters and the
@@ -206,10 +213,15 @@ original-preservation and resource evidence, not blanket workflow PASS.
   auto-detection, stdout/stderr separation, residual low short-term windows,
   timeout/cancel error refinements, gate quantization, native Windows death
   evidence and policy/mastering. Independent evidence observed an approximately
-  eight-sample shift at 48 kHz for a Matroska/WebM fixture while PTS and sample
-  count remained internally coherent. Current RMS/loudness impact is low, but
-  sample-exact excerpt identity must be revisited before transient/boundary QA or
-  policy consumes it; V1 does not claim sample-exact Matroska/WebM seeking.
+  eight-sample shift in one 48 kHz Matroska/WebM fixture while PTS and sample
+  count remained internally coherent; this is an observation, not a bound.
+  Container/packet timestamp granularity can permit larger displacements. For a
+  nominal 1 ms granularity, half a unit is approximately ±0.5 ms: ±24 samples at
+  48 kHz and ±96 samples at 192 kHz. Those values are an order-of-magnitude
+  consequence, not a universal maximum or guarantee. Current RMS/loudness impact
+  is low, but sample-exact excerpt identity must be revisited before transient/
+  boundary QA or policy consumes it; V1 does not claim sample-exact Matroska/
+  WebM seeking.
   These require specific new evidence or scope, not guessed values or hidden
   transforms. Closed ADR 0020 LOW/NOTE hardening is not reopened opportunistically.
 

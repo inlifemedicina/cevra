@@ -76,7 +76,7 @@ def graph(index: int, rate: int, channels: int, start: int, end: int,
         f";[context]atrim=start_pts={guard_start}:end_pts={guard_end},asetpts=N/SR/TB,"
         f"aresample={rate * 4}:resampler=swr:filter_size=32:phase_shift=10:exact_rational=1:linear_interp=1,"
         f"atrim=start_sample={peak_start}:end_sample={peak_end},asetpts=N/SR/TB,"
-        + stats("Peak_level", "truepeak") + ",anullsink"
+        + stats("Peak_level+Number_of_NaNs+Number_of_Infs", "truepeak") + ",anullsink"
     )
 
 
@@ -196,6 +196,8 @@ class Reduction:
             prefix = f"lavfi.astats.{ch}."
             for key in ("Number of NaNs", "Number of Infs"):
                 if self.number(raw, prefix + key) != 0:
+                    raise MeasurementError("NON_FINITE_SAMPLES")
+                if self.number(peaks, prefix + key) != 0:
                     raise MeasurementError("NON_FINITE_SAMPLES")
             bits = self.number(flags, prefix + "Max_level")
             if bits not in (0, 1, 3, 7):

@@ -1505,7 +1505,7 @@ coordinated Media Runtime adjustment gate is not closed. The next active slice
 inside that gate is typed audio measurement (MR-A02), which must establish
 measurement evidence before automatic audio policy or mastering decisions.
 
-**Audio Measurement V1 (MR-A02) — IN DEVELOPMENT / independent remediation review pending.**
+**Audio Measurement V1 (MR-A02) — IN DEVELOPMENT / final review complete, PR pending.**
 Branch `feat/typed-audio-measurement-v1` extends the existing read-only typed
 Media execution path with one explicitly selected stream/interval, native-rate
 RMS/sample peak, eligible loudness, drained true-peak estimate and unrounded
@@ -1531,12 +1531,15 @@ requested core with real neighboring signal could be rejected because its core
 silence flag was incorrectly reused while parsing the contextual SWR4 true peak.
 The bounded correction separates native sample-silence evidence from continuous
 reconstruction evidence; exact/inner Audio Sequence gaps and a non-stationary
-MPEG-TS temporal oracle now cover the distinction. Independent remediation
-review is still required. Semantic ADTS/TS codec priming and an independently
-observed approximately eight-sample Matroska/WebM seek displacement at 48 kHz
-remain explicitly deferred despite internally coherent decoded PTS/counts; the
-latter must be revisited before sample-exact transient/boundary policy. **No
-PR/merge or CLOSED claim.**
+MPEG-TS temporal oracle now cover the distinction. Final bounded hardening also
+requires per-channel NaN/Infinity evidence from the consumed SWR4 true-peak
+center, so non-finite guard context cannot hide behind a finite maximum. Semantic
+ADTS/TS codec priming and Matroska/WebM seek granularity remain explicitly
+deferred despite internally coherent decoded PTS/counts. The approximately
+eight-sample shift independently observed in one 48 kHz fixture is not a bound:
+at nominal 1 ms granularity, ±0.5 ms corresponds to ±24 samples at 48 kHz and
+±96 at 192 kHz, as scale rather than a guaranteed maximum. Revisit before
+sample-exact transient/boundary policy. **No PR/merge or CLOSED claim.**
 
 **Permanent progress-prompt rule:** CEVRA Vids progress toward a fully usable
 functional version has Product Owner baseline **48%**. Carry that baseline in

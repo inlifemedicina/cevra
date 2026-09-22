@@ -179,6 +179,16 @@ try {
   assert.equal(contextualPeak.integratedLufs.reason, "digital-silence");
   assert.equal(contextualPeak.shortTermMaxLufs.reason, "digital-silence");
   assert.ok(contextualPeak.truePeakLinear > 0, "real neighboring sample must influence continuous reconstruction inside boundary");
+  const contextualNonfiniteCases = [
+    ["nan-before", NaN, 47999], ["nan-after", NaN, 72000],
+    ["positive-infinity-before", Infinity, 47999], ["positive-infinity-after", Infinity, 72000],
+    ["negative-infinity-before", -Infinity, 47999], ["negative-infinity-after", -Infinity, 72000]
+  ];
+  for (const [name, value, position] of contextualNonfiniteCases) {
+    const file = wav(`true-peak-context-${name}`, 48000, 1, 3, n => n === position ? value : tone(48000, 0.25)(n));
+    await assert.rejects(engine.execute(request(file, 1000, 1500), { jobId: `context-${++serial}`, locale: "en-US" }),
+      /AUDIO_MEASUREMENT_NON_FINITE_SAMPLES/);
+  }
   for (const [name, value, reaches, exceeds] of [["below-one", 1 - 2 ** -24, false, false], ["one", 1, true, false], ["above-one", 1 + 2 ** -23, true, true]]) {
     const f = wav(name, 48000, 1, 0.1, () => value);
     const r = await measure(name, request(f, 0, 100));
@@ -235,7 +245,8 @@ try {
   }
   for (const value of [NaN, Infinity, -Infinity]) {
     const file = wav(`nonfinite-${String(value)}`, 48000, 1, 0.1, n => n === 4000 ? value : 0.25);
-    await assert.rejects(engine.execute(request(file, 0, 100), { jobId: `invalid-${++serial}`, locale: "en-US" }));
+    await assert.rejects(engine.execute(request(file, 0, 100), { jobId: `invalid-${++serial}`, locale: "en-US" }),
+      /AUDIO_MEASUREMENT_NON_FINITE_SAMPLES/);
   }
   const surround = wav("unsupported-layout", 48000, 6, 0.1, () => 0);
   await assert.rejects(engine.execute(request(surround, 0, 100), { jobId: `invalid-${++serial}`, locale: "en-US" }), /UNSUPPORTED_STREAM/);
@@ -265,7 +276,7 @@ try {
   const exactGap = await measure("audio-sequence-exact-gap-1000-1500", request(sequenceGapOutput, 1000, 1500));
   assertDigitalSilentCore(exactGap, 24000);
   const innerGap = await measure("audio-sequence-inner-gap-1001-1499", request(sequenceGapOutput, 1001, 1499));
-  assertDigitalSilentCore(innerGap, 23904);
+  assertDigitalSilentCore(innerGap, 23904); assert.equal(innerGap.truePeakLinear, 0);
   const history = new ProjectHistory(createEmptyProject({ id: "measure", name: "Measurement", locale: "en-US", now: "2026-09-22T00:00:00Z" }));
   const original = JSON.stringify(history.current);
   const service = new MediaApplicationService({ engine, history, executions: new InMemoryMediaExecutionRepository(), artifacts: new NodeMediaArtifactStore() });

@@ -35,7 +35,10 @@ class AudioMeasurementTests(unittest.TestCase):
         raw.update(overrides)
         self.frame(r, "raw", 0, raw)
         self.frame(r, "scale", 0, {"lavfi.astats.Overall.Number_of_samples": 4800, "lavfi.astats.1.Max_level": 1})
-        self.frame(r, "truepeak", 0, {"lavfi.astats.Overall.Number_of_samples": 19200, "lavfi.astats.1.Peak_level": "-6.020600"})
+        self.frame(r, "truepeak", 0, {"lavfi.astats.Overall.Number_of_samples": 19200,
+                                       "lavfi.astats.1.Peak_level": "-6.020600",
+                                       "lavfi.astats.1.Number of NaNs": 0,
+                                       "lavfi.astats.1.Number of Infs": 0})
         return r
 
     def test_partial_short_windows_have_no_sentinel_loudness(self):
@@ -58,7 +61,9 @@ class AudioMeasurementTests(unittest.TestCase):
         self.frame(r, "scale", 0, {"lavfi.astats.Overall.Number_of_samples": 24000,
                                     "lavfi.astats.1.Max_level": 0})
         self.frame(r, "truepeak", 0, {"lavfi.astats.Overall.Number_of_samples": 96000,
-                                       "lavfi.astats.1.Peak_level": "-20"})
+                                       "lavfi.astats.1.Peak_level": "-20",
+                                       "lavfi.astats.1.Number of NaNs": 0,
+                                       "lavfi.astats.1.Number of Infs": 0})
         result = r.result()
         self.assertEqual(result["channels"][0]["rmsLinear"], 0)
         self.assertEqual(result["channels"][0]["samplePeakLinear"], 0)
@@ -67,6 +72,24 @@ class AudioMeasurementTests(unittest.TestCase):
         self.assertEqual(result["shortTermMaxLufs"], {"status": "unavailable", "reason": "digital-silence"})
         for invalid in ("NaN", "inf"):
             r.latest["truepeak"]["lavfi.astats.1.Peak_level"] = invalid
+            with self.assertRaisesRegex(measure.MeasurementError, "INVALID_METADATA"):
+                r.result()
+
+    def test_true_peak_context_nonfinite_counts_fail_closed(self):
+        for key in ("Number of NaNs", "Number of Infs"):
+            r = self.fixture()
+            r.flush()
+            r.latest["truepeak"][f"lavfi.astats.1.{key}"] = "1"
+            with self.assertRaisesRegex(measure.MeasurementError, "NON_FINITE_SAMPLES"):
+                r.result()
+        for value in (None, "malformed"):
+            r = self.fixture()
+            r.flush()
+            key = "lavfi.astats.1.Number of NaNs"
+            if value is None:
+                del r.latest["truepeak"][key]
+            else:
+                r.latest["truepeak"][key] = value
             with self.assertRaisesRegex(measure.MeasurementError, "INVALID_METADATA"):
                 r.result()
 
@@ -139,6 +162,7 @@ class AudioMeasurementTests(unittest.TestCase):
         self.assertNotIn("loudnorm", graph)
         self.assertIn("[context]atrim=start_pts=0:end_pts=4410", graph)
         self.assertIn("atrim=start_sample=180:end_sample=1588", graph)
+        self.assertIn("measure_perchannel=Peak_level+Number_of_NaNs+Number_of_Infs", graph)
 
 
 if __name__ == "__main__":
