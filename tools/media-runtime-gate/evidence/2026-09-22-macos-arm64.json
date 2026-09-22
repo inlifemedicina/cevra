@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "baseMainSha": "21e7cce26af6b1bb744fe8f47f9b34461426bd61",
+  "experimentRevision": "c6426b40ba7e17384967549b4b0c719928911e87",
+  "generatedAtUtc": "2026-09-22T04:19:29Z",
+  "platform": {
+    "system": "Darwin",
+    "release": "27.0.0",
+    "machine": "arm64",
+    "host": "Apple M4, 10 logical CPUs, 24 GiB RAM"
+  },
+  "binary": {
+    "identity": "Homebrew FFmpeg 9.0.2 laboratory binary; not CEVRA release parity",
+    "sha256": "c8173e9755795978bce8e104f8d7044fabe7d6d84044aba37d3648c6f4e4e1a8",
+    "h264Mf": false,
+    "h264Videotoolbox": true,
+    "zscale": false,
+    "tonemap": true
+  },
+  "safeguards": {
+    "oneHeavyProcessAtATime": true,
+    "scratchBudgetGiB": 20,
+    "minimumRemainingDiskGiB": 60,
+    "heavyProcessTimeoutMinutes": 30,
+    "finalScratchBytesApproximate": 4194304
+  },
+  "experiments": {
+    "audioJCut": {
+      "classification": "PASS",
+      "fixtureRecipe": "red 440 Hz/48 kHz source A plus blue 880 Hz/44.1 kHz source B; audio B begins at 1.500 s and video B begins at 2.000 s",
+      "fixtureHashes": {
+        "source-a.mov": "846031f67287bf34c9020521d924036e7b680fd87602217547e0abab8c05cf05",
+        "source-b.mov": "bfaa23272b019d628009764ec4cfbd31eb429fa145dc449fa6d626ca41d1a888"
+      },
+      "sequential": {
+        "wallSeconds": 0.037585,
+        "cpuSeconds": 0.05,
+        "peakRssBytes": 28983296,
+        "outputBytes": 404735,
+        "durationSeconds": 4.0,
+        "processCount": 1,
+        "encodeGenerations": 1
+      },
+      "fixedTwoInputCandidate": {
+        "wallSeconds": 0.034937,
+        "cpuSeconds": 0.06,
+        "peakRssBytes": 30343168,
+        "outputBytes": 404759,
+        "durationSeconds": 4.0,
+        "processCount": 1,
+        "encodeGenerations": 1,
+        "dominantHzAt1_1s": 440,
+        "dominantHzAt1_65s": 880,
+        "dominantHzAt2_2s": 880
+      },
+      "limitation": "Fixed laboratory graph; no product contract or subjective audio acceptance."
+    },
+    "manyCutScaling": {
+      "classification": "PASS",
+      "fixtureRecipe": "24 alternating 100 ms cuts from two 30 fps, 48 kHz synthetic sources; expected duration 2.400 s",
+      "operationComposition": {
+        "processCount": 25,
+        "aggregateWallSeconds": 0.600342,
+        "aggregateCpuSeconds": 0.25,
+        "peakRssBytesMaxProcess": 26116096,
+        "intermediateBytes": 286068,
+        "outputBytes": 255639,
+        "durationSeconds": 2.4
+      },
+      "singlePassCandidate": {
+        "processCount": 1,
+        "wallSeconds": 0.035221,
+        "cpuSeconds": 0.06,
+        "peakRssBytes": 32423936,
+        "intermediateBytes": 0,
+        "outputBytes": 255639,
+        "durationSeconds": 2.4
+      },
+      "limitation": "Short synthetic topology characterization, not product-scale or full-application performance."
+    },
+    "muxVideoCopy": {
+      "classification": "PASS",
+      "fixtureRecipe": "30000/1001 MPEG-4 video plus 48 kHz AAC tone, fixed video-copy/audio-encode mux",
+      "muxWallSeconds": 0.040536,
+      "muxCpuSeconds": 0.03,
+      "muxPeakRssBytes": 18710528,
+      "decodeWallSeconds": 0.025001,
+      "decodePeakRssBytes": 22659072,
+      "outputBytes": 330841,
+      "sourceVideoPacketCount": 60,
+      "outputVideoPacketCount": 60,
+      "sourceVideoPacketSequenceSha256": "eed752aba0769fea26bdd69c2a207226527b185d5551d8031d762a5cdecd8433",
+      "outputVideoPacketSequenceSha256": "eed752aba0769fea26bdd69c2a207226527b185d5551d8031d762a5cdecd8433",
+      "videoEncodeGenerations": 0,
+      "audioEncodeGenerations": 1
+    },
+    "colorTiming": {
+      "classification": "WARN",
+      "sdrMetadataAndDecode": "PASS",
+      "pqMetadataAndDecode": "PASS",
+      "hlgMetadataAndDecode": "PASS",
+      "vfrTimingEvidence": "PASS",
+      "rotationEvidence": "PASS",
+      "hdrToSdr": "NOT RUN: zscale unavailable and no approved dependency/profile",
+      "fixtureHashes": {
+        "sdr-bt709.mkv": "0e00511eac0b88acd81e42b9acc3ae7793bd51c9b8fa95805f3fc0b084603ade",
+        "hdr10-pq-ramp.mkv": "8c3fdbc8fa0aff01ac05e1f6a68c41e23cecb74c1258366f73b4f4d32c3e33f6",
+        "hlg-ramp.mkv": "8a7e3109cc0ead2dc54d220698c77a93f5a3ab38c032fcf87cb1a69008d6ecfa",
+        "vfr.mp4": "d12c0f5e543cb2d79d9ec97eb327961d33f2778b43a1774a140100f5912b975e",
+        "rotated-90.mp4": "9fe12457177d650162023685f39f34716488bb372f2a70a5eff8c37694c348e4"
+      },
+      "limitations": [
+        "Synthetic signal ramps do not validate real iPhone or Dolby Vision input.",
+        "Metadata and decode evidence are not subjective tone-map acceptance.",
+        "A nominal/average rate mismatch is evidence, not a complete VFR decision."
+      ]
+    },
+    "failureLifecycle": {
+      "classification": "PASS",
+      "existingOutputSentinelPreserved": true,
+      "cancelledFinalAbsent": true,
+      "ownerPartialRemoved": true,
+      "permissionFailureOutputAbsent": true,
+      "lowDisk": "NOT RUN: no isolated quota/mount; RLIMIT_FSIZE is not faithful ENOSPC"
+    }
+  },
+  "unavailable": {
+    "exactSealedFfmpegBuild": "NOT RUN: gpg required by authoritative source verifier was absent",
+    "nativeWindows": "NOT RUN: no native host; private-runner cost allowance not provable",
+    "realIphoneDolbyVision": "NOT RUN",
+    "subjectiveVisualApproval": "NOT RUN"
+  }
+}

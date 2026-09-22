@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-21, cross-platform/runtime prerequisites closeout through merged PR #32 / `origin/main` `13dc11a869fdb103be609a66d312ea49966cc0df`
+**Last decision reconciliation:** 2026-09-22, coordinated Media Runtime evidence plan on `spike/media-runtime-coordinated-gate`, based on `origin/main` `21e7cce26af6b1bb744fe8f47f9b34461426bd61`
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1473,6 +1473,16 @@ worker-exit and artifact-cleanup mechanisms satisfy this bounded prerequisite.
 Real Windows runtime/export execution remains a later validation gate. Windows
 H.264/export, HDR-to-SDR and the coordinated Media Runtime gate are not closed.
 
+**Coordinated Media Runtime gate — PLAN REVIEW / PRODUCTION NOT STARTED.** The
+source-linked requirement matrix, synthetic characterization, blocked native
+evidence, dependency/license assessment and ordered production slices are in
+[`CEVRA_MEDIA_RUNTIME_COORDINATED_PLAN.md`](CEVRA_MEDIA_RUNTIME_COORDINATED_PLAN.md).
+The evidence recommends a bounded typed multi-input audio/J-cut executor as the
+first production slice, pending Product Owner approval of its PCM and overlap
+policy. Native Windows H.264, exact zimg/HDR-to-SDR, real iPhone/Dolby Vision
+and subjective quality evidence remain explicitly unproved. This research does
+not close the gate or authorize production promotion.
+
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
 GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.
@@ -1545,6 +1555,7 @@ Current dependency blockers/gates:
 - **CANONICAL:** the fix-now/defer, execution-feasibility, Product Owner pause, coordinated Media Runtime, acceptance-catalog and Director-impact rules are permanent agent policy in `AGENTS.md`.
 - **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
+- **PLAN REVIEW:** the coordinated Media Runtime plan on `spike/media-runtime-coordinated-gate` reconciles MR-A01–MR-A06, MR-V01–MR-V02 and MR-Q01 against current code and synthetic evidence. It proposes the typed multi-input audio/J-cut executor first; production work, Windows validation, zimg/HDR approval and all unresolved Product Owner choices remain open.
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
 - **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, paused for dependency reconciliation. GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS; focused independent review and reconciliation against the changed history baseline remain required.
 - **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
@@ -1593,7 +1604,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
+1. Review and approve or revise the coordinated Media Runtime plan, beginning with the proposed typed multi-input audio/J-cut executor and its PCM/overlap policy; do not treat the research branch as production implementation.
 2. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
 3. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
 4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.

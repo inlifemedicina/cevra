@@ -35,4 +35,3 @@ Synthetic PQ/HLG ramps carry deliberate 10-bit signal code ramps and explicit
 transfer/color tags. They are useful for metadata and decoded-signal checks, but
 they are not substitutes for licensed/reference HDR footage or human visual
 acceptance.
-
