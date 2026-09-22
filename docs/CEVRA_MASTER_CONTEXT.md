@@ -1478,10 +1478,18 @@ source-linked requirement matrix, synthetic characterization, blocked native
 evidence, dependency/license assessment and ordered production slices are in
 [`CEVRA_MEDIA_RUNTIME_COORDINATED_PLAN.md`](CEVRA_MEDIA_RUNTIME_COORDINATED_PLAN.md).
 The evidence recommends a bounded typed multi-input audio/J-cut executor as the
-first production slice, pending Product Owner approval of its PCM and overlap
-policy. Native Windows H.264, exact zimg/HDR-to-SDR, real iPhone/Dolby Vision
-and subjective quality evidence remain explicitly unproved. This research does
-not close the gate or authorize production promotion.
+first production slice. Targeted remediation corrected the B-picture source
+mapping, added an independent flash/click synchronization oracle whose old
+mapping negative control fails by approximately 498 ms, separated a 48 kHz
+float-PCM audio-only prototype, validated a bounded 64-item workload, and fixed
+FAIL/NOT-RUN evidence aggregation. The resulting recommendation is ready for a
+focused Product Owner decision on its explicit PCM/channel/overlap/bounds
+contract; it is not an approved product default. A standard native Windows
+runner was reached, but exact Python 3.12.14 was unavailable on the selected
+Windows Server 2025 image before signature verification/runtime assembly, so
+native H.264 remains NOT RUN. Exact zimg/HDR-to-SDR, real iPhone/Dolby Vision
+and subjective quality evidence also remain explicitly unproved. This research
+does not close the gate or authorize production promotion.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
@@ -1604,7 +1612,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Review and approve or revise the coordinated Media Runtime plan, beginning with the proposed typed multi-input audio/J-cut executor and its PCM/overlap policy; do not treat the research branch as production implementation.
+1. Approve or revise the coordinated Media Runtime plan's first-slice recommendation: a bounded typed multi-input audio/J-cut executor using the proposed explicit 48 kHz float32 PCM, mono/stereo conversion, linear-overlap/headroom and ownership contract; do not treat the research branch as production implementation or the recommendation as an approved default.
 2. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
 3. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
 4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.

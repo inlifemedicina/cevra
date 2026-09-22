@@ -28,6 +28,11 @@ Completed in this research gate:
 - characterized audio/J-cut feasibility, multi-cut process topology, mux video
   packet identity, SDR/PQ/HLG/VFR/rotation evidence and failure cleanup with
   synthetic fixtures;
+- corrected the B-picture source mapping, added an independent flash/click
+  synchronization oracle and proved the former mapping fails its mandatory
+  negative control;
+- separated an audio-only float-PCM prototype from the A/V oracle and exercised
+  explicit gain, fades, resampling, overlap, stereo preservation and 64 items;
 - audited Windows H.264 selection and the HDR dependency/build gap;
 - reconciled render/composition ownership, artifact ownership and the frozen
   Transcript Cache V1 impact;
@@ -36,20 +41,28 @@ Completed in this research gate:
 
 Explicitly blocked or unavailable:
 
-- **native Windows execution:** NOT RUN; no native Windows host was available;
-- **experimental Windows GitHub Actions:** NOT RUN; the repository's remaining
-  private-runner allowance/billing could not be verified and the local host has
-  no `gh` client, so the no-new-cost condition was not provable;
+- **native Windows execution:** ATTEMPTED / BLOCKED before runtime assembly in
+  experimental run `35721243478`; the standard `windows-2025` host started,
+  but `actions/setup-python` could not supply exact Python 3.12.14 for that
+  image. Signature verification, exact FFmpeg build and `h264_mf` encode were
+  therefore skipped and remain NOT RUN;
+- **public-runner eligibility:** VERIFIED; GitHub reports this repository as
+  public and official documentation states standard public-repository runners
+  are free/unlimited. The prior private-minute/absence-of-`gh` blocker is
+  superseded;
 - **exact sealed FFmpeg rebuild:** NOT RUN; the authoritative source-preparation
   script requires `gpg`, which is absent on this host. The signature requirement
   was not bypassed;
 - **HDR→SDR:** NOT RUN; neither the pinned configuration nor the local lab
   binary contains `zscale`, and no unapproved dependency was installed;
 - **real iPhone HDR/Dolby Vision and subjective visual acceptance:** NOT RUN;
-- **deterministic ENOSPC injection:** NOT RUN; no isolated quota/mount was
-  available and a process file-size limit would not faithfully model ENOSPC.
+- **permission/ENOSPC propagation:** deterministic laboratory injection PASS;
+  real-filesystem permission denial, real ENOSPC and product-boundary crash
+  durability remain NOT RUN.
 
-The outcome is therefore **PLAN REVIEW READY WITH EXPLICIT BLOCKED EVIDENCE**.
+The coordinated plan remains **PLAN REVIEW READY WITH EXPLICIT BLOCKED
+EVIDENCE**. The corrected audio evidence is additionally sufficient for a
+focused **FIRST-SLICE DECISION**; neither status closes the coordinated gate.
 
 ## 2. Authorities and source chain
 
@@ -118,7 +131,7 @@ Host characterization:
 | Free disk before labs | approximately 107 GiB |
 | Scratch | `/tmp/cevra-media-runtime-gate-21e7cce`, owner mode `0700` |
 | Lab binary | Homebrew FFmpeg 9.0.2, SHA-256 `c8173e9755795978bce8e104f8d7044fabe7d6d84044aba37d3648c6f4e4e1a8` |
-| Lab output size | 4.0 MiB for the final run |
+| Lab output size | approximately 6.2 MiB for the corrected final run |
 
 Safeguards: one heavy process/build at a time, four build jobs maximum, 20 GiB
 scratch budget, stop below 60 GiB free disk, 30-minute heavy-command timeout,
@@ -177,25 +190,61 @@ gates, not reasons to combine all work into one production PR.
 
 ### Synthetic J-cut result
 
-The fixed lab graph used two sources: red/440 Hz at 48 kHz and blue/880 Hz at
-44.1 kHz. Video cuts at 2.000 s. Source B audio begins at 1.500 s and source A
-audio stops at 1.500 s, so the audio leads picture by 500 ms without overlapping
-the two tones.
+The original laboratory graph was wrong: B audio used source `0..2.5` at
+timeline `1.5..4`, but B picture used source `0..2` at timeline `2..4`. Once B
+became visible, audio source time was therefore 500 ms ahead of picture source
+time. Dominant continuous tones could not expose that defect. That result is
+retained only as superseded evidence.
+
+The corrected graph uses the explicit resolved mapping:
+
+| Element | Source range | Timeline range |
+|---|---:|---:|
+| A picture | 0..2.0 s | 0..2.0 s |
+| A audio | 0..1.5 s | 0..1.5 s |
+| B audio | 0..2.5 s | 1.5..4.0 s |
+| B picture | 0.5..2.5 s | 2.0..4.0 s |
+
+Machine-readable white flashes and audio clicks were generated at corresponding
+source instants. The output was decoded into 120 frames and 192,000 samples.
+The tolerance is one 30 fps frame interval plus one 48 kHz sample interval,
+33.354 ms; it is not an unsupported exact-sync claim.
 
 | Check | Result |
 |---|---|
-| Output duration | 4.000 s, expected 4.000 s — PASS |
-| 1.1 s tone | 440 Hz — PASS |
-| 1.65 s tone (before picture cut) | 880 Hz — PASS |
-| 2.2 s tone | 880 Hz — PASS |
-| Resampling | 44.1 kHz source normalized to the 48 kHz output — PASS |
-| Candidate wall / peak RSS / bytes | 0.0349 s / 30,343,168 bytes / 404,759 bytes |
-| Sequential graph wall / peak RSS / bytes | 0.0376 s / 28,983,296 bytes / 404,735 bytes |
+| Corrected visible-B A/V error | maximum 1.958 ms — PASS |
+| Mandatory old-mapping control | 498.042 ms and missing visual event — expected FAIL |
+| Output duration | 4.000 s; 120 frames; 192,000 samples — PASS |
+| B before authorized 1.5 s placement | absent by independent 880/440 power ratio — PASS |
+| A after authorized 1.5 s range | absent by independent 440/880 power ratio — PASS |
+| Resampling | 44.1 kHz B source to 48 kHz output — PASS |
+| Corrected A/V wall / peak RSS / bytes | 0.0358 s / 33,423,360 B / 427,418 B |
 
-The tiny fixture is a correctness result, not a meaningful speed claim. Both
-graphs were one process and one video/audio encode. The important result is
-representational: current CEVRA operations cannot independently place/mix the
-audio while cutting video at another time.
+The tiny fixture establishes the source-time mapping only. It is not a complete
+CEVRA execution benchmark. The representational conclusion remains: current
+CEVRA operations cannot independently place/mix audio while cutting picture at
+another source position.
+
+### Separate audio-only prototype
+
+The first proposed production primitive is audio-only, so the corrected lab now
+renders a separate `pcm_f32le` WAV with explicit source trims/timeline placement,
+per-item gain/fades and 44.1→48 kHz resampling. It performs zero video encodes.
+
+| Check | Result |
+|---|---|
+| Events and duration | all eight events within tolerance; 4.000 s — PASS |
+| Mono output | 48 kHz float PCM, one channel — PASS |
+| Stereo preservation | left 330 Hz / right 550 Hz remain separated — PASS |
+| Explicit overlap | linear sum, `normalize=0`, no implicit limiter; peak 0.999962 — PASS |
+| Wall / peak RSS / bytes | 0.0241 s / 17,416,192 B / 768,092 B |
+
+A separate bounded audio-only graph rendered 64 alternating 40 ms items from
+two sources in one process, one float-PCM generation, no video encode and no
+intermediate files. It produced exactly 2.560 s in 0.0447 s, with 28,049,408 B
+peak RSS and 491,612 B output. This supports a conservative initial 64-item cap
+for the short Slice 1 fixture; it does not prove unlimited sources, tracks or
+duration.
 
 ### Bounded multi-cut comparison
 
@@ -208,11 +257,11 @@ with one internal graph. Each cut was exactly 100 ms (three video frames at
 | Per-cut encode + copy concat | 25 | 0.6003 s | 26,116,096 B | 286,068 B | 255,639 B | 2.400 s |
 | One fixed multi-input graph | 1 | 0.0352 s | 32,423,936 B | 0 B | 255,639 B | 2.400 s |
 
-The single pass used more peak memory in its one process but removed 24 process
-starts and all cut intermediates. The workload is deliberately short; it does
-not establish product-scale memory bounds or subjective quality. It does show
-why composing existing per-file mutations is the wrong execution topology for
-the first J-cut slice.
+This A/V comparison is standalone process-topology evidence, not an end-to-end
+CEVRA or audio-only performance comparison. The single pass used more peak
+memory in its one process but removed 24 process starts and all cut
+intermediates. It does not establish product-scale memory bounds or subjective
+quality.
 
 ### Proposed smallest closed contract
 
@@ -241,11 +290,22 @@ cuts nor invents gain/normalization. Slice 1 produces an isolated PCM artifact;
 final normalization, treatment policy, video composition and mux remain later
 explicit steps.
 
-The output PCM choice avoids another lossy audio generation and permits
-measurement before final encoding. The exact PCM depth (`s16le`, `s24le` or
-float) and overlap/headroom rule require Product Owner/quality approval; the lab
-used s16le only for deterministic measurement and does not select the product
-format.
+The implementation-ready recommendation for review is 48 kHz interleaved
+float32 WAV (`pcm_f32le`), with an explicit output layout of mono or stereo.
+Mono remains mono when requested; stereo channels are preserved; mono→stereo
+duplicates the channel, while stereo→mono uses a fixed `0.5L + 0.5R` downmix.
+Every item is linearly summed at its explicit placement with no hidden
+normalization, compressor or limiter. Float PCM preserves intermediate
+headroom; final gain/limiting remains a later explicit decision. This is a
+recommendation, not an approved default.
+
+All contract times remain integer milliseconds. At 48 kHz each millisecond is
+exactly 48 samples; output begins at timeline zero, gaps are silence and output
+length is the greatest validated item end. The first production slice should
+initially allow at most 64 items from at most two sources, mono/stereo only and
+at most eight simultaneous items. Only the 64-item/two-source short workload is
+measured here; the overlap-count and maximum-duration caps still require
+production characterization rather than extrapolation.
 
 ## 6. Front B — Windows H.264 feasibility
 
@@ -268,9 +328,15 @@ if the pinned binary enumerates the encoder. The smallest later code change is
 to add `h264_mf` to both allow-lists only after a native encode/probe/decode test
 passes. Enumeration alone remains insufficient.
 
-Native status: **NOT RUN**. No statement about hardware use, software fallback,
-consumer-PC compatibility, output quality, timing or A/V sync is proven. A
-future native recipe must:
+Native status: **ATTEMPTED / BUILD AND ENCODE NOT RUN**. GitHub confirmed the
+repository is public, and the standard `windows-2025` runner started under
+read-only contents permission in run `35721243478`. The attempt stopped at
+`actions/setup-python`: exact Python 3.12.14 was unavailable for that runner
+image. Consequently the pinned-source signature verification, exact build and
+real `h264_mf` encode/probe/decode steps were skipped. This is a concrete
+toolchain prerequisite failure, not encoder evidence. No statement about
+hardware use, software fallback, consumer-PC compatibility, output quality,
+timing or A/V sync is proven. A future corrected native recipe must:
 
 1. assemble/verify the exact private Windows x64 runtime and root `python.exe`;
 2. prove `h264_mf` enumeration and capture `ffmpeg -h encoder=h264_mf`;
@@ -305,12 +371,17 @@ on durable MR-V01 evidence yet.
 
 | Fixture | Result | Limitation |
 |---|---|---|
-| SDR BT.709 yuv420p | metadata + full decode PASS | no visual-grade comparison |
-| 10-bit BT.2020/PQ ramp | tags, 10-bit pixels + full decode PASS | synthetic code-value ramp, not real HDR footage |
-| 10-bit BT.2020/HLG ramp | tags, 10-bit pixels + full decode PASS | same limitation |
-| VFR timing | `r_frame_rate=30/1`, `avg_frame_rate=23/1` — evidence PASS | mismatch is not by itself definitive VFR policy |
+| SDR BT.709 yuv420p | asserted range/matrix/primaries/transfer/pixel format + separate full decode PASS | no visual-grade comparison |
+| 10-bit BT.2020/PQ ramp | asserted tags and 10-bit pixels + separate full decode PASS | synthetic code-value ramp, not real HDR footage |
+| 10-bit BT.2020/HLG ramp | asserted tags and 10-bit pixels + separate full decode PASS | same limitation |
+| VFR timestamps | 60 monotonic frames; 30 fps then 15 fps intervals; expected schedule PASS; A/V duration error 0.001 ms | `r_frame_rate=30/1`, `avg_frame_rate=20/1` is retained evidence, not policy |
 | Rotation | 90° display matrix preserved and probed — PASS | pixels were not rotated |
 | HDR→SDR | **NOT RUN** | `zscale` absent; no approved profile/dependency |
+
+The VFR result inspects decoded frame PTS rather than classifying from two rate
+strings. It observes intervals of approximately 33.333/33.334 ms and
+66.666/66.667 ms across the generated schedule. It does not select CFR/VFR
+product behavior, and unavailable/sentinel rate strings remain unavailable.
 
 The PQ/HLG fixtures use a deliberate limited-range 10-bit ramp and explicit
 BT.2020/transfer semantics. They are not SDR pixels merely relabeled as HDR, but
@@ -362,13 +433,20 @@ Application
   validates output/effective profile and promotes the exact result
 ```
 
-The lab mux copied all 60 encoded video packets: source and output packet-hash
+The standalone laboratory mux copied all 60 encoded video packets: source and output packet-hash
 sequence SHA-256 both equal
 `eed752aba0769fea26bdd69c2a207226527b185d5551d8031d762a5cdecd8433`.
-Mux wall time was 0.0405 s, peak RSS 18,710,528 bytes and output 330,841
-bytes. Full decode then passed in 0.0250 s with 22,659,072-byte peak RSS. Video
-encode generations: zero; new audio encode generations: one. Container hashes
+Mux wall time was 0.0401 s, peak RSS 18,677,760 bytes and output 330,841
+bytes. Full decode then passed in 0.0249 s with 22,757,376-byte peak RSS. Video
+encode generations at the mux stage: zero; audio generations at that stage:
+one; cumulative synthetic-fixture audio generations: two. Container hashes
 were intentionally not compared.
+
+This is evidence level A only: direct Homebrew FFmpeg command. The fixture uses
+MPEG-4 Part 2, which is outside CEVRA's closed H.264/H.265/AV1 delivery matrix.
+Evidence with B) the exact pinned CEVRA binary, C) the real adapter/worker
+`mux-audio` operation and D) Application promotion/lifecycle is **NOT RUN**.
+No CEVRA-path or delivery-policy claim is inferred from the packet result.
 
 ### PROPOSED resolved-plan boundary
 
@@ -422,10 +500,14 @@ Existing production safeguards cover output-exists, symlink refusal, worker
 loss, cancellation, configurable render timeout, liveness, bounded settlement,
 subprocess reaping and application cleanup. Repository lifecycle tests are the
 authoritative evidence. The lab additionally preserved an existing sentinel,
-left no final output after cancellation, removed its owner-created partial, and
-failed closed on a read-only directory. Low-disk behavior remains unproven and
-must be injected at the artifact-store/worker boundary in the slice that adds
-multi-artifact staging.
+left no final output after cancellation and removed its owner-created partial.
+The former `chmod` permission claim is superseded because it is platform/user
+dependent and does not deny root. Deterministic SIMULATED `EACCES` and `ENOSPC`
+injection now proves only the lab abstraction: no final promotion, existing and
+unrelated files unchanged, owned cleanup attempted, and cleanup failure kept
+visible. Real permission denial, real-filesystem ENOSPC and product-boundary
+crash durability remain NOT RUN and must be tested at the actual staging
+boundary when it exists.
 
 No general cache manager, quota system, updater or garbage collector is
 justified by the imminent slices.
@@ -433,12 +515,17 @@ justified by the imminent slices.
 ## 10. Resource, compatibility and dependency summary
 
 - PCM is the largest predictable new temporary cost: 48 kHz stereo s16 is
-  about 11.52 MiB/min; s24 about 17.28 MiB/min; float32 about 23.04 MiB/min.
-  Product depth is unresolved.
+  11,520,000 B/min (about 10.99 MiB/min); s24 is 17,280,000 B/min (about
+  16.48 MiB/min); float32 is 23,040,000 B/min (about 21.97 MiB/min). The
+  recommended first-slice review candidate is float32; it is not approved.
 - One-pass 24-cut assembly removed 286,068 bytes of short-lived intermediates
   in the tiny fixture and reduced process count 25→1. Its single-process peak
-  RSS was about 6.4 MiB higher. Longer-source scaling must be measured before a
+  RSS was approximately 5.97 MiB higher. Longer-source scaling must be measured before a
   product cap is chosen.
+- The separate 64-item audio-only graph used one process, one float-PCM
+  generation, zero video encodes, 0.0447 s wall time and approximately
+  26.75 MiB peak RSS for 2.56 s output. It supports only the proposed initial
+  item cap, not a duration/track scalability claim.
 - Mux video stream-copy is objectively preserved for the fixture at zero video
   encode generations.
 - Current VFR/color/rotation evidence is additive and backward compatible in
@@ -503,7 +590,11 @@ required for the runtime-only first slice.
 - **Rollback:** operation remains unused by current consumers until Slice 3;
   revert the additive contract/worker surface.
 - **Completion:** exact sealed macOS runtime passes; resource scaling is bounded;
-  independent review approves the contract and PCM/overlap rules.
+  cancellation owns and removes only its staging output; the Application owns
+  promotion after revision validation; alignment PCM preparation remains a
+  separate read-only consumer and its existing 16 kHz mono contract is not
+  changed; independent review approves the contract and recommended PCM/
+  overlap rules.
 
 ### Slice 2 — typed audio measurement
 
@@ -566,8 +657,12 @@ new evidence demonstrates a narrow dependency.
 
 ## 13. Exact first recommendation
 
-Implement **Slice 1: the typed multi-input audio/J-cut executor**, after the
-Product Owner approves its PCM depth and overlap/headroom rule.
+Review **Slice 1: the typed multi-input audio/J-cut executor** with the concrete
+recommended contract from Section 5: 48 kHz interleaved float32 WAV, explicit
+mono/stereo output, fixed channel conversions, linear overlap without hidden
+normalization/limiting, integer-millisecond timing, and the initial bounded
+item/source shape. Production implementation starts only after Product Owner
+approval of this recommendation and independent contract review.
 
 Why first:
 
@@ -585,8 +680,10 @@ cache manager or Composition Engine.
 
 ## 14. Minimum Product Owner decisions
 
-1. **Slice 1 PCM and overlap policy:** select intermediate depth and explicit
-   headroom/clipping behavior; confirm the proposed bounded operation shape/name.
+1. **Slice 1 decision:** approve or revise the recommended 48 kHz float32 PCM,
+   mono/stereo conversion, linear-overlap/headroom behavior, bounded operation
+   shape and final internal name. The laboratory recommendation is not yet a
+   product default.
 2. **MR-V01 durable authority:** decide whether normalized source technical
    evidence becomes a typed Project IR field, a versioned Project Package
    descriptor, or is always re-probed with an explicit freshness policy.
@@ -600,7 +697,9 @@ cache manager or Composition Engine.
    approve which of EQ/compression/de-ess/limiting/denoise belongs in V1.
 
 Composition Engine selection and preview proxy quality remain their existing
-ADR 0012 decision gate, not a new decision caused by this plan.
+ADR 0012 decision gate, not a new decision caused by this plan. Windows
+fallback, zimg/tone mapping, Composition and voice-treatment choices are not
+prerequisites for deciding the independent first audio slice.
 
 ## 15. Adversarial self-review
 
@@ -614,9 +713,11 @@ Attempts to disprove the plan found:
 - **Single application of transforms:** the plan carries explicit source
   interpretation and operation stages; no color transform exists yet. It must
   be tested for SDR bypass and double-application before MR-V02 closes.
-- **A/V sync:** exact 500 ms J-cut timing and 4.000/2.400 s synthetic durations
-  passed. Long VFR and real-camera sync remain unproven.
-- **Bounded memory:** short labs peaked near 32.4 MB, but long-source/many-track
+- **A/V sync:** the corrected visible-B events measured at most 1.958 ms error
+  against a 33.354 ms frame/sample-derived tolerance; the old mapping failed at
+  498.042 ms. The 4.000 s corrected fixture and 2.400 s topology fixture passed.
+  Long VFR and real-camera sync remain unproven.
+- **Bounded memory:** short labs peaked near 31.88 MiB, but long-source/many-track
   scaling is not proven; item/duration bounds need production characterization.
 - **Late promotion:** existing app/transport tests reject stale/lost/cancelled
   results and clean outputs. Multi-artifact plan state must be persisted before
@@ -635,7 +736,8 @@ Inherited observations not patched here:
 - Windows encoder candidate tables are intentionally empty pending evidence;
 - local ingest loses enriched probe evidence;
 - exact sealed rebuild tooling requires `gpg`;
-- low-disk behavior lacks a deterministic isolated test;
+- deterministic injected ENOSPC propagation passes in the laboratory, while
+  real-filesystem and product-boundary crash durability remain unproved;
 - the worker lifecycle and cleanup paths remain current foundations, not
   generalized claims about future multi-artifact renders.
 
@@ -650,9 +752,9 @@ Final local raw evidence (not committed because it contains generated media and
 verbose logs):
 
 - `tools/media-runtime-gate/evidence/2026-09-22-macos-arm64.json` — committed
-  concise result summary tied to experiment revision `c6426b40...`;
-- `/tmp/cevra-media-runtime-gate-21e7cce/lab-system-ffmpeg-v5/results.json`
-  — full local raw report;
+  concise result summary tied to experiment revision `dcbdd818...`;
+- `/private/tmp/cevra-media-runtime-remediation-validation-7KqZYP/results.json`
+  — latest full local revalidation report;
 - sibling synthetic fixtures under the same owner-only directory.
 
 Reproduce with a chosen binary:
@@ -672,8 +774,9 @@ separately rather than overwriting the non-parity result.
 
 ## 17. Final gate status
 
-**PLAN REVIEW READY WITH EXPLICIT BLOCKED EVIDENCE**
+**READY FOR FIRST-SLICE DECISION**
 
 Production implementation has not started. The coordinated Media Runtime gate
-is not closed. Main and the frozen Transcript Cache V1 branch remain outside
-this research branch.
+is not closed. Native Windows/exact-runtime, HDR transformation and real-camera
+quality evidence remain explicitly blocked or NOT RUN. Main and the frozen
+Transcript Cache V1 branch remain outside this research branch.

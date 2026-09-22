@@ -1,8 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "baseMainSha": "21e7cce26af6b1bb744fe8f47f9b34461426bd61",
-  "experimentRevision": "c6426b40ba7e17384967549b4b0c719928911e87",
-  "generatedAtUtc": "2026-09-22T04:19:29Z",
+  "experimentRevision": "dcbdd81841f225623fd63f47358b3c8780739a2c",
+  "generatedAtUtc": "2026-09-22T11:24:17Z",
+  "supersedesRevision": "c6426b40ba7e17384967549b4b0c719928911e87",
   "platform": {
     "system": "Darwin",
     "release": "27.0.0",
@@ -17,116 +18,170 @@
     "zscale": false,
     "tonemap": true
   },
-  "safeguards": {
-    "oneHeavyProcessAtATime": true,
-    "scratchBudgetGiB": 20,
-    "minimumRemainingDiskGiB": 60,
-    "heavyProcessTimeoutMinutes": 30,
-    "finalScratchBytesApproximate": 4194304
-  },
   "experiments": {
     "audioJCut": {
       "classification": "PASS",
-      "fixtureRecipe": "red 440 Hz/48 kHz source A plus blue 880 Hz/44.1 kHz source B; audio B begins at 1.500 s and video B begins at 2.000 s",
+      "mapping": {
+        "aPicture": "source 0..2 -> timeline 0..2",
+        "aAudio": "source 0..1.5 -> timeline 0..1.5",
+        "bAudio": "source 0..2.5 -> timeline 1.5..4",
+        "bPicture": "source 0.5..2.5 -> timeline 2..4"
+      },
       "fixtureHashes": {
-        "source-a.mov": "846031f67287bf34c9020521d924036e7b680fd87602217547e0abab8c05cf05",
-        "source-b.mov": "bfaa23272b019d628009764ec4cfbd31eb429fa145dc449fa6d626ca41d1a888"
+        "source-a.mkv": "6957269d572c4aea569392ebfc21c8bc2e536006c33dd4a63430faace97eed25",
+        "source-b.mkv": "3ffe9cd123f7365c4dc06662e2ce033adfc4640a6380c76c741d3873d75eef5b"
       },
-      "sequential": {
-        "wallSeconds": 0.037585,
-        "cpuSeconds": 0.05,
-        "peakRssBytes": 28983296,
-        "outputBytes": 404735,
+      "correctedAvOracle": {
+        "classification": "PASS",
+        "visualEventSeconds": [0.4, 0.9, 1.4, 2.2, 2.7, 3.2, 3.7],
+        "audioEventSeconds": [0.4, 0.9, 1.4, 1.7519583333, 2.2019583333, 2.7019583333, 3.2019583333, 3.7019583333],
+        "maxVisibleBAvErrorSeconds": 0.001958,
+        "toleranceSeconds": 0.033354167,
+        "frameCount": 120,
+        "sampleCount": 192000,
         "durationSeconds": 4.0,
-        "processCount": 1,
-        "encodeGenerations": 1
+        "wallSeconds": 0.035781,
+        "peakRssBytes": 33423360
       },
-      "fixedTwoInputCandidate": {
-        "wallSeconds": 0.034937,
-        "cpuSeconds": 0.06,
-        "peakRssBytes": 30343168,
-        "outputBytes": 404759,
+      "oldMappingNegativeControl": {
+        "expectedOracleResult": "FAIL",
+        "observedOracleResult": "FAIL",
+        "maxVisibleBAvErrorSeconds": 0.498042,
+        "visualEventCount": 6,
+        "audioEventCount": 8
+      },
+      "noUnintendedOverlap": {
+        "classification": "PASS",
+        "unauthorizedBToARatioBefore1_5s": 1.0524931472135674e-32,
+        "unauthorizedAToBRatioAfter1_5s": 6.76930902738671e-13
+      },
+      "audioOnlyPrototype": {
+        "classification": "PASS",
+        "sampleFormat": "float32 PCM",
+        "sampleRate": 48000,
+        "channels": 1,
         "durationSeconds": 4.0,
-        "processCount": 1,
-        "encodeGenerations": 1,
-        "dominantHzAt1_1s": 440,
-        "dominantHzAt1_65s": 880,
-        "dominantHzAt2_2s": 880
+        "videoEncodeGenerations": 0,
+        "wallSeconds": 0.024099,
+        "peakRssBytes": 17416192,
+        "outputBytes": 768092,
+        "overlap": {
+          "rule": "linear sum without implicit normalization or limiter",
+          "peakLinear": 0.9999622107,
+          "classification": "PASS"
+        },
+        "stereo": {
+          "channels": 2,
+          "leftDominantHz": 330,
+          "rightDominantHz": 550,
+          "classification": "PASS"
+        }
       },
-      "limitation": "Fixed laboratory graph; no product contract or subjective audio acceptance."
+      "supersededEvidence": "The prior dominant-frequency-only result did not establish source-time A/V synchronization."
+    },
+    "audioOnlyScaling": {
+      "classification": "PASS",
+      "itemCount": 64,
+      "sourceCount": 2,
+      "itemDurationSeconds": 0.04,
+      "durationSeconds": 2.56,
+      "processCount": 1,
+      "videoEncodeGenerations": 0,
+      "audioPcmGenerations": 1,
+      "intermediateBytes": 0,
+      "wallSeconds": 0.044659,
+      "peakRssBytes": 28049408,
+      "outputBytes": 491612,
+      "limitation": "Supports a proposed initial cap of 64 items for the short fixture; it does not establish unlimited track or duration scalability."
     },
     "manyCutScaling": {
       "classification": "PASS",
-      "fixtureRecipe": "24 alternating 100 ms cuts from two 30 fps, 48 kHz synthetic sources; expected duration 2.400 s",
+      "evidenceLevel": "standalone A/V process-topology demonstration, not CEVRA end-to-end execution",
       "operationComposition": {
         "processCount": 25,
-        "aggregateWallSeconds": 0.600342,
+        "aggregateWallSeconds": 0.612347,
         "aggregateCpuSeconds": 0.25,
-        "peakRssBytesMaxProcess": 26116096,
+        "peakRssBytesMaxProcess": 26050560,
         "intermediateBytes": 286068,
-        "outputBytes": 255639,
         "durationSeconds": 2.4
       },
       "singlePassCandidate": {
         "processCount": 1,
-        "wallSeconds": 0.035221,
-        "cpuSeconds": 0.06,
-        "peakRssBytes": 32423936,
+        "wallSeconds": 0.035577,
+        "peakRssBytes": 32358400,
         "intermediateBytes": 0,
-        "outputBytes": 255639,
         "durationSeconds": 2.4
-      },
-      "limitation": "Short synthetic topology characterization, not product-scale or full-application performance."
+      }
     },
     "muxVideoCopy": {
       "classification": "PASS",
-      "fixtureRecipe": "30000/1001 MPEG-4 video plus 48 kHz AAC tone, fixed video-copy/audio-encode mux",
-      "muxWallSeconds": 0.040536,
-      "muxCpuSeconds": 0.03,
-      "muxPeakRssBytes": 18710528,
-      "decodeWallSeconds": 0.025001,
-      "decodePeakRssBytes": 22659072,
-      "outputBytes": 330841,
+      "evidenceLevels": {
+        "standaloneLaboratoryCommand": "PASS",
+        "exactPinnedCevraBinary": "NOT RUN",
+        "realCevraAdapterWorkerOperation": "NOT RUN",
+        "applicationPromotionLifecycle": "NOT RUN"
+      },
+      "fixtureCodec": "MPEG-4 Part 2; outside the closed CEVRA delivery matrix",
       "sourceVideoPacketCount": 60,
       "outputVideoPacketCount": 60,
-      "sourceVideoPacketSequenceSha256": "eed752aba0769fea26bdd69c2a207226527b185d5551d8031d762a5cdecd8433",
-      "outputVideoPacketSequenceSha256": "eed752aba0769fea26bdd69c2a207226527b185d5551d8031d762a5cdecd8433",
-      "videoEncodeGenerations": 0,
-      "audioEncodeGenerations": 1
+      "packetSequenceSha256": "eed752aba0769fea26bdd69c2a207226527b185d5551d8031d762a5cdecd8433",
+      "videoEncodeGenerationsAtMux": 0,
+      "audioEncodeGenerationsAtMux": 1,
+      "audioEncodeGenerationsCumulative": 2,
+      "muxWallSeconds": 0.040124,
+      "muxPeakRssBytes": 18677760
     },
     "colorTiming": {
       "classification": "WARN",
-      "sdrMetadataAndDecode": "PASS",
-      "pqMetadataAndDecode": "PASS",
-      "hlgMetadataAndDecode": "PASS",
-      "vfrTimingEvidence": "PASS",
-      "rotationEvidence": "PASS",
-      "hdrToSdr": "NOT RUN: zscale unavailable and no approved dependency/profile",
-      "fixtureHashes": {
-        "sdr-bt709.mkv": "0e00511eac0b88acd81e42b9acc3ae7793bd51c9b8fa95805f3fc0b084603ade",
-        "hdr10-pq-ramp.mkv": "8c3fdbc8fa0aff01ac05e1f6a68c41e23cecb74c1258366f73b4f4d32c3e33f6",
-        "hlg-ramp.mkv": "8a7e3109cc0ead2dc54d220698c77a93f5a3ab38c032fcf87cb1a69008d6ecfa",
-        "vfr.mp4": "d12c0f5e543cb2d79d9ec97eb327961d33f2778b43a1774a140100f5912b975e",
-        "rotated-90.mp4": "9fe12457177d650162023685f39f34716488bb372f2a70a5eff8c37694c348e4"
+      "passed": [
+        "SDR metadata",
+        "SDR decode",
+        "PQ metadata",
+        "PQ decode",
+        "HLG metadata",
+        "HLG decode",
+        "VFR frame count",
+        "VFR monotonic timestamps",
+        "VFR expected schedule",
+        "VFR audio duration",
+        "rotation metadata"
+      ],
+      "notRun": ["HDR-to-SDR", "real Dolby Vision", "subjective visual quality"],
+      "vfr": {
+        "frameCount": 60,
+        "observedIntervalsSeconds": [0.033333, 0.033334, 0.066666, 0.066667],
+        "expectedIntervalsSeconds": [0.033333, 0.066667],
+        "monotonic": true,
+        "avgFrameRate": "20/1",
+        "rFrameRate": "30/1",
+        "videoDurationSeconds": 2.999999,
+        "audioDurationSeconds": 3.0,
+        "avDurationErrorSeconds": 0.000001
       },
-      "limitations": [
-        "Synthetic signal ramps do not validate real iPhone or Dolby Vision input.",
-        "Metadata and decode evidence are not subjective tone-map acceptance.",
-        "A nominal/average rate mismatch is evidence, not a complete VFR decision."
-      ]
+      "fixtureHashes": {
+        "sdr-bt709.mkv": "97631bfc0e17eb849b996019eb48f384323eb5f5622dbf16af27ae6a6159bc12",
+        "hdr10-pq-ramp.mkv": "9d2c5dc6e66d610d2372ffe4a681058561ddad4f390629d4f0e4a7aaa7aea6ee",
+        "hlg-ramp.mkv": "37320a51236e30a0e3a48c7e480e830b5180ed0509302f961c89ea43794b4413",
+        "vfr.mp4": "84e53b647053f44b5ee11869568d9ff13c29de5e1d7a2611e4cad73545d2485c",
+        "rotated-90.mp4": "9fe12457177d650162023685f39f34716488bb372f2a70a5eff8c37694c348e4"
+      }
     },
     "failureLifecycle": {
       "classification": "PASS",
-      "existingOutputSentinelPreserved": true,
-      "cancelledFinalAbsent": true,
-      "ownerPartialRemoved": true,
-      "permissionFailureOutputAbsent": true,
-      "lowDisk": "NOT RUN: no isolated quota/mount; RLIMIT_FSIZE is not faithful ENOSPC"
+      "realCancellation": "PASS: no final promotion and owned partial removed",
+      "outputExists": "PASS: existing sentinel preserved",
+      "simulatedPermissionFailure": "PASS",
+      "simulatedEnospcFailure": "PASS",
+      "simulatedCleanupFailureVisibility": "PASS",
+      "unrelatedPathPreserved": true,
+      "realFilesystemPermissionFailure": "NOT RUN",
+      "realFilesystemEnospc": "NOT RUN",
+      "limitation": "Injected failures validate laboratory propagation only, not product-boundary or real-filesystem crash durability."
     }
   },
   "unavailable": {
-    "exactSealedFfmpegBuild": "NOT RUN: gpg required by authoritative source verifier was absent",
-    "nativeWindows": "NOT RUN: no native host; private-runner cost allowance not provable",
+    "exactPinnedCevraBinaryLocal": "NOT RUN: authoritative source verifier requires gpg, unavailable on the Mac host",
+    "nativeWindows": "ATTEMPTED / NOT RUN: standard Windows Server 2025 runner started, but actions/setup-python could not supply exact Python 3.12.14; runs 35720993536 and 35721243478 stopped before signature verification, runtime assembly and h264_mf encode",
     "realIphoneDolbyVision": "NOT RUN",
     "subjectiveVisualApproval": "NOT RUN"
   }
