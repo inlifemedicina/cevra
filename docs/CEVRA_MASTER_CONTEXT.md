@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-21, final residual pass based on merged PR #27 / `origin/main` `a8e7546332a56075aab5a6ea88081e34a29cf53f`
+**Last decision reconciliation:** 2026-09-21, ProjectHistory documentation closeout through merged PR #31 / `origin/main` `2bcb18e6888e0221a62fe822f265927c9d9a9c4e`
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1419,9 +1419,9 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` after ProjectHistory Scalability V2 merged:
+Canonical remote `main` after the ProjectHistory Scalability V2 documentation closeout:
 
-`b6f201afa73aae0aa85f8a3d4187a568ab749e72`
+`2bcb18e6888e0221a62fe822f265927c9d9a9c4e`
 
 PR #30 merged the implementation by normal merge commit. Post-merge CI run
 `35668351461` passed all five required jobs.
@@ -1458,13 +1458,27 @@ cleanup uses the metadata-only path, and the corrected commit hot path avoids
 redundant rematerialization. Project IR schema is unchanged; V1 read → V2 write
 compatibility, journal, undo/redo and recovery are preserved.
 
+**Cross-platform/runtime correctness prerequisites — IN DEVELOPMENT.** Branch
+`fix/cross-platform-runtime-prerequisites` resolves managed Python executables
+from pinned runtime metadata, preserves the Windows x64 private-root
+`python.exe` layout and the Windows venv `Scripts/python.exe` layout, and keeps
+existing private-root, venv-provenance and isolation checks intact. The media
+probe contract now retains bounded rotation, pixel-depth, color/HDR and exact
+average/nominal frame-rate evidence already emitted by the pinned worker;
+Project IR remains unchanged. The render watchdog audit found the existing
+configurable render timeout, liveness, cancellation, settlement, worker-exit
+and artifact-cleanup path already satisfies this bounded prerequisite, so no
+watchdog production code changed. Deterministic layout tests do not constitute
+real Windows runtime/export validation, and the coordinated Media Runtime gate
+has not started.
+
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
 GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.
 
 Current dependency blockers/gates:
 
-1. close bounded cross-platform/runtime correctness prerequisites;
+1. complete validation and independent review of the bounded cross-platform/runtime correctness prerequisites;
 2. complete the approved coordinated Media Runtime adjustment gate;
 3. reconcile and close Transcript Cache V1, revalidating its relationship to history/storage.
 
@@ -1579,7 +1593,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Close the small cross-platform/runtime correctness prerequisites supported by the targeted audit, including platform-aware Python resolution, media metadata propagation and watchdog policy.
+1. Complete validation and independent review of the in-development cross-platform/runtime correctness prerequisites: platform-aware Python resolution, media metadata propagation and the audited existing watchdog policy.
 2. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
 3. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
 4. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
