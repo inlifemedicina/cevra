@@ -1485,7 +1485,10 @@ records the contract, execution safeguards, artifact ownership and exact-runtime
 validation gate. The implementation reuses
 the corrected research evidence at
 `4cf2e3d6fd74d8a1111b0d8c6ba9e559170f48ef`; the coordinated Media Runtime gate
-remains open.
+remains open. Branch CI run `35742354475` passed the five normal jobs plus the
+additional exact managed-runtime catalog on native macOS arm64; this is
+implementation evidence, not merge/closeout or delivery of the full editable
+J-cut workflow.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 

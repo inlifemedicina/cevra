@@ -115,8 +115,11 @@ the 2,048-item structural bound.
 Local macOS arm64 characterization uses a development Homebrew FFmpeg and is
 not release proof. A branch-restricted normal-CI job builds FFmpeg 9.0.1 from
 the pinned signature-verified source, assembles the exact managed private
-runtime and runs the same catalog on the standard macOS arm64 runner. Until
-that job succeeds, exact-runtime validation remains pending.
+runtime and runs the same catalog on the standard macOS arm64 runner. Branch
+CI run `35742354475` passed all five normal jobs and the additional exact-runtime
+job; that job executed the catalog successfully with CEVRA Media Worker 0.2.0,
+FFmpeg 9.0.1 and private CPython 3.12.14 on macOS arm64. The slice remains in
+development until independent review and merge.
 
 ## Consequences and compatibility
 
