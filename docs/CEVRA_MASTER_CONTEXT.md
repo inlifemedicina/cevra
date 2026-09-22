@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-21, ProjectHistory documentation closeout through merged PR #31 / `origin/main` `2bcb18e6888e0221a62fe822f265927c9d9a9c4e`
+**Last decision reconciliation:** 2026-09-21, cross-platform/runtime prerequisites closeout through merged PR #32 / `origin/main` `13dc11a869fdb103be609a66d312ea49966cc0df`
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1419,9 +1419,9 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` after the ProjectHistory Scalability V2 documentation closeout:
+Canonical remote `main` after the cross-platform/runtime prerequisites implementation merge:
 
-`2bcb18e6888e0221a62fe822f265927c9d9a9c4e`
+`13dc11a869fdb103be609a66d312ea49966cc0df`
 
 PR #30 merged the implementation by normal merge commit. Post-merge CI run
 `35668351461` passed all five required jobs.
@@ -1458,19 +1458,20 @@ cleanup uses the metadata-only path, and the corrected commit hot path avoids
 redundant rematerialization. Project IR schema is unchanged; V1 read → V2 write
 compatibility, journal, undo/redo and recovery are preserved.
 
-**Cross-platform/runtime correctness prerequisites — IN DEVELOPMENT.** Branch
-`fix/cross-platform-runtime-prerequisites` resolves managed Python executables
-from pinned runtime metadata, preserves the Windows x64 private-root
-`python.exe` layout and the Windows venv `Scripts/python.exe` layout, and keeps
-existing private-root, venv-provenance and isolation checks intact. The media
-probe contract now retains bounded rotation, pixel-depth, color/HDR and exact
-average/nominal frame-rate evidence already emitted by the pinned worker;
-Project IR remains unchanged. The render watchdog audit found the existing
-configurable render timeout, liveness, cancellation, settlement, worker-exit
-and artifact-cleanup path already satisfies this bounded prerequisite, so no
-watchdog production code changed. Deterministic layout tests do not constitute
-real Windows runtime/export validation, and the coordinated Media Runtime gate
-has not started.
+**Cross-platform/runtime correctness prerequisites — CLOSED.** PR #32 merged by
+normal merge commit `13dc11a869fdb103be609a66d312ea49966cc0df`.
+Post-merge CI run `35679529464` passed all five required jobs. Platform-aware
+runtime path contracts are implemented from pinned runtime metadata, including
+the Windows x64 private-root `python.exe` and Windows venv
+`Scripts/python.exe` layouts, while preserving private-root confinement,
+venv-provenance and isolation controls. The media probe contract now preserves
+bounded rotation, pixel-depth, color/HDR and exact average/nominal frame-rate
+evidence already emitted by the pinned worker; Project IR remains unchanged.
+The render watchdog prerequisite was audited with no production code change:
+the existing configurable timeout, liveness, cancellation, settlement,
+worker-exit and artifact-cleanup mechanisms satisfy this bounded prerequisite.
+Real Windows runtime/export execution remains a later validation gate. Windows
+H.264/export, HDR-to-SDR and the coordinated Media Runtime gate are not closed.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
@@ -1478,9 +1479,8 @@ GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remainin
 
 Current dependency blockers/gates:
 
-1. complete validation and independent review of the bounded cross-platform/runtime correctness prerequisites;
-2. complete the approved coordinated Media Runtime adjustment gate;
-3. reconcile and close Transcript Cache V1, revalidating its relationship to history/storage.
+1. complete the approved coordinated Media Runtime adjustment gate;
+2. reconcile and close Transcript Cache V1, revalidating its relationship to history/storage.
 
 ---
 
@@ -1593,12 +1593,11 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete validation and independent review of the in-development cross-platform/runtime correctness prerequisites: platform-aware Python resolution, media metadata propagation and the audited existing watchdog policy.
-2. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
-3. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
-4. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
-5. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
-6. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
+1. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
+2. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
+3. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
+4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
+5. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
 
 ---
 
