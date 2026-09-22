@@ -1,4 +1,6 @@
 import {
+  AUDIO_SEQUENCE_SAMPLE_FORMAT,
+  AUDIO_SEQUENCE_SAMPLE_RATE,
   MEDIA_DELIVERY_MATRIX,
   normalizeAudioCodec,
   normalizeVideoCodec,
@@ -130,7 +132,8 @@ export class MediaApplicationService {
         continue;
       }
       if (attempt) {
-        const cleanup = await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);
+        const cleanupUris = record.operation.type === "render-audio-sequence" ? attempt.ownedOutputUris ?? [] : attempt.outputUris;
+        const cleanup = await this.cleanup(cleanupUris, attempt.preexistingOutputUris);
         attempt.removedPartialOutputUris.push(...cleanup.removed);
         attempt.cleanupFailedOutputUris.push(...cleanup.failed);
         attempt.status = "interrupted";
@@ -172,6 +175,7 @@ export class MediaApplicationService {
       requestedAt: this.clock(),
       outputUris,
       preexistingOutputUris: [],
+      ownedOutputUris: [],
       removedPartialOutputUris: [],
       cleanupFailedOutputUris: [],
       projectRevisionBefore: current.history.revision,
@@ -203,6 +207,10 @@ export class MediaApplicationService {
       await this.executions.save(record);
 
       const result = await this.engine.execute(record.operation, { jobId: attempt.jobId, locale: record.locale, ...(signal ? { signal } : {}) });
+      if (record.operation.type === "render-audio-sequence" && result.type === "file" && result.outputUri === outputUris[0]) {
+        attempt.ownedOutputUris.push(result.outputUri);
+        await this.executions.save(record);
+      }
       await this.validateResult(record.operation, result, outputUris);
       if (result.type === "file") attempt.effectiveProfile = clone(result.effectiveProfile);
       const latest = this.history.current;
@@ -241,7 +249,8 @@ export class MediaApplicationService {
       const cancelled = isAbort(cause, signal);
       const failure = cause instanceof AttemptFailure ? cause : undefined;
       const code: MediaApplicationErrorCode = cancelled ? "MEDIA_OPERATION_CANCELLED" : failure?.code ?? "MEDIA_OPERATION_FAILED";
-      const cleanup = await this.cleanup(outputUris, attempt.preexistingOutputUris);
+      const cleanupUris = record.operation.type === "render-audio-sequence" ? attempt.ownedOutputUris : outputUris;
+      const cleanup = await this.cleanup(cleanupUris, attempt.preexistingOutputUris);
       attempt.removedPartialOutputUris.push(...cleanup.removed);
       attempt.cleanupFailedOutputUris.push(...cleanup.failed);
       attempt.status = cancelled ? "cancelled" : "failed";
@@ -297,6 +306,10 @@ export class MediaApplicationService {
 }
 
 function validateMutation(operation: MediaOperation, mutation: MediaProjectMutation): void {
+  if (operation.type === "render-audio-sequence") {
+    if (mutation.type !== "none") throw new Error("Audio sequence PCM is a derived intermediate and must not mutate Project IR.");
+    return;
+  }
   const producesFile = operationOutputUris(operation).length > 0;
   if (producesFile === (mutation.type === "none")) throw new Error("File-producing media operations require a typed Project IR mutation.");
 }
@@ -380,6 +393,7 @@ function operationOutputUris(operation: MediaOperation): string[] {
     case "extract-audio":
     case "extract-frame":
     case "overlay-media":
+    case "render-audio-sequence":
       return [operation.outputUri];
   }
 }
@@ -436,6 +450,29 @@ function validateDeliveryPostcondition(operation: MediaOperation, result: Extrac
     }
     return;
   }
+  if (operation.type === "render-audio-sequence") {
+    const expectedChannels = operation.outputChannelLayout === "mono" ? 1 : 2;
+    const expectedSamples = operation.outputDurationMs * (AUDIO_SEQUENCE_SAMPLE_RATE / 1000);
+    const expectedDataBytes = expectedSamples * expectedChannels * 4;
+    if (result.probe.hasVideo || !result.probe.hasAudio
+      || result.probe.audioCodec !== AUDIO_SEQUENCE_SAMPLE_FORMAT
+      || result.probe.sampleRate !== AUDIO_SEQUENCE_SAMPLE_RATE
+      || result.probe.channels !== expectedChannels
+      || result.durationMs !== operation.outputDurationMs
+      || result.effectiveProfile.container !== "wav"
+      || result.effectiveProfile.audioCodec !== "pcm"
+      || result.effectiveProfile.audioEncoder !== AUDIO_SEQUENCE_SAMPLE_FORMAT
+      || result.audioSequence?.outputSampleCount !== expectedSamples
+      || result.audioSequence.estimatedDataBytes !== expectedDataBytes
+      || result.audioSequence.measuredDataBytes !== expectedDataBytes
+      || result.audioSequence.distinctSourceCount !== operation.sources.length
+      || result.audioSequence.itemCount !== operation.items.length
+      || result.audioSequence.maximumSimultaneousItemCount !== maximumSimultaneousAudioItems(operation)
+      || result.audioSequence.channelLayout !== operation.outputChannelLayout) {
+      throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Audio sequence output does not satisfy its float32/48 kHz/timing contract.");
+    }
+    return;
+  }
   const delivery = resolvedDelivery(operation);
   if (!delivery) return;
   const actualVideo = normalizeVideoCodec(result.probe.videoCodec);
@@ -450,9 +487,23 @@ function validateDeliveryPostcondition(operation: MediaOperation, result: Extrac
   }
 }
 
+function maximumSimultaneousAudioItems(operation: Extract<MediaOperation, { type: "render-audio-sequence" }>): number {
+  const events = operation.items.flatMap((item) => {
+    const duration = item.sourceEndMs - item.sourceStartMs;
+    return [{ at: item.timelineStartMs, delta: 1 }, { at: item.timelineStartMs + duration, delta: -1 }];
+  }).sort((left, right) => left.at - right.at || left.delta - right.delta);
+  let active = 0;
+  let maximum = 0;
+  for (const event of events) {
+    active += event.delta;
+    maximum = Math.max(maximum, active);
+  }
+  return maximum;
+}
+
 function resolvedDelivery(operation: MediaOperation) {
   switch (operation.type) {
-    case "probe": case "detect-silence": case "extract-frame": return undefined;
+    case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": return undefined;
     case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
     case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
     case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);

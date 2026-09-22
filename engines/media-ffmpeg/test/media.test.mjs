@@ -8,7 +8,7 @@ class FakeWorker {
   probeAudioCodec = "aac";
   probeVideoMetadata = {};
   async info() {
-    return { name: "cevra-media-worker", version: "0.1.0", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
+    return { name: "cevra-media-worker", version: "0.2.1", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
   }
   async health() {
     return {
@@ -34,6 +34,12 @@ class FakeWorker {
     if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: this.probeVideoCodec, ...this.probeVideoMetadata }, audio: { codec: this.probeAudioCodec, sample_rate: 48000, channels: 2 } } };
     if (name === "silence") return { structuredContent: { silences: [[1.2, 2.4], [5.0, null]] } };
     if (name === "cevra-extract-frame") return { structuredContent: { status: "completed", output: arguments_.output, probe: { file: arguments_.output, video: { codec: "png", width: 1920, height: 1080 } }, effectiveProfile: { container: "png", videoCodec: "png", videoEncoder: "png" } } };
+    if (name === "cevra-render-audio-sequence") return { structuredContent: {
+      status: "completed", output: arguments_.output,
+      probe: { file: arguments_.output, duration: arguments_.output_duration_ms / 1000, size_bytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4 + 114, audio: { codec: "pcm_f32le", sample_rate: 48000, channels: arguments_.output_channel_layout === "mono" ? 1 : 2 } },
+      effectiveProfile: { container: "wav", audioCodec: "pcm", audioEncoder: "pcm_f32le" },
+      audioSequence: { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: arguments_.output_channel_layout, distinctSourceCount: arguments_.sources.length, itemCount: arguments_.items.length, maximumSimultaneousItemCount: 2, outputSampleCount: arguments_.output_duration_ms * 48, estimatedDataBytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4, measuredDataBytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4, graphBytes: 1024 }
+    } };
     const audioOnly = arguments_.drop_video === true;
     const audioCodec = arguments_.audio_codec ?? "aac";
     const videoCodec = arguments_.video_codec ?? "h264";
@@ -351,4 +357,51 @@ test("audio mutations validate copied input video against the output container",
     /video codec cannot be copied/
   );
   assert.deepEqual(incompatible.calls.map((call) => call.name), ["probe"]);
+});
+
+test("render-audio-sequence maps the general typed value without a video delivery prerequisite", async () => {
+  const worker = new FakeWorker();
+  const engine = new FfmpegMediaEngine(worker);
+  const result = await engine.execute({
+    type: "render-audio-sequence", version: 1,
+    sources: [{ id: "a", uri: "/media/a.wav" }, { id: "b", uri: "/media/b.mov" }, { id: "c", uri: "/media/c.wav" }],
+    items: [
+      { sourceId: "a", sourceStartMs: 0, sourceEndMs: 1500, timelineStartMs: 0 },
+      { sourceId: "b", sourceStartMs: 0, sourceEndMs: 2500, timelineStartMs: 1500, gainDb: -3, fadeInMs: 50 },
+      { sourceId: "c", sourceStartMs: 500, sourceEndMs: 1000, timelineStartMs: 3000, fadeOutMs: 50 }
+    ],
+    outputUri: "/media/staging/jcut.wav", outputDurationMs: 4000, outputChannelLayout: "stereo"
+  }, context);
+  assert.equal(worker.calls.length, 1);
+  assert.equal(worker.calls[0].name, "cevra-render-audio-sequence");
+  assert.deepEqual(worker.calls[0].arguments_.sources, [
+    { id: "a", uri: "/media/a.wav" }, { id: "b", uri: "/media/b.mov" }, { id: "c", uri: "/media/c.wav" }
+  ]);
+  assert.deepEqual(worker.calls[0].arguments_.items[1], {
+    source_id: "b", source_start_ms: 0, source_end_ms: 2500, timeline_start_ms: 1500, gain_db: -3, fade_in_ms: 50
+  });
+  assert.equal(result.probe.audioCodec, "pcm_f32le");
+  assert.equal(result.probe.sizeBytes, 1_536_114);
+  assert.equal(result.audioSequence.outputSampleCount, 192_000);
+});
+
+test("render-audio-sequence rejects malformed worker evidence", async () => {
+  for (const audioSequence of [
+    { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: "mono", distinctSourceCount: 1, itemCount: 1, maximumSimultaneousItemCount: -1, outputSampleCount: 48000, estimatedDataBytes: 192000, measuredDataBytes: 192000, graphBytes: 10 },
+    { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: "mono", distinctSourceCount: 1, itemCount: 1, maximumSimultaneousItemCount: 1, outputSampleCount: 48000, estimatedDataBytes: 192000, measuredDataBytes: 192000, graphBytes: 10, arbitrary: true }
+  ]) {
+    const worker = new FakeWorker();
+    worker.callTool = async () => ({ structuredContent: {
+      status: "completed", output: "/media/out.wav",
+      probe: { file: "/media/out.wav", duration: 1, audio: { codec: "pcm_f32le", sample_rate: 48000, channels: 1 } },
+      effectiveProfile: { container: "wav", audioCodec: "pcm", audioEncoder: "pcm_f32le" },
+      audioSequence
+    } });
+    await assert.rejects(() => new FfmpegMediaEngine(worker).execute({
+      type: "render-audio-sequence", version: 1,
+      sources: [{ id: "a", uri: "/media/a.wav" }],
+      items: [{ sourceId: "a", sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 0 }],
+      outputUri: "/media/out.wav", outputDurationMs: 1000, outputChannelLayout: "mono"
+    }, context), /audio sequence evidence is invalid/);
+  }
 });

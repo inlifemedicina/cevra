@@ -15,6 +15,42 @@ export const MAX_MEDIA_FPS = 240;
 export const MAX_MEDIA_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_MEDIA_INPUTS = 128;
 export const MAX_MEDIA_URI_LENGTH = 32_768;
+export const AUDIO_SEQUENCE_VERSION = 1 as const;
+export const AUDIO_SEQUENCE_SAMPLE_RATE = 48_000 as const;
+export const AUDIO_SEQUENCE_SAMPLE_FORMAT = "pcm_f32le" as const;
+export const MAX_AUDIO_SEQUENCE_ITEMS = 2_048;
+export const MAX_AUDIO_SEQUENCE_GAIN_DB = 24;
+export const MIN_AUDIO_SEQUENCE_GAIN_DB = -120;
+export const MAX_AUDIO_SEQUENCE_GRAPH_BYTES = 2 * 1024 * 1024;
+export const MAX_AUDIO_SEQUENCE_INPUT_ARGUMENT_BYTES = 24 * 1024;
+export const MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES = 0xffff_ffff - 256;
+
+export type AudioSequenceChannelLayout = "mono" | "stereo";
+
+export interface AudioSequenceSource {
+  id: string;
+  uri: string;
+}
+
+export interface AudioSequenceItem {
+  sourceId: string;
+  sourceStartMs: number;
+  sourceEndMs: number;
+  timelineStartMs: number;
+  gainDb?: number;
+  fadeInMs?: number;
+  fadeOutMs?: number;
+}
+
+export interface RenderAudioSequenceOperationV1 {
+  type: "render-audio-sequence";
+  version: typeof AUDIO_SEQUENCE_VERSION;
+  sources: AudioSequenceSource[];
+  items: AudioSequenceItem[];
+  outputUri: string;
+  outputDurationMs: number;
+  outputChannelLayout: AudioSequenceChannelLayout;
+}
 
 export interface MediaDeliveryRule {
   readonly videoCodecs: readonly EncodedVideoCodec[];
@@ -158,6 +194,7 @@ function validateRequestedAudioCodec(container: MediaContainer, codec: AudioCode
 
 export interface MediaProbeResult {
   uri: string;
+  sizeBytes?: number;
   durationMs?: number;
   width?: number;
   height?: number;
@@ -180,6 +217,20 @@ export interface MediaProbeResult {
   audioCodec?: string;
   sampleRate?: number;
   channels?: number;
+}
+
+export interface AudioSequenceExecutionEvidence {
+  version: typeof AUDIO_SEQUENCE_VERSION;
+  sampleRate: typeof AUDIO_SEQUENCE_SAMPLE_RATE;
+  sampleFormat: typeof AUDIO_SEQUENCE_SAMPLE_FORMAT;
+  channelLayout: AudioSequenceChannelLayout;
+  distinctSourceCount: number;
+  itemCount: number;
+  maximumSimultaneousItemCount: number;
+  outputSampleCount: number;
+  estimatedDataBytes: number;
+  measuredDataBytes: number;
+  graphBytes: number;
 }
 
 export interface SilenceRange {
@@ -210,12 +261,13 @@ export type MediaOperation =
   | { type: "extract-frame"; inputUri: string; outputUri: string; atMs: number }
   | { type: "detect-silence"; inputUri: string; thresholdDb: number; minDurationMs: number }
   | { type: "overlay-media"; baseUri: string; overlayUri: string; outputUri: string; startMs: number; endMs: number; x: number; y: number; width: number; height: number; opacity?: number }
-  | { type: "mux-audio"; videoUri: string; audioUri: string; outputUri: string; replaceExisting?: boolean };
+  | { type: "mux-audio"; videoUri: string; audioUri: string; outputUri: string; replaceExisting?: boolean }
+  | RenderAudioSequenceOperationV1;
 
 export type MediaOperationResult =
   | { type: "probe"; probe: MediaProbeResult }
   | { type: "detect-silence"; ranges: SilenceRange[] }
-  | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile };
+  | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence };
 
 export interface MediaEngineAdapter extends EngineAdapter {
   execute(operation: MediaOperation, context: ExecutionContext): Promise<MediaOperationResult>;
@@ -240,7 +292,8 @@ const OPERATION_FIELDS: Readonly<Record<MediaOperation["type"], ReadonlySet<stri
   "extract-frame": new Set(["type", "inputUri", "outputUri", "atMs"]),
   "detect-silence": new Set(["type", "inputUri", "thresholdDb", "minDurationMs"]),
   "overlay-media": new Set(["type", "baseUri", "overlayUri", "outputUri", "startMs", "endMs", "x", "y", "width", "height", "opacity"]),
-  "mux-audio": new Set(["type", "videoUri", "audioUri", "outputUri", "replaceExisting"])
+  "mux-audio": new Set(["type", "videoUri", "audioUri", "outputUri", "replaceExisting"]),
+  "render-audio-sequence": new Set(["type", "version", "sources", "items", "outputUri", "outputDurationMs", "outputChannelLayout"])
 };
 
 export function validateMediaOperation(value: unknown): MediaOperation {
@@ -312,9 +365,113 @@ export function validateMediaOperation(value: unknown): MediaOperation {
       if (MEDIA_DELIVERY_MATRIX[container].audioOnly) throw new Error(`${container.toUpperCase()} is audio-only and cannot be used by mux-audio.`);
       break;
     }
+    case "render-audio-sequence": validateAudioSequence(value); break;
     default: throw new Error(`Unsupported media operation ${String(value.type)}.`);
   }
   return value as unknown as MediaOperation;
+}
+
+function validateAudioSequence(value: Record<string, unknown>): void {
+  if (value.version !== AUDIO_SEQUENCE_VERSION) throw new Error(`render-audio-sequence version must be ${AUDIO_SEQUENCE_VERSION}.`);
+  if (!Array.isArray(value.sources) || value.sources.length < 1 || value.sources.length > MAX_MEDIA_INPUTS) {
+    throw new Error(`sources must contain 1-${MAX_MEDIA_INPUTS} entries.`);
+  }
+  if (!Array.isArray(value.items) || value.items.length < 1 || value.items.length > MAX_AUDIO_SEQUENCE_ITEMS) {
+    throw new Error(`items must contain 1-${MAX_AUDIO_SEQUENCE_ITEMS} entries.`);
+  }
+  if (!isAbsoluteLocalMediaPath(value.outputUri) || !/\.wav$/iu.test(value.outputUri)) {
+    throw new Error("outputUri must be an absolute local WAV path.");
+  }
+  if (value.outputChannelLayout !== "mono" && value.outputChannelLayout !== "stereo") {
+    throw new Error("outputChannelLayout must be mono or stereo.");
+  }
+  requireSafeIntegerMs(value.outputDurationMs, "outputDurationMs", true);
+
+  const sourceIds = new Set<string>();
+  const sourceUris = new Set<string>();
+  let inputArgumentBytes = 0;
+  for (const [index, candidate] of value.sources.entries()) {
+    if (!isRecord(candidate)) throw new Error(`sources[${index}] must be an object.`);
+    rejectUnexpectedFields(candidate, new Set(["id", "uri"]), `sources[${index}]`);
+    if (!isAudioSequenceId(candidate.id)) throw new Error(`sources[${index}].id is invalid.`);
+    if (sourceIds.has(candidate.id)) throw new Error(`sources[${index}].id is duplicated.`);
+    if (!isAbsoluteLocalMediaPath(candidate.uri)) throw new Error(`sources[${index}].uri must be an absolute local media path.`);
+    if (sourceUris.has(candidate.uri)) throw new Error(`sources[${index}].uri is duplicated; reuse its source id instead.`);
+    if (candidate.uri === value.outputUri) throw new Error(`sources[${index}].uri must not alias outputUri.`);
+    sourceIds.add(candidate.id);
+    sourceUris.add(candidate.uri);
+    inputArgumentBytes = checkedAdd(inputArgumentBytes, new TextEncoder().encode(candidate.uri).byteLength + 3, "input argument bytes");
+  }
+  if (inputArgumentBytes > MAX_AUDIO_SEQUENCE_INPUT_ARGUMENT_BYTES) throw new Error("audio sequence input paths exceed the cross-platform command argument boundary.");
+
+  const usedSourceIds = new Set<string>();
+  for (const [index, candidate] of value.items.entries()) {
+    if (!isRecord(candidate)) throw new Error(`items[${index}] must be an object.`);
+    rejectUnexpectedFields(candidate, new Set(["sourceId", "sourceStartMs", "sourceEndMs", "timelineStartMs", "gainDb", "fadeInMs", "fadeOutMs"]), `items[${index}]`);
+    if (!isAudioSequenceId(candidate.sourceId) || !sourceIds.has(candidate.sourceId)) throw new Error(`items[${index}].sourceId is unknown.`);
+    usedSourceIds.add(candidate.sourceId);
+    requireSafeIntegerMs(candidate.sourceStartMs, `items[${index}].sourceStartMs`);
+    requireSafeIntegerMs(candidate.sourceEndMs, `items[${index}].sourceEndMs`, true);
+    requireSafeIntegerMs(candidate.timelineStartMs, `items[${index}].timelineStartMs`);
+    const sourceDurationMs = (candidate.sourceEndMs as number) - (candidate.sourceStartMs as number);
+    if (sourceDurationMs <= 0) throw new Error(`items[${index}] source range must be positive.`);
+    const timelineEndMs = checkedAdd(candidate.timelineStartMs as number, sourceDurationMs, `items[${index}] timeline end`);
+    if (timelineEndMs > (value.outputDurationMs as number)) throw new Error(`items[${index}] extends beyond outputDurationMs.`);
+    if (candidate.gainDb !== undefined && (!isFiniteNumber(candidate.gainDb) || candidate.gainDb < MIN_AUDIO_SEQUENCE_GAIN_DB || candidate.gainDb > MAX_AUDIO_SEQUENCE_GAIN_DB)) {
+      throw new Error(`items[${index}].gainDb must be between ${MIN_AUDIO_SEQUENCE_GAIN_DB} and ${MAX_AUDIO_SEQUENCE_GAIN_DB}.`);
+    }
+    for (const key of ["fadeInMs", "fadeOutMs"] as const) {
+      if (candidate[key] === undefined) continue;
+      requireSafeIntegerMs(candidate[key], `items[${index}].${key}`);
+      if ((candidate[key] as number) > sourceDurationMs) throw new Error(`items[${index}].${key} exceeds the item duration.`);
+    }
+    if ((candidate.fadeInMs as number | undefined ?? 0) + (candidate.fadeOutMs as number | undefined ?? 0) > sourceDurationMs) {
+      throw new Error(`items[${index}] fades overlap beyond the item duration.`);
+    }
+  }
+  const unusedSourceIds = [...sourceIds].filter((sourceId) => !usedSourceIds.has(sourceId));
+  if (unusedSourceIds.length) throw new Error(`sources are declared but unused: ${unusedSourceIds.sort().join(", ")}.`);
+
+  const channels = value.outputChannelLayout === "mono" ? 1 : 2;
+  const samples = checkedMultiply(value.outputDurationMs as number, AUDIO_SEQUENCE_SAMPLE_RATE / 1000, "output samples");
+  const dataBytes = checkedMultiply(samples, channels * 4, "WAV data bytes");
+  if (dataBytes > MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES) throw new Error("outputDurationMs exceeds the ordinary RIFF/WAV data-size boundary for the selected channel layout.");
+  const estimatedGraphBytes = 256 + value.sources.length * 48 + value.items.length * 384;
+  if (estimatedGraphBytes > MAX_AUDIO_SEQUENCE_GRAPH_BYTES) throw new Error("render-audio-sequence graph exceeds its bounded compiler size.");
+}
+
+function rejectUnexpectedFields(value: Record<string, unknown>, allowed: ReadonlySet<string>, location: string): void {
+  const extras = Object.keys(value).filter((key) => !allowed.has(key));
+  if (extras.length) throw new Error(`${location} contains unexpected fields: ${extras.sort().join(", ")}.`);
+}
+
+function requireSafeIntegerMs(value: unknown, location: string, positive = false): void {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0 || (positive && value === 0) || value > MAX_MEDIA_DURATION_MS) {
+    throw new Error(`${location} must be a ${positive ? "positive" : "non-negative"} safe integer within the media duration boundary.`);
+  }
+}
+
+function checkedAdd(left: number, right: number, location: string): number {
+  const result = left + right;
+  if (!Number.isSafeInteger(result)) throw new Error(`${location} exceeds safe integer arithmetic.`);
+  return result;
+}
+
+function checkedMultiply(left: number, right: number, location: string): number {
+  const result = left * right;
+  if (!Number.isSafeInteger(result)) throw new Error(`${location} exceeds safe integer arithmetic.`);
+  return result;
+}
+
+function isAudioSequenceId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value);
+}
+
+function isAbsoluteLocalMediaPath(value: unknown): value is string {
+  return isSafeMediaUri(value)
+    && (value.startsWith("/") || /^[A-Za-z]:[\\/][^\\/]/u.test(value))
+    && !value.startsWith("//")
+    && !value.startsWith("\\\\");
 }
 
 function rejectForbiddenKeys(value: unknown): void {

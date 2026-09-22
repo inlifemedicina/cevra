@@ -22,6 +22,7 @@ export interface MediaRuntimeCapabilities {
   ffmpegVersion?: string;
   ffmpegLicense?: string;
   encoders: string[];
+  filters: string[];
   hwaccels: string[];
   effectiveDeliveries?: EffectiveDeliveryCapability[];
 }

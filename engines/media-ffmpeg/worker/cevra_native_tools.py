@@ -6,11 +6,111 @@ import io
 import json
 import math
 import os
+import re
+import struct
 import sys
+import tempfile
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio"}
+import cevra_job_control as job_control
+
+CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio", "cevra-render-audio-sequence"}
+
+AUDIO_SEQUENCE_VERSION = 1
+AUDIO_SEQUENCE_SAMPLE_RATE = 48_000
+AUDIO_SEQUENCE_SAMPLE_FORMAT = "pcm_f32le"
+MAX_AUDIO_SEQUENCE_ITEMS = 2_048
+MAX_AUDIO_SEQUENCE_GAIN_DB = 24.0
+MIN_AUDIO_SEQUENCE_GAIN_DB = -120.0
+MAX_AUDIO_SEQUENCE_GRAPH_BYTES = 2 * 1024 * 1024
+MAX_AUDIO_SEQUENCE_INPUT_ARGUMENT_BYTES = 24 * 1024
+MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES = 0xFFFFFFFF - 256
+MAX_MEDIA_DURATION_MS = 7 * 24 * 60 * 60 * 1000
+MAX_MEDIA_INPUTS = 128
+
+
+def _fraction(value: Any, label: str) -> Fraction:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError(f"{label} is unavailable")
+    try:
+        result = Fraction(str(value))
+    except (ValueError, ZeroDivisionError) as exc:
+        raise ValueError(f"{label} is unavailable") from exc
+    return result
+
+
+def _audio_coverage_ms(audio: Dict[str, Any], source_id: str) -> tuple[Fraction, Fraction]:
+    time_base_value = audio.get("time_base")
+    duration_ts = audio.get("duration_ts")
+    start_pts = audio.get("start_pts")
+    if isinstance(time_base_value, str) and isinstance(duration_ts, int) and not isinstance(duration_ts, bool):
+        time_base = _fraction(time_base_value, f"source {source_id} audio time_base")
+        if time_base <= 0 or duration_ts <= 0:
+            raise ValueError(f"source {source_id} audio timeline coverage is unavailable")
+        if isinstance(start_pts, int) and not isinstance(start_pts, bool):
+            start = start_pts * time_base
+        elif audio.get("start_time") is None:
+            start = Fraction(0)
+        else:
+            start = _fraction(audio.get("start_time"), f"source {source_id} audio start_time")
+        duration = duration_ts * time_base
+    else:
+        start = Fraction(0) if audio.get("start_time") is None else _fraction(audio.get("start_time"), f"source {source_id} audio start_time")
+        duration_value = audio.get("duration")
+        if duration_value is None and isinstance(audio.get("duration_tag"), str):
+            parts = audio["duration_tag"].split(":")
+            if len(parts) == 3:
+                duration_value = str(int(parts[0]) * 3600 + int(parts[1]) * 60 + _fraction(parts[2], f"source {source_id} audio duration tag"))
+        duration = _fraction(duration_value, f"source {source_id} audio duration")
+    if duration <= 0:
+        raise ValueError(f"source {source_id} audio timeline coverage is unavailable")
+    return start * 1000, (start + duration) * 1000
+
+
+def _measure_pcm_f32le_wav(path: Path) -> tuple[int, int]:
+    file_size = path.stat().st_size
+    with path.open("rb") as handle:
+        header = handle.read(12)
+        if len(header) != 12 or header[:4] != b"RIFF" or header[8:] != b"WAVE":
+            raise RuntimeError("audio sequence output is not an ordinary RIFF/WAVE file")
+        format_fields: Optional[tuple[int, int, int, int, int]] = None
+        data_bytes: Optional[int] = None
+        while handle.tell() + 8 <= file_size:
+            chunk_header = handle.read(8)
+            chunk_id, chunk_size = chunk_header[:4], struct.unpack("<I", chunk_header[4:])[0]
+            chunk_start = handle.tell()
+            chunk_end = chunk_start + chunk_size
+            if chunk_end > file_size:
+                raise RuntimeError("audio sequence WAV contains a truncated chunk")
+            if chunk_id == b"fmt ":
+                if format_fields is not None or chunk_size < 16:
+                    raise RuntimeError("audio sequence WAV format chunk is invalid")
+                payload = handle.read(chunk_size)
+                audio_format, channels, sample_rate, _, block_align, bits = struct.unpack("<HHIIHH", payload[:16])
+                if audio_format == 0xFFFE:
+                    if chunk_size < 40 or payload[24:26] != b"\x03\x00":
+                        raise RuntimeError("audio sequence WAV extensible subtype is not IEEE float")
+                    audio_format = 3
+                format_fields = (audio_format, channels, sample_rate, block_align, bits)
+            elif chunk_id == b"data":
+                if data_bytes is not None:
+                    raise RuntimeError("audio sequence WAV contains multiple data chunks")
+                data_bytes = chunk_size
+                handle.seek(chunk_size, os.SEEK_CUR)
+            else:
+                handle.seek(chunk_size, os.SEEK_CUR)
+            if chunk_size & 1:
+                handle.seek(1, os.SEEK_CUR)
+        if format_fields is None or data_bytes is None:
+            raise RuntimeError("audio sequence WAV is missing its format or data chunk")
+        audio_format, channels, sample_rate, block_align, bits = format_fields
+        if audio_format != 3 or sample_rate != AUDIO_SEQUENCE_SAMPLE_RATE or bits != 32 or block_align != channels * 4:
+            raise RuntimeError("audio sequence WAV format does not match interleaved float32/48 kHz")
+        if data_bytes <= 0 or data_bytes % block_align:
+            raise RuntimeError("audio sequence WAV data size is not sample-frame aligned")
+        return data_bytes // block_align, data_bytes
 
 DELIVERY_MATRIX: Dict[str, Dict[str, Any]] = {
     "mp4": {"video": {"h264", "h265", "av1"}, "audio": {"aac"}, "default_video": "h264", "default_audio": "aac", "format": "mp4", "audio_only": False},
@@ -404,6 +504,328 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     return _file_result(common, output, {"replacedExistingAudio": replace_existing})
 
 
+def _absolute_regular_input(raw: str, label: str) -> Path:
+    path = Path(raw)
+    if not path.is_absolute():
+        raise ValueError(f"{label} must be an absolute local media path")
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError as exc:
+        raise ValueError(f"{label} does not exist") from exc
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"{label} must be a non-symlink regular file")
+    return path.resolve(strict=True)
+
+
+def _absolute_new_output(raw: str) -> Path:
+    path = Path(raw)
+    if not path.is_absolute() or path.suffix.lower() != ".wav":
+        raise ValueError("output must be an absolute local WAV path")
+    parent = path.parent
+    if not parent.is_dir() or parent.is_symlink():
+        raise ValueError("output parent must be an existing non-symlink directory")
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        if path.is_symlink():
+            raise ValueError("media output path must not be a symlink")
+        raise FileExistsError(f"refusing to overwrite existing output: {path}")
+    return path.absolute()
+
+
+def _audio_sequence_graph(args: Dict[str, Any], source_indexes: Dict[str, int], source_metadata: Dict[str, Dict[str, Any]]) -> str:
+    output_layout = str(args["output_channel_layout"])
+    output_samples = int(args["output_duration_ms"]) * (AUDIO_SEQUENCE_SAMPLE_RATE // 1000)
+    uses: Dict[str, List[int]] = {source_id: [] for source_id in source_indexes}
+    for item_index, item in enumerate(args["items"]):
+        uses[str(item["source_id"])].append(item_index)
+
+    graph: List[str] = []
+    item_inputs: Dict[int, str] = {}
+    for source_id, input_index in source_indexes.items():
+        item_indexes = uses[source_id]
+        if len(item_indexes) == 1:
+            item_inputs[item_indexes[0]] = f"[{input_index}:a:0]"
+            continue
+        labels = "".join(f"[cevra_src_{item_index}]" for item_index in item_indexes)
+        graph.append(f"[{input_index}:a:0]asplit={len(item_indexes)}{labels}")
+        for item_index in item_indexes:
+            item_inputs[item_index] = f"[cevra_src_{item_index}]"
+
+    item_outputs: List[str] = []
+    for item_index, item in enumerate(args["items"]):
+        source_id = str(item["source_id"])
+        audio = source_metadata[source_id]["audio"]
+        input_layout = str(audio["channel_layout"])
+        source_start_ms = int(item["source_start_ms"])
+        source_end_ms = int(item["source_end_ms"])
+        item_samples = (source_end_ms - source_start_ms) * (AUDIO_SEQUENCE_SAMPLE_RATE // 1000)
+        timeline_samples = int(item["timeline_start_ms"]) * (AUDIO_SEQUENCE_SAMPLE_RATE // 1000)
+        filters = [
+            f"atrim=start={source_start_ms / 1000:.3f}:end={source_end_ms / 1000:.3f}",
+            "asetpts=PTS-STARTPTS",
+            f"aresample={AUDIO_SEQUENCE_SAMPLE_RATE}:async=0:first_pts=0",
+        ]
+        if input_layout == "mono" and output_layout == "stereo":
+            filters.append("pan=stereo|c0=c0|c1=c0")
+        elif input_layout == "stereo" and output_layout == "mono":
+            filters.append("pan=mono|c0=0.5*c0+0.5*c1")
+        else:
+            filters.append(f"aformat=channel_layouts={output_layout}")
+        filters.extend([f"atrim=end_sample={item_samples}", "asetpts=N/SR/TB"])
+        if "gain_db" in item:
+            filters.append(f"volume={float(item['gain_db']):.8g}dB:precision=double")
+        fade_in_ms = int(item.get("fade_in_ms", 0))
+        fade_out_ms = int(item.get("fade_out_ms", 0))
+        if fade_in_ms:
+            filters.append(f"afade=t=in:start_sample=0:nb_samples={fade_in_ms * 48}:curve=tri")
+        if fade_out_ms:
+            fade_samples = fade_out_ms * 48
+            filters.append(f"afade=t=out:start_sample={item_samples - fade_samples}:nb_samples={fade_samples}:curve=tri")
+        if timeline_samples:
+            filters.append(f"adelay={timeline_samples}S:all=1")
+        output_label = f"cevra_item_{item_index}"
+        graph.append(f"{item_inputs[item_index]}{','.join(filters)}[{output_label}]")
+        item_outputs.append(f"[{output_label}]")
+
+    silence = "cevra_silence"
+    graph.append(f"anullsrc=r={AUDIO_SEQUENCE_SAMPLE_RATE}:cl={output_layout},atrim=end_sample={output_samples},asetpts=N/SR/TB[{silence}]")
+    mixed_inputs = f"[{silence}]" + "".join(item_outputs)
+    graph.append(
+        f"{mixed_inputs}amix=inputs={len(item_outputs) + 1}:duration=longest:dropout_transition=0:normalize=0,"
+        f"atrim=end_sample={output_samples},asetpts=N/SR/TB,"
+        f"aformat=sample_rates={AUDIO_SEQUENCE_SAMPLE_RATE}:sample_fmts=flt:channel_layouts={output_layout}[cevra_audio_out]"
+    )
+    result = ";".join(graph)
+    if len(result.encode("utf-8")) > MAX_AUDIO_SEQUENCE_GRAPH_BYTES:
+        raise ValueError("render-audio-sequence graph exceeds its bounded compiler size")
+    return result
+
+
+def _validate_audio_sequence_semantics(args: Dict[str, Any]) -> None:
+    if args.get("version") != AUDIO_SEQUENCE_VERSION:
+        raise ValueError(f"version must be {AUDIO_SEQUENCE_VERSION}")
+    output_layout = args.get("output_channel_layout")
+    if output_layout not in {"mono", "stereo"}:
+        raise ValueError("output_channel_layout must be mono or stereo")
+    output_duration_ms = _positive_integer(args, "output_duration_ms")
+    if output_duration_ms > MAX_MEDIA_DURATION_MS:
+        raise ValueError("output_duration_ms exceeds the media duration boundary")
+    channels = 1 if output_layout == "mono" else 2
+    output_bytes = output_duration_ms * 48 * channels * 4
+    if output_bytes > MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES:
+        raise ValueError("output duration exceeds the ordinary RIFF/WAV data-size boundary")
+
+    sources = args.get("sources")
+    items = args.get("items")
+    if not isinstance(sources, list) or not sources or len(sources) > MAX_MEDIA_INPUTS:
+        raise ValueError(f"sources must contain 1-{MAX_MEDIA_INPUTS} entries")
+    if not isinstance(items, list) or not items or len(items) > MAX_AUDIO_SEQUENCE_ITEMS:
+        raise ValueError(f"items must contain 1-{MAX_AUDIO_SEQUENCE_ITEMS} entries")
+    source_ids: set[str] = set()
+    source_uris: set[str] = set()
+    input_argument_bytes = 0
+    for index, source in enumerate(sources):
+        source_id = source.get("id") if isinstance(source, dict) else None
+        uri = source.get("uri") if isinstance(source, dict) else None
+        if not isinstance(source_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", source_id):
+            raise ValueError(f"sources[{index}].id is invalid")
+        if source_id in source_ids:
+            raise ValueError(f"sources[{index}].id is duplicated")
+        if not isinstance(uri, str) or uri in source_uris:
+            raise ValueError(f"sources[{index}].uri is invalid or duplicated")
+        source_ids.add(source_id)
+        source_uris.add(uri)
+        input_argument_bytes += len(uri.encode("utf-8")) + 3
+    if input_argument_bytes > MAX_AUDIO_SEQUENCE_INPUT_ARGUMENT_BYTES:
+        raise ValueError("audio sequence input paths exceed the cross-platform command argument boundary")
+
+    used_source_ids: set[str] = set()
+    for index, item in enumerate(items):
+        source_id = item.get("source_id") if isinstance(item, dict) else None
+        if not isinstance(source_id, str) or source_id not in source_ids:
+            raise ValueError(f"items[{index}].source_id is unknown")
+        used_source_ids.add(source_id)
+        source_start_ms = _non_negative_integer(item, "source_start_ms")
+        source_end_ms = _positive_integer(item, "source_end_ms")
+        timeline_start_ms = _non_negative_integer(item, "timeline_start_ms")
+        if source_end_ms > MAX_MEDIA_DURATION_MS or timeline_start_ms > MAX_MEDIA_DURATION_MS:
+            raise ValueError(f"items[{index}] exceeds the media duration boundary")
+        item_duration_ms = source_end_ms - source_start_ms
+        if item_duration_ms <= 0:
+            raise ValueError(f"items[{index}] source range must be positive")
+        if timeline_start_ms + item_duration_ms > output_duration_ms:
+            raise ValueError(f"items[{index}] extends beyond output_duration_ms")
+        gain = item.get("gain_db")
+        if gain is not None and (not isinstance(gain, (int, float)) or isinstance(gain, bool) or not math.isfinite(gain)
+                                 or gain < MIN_AUDIO_SEQUENCE_GAIN_DB or gain > MAX_AUDIO_SEQUENCE_GAIN_DB):
+            raise ValueError(f"items[{index}].gain_db is outside its bounded range")
+        fade_in_ms = _non_negative_integer(item, "fade_in_ms") if "fade_in_ms" in item else 0
+        fade_out_ms = _non_negative_integer(item, "fade_out_ms") if "fade_out_ms" in item else 0
+        if fade_in_ms + fade_out_ms > item_duration_ms:
+            raise ValueError(f"items[{index}] fades overlap beyond the item duration")
+    unused = sorted(source_ids - used_source_ids)
+    if unused:
+        raise ValueError(f"sources are declared but unused: {', '.join(unused)}")
+
+
+def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
+    _validate_audio_sequence_semantics(args)
+    output = _absolute_new_output(_required_string(args, "output"))
+    output_layout = args.get("output_channel_layout")
+    output_duration_ms = _positive_integer(args, "output_duration_ms")
+    channels = 1 if output_layout == "mono" else 2
+    output_samples = output_duration_ms * (AUDIO_SEQUENCE_SAMPLE_RATE // 1000)
+    output_bytes = output_samples * channels * 4
+    events: List[tuple[int, int]] = []
+    for item in args["items"]:
+        start = int(item["timeline_start_ms"])
+        end = start + int(item["source_end_ms"]) - int(item["source_start_ms"])
+        events.extend(((start, 1), (end, -1)))
+    active = 0
+    maximum_active = 0
+    for _, delta in sorted(events, key=lambda event: (event[0], event[1])):
+        active += delta
+        maximum_active = max(maximum_active, active)
+
+    sources = args.get("sources")
+    items = args.get("items")
+    assert isinstance(sources, list)
+    assert isinstance(items, list)
+
+    source_indexes: Dict[str, int] = {}
+    source_paths: Dict[str, Path] = {}
+    source_metadata: Dict[str, Dict[str, Any]] = {}
+    source_coverage_ms: Dict[str, tuple[Fraction, Fraction]] = {}
+    canonical_source_paths: set[Path] = set()
+    for input_index, source in enumerate(sources):
+        source_id = str(source["id"])
+        canonical = _absolute_regular_input(str(source["uri"]), f"source {source_id}")
+        if canonical == output.resolve(strict=False):
+            raise ValueError(f"source {source_id} aliases output")
+        if canonical in canonical_source_paths:
+            raise ValueError(f"source {source_id} aliases another declared source; reuse its source id")
+        metadata = common.probe(str(canonical))
+        audio = metadata.get("audio")
+        if not isinstance(audio, dict):
+            raise ValueError(f"source {source_id} has no supported audio stream")
+        channels_value = audio.get("channels")
+        layout = audio.get("channel_layout")
+        if channels_value == 1 and layout in {None, "mono"}:
+            audio["channel_layout"] = "mono"
+        elif channels_value == 2 and layout in {None, "stereo"}:
+            audio["channel_layout"] = "stereo"
+        else:
+            raise ValueError(f"source {source_id} must have an unambiguous mono or stereo layout")
+        coverage = _audio_coverage_ms(audio, source_id)
+        source_indexes[source_id] = input_index
+        source_paths[source_id] = canonical
+        source_metadata[source_id] = metadata
+        source_coverage_ms[source_id] = coverage
+        canonical_source_paths.add(canonical)
+
+    for item_index, item in enumerate(items):
+        source_id = str(item["source_id"])
+        coverage_start_ms, coverage_end_ms = source_coverage_ms[source_id]
+        source_start_ms = int(item["source_start_ms"])
+        source_end_ms = int(item["source_end_ms"])
+        if source_start_ms < coverage_start_ms or source_end_ms > coverage_end_ms:
+            raise ValueError(
+                f"item {item_index} exceeds proven audio timeline coverage for source {source_id} "
+                f"[{float(coverage_start_ms):.6f}, {float(coverage_end_ms):.6f}) ms"
+            )
+
+    graph = _audio_sequence_graph(args, source_indexes, source_metadata)
+    graph_path: Optional[Path] = None
+    staging_directory: Optional[Path] = None
+    staging_output: Optional[Path] = None
+    promoted_output = False
+    cleanup_errors: List[str] = []
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="cevra-audio-sequence-", suffix=".ffgraph", delete=False) as handle:
+            handle.write(graph)
+            handle.write("\n")
+            graph_path = Path(handle.name)
+        job_control.register_artifacts([str(graph_path)])
+        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-audio-sequence-", dir=output.parent))
+        staging_output = staging_directory / "output.wav"
+        cmd = common.ffmpeg_base(overwrite=False) + ["-xerror"]
+        for source in sources:
+            cmd += ["-i", str(source_paths[str(source["id"])])]
+        cmd += [
+            "-/filter_complex", str(graph_path),
+            "-map", "[cevra_audio_out]",
+            "-vn", "-c:a", AUDIO_SEQUENCE_SAMPLE_FORMAT,
+            "-ar", str(AUDIO_SEQUENCE_SAMPLE_RATE),
+            "-ac", str(channels),
+            "-f", "wav", str(staging_output),
+        ]
+        try:
+            common.run(cmd)
+            staged_probe = common.verify_output(str(staging_output))
+            staged_audio = staged_probe.get("audio") if isinstance(staged_probe, dict) else None
+            if not isinstance(staged_audio, dict) or staged_audio.get("codec") != AUDIO_SEQUENCE_SAMPLE_FORMAT \
+                    or staged_audio.get("sample_rate") != AUDIO_SEQUENCE_SAMPLE_RATE or staged_audio.get("channels") != channels:
+                raise RuntimeError("audio sequence output failed its float32/48 kHz/channel postcondition")
+            measured_samples, measured_data_bytes = _measure_pcm_f32le_wav(staging_output)
+            if measured_samples != output_samples or measured_data_bytes != output_bytes:
+                raise RuntimeError(
+                    "audio sequence output failed its measured sample-frame/data-size postcondition"
+                )
+            os.link(staging_output, output, follow_symlinks=False)
+            promoted_output = True
+            result = _file_result(common, str(output), {
+            "audioSequence": {
+                "version": AUDIO_SEQUENCE_VERSION,
+                "sampleRate": AUDIO_SEQUENCE_SAMPLE_RATE,
+                "sampleFormat": AUDIO_SEQUENCE_SAMPLE_FORMAT,
+                "channelLayout": output_layout,
+                "distinctSourceCount": len(sources),
+                "itemCount": len(items),
+                "maximumSimultaneousItemCount": maximum_active,
+                "outputSampleCount": measured_samples,
+                "estimatedDataBytes": output_bytes,
+                "measuredDataBytes": measured_data_bytes,
+                "graphBytes": len(graph.encode("utf-8")),
+            }
+            })
+            return result
+        except BaseException as execution_error:
+            if promoted_output:
+                try:
+                    output.unlink(missing_ok=True)
+                except OSError as output_cleanup_error:
+                    raise RuntimeError(
+                        f"audio sequence failed and its owned promoted output cleanup failed: {output_cleanup_error}"
+                    ) from execution_error
+            raise
+    finally:
+        if graph_path is not None:
+            try:
+                graph_path.unlink(missing_ok=True)
+            except OSError as exc:
+                cleanup_errors.append(f"graph cleanup failed: {exc}")
+        if staging_output is not None:
+            try:
+                staging_output.unlink(missing_ok=True)
+            except OSError as exc:
+                cleanup_errors.append(f"staging output cleanup failed: {exc}")
+        if staging_directory is not None:
+            try:
+                staging_directory.rmdir()
+            except OSError as exc:
+                cleanup_errors.append(f"staging directory cleanup failed: {exc}")
+        if cleanup_errors:
+            if promoted_output:
+                try:
+                    output.unlink(missing_ok=True)
+                except OSError as exc:
+                    cleanup_errors.append(f"promoted output rollback failed: {exc}")
+            raise RuntimeError(f"audio sequence owned artifact cleanup failed: {'; '.join(cleanup_errors)}")
+
+
 def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Optional[Dict[str, Any]]:
     if name not in CUSTOM_TOOLS:
         return None
@@ -427,6 +849,8 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
                 return _run_transcode(common, runtime, args)
             if name == "cevra-mux-audio":
                 return _run_mux_audio(common, args)
+            if name == "cevra-render-audio-sequence":
+                return _run_audio_sequence(common, args)
     except SystemExit as exc:
         code = exc.code if isinstance(exc.code, int) else 1
         text = "\n".join(stderr.getvalue().strip().splitlines()[-12:]) or stdout.getvalue().strip()

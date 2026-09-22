@@ -242,7 +242,7 @@ test("close cancels and reaps an active subprocess without leaving the worker al
 test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async () => {
   const runtime = createRuntime();
   const tools = await runtime.client.listTools();
-  const expectedTools = ["cut", "cevra-extract-frame", "cevra-mux-audio", "cevra-overlay-media", "cevra-scale", "cevra-speed", "cevra-transcode"];
+  const expectedTools = ["cut", "cevra-extract-frame", "cevra-mux-audio", "cevra-overlay-media", "cevra-render-audio-sequence", "cevra-scale", "cevra-speed", "cevra-transcode"];
   assert.deepEqual(tools.map((tool) => tool.name), expectedTools);
   const health = await runtime.client.health();
   assert.equal(Object.hasOwn(health.tools, "redact"), false);
@@ -324,6 +324,12 @@ def run():
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=limit)
     subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 def require_tool(name): pass
+def probe_audio(audio):
+    if audio:
+        return {
+            "sample_rate": _to_int(audio.get("sample_rate")),
+            "bitrate": _to_int(audio.get("bit_rate")),
+        }
 def ffmpeg_version():
     return subprocess.run(["ffprobe", "-version"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
 `);
