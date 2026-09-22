@@ -49,7 +49,11 @@ export interface AudioMeasurementReportV1 {
   coverageEndSample: number;
   complete: true;
   channels: AudioChannelMeasurement[];
-  /** Drained native SWR 4x oversampled peak estimate; not sample peak. */
+  /**
+   * Drained native SWR 4x estimate of the continuous reconstruction inside
+   * the requested interval; real neighboring context may make this positive
+   * even when every discrete core sample is digital zero. Not sample peak.
+   */
   truePeakLinear: number;
   integratedLufs: AudioLoudnessEvidence;
   shortTermMaxLufs: AudioLoudnessEvidence;
@@ -89,8 +93,7 @@ export function validateAudioMeasurementReport(value: unknown, operation: Measur
     silent &&= peak === 0;
   }
   const truePeak = nonnegative(report.truePeakLinear);
-  if ((truePeak === 0) !== silent) invalid();
-  if (truePeak + AUDIO_MEASUREMENT_LINEAR_TOLERANCE * Math.max(1, maximumSamplePeak) < maximumSamplePeak) invalid();
+  if (!silent && truePeak + AUDIO_MEASUREMENT_LINEAR_TOLERANCE * Math.max(1, maximumSamplePeak) < maximumSamplePeak) invalid();
   const integrated = loudness(report.integratedLufs, true);
   const short = loudness(report.shortTermMaxLufs, false);
   const observations = nonnegative(report.shortTermValidObservations);

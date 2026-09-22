@@ -201,7 +201,7 @@ class Reduction:
             if bits not in (0, 1, 3, 7):
                 raise MeasurementError("INVALID_METADATA")
             silence = bits == 0
-            def amplitude(frame: dict[str, str], key: str) -> float:
+            def core_amplitude(frame: dict[str, str], key: str) -> float:
                 if silence and frame.get(prefix + key) == "-inf":
                     return 0.0
                 db = self.number(frame, prefix + key)
@@ -209,10 +209,22 @@ class Reduction:
                 if not math.isfinite(value) or value <= 0 or silence:
                     raise MeasurementError("NUMERICAL_RANGE")
                 return value
-            channels.append({"channelIndex": ch - 1, "rmsLinear": amplitude(raw, "RMS_level"),
-                             "samplePeakLinear": amplitude(raw, "Peak_level"),
+            def true_peak_amplitude(frame: dict[str, str], key: str) -> float:
+                # Digital silence describes the requested native samples only.
+                # Real guard samples may contribute to the band-limited
+                # reconstruction inside that interval, so parse SWR4 evidence
+                # independently from the core-silence predicate.
+                if frame.get(prefix + key) == "-inf":
+                    return 0.0
+                db = self.number(frame, prefix + key)
+                value = 10 ** (db / 20)
+                if not math.isfinite(value) or value <= 0:
+                    raise MeasurementError("NUMERICAL_RANGE")
+                return value
+            channels.append({"channelIndex": ch - 1, "rmsLinear": core_amplitude(raw, "RMS_level"),
+                             "samplePeakLinear": core_amplitude(raw, "Peak_level"),
                              "reachesFullScale": bits >= 3, "exceedsFullScale": bits == 7})
-            true_peaks.append(amplitude(peaks, "Peak_level"))
+            true_peaks.append(true_peak_amplitude(peaks, "Peak_level"))
         silent = all(ch["samplePeakLinear"] == 0 for ch in channels)
         def unavailable(reason: str) -> dict[str, str]:
             return {"status": "unavailable", "reason": reason}

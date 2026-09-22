@@ -16,10 +16,34 @@ this method has not yet been published or merged.
 | Finding | Before | Bounded correction / current evidence |
 |---|---|---|
 | FFmpeg 9.0.1 R128 M/S NaN after signal → exact zero | A valid speech-like/sine clip followed by ≥500 ms zero aborted as `AUDIO_MEASUREMENT_INVALID_METADATA` | Only NaN M/S windows are skipped for their respective gated/short-term update. Prior valid integrated evidence survives. Infinity and decoded NaN/Inf remain fail-closed. Signal→zero, fade→zero, clip→1 s gap→clip and Audio Sequence with a real 500 ms gap all pass locally. |
-| MPEG-TS input seek | `-copyts -seek_timestamp 1 -ss` permitted FFmpeg accurate-seek to apply container start time again | `-noaccurate_seek` is an input option before `-i`; exact selection remains typed `atrim` plus PTS/frame coverage validation. Two windows in a generated non-zero-start MPEG-TS each produced 48,000 frames and expected RMS locally; existing MP4/AAC cases remain passing. |
+| MPEG-TS input seek | `-copyts -seek_timestamp 1 -ss` permitted FFmpeg accurate-seek to apply container start time again | `-noaccurate_seek` is an input option before `-i`; exact selection remains typed `atrim` plus PTS/frame coverage validation. Three windows in a generated non-zero-start, amplitude-stepped MPEG-TS each produced 24,000 frames and segment-specific RMS locally; existing MP4/AAC cases remain passing. |
 | Matroska/WebM duration fallback | `_audio_coverage_ms` understood `duration_tag`, but the closed ffprobe request never requested it | Probe requests only `stream_tags=DURATION`, validates the bounded tag object and maps that field to `duration_tag`. MKV/AAC, MKV/FLAC and WebM/Vorbis fixtures prove 182,400 frames over 100..3,900 ms locally. Missing/malformed evidence remains fail-closed. |
-| True-peak excerpt edge | Cutting before SWR made an internal boundary look like a physical source edge | The SWR branch receives up to 50 ms of proven real context on both sides, drains, then selects only the requested center at 4×. Guards do not affect other metrics or the reported peak. At real source boundaries the available guard is clipped, never padded. |
+| True-peak excerpt edge | Cutting before SWR made an internal boundary look like a physical source edge | The SWR branch receives up to 50 ms of proven real context on both sides, drains, then selects only the requested center at 4×. Guard samples are not requested sample evidence, but their contribution to the band-limited reconstruction may influence intersample values inside the requested boundary. Other metrics remain core-only. At real source boundaries the available guard is clipped, never padded. |
 | Acoustically contradictory reports | Structurally valid but impossible peak/full-scale combinations passed contract validation | `truePeakLinear`, sample peaks and exact full-scale predicates now obey cross-field invariants with an explicit `2e-6` linear tolerance. This is rounding tolerance, not clipping inference. |
+
+The final focused re-review found one additional coupling defect: the reduction
+used the core's digital-silence classification while parsing the independent
+SWR4 branch. A core of all-zero native samples with adjacent real signal could
+therefore reject a finite contextual true peak as `AUDIO_MEASUREMENT_NUMERICAL_RANGE`.
+The parser now keeps those authorities separate. `-inf` in the true-peak branch
+maps to zero; a finite peak is converted normally regardless of core silence;
+NaN/Infinity remain invalid. The contract likewise allows zero or positive true
+peak for a silent core while continuing to require zero core RMS/sample peak,
+false full-scale predicates and digital-silence loudness.
+
+Bounded local development evidence on FFmpeg 9.0.2 (not release proof):
+
+- a unit impulse one native sample before a silent 1,000..1,500 ms core produced
+  24,000 core frames, RMS/sample peak **0**, all full-scale predicates false,
+  digital-silence loudness and contextual true peak **0.204424573**;
+- a real Audio Sequence gap measured at 1,000..1,500 ms produced 24,000 frames,
+  core RMS/sample peak **0**, digital-silence loudness and true peak
+  **0.004726129**; the inner 1,001..1,499 ms interval produced 23,904 frames and
+  true peak **0**, both valid under the same semantics;
+- the MPEG-TS oracle now uses three non-stationary amplitude steps. Its 500 ms
+  after-start/active-seek/late windows measured RMS **0.070678968**,
+  **0.176731474** and **0.353546303**, identifying the intended 0.1/0.25/0.5
+  amplitude regions rather than merely accepting a stationary sine.
 
 The worst deterministic local edge reproduction used a 48 kHz stable sine at
 0.45×Nyquist, amplitude 0.8, phase π/4, measured over the internal 1..2 s
@@ -38,6 +62,14 @@ requested decoded interval was fully analyzed, but ADTS/TS AAC priming can
 still present a coherent yet semantically shifted source timeline. Generic
 priming resolution is **DEFERRED / non-blocking for MR-A02**; the prior broader
 claim that every ambiguity is necessarily rejected conservatively is withdrawn.
+
+Matroska/WebM seek granularity is also **DEFERRED / non-blocking for MR-A02**.
+Independent evidence observed approximately eight samples of decoded-content
+shift in a 48 kHz fixture even though the reported PTS and sample count remained
+internally coherent. This is consistent with container/packet time granularity;
+current RMS/loudness impact is low, but MR-A02 does not claim sample-exact seek
+identity for these containers. Re-evaluate before any transient/boundary QA or
+policy consumer requires sample-exact excerpts. No report-schema change is made.
 
 ## Feasibility before contract consolidation
 
@@ -101,9 +133,10 @@ measured (development evidence, separate from exact CI below):
   of dB rounding. Saturated-signal evidence does not diagnose distortion.
 - Representative 30-minute compressed source late 1 s excerpt: ~74–75 ms per
   warm repeated call; long 120 s analysis ~1.11 s; reports ~0.7–0.9 KiB;
-  post-remediation sampled worker-tree RSS ≤57.02 MiB; ≤2 processes; maximum
-  report 898 bytes; 41,622,466 fixture bytes (~39.7 MiB, now including bounded
-  TS/MKV/WebM/guard fixtures).
+  final-focused local run late excerpts **75.14 / 72.91 / 73.03 ms** and long
+  120 s analysis **1,120.24 ms**; sampled worker-tree RSS ≤57.41 MiB; ≤2
+  processes; selected new reports 732–775 bytes; 42,268,446 fixture bytes
+  (40.31 MiB, including bounded TS/MKV/WebM/guard fixtures).
   These are observations, not latency/product guarantees. CPU is sampled
   percent, not integrated CPU time; I/O traffic is not measured.
 

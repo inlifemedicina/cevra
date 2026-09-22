@@ -169,6 +169,16 @@ try {
   assert.ok(firstImpulseReport.truePeakLinear >= firstImpulseReport.channels[0].samplePeakLinear - 2e-6);
   const nearEnd = await measure("source-end-nearby", request(firstImpulse, 500, 1000));
   assert.equal(nearEnd.truePeakLinear, 0);
+  const silentCoreWithContext = wav("silent-core-real-context", 48000, 1, 3, n => n === 47999 ? 1 : 0);
+  const contextualPeak = await measure("silent-core-contextual-true-peak", request(silentCoreWithContext, 1000, 1500));
+  assert.equal(contextualPeak.sampleFrames, 24000);
+  assert.equal(contextualPeak.channels[0].rmsLinear, 0);
+  assert.equal(contextualPeak.channels[0].samplePeakLinear, 0);
+  assert.equal(contextualPeak.channels[0].reachesFullScale, false);
+  assert.equal(contextualPeak.channels[0].exceedsFullScale, false);
+  assert.equal(contextualPeak.integratedLufs.reason, "digital-silence");
+  assert.equal(contextualPeak.shortTermMaxLufs.reason, "digital-silence");
+  assert.ok(contextualPeak.truePeakLinear > 0, "real neighboring sample must influence continuous reconstruction inside boundary");
   for (const [name, value, reaches, exceeds] of [["below-one", 1 - 2 ** -24, false, false], ["one", 1, true, false], ["above-one", 1 + 2 ** -23, true, true]]) {
     const f = wav(name, 48000, 1, 0.1, () => value);
     const r = await measure(name, request(f, 0, 100));
@@ -199,16 +209,16 @@ try {
   const lateReport = await measure("nonzero-stream-start", request(late, 2100, 2900, 1));
   near(lateReport.channels[0].rmsLinear, 0.25 / Math.sqrt(2), 0.005, "late AAC signal");
   const transportStream = path.join(root, "nonzero-start.ts");
-  run(["-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=6", "-c:a", "aac", "-b:a", "128k",
+  run(["-f", "lavfi", "-i", "aevalsrc=if(lt(t\\,3)\\,0.1*sin(2*PI*997*t)\\,if(lt(t\\,6)\\,0.25*sin(2*PI*997*t)\\,0.5*sin(2*PI*997*t))):s=48000:d=9", "-c:a", "aac", "-b:a", "128k",
     "-muxdelay", "0", "-muxpreload", "0", "-output_ts_offset", "5", "-f", "mpegts", transportStream]);
   const tsMetadata = probeAudio(transportStream);
-  const tsStartMs = Math.ceil(Number(tsMetadata.start_time) * 1000) + 1000;
+  const tsStartMs = Math.ceil(Number(tsMetadata.start_time) * 1000);
   assert.ok(tsStartMs > 1000 && Number(tsMetadata.start_time) > 0);
-  for (const offset of [0, 2500]) {
+  for (const [label, offset, amplitude] of [["after-start", 500, 0.1], ["active-seek", 4000, 0.25], ["late", 7500, 0.5]]) {
     const start = tsStartMs + offset;
-    const r = await measure(`mpeg-ts-noaccurate-seek-${offset}`, request(transportStream, start, start + 1000));
-    assert.equal(r.sampleFrames, 48000); assert.equal(r.coverageStartSample, start * 48);
-    near(r.channels[0].rmsLinear, 0.125 / Math.sqrt(2), 0.005, "MPEG-TS AAC signal");
+    const r = await measure(`mpeg-ts-temporal-oracle-${label}`, request(transportStream, start, start + 500));
+    assert.equal(r.sampleFrames, 24000); assert.equal(r.coverageStartSample, start * 48);
+    near(r.channels[0].rmsLinear, amplitude / Math.sqrt(2), 0.008, `MPEG-TS ${label} amplitude step`);
   }
   const taggedContainers = [
     ["matroska-aac.mkv", ["-f", "lavfi", "-i", "sine=frequency=997:sample_rate=48000:duration=4", "-c:a", "aac"]],
@@ -242,11 +252,26 @@ try {
     outputUri: sequenceGapOutput, outputDurationMs: 3000, outputChannelLayout: "mono" }, { jobId: "sequence-gap-prerequisite", locale: "en-US" });
   const measuredGap = await measure("audio-sequence-real-500ms-gap", request(sequenceGapOutput, 0, 3000));
   assert.equal(measuredGap.sampleFrames, 144000); assert.equal(measuredGap.integratedLufs.status, "available");
+  function assertDigitalSilentCore(report, frames) {
+    assert.equal(report.sampleFrames, frames);
+    for (const channel of report.channels) {
+      assert.equal(channel.rmsLinear, 0); assert.equal(channel.samplePeakLinear, 0);
+      assert.equal(channel.reachesFullScale, false); assert.equal(channel.exceedsFullScale, false);
+    }
+    assert.equal(report.integratedLufs.reason, "digital-silence");
+    assert.equal(report.shortTermMaxLufs.reason, "digital-silence");
+    assert.equal(report.shortTermValidObservations, 0);
+  }
+  const exactGap = await measure("audio-sequence-exact-gap-1000-1500", request(sequenceGapOutput, 1000, 1500));
+  assertDigitalSilentCore(exactGap, 24000);
+  const innerGap = await measure("audio-sequence-inner-gap-1001-1499", request(sequenceGapOutput, 1001, 1499));
+  assertDigitalSilentCore(innerGap, 23904);
   const history = new ProjectHistory(createEmptyProject({ id: "measure", name: "Measurement", locale: "en-US", now: "2026-09-22T00:00:00Z" }));
   const original = JSON.stringify(history.current);
   const service = new MediaApplicationService({ engine, history, executions: new InMemoryMediaExecutionRepository(), artifacts: new NodeMediaArtifactStore() });
-  const outcome = await service.execute({ id: "measure-read-only", operation: request(sequenceOutput, 0, 1200), mutation: { type: "none" } });
-  assert.equal(outcome.record.status, "succeeded"); assert.equal(JSON.stringify(history.current), original); assert.equal(history.entries.length, 0);
+  const outcome = await service.execute({ id: "measure-read-only", operation: request(sequenceGapOutput, 1000, 1500), mutation: { type: "none" } });
+  assert.equal(outcome.record.status, "succeeded"); assertDigitalSilentCore(outcome.record.attempts[0].result.report, 24000);
+  assert.equal(JSON.stringify(history.current), original); assert.equal(history.entries.length, 0);
   const pcm = path.join(root, "alignment-profile.wav");
   const extraction = await engine.execute({ type: "extract-audio", inputUri: headroom, outputUri: pcm, audioCodec: "pcm" }, { jobId: "extract-regression", locale: "en-US" });
   assert.equal(extraction.probe.audioCodec, "pcm_s16le");

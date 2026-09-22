@@ -75,12 +75,17 @@ remapping, rate change or dual-mono compensation. Fixed native branches provide:
    32-tap filter, phase shift 10, exact rational/linear interpolation enabled;
    its input is the requested interval plus up to 50 ms of proven real stream
    context on each side. After full drain, only the oversampled center that maps
-   to `[startMs, endMs)` enters `astats`; guard samples never enter the reported
-   peak. At a genuine stream boundary, the guard is clipped to real coverage and
-   no silence is invented. The output is a declared **true-peak estimate**, not
-   sample peak or a certified conformance claim. Its measured center frame count
-   must be exactly 4× the requested native frame count. RMS, sample peak,
-   full-scale predicates and loudness continue to see only the requested interval.
+   to `[startMs, endMs)` enters `astats`. Guard samples are not themselves
+   requested sample evidence, but true peak estimates a band-limited continuous
+   reconstruction: neighboring real samples may therefore influence intersample
+   values inside the interval boundary. Consequently, a digitally silent core
+   can legitimately have a positive true-peak estimate while its native RMS,
+   sample peak, full-scale predicates and loudness remain silent. At a genuine
+   stream boundary, the guard is clipped to real coverage and no silence is
+   invented. The output is a declared **true-peak estimate**, not sample peak or
+   a certified conformance claim. Its measured center frame count must be exactly
+   4× the requested native frame count. All non-true-peak metrics continue to see
+   only the requested interval.
 4. A separate native `aeval` predicate branch tests exact zero, `abs(x) >= 1`
    and `abs(x) > 1` before textual rounding. These are full-scale facts, **not a
    clipping/distortion diagnosis**. `Peak_count` is not used as clipping count.
@@ -143,9 +148,12 @@ observed source changes, not advertised as a durable content digest. The
 report remains execution evidence, not cached source truth.
 
 At the typed boundary, `truePeakLinear` must not be materially below the largest
-channel sample peak, and exact native full-scale predicates must agree with the
-text-derived sample peak. A linear tolerance of `2e-6` covers the six-decimal dB
-serialization and float fixture quantization around 1.0; it is not a clipping
+channel sample peak for a non-silent core, and exact native full-scale predicates
+must agree with the text-derived sample peak. A digitally silent core requires
+zero native RMS/sample peaks and digital-silence loudness, but does not force
+`truePeakLinear` to zero because the reconstructed interval boundary can depend
+on real neighboring samples. A linear tolerance of `2e-6` covers the six-decimal
+dB serialization and float fixture quantization around 1.0; it is not a clipping
 threshold and does not weaken the native unrounded predicates.
 
 ## Validation and status
@@ -154,8 +162,10 @@ The [functional catalog](../../engines/media-ffmpeg/test_functional/audio-measur
 includes analytical RMS/peaks, phase-offset intersample peaks, headroom around
 and above full scale, signal/fade/clip followed by exact-zero gaps,
 silence/gating/short windows, 44.1/48/96 kHz, stereo phase and imbalance,
-video/multiple audio streams, MPEG-TS non-zero timestamps, Matroska/WebM stream
-duration tags, coverage/truncation, non-finite data,
+video/multiple audio streams, MPEG-TS non-zero timestamps with an amplitude-step
+temporal oracle, Matroska/WebM stream duration tags, a silent native core with a
+positive context-derived true peak, exact and inner Audio Sequence gap excerpts,
+coverage/truncation, non-finite data,
 late compressed excerpts, repeated execution, long measurement, cancellation,
 timeout/worker death, unchanged history and Audio Sequence output with a real
 500 ms gap → measurement.
@@ -184,16 +194,22 @@ original-preservation and resource evidence, not blanket workflow PASS.
 
 - **FIX NOW:** isolated R128 M/S NaN windows, MPEG-TS seek semantics,
   selected-stream duration-tag fallback, real-context true-peak boundaries,
-  acoustic report invariants, native peak tail/precision, measured coverage,
+  independent silent-core/contextual-true-peak semantics, acoustic report
+  invariants, native peak tail/precision, measured coverage,
   bounded metadata, unrounded full-scale predicates, and worker-death child cleanup. False evidence
   or stranded work affects MR-A02 immediately; correcting before dependent QA
   consumes reports avoids compatibility/review churn. Native filters and the
   existing transport suffice; no engine/dependency/Project IR migration.
 - **DEFER:** certified meter conformance, broader layout/rate support,
-  semantic ADTS/TS codec priming, tiny-interval error classification, periodic-WAV
-  demux auto-detection, stdout/stderr separation, residual low short-term windows,
+  semantic ADTS/TS codec priming, Matroska/WebM seek displacement at container/
+  packet time granularity, tiny-interval error classification, periodic-WAV demux
+  auto-detection, stdout/stderr separation, residual low short-term windows,
   timeout/cancel error refinements, gate quantization, native Windows death
-  evidence and policy/mastering.
+  evidence and policy/mastering. Independent evidence observed an approximately
+  eight-sample shift at 48 kHz for a Matroska/WebM fixture while PTS and sample
+  count remained internally coherent. Current RMS/loudness impact is low, but
+  sample-exact excerpt identity must be revisited before transient/boundary QA or
+  policy consumes it; V1 does not claim sample-exact Matroska/WebM seeking.
   These require specific new evidence or scope, not guessed values or hidden
   transforms. Closed ADR 0020 LOW/NOTE hardening is not reopened opportunistically.
 

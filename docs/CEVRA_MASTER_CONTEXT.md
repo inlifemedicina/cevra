@@ -1526,9 +1526,17 @@ identity change. Remediation code `45a89c76e3f78bcaf79bbdb06e60d2edbe0fa29f`
 passed normal CI `35786488724` 5/5 and exact managed macOS arm64 run
 `35786488665`; the latter rebuilt the signed/pinned FFmpeg 9.0.1 runtime once
 and passed the preserved Audio Sequence, feasibility and expanded Audio
-Measurement catalogs. Independent remediation review is still required.
-Semantic ADTS/TS codec priming remains explicitly deferred despite proven
-decoded timeline coverage. **No PR/merge or CLOSED claim.**
+Measurement catalogs. Final focused re-review then found that a digitally silent
+requested core with real neighboring signal could be rejected because its core
+silence flag was incorrectly reused while parsing the contextual SWR4 true peak.
+The bounded correction separates native sample-silence evidence from continuous
+reconstruction evidence; exact/inner Audio Sequence gaps and a non-stationary
+MPEG-TS temporal oracle now cover the distinction. Independent remediation
+review is still required. Semantic ADTS/TS codec priming and an independently
+observed approximately eight-sample Matroska/WebM seek displacement at 48 kHz
+remain explicitly deferred despite internally coherent decoded PTS/counts; the
+latter must be revisited before sample-exact transient/boundary policy. **No
+PR/merge or CLOSED claim.**
 
 **Permanent progress-prompt rule:** CEVRA Vids progress toward a fully usable
 functional version has Product Owner baseline **48%**. Carry that baseline in

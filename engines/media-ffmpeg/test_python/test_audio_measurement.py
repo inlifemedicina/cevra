@@ -49,6 +49,27 @@ class AudioMeasurementTests(unittest.TestCase):
             with self.assertRaises(measure.MeasurementError):
                 self.fixture(**{key: value}).result()
 
+    def test_silent_core_accepts_true_peak_from_real_context(self):
+        r = measure.Reduction(48000, 1, 0, 24000)
+        self.frame(r, "coverage", 0, {"lavfi.astats.Overall.Number_of_samples": 24000})
+        self.frame(r, "raw", 0, {"lavfi.astats.Overall.Number_of_samples": 24000,
+                                  "lavfi.astats.1.Peak_level": "-inf", "lavfi.astats.1.RMS_level": "-inf",
+                                  "lavfi.astats.1.Number of NaNs": 0, "lavfi.astats.1.Number of Infs": 0})
+        self.frame(r, "scale", 0, {"lavfi.astats.Overall.Number_of_samples": 24000,
+                                    "lavfi.astats.1.Max_level": 0})
+        self.frame(r, "truepeak", 0, {"lavfi.astats.Overall.Number_of_samples": 96000,
+                                       "lavfi.astats.1.Peak_level": "-20"})
+        result = r.result()
+        self.assertEqual(result["channels"][0]["rmsLinear"], 0)
+        self.assertEqual(result["channels"][0]["samplePeakLinear"], 0)
+        self.assertAlmostEqual(result["truePeakLinear"], 0.1)
+        self.assertEqual(result["integratedLufs"], {"status": "unavailable", "reason": "digital-silence"})
+        self.assertEqual(result["shortTermMaxLufs"], {"status": "unavailable", "reason": "digital-silence"})
+        for invalid in ("NaN", "inf"):
+            r.latest["truepeak"]["lavfi.astats.1.Peak_level"] = invalid
+            with self.assertRaisesRegex(measure.MeasurementError, "INVALID_METADATA"):
+                r.result()
+
     def test_r128_window_nan_is_skipped_but_infinity_is_invalid(self):
         r = measure.Reduction(48000, 1, 0, 192000)
         valid = {"lavfi.astats.Overall.Number_of_samples": 144000,

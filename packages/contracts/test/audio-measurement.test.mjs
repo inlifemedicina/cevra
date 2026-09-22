@@ -28,9 +28,11 @@ test("nonfinite metrics, impossible channel shapes and hidden policy fields fail
     assert.throws(() => validateAudioMeasurementReport(value, op, "job"));
   }
 });
-test("digital silence is measured zero, not a fabricated finite loudness value", () => {
+test("digital sample silence retains zero core evidence while contextual true peak may be positive", () => {
   const value = report(); Object.assign(value.channels[0], { rmsLinear: 0, samplePeakLinear: 0 }); value.truePeakLinear = 0;
   value.integratedLufs = value.shortTermMaxLufs = { status: "unavailable", reason: "digital-silence" }; value.shortTermValidObservations = 0;
+  validateAudioMeasurementReport(value, op, "job");
+  value.truePeakLinear = 0.125;
   validateAudioMeasurementReport(value, op, "job");
   value.integratedLufs = { status: "available", value: -69 }; assert.throws(() => validateAudioMeasurementReport(value, op, "job"));
 });
