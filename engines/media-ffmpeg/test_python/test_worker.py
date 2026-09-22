@@ -369,7 +369,7 @@ class RuntimeBuildTests(unittest.TestCase):
                     prepare_ffmpeg_source.prepare(destination)
                 command.assert_not_called()
 
-    def test_ffmpeg_signature_verifier_requires_gpgconf(self) -> None:
+    def test_ffmpeg_signature_verifier_requires_gpgv(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             destination = Path(directory) / "source"
             with mock.patch.object(
@@ -377,7 +377,7 @@ class RuntimeBuildTests(unittest.TestCase):
                 "which",
                 side_effect=lambda executable: "/usr/bin/gpg" if executable == "gpg" else None,
             ), mock.patch.object(prepare_ffmpeg_source, "download") as download:
-                with self.assertRaisesRegex(SystemExit, "gpgconf is required"):
+                with self.assertRaisesRegex(SystemExit, "gpgv is required"):
                     prepare_ffmpeg_source.prepare(destination)
                 download.assert_not_called()
                 self.assertFalse(destination.exists())
