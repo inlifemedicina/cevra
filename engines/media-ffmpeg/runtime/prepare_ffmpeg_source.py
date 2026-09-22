@@ -78,6 +78,8 @@ def extract_verified_archive(archive: Path, destination: Path) -> None:
 def prepare(destination: Path) -> Path:
     if shutil.which("gpg") is None:
         raise SystemExit("gpg is required to verify the FFmpeg release signature")
+    if shutil.which("gpgconf") is None:
+        raise SystemExit("gpgconf is required to manage the isolated FFmpeg signature verifier")
     destination.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="cevra-ffmpeg-source-") as temp_name:
         temp = Path(temp_name)
@@ -97,15 +99,25 @@ def prepare(destination: Path) -> Path:
         gnupg.mkdir(mode=0o700)
         env = os.environ.copy()
         env["GNUPGHOME"] = str(gnupg)
-        listing = command(["gpg", "--batch", "--with-colons", "--import-options", "show-only", "--import", str(key)], env=env)
-        fingerprints = {line.split(":")[9].upper() for line in listing.splitlines() if line.startswith("fpr:") and len(line.split(":")) > 9}
-        expected = PIN["signingFingerprint"].upper()
-        if expected not in fingerprints:
-            raise SystemExit(f"FFmpeg signing key fingerprint mismatch: expected {expected}")
-        command(["gpg", "--batch", "--import", str(key)], env=env)
-        verification = command(["gpg", "--batch", "--status-fd", "1", "--verify", str(signature), str(archive)], env=env)
-        if not signature_matches(verification, expected):
-            raise SystemExit(f"FFmpeg release signature was not made by pinned fingerprint {expected}")
+        command(["gpgconf", "--launch", "gpg-agent"], env=env)
+        try:
+            listing = command(["gpg", "--batch", "--with-colons", "--import-options", "show-only", "--import", str(key)], env=env)
+            fingerprints = {line.split(":")[9].upper() for line in listing.splitlines() if line.startswith("fpr:") and len(line.split(":")) > 9}
+            expected = PIN["signingFingerprint"].upper()
+            if expected not in fingerprints:
+                raise SystemExit(f"FFmpeg signing key fingerprint mismatch: expected {expected}")
+            command(["gpg", "--batch", "--import", str(key)], env=env)
+            verification = command(["gpg", "--batch", "--status-fd", "1", "--verify", str(signature), str(archive)], env=env)
+            if not signature_matches(verification, expected):
+                raise SystemExit(f"FFmpeg release signature was not made by pinned fingerprint {expected}")
+        finally:
+            subprocess.run(
+                ["gpgconf", "--kill", "gpg-agent"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=env,
+                check=False,
+            )
 
         extract_root = temp / "extract"
         extract_root.mkdir()
