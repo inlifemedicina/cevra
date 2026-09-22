@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feat/audio-sequence-runtime-v1
+      - feat/typed-audio-measurement-v1
     paths:
       - .github/workflows/audio-sequence-runtime.yml
       - package.json
@@ -80,3 +81,7 @@ jobs:
           CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
           CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
         run: node engines/media-ffmpeg/test_functional/audio-sequence-runtime.mjs
+      - name: Characterize native audio measurement candidate
+        run: >-
+          python3 engines/media-ffmpeg/test_functional/audio-measurement-feasibility.py
+          --ffmpeg "${RUNNER_TEMP}/cevra-media-runtime/bin/ffmpeg"
