@@ -132,7 +132,8 @@ export class MediaApplicationService {
         continue;
       }
       if (attempt) {
-        const cleanup = await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);
+        const cleanupUris = record.operation.type === "render-audio-sequence" ? attempt.ownedOutputUris ?? [] : attempt.outputUris;
+        const cleanup = await this.cleanup(cleanupUris, attempt.preexistingOutputUris);
         attempt.removedPartialOutputUris.push(...cleanup.removed);
         attempt.cleanupFailedOutputUris.push(...cleanup.failed);
         attempt.status = "interrupted";
@@ -174,6 +175,7 @@ export class MediaApplicationService {
       requestedAt: this.clock(),
       outputUris,
       preexistingOutputUris: [],
+      ownedOutputUris: [],
       removedPartialOutputUris: [],
       cleanupFailedOutputUris: [],
       projectRevisionBefore: current.history.revision,
@@ -205,6 +207,10 @@ export class MediaApplicationService {
       await this.executions.save(record);
 
       const result = await this.engine.execute(record.operation, { jobId: attempt.jobId, locale: record.locale, ...(signal ? { signal } : {}) });
+      if (record.operation.type === "render-audio-sequence" && result.type === "file" && result.outputUri === outputUris[0]) {
+        attempt.ownedOutputUris.push(result.outputUri);
+        await this.executions.save(record);
+      }
       await this.validateResult(record.operation, result, outputUris);
       if (result.type === "file") attempt.effectiveProfile = clone(result.effectiveProfile);
       const latest = this.history.current;
@@ -243,7 +249,8 @@ export class MediaApplicationService {
       const cancelled = isAbort(cause, signal);
       const failure = cause instanceof AttemptFailure ? cause : undefined;
       const code: MediaApplicationErrorCode = cancelled ? "MEDIA_OPERATION_CANCELLED" : failure?.code ?? "MEDIA_OPERATION_FAILED";
-      const cleanup = await this.cleanup(outputUris, attempt.preexistingOutputUris);
+      const cleanupUris = record.operation.type === "render-audio-sequence" ? attempt.ownedOutputUris : outputUris;
+      const cleanup = await this.cleanup(cleanupUris, attempt.preexistingOutputUris);
       attempt.removedPartialOutputUris.push(...cleanup.removed);
       attempt.cleanupFailedOutputUris.push(...cleanup.failed);
       attempt.status = cancelled ? "cancelled" : "failed";
@@ -457,6 +464,7 @@ function validateDeliveryPostcondition(operation: MediaOperation, result: Extrac
       || result.effectiveProfile.audioEncoder !== AUDIO_SEQUENCE_SAMPLE_FORMAT
       || result.audioSequence?.outputSampleCount !== expectedSamples
       || result.audioSequence.estimatedDataBytes !== expectedDataBytes
+      || result.audioSequence.measuredDataBytes !== expectedDataBytes
       || result.audioSequence.distinctSourceCount !== operation.sources.length
       || result.audioSequence.itemCount !== operation.items.length
       || result.audioSequence.maximumSimultaneousItemCount !== maximumSimultaneousAudioItems(operation)

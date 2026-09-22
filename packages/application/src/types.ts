@@ -46,6 +46,7 @@ export interface MediaExecutionAttempt {
   completedAt?: string;
   outputUris: string[];
   preexistingOutputUris: string[];
+  ownedOutputUris: string[];
   removedPartialOutputUris: string[];
   cleanupFailedOutputUris: string[];
   projectRevisionBefore: number;
