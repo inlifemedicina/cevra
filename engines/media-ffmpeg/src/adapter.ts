@@ -206,6 +206,18 @@ function parseProbe(payload: Record<string, unknown>, fallbackUri: string): Medi
     ...(video && finite(video.width) ? { width: video.width } : {}),
     ...(video && finite(video.height) ? { height: video.height } : {}),
     ...(video && finite(video.fps) ? { frameRate: video.fps } : {}),
+    ...(video ? optionalRational(video, "avg_frame_rate", "avgFrameRate") : {}),
+    ...(video ? optionalRational(video, "r_frame_rate", "rFrameRate") : {}),
+    ...(video ? optionalBoolean(video, "variable_frame_rate_suspected", "variableFrameRateSuspected") : {}),
+    ...(video ? optionalInteger(video, "rotation", "rotationDegrees", -360, 360) : {}),
+    ...(video ? optionalString(video, "pix_fmt", "pixelFormat", 64) : {}),
+    ...(video ? optionalInteger(video, "bit_depth", "bitDepth", 1, 64) : {}),
+    ...(video ? optionalString(video, "color_space", "colorSpace", 64) : {}),
+    ...(video ? optionalString(video, "color_primaries", "colorPrimaries", 64) : {}),
+    ...(video ? optionalString(video, "color_transfer", "colorTransfer", 64) : {}),
+    ...(video ? optionalString(video, "color_range", "colorRange", 64) : {}),
+    ...(video ? optionalBoolean(video, "hdr", "hdr") : {}),
+    ...(video ? optionalString(video, "hdr_format", "hdrFormat", 128) : {}),
     hasVideo: Boolean(video),
     hasAudio: Boolean(audio),
     ...(video && typeof video.codec === "string" ? { videoCodec: video.codec } : {}),
@@ -213,6 +225,59 @@ function parseProbe(payload: Record<string, unknown>, fallbackUri: string): Medi
     ...(audio && finite(audio.sample_rate) ? { sampleRate: audio.sample_rate } : {}),
     ...(audio && finite(audio.channels) ? { channels: audio.channels } : {})
   };
+}
+
+function optionalString(
+  source: Record<string, unknown>,
+  sourceKey: string,
+  outputKey: string,
+  maximumLength: number
+): Record<string, string> {
+  const value = source[sourceKey];
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "string" || value.length === 0 || value.length > maximumLength || value !== value.trim() || /[\0\r\n]/u.test(value)) {
+    throw new Error(`Media worker probe ${sourceKey} is invalid.`);
+  }
+  return { [outputKey]: value };
+}
+
+function optionalRational(
+  source: Record<string, unknown>,
+  sourceKey: string,
+  outputKey: string
+): Record<string, string> {
+  const result = optionalString(source, sourceKey, outputKey, 64);
+  const value = result[outputKey];
+  if (value === undefined) return result;
+  const match = /^(\d+)\/(\d+)$/u.exec(value);
+  if (!match || (match[2] === "0" && match[1] !== "0")) throw new Error(`Media worker probe ${sourceKey} is invalid.`);
+  return result;
+}
+
+function optionalBoolean(
+  source: Record<string, unknown>,
+  sourceKey: string,
+  outputKey: string
+): Record<string, boolean> {
+  const value = source[sourceKey];
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "boolean") throw new Error(`Media worker probe ${sourceKey} is invalid.`);
+  return { [outputKey]: value };
+}
+
+function optionalInteger(
+  source: Record<string, unknown>,
+  sourceKey: string,
+  outputKey: string,
+  minimum: number,
+  maximum: number
+): Record<string, number> {
+  const value = source[sourceKey];
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "number" || !Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`Media worker probe ${sourceKey} is invalid.`);
+  }
+  return { [outputKey]: value };
 }
 
 function fileResult(payload: Record<string, unknown>, fallbackUri: string): MediaOperationResult {
