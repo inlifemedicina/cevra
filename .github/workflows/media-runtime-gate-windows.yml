@@ -1,0 +1,65 @@
+name: Media Runtime gate native Windows evidence
+
+on:
+  push:
+    branches:
+      - spike/media-runtime-coordinated-gate
+    paths:
+      - .github/workflows/media-runtime-gate-windows.yml
+      - engines/media-ffmpeg/runtime/**
+      - tools/media-runtime-gate/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-runtime-gate-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-h264-prerequisite:
+    name: Exact runtime Windows H.264 prerequisite and encode
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: 3.12.14
+      - name: Run FFmpeg-independent laboratory regressions
+        run: python -m unittest discover -s tools/media-runtime-gate -p 'test_*.py' -v
+      - name: Verify available source and build prerequisites
+        shell: pwsh
+        run: |
+          $env:PATH = "C:\msys64\usr\bin;C:\Program Files\Git\usr\bin;$env:PATH"
+          python --version
+          gpg --version
+          bash --version
+          make --version
+          $vsDevCmd = "$env:ProgramFiles\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"
+          if (-not (Test-Path $vsDevCmd)) { throw "Visual Studio developer command prompt not found" }
+      - name: Verify pinned FFmpeg release signature
+        shell: pwsh
+        run: |
+          $env:PATH = "C:\msys64\usr\bin;C:\Program Files\Git\usr\bin;$env:PATH"
+          python engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "$env:RUNNER_TEMP\ffmpeg-source"
+      - name: Build exact pinned CEVRA FFmpeg configuration
+        shell: cmd
+        run: |
+          call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          set "PATH=C:\msys64\usr\bin;C:\Program Files\Git\usr\bin;%PATH%"
+          python engines/media-ffmpeg/runtime/build_ffmpeg.py "%RUNNER_TEMP%\ffmpeg-source\ffmpeg-9.0.1" "%RUNNER_TEMP%\cevra-ffmpeg" --jobs 4
+      - name: Execute native h264_mf encode, probe and decode
+        shell: pwsh
+        run: |
+          $ffmpeg = "$env:RUNNER_TEMP\cevra-ffmpeg\bin\ffmpeg.exe"
+          $ffprobe = "$env:RUNNER_TEMP\cevra-ffmpeg\bin\ffprobe.exe"
+          $output = "$env:RUNNER_TEMP\h264-mf-smoke.mp4"
+          & $ffmpeg -hide_banner -encoders | Select-String -Pattern '\bh264_mf\b'
+          if ($LASTEXITCODE -ne 0) { throw "exact runtime does not enumerate h264_mf" }
+          & $ffmpeg -y -v error -f lavfi -i "testsrc2=size=320x180:rate=30:duration=2" -f lavfi -i "sine=frequency=1000:sample_rate=48000:duration=2" -pix_fmt nv12 -c:v h264_mf -c:a aac -shortest $output
+          if ($LASTEXITCODE -ne 0) { throw "native h264_mf encode failed" }
+          & $ffprobe -v error -show_streams -show_format -of json $output
+          if ($LASTEXITCODE -ne 0) { throw "native h264_mf probe failed" }
+          & $ffmpeg -v error -i $output -f null NUL
+          if ($LASTEXITCODE -ne 0) { throw "native h264_mf decode failed" }
