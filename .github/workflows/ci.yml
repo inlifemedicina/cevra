@@ -123,6 +123,59 @@ jobs:
           --python-root "${RUNNER_TEMP}/cevra-python"
           --ffmpeg-source "${RUNNER_TEMP}/ffmpeg-source/ffmpeg-9.0.1"
 
+  audio-sequence-runtime:
+    name: Audio sequence exact runtime (macOS arm64)
+    if: github.ref_name == 'feat/audio-sequence-runtime-v1' || github.head_ref == 'feat/audio-sequence-runtime-v1'
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: 3.12.14
+      - name: Report native toolchain and verify signature tool
+        run: |
+          sw_vers
+          uname -m
+          cc --version
+          gpg --version
+      - run: npm ci
+      - name: Build the typed Media execution path
+        run: |
+          npm run build -w @cevra/project-ir
+          npm run build -w @cevra/contracts
+          npm run build -w @cevra/i18n
+          npm run build -w @cevra/application
+          npm run build -w @cevra/media-ffmpeg
+      - name: Prepare signature-verified release inputs
+        run: |
+          python engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "${RUNNER_TEMP}/ffmpeg-source"
+          python engines/media-ffmpeg/runtime/prepare_vendor.py "${RUNNER_TEMP}/ffmpeg-skill"
+          python engines/media-ffmpeg/runtime/prepare_python_runtime.py "${RUNNER_TEMP}/cevra-python"
+      - name: Build pinned FFmpeg 9.0.1 for macOS arm64
+        run: >-
+          python engines/media-ffmpeg/runtime/build_ffmpeg.py
+          "${RUNNER_TEMP}/ffmpeg-source/ffmpeg-9.0.1"
+          "${RUNNER_TEMP}/cevra-ffmpeg"
+          --jobs 3
+      - name: Assemble and verify the exact managed runtime
+        run: >-
+          python engines/media-ffmpeg/runtime/assemble_runtime.py
+          "${RUNNER_TEMP}/cevra-media-runtime"
+          --python-root "${RUNNER_TEMP}/cevra-python"
+          --ffmpeg-prefix "${RUNNER_TEMP}/cevra-ffmpeg"
+          --vendor-source "${RUNNER_TEMP}/ffmpeg-skill"
+      - name: Execute bounded multi-source audio acceptance catalog
+        env:
+          CEVRA_AUDIO_SEQUENCE_RELEASE: "1"
+          CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
+          CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
+        run: node engines/media-ffmpeg/test_functional/audio-sequence-runtime.mjs
+
   transcription-worker:
     name: Transcription worker contract tests (Python 3.12)
     runs-on: ubuntu-24.04
