@@ -112,14 +112,24 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Assemble a verified CEVRA Media Runtime from prepared release inputs")
     parser.add_argument("output", type=Path)
     parser.add_argument("--python-root", type=Path, required=True)
-    parser.add_argument("--python-executable", default="bin/python3.12")
+    parser.add_argument(
+        "--python-executable",
+        help="optional relative executable override; defaults to the executable verified from the pinned managed-Python inventory",
+    )
     parser.add_argument("--ffmpeg-prefix", type=Path, required=True)
     parser.add_argument("--vendor-source", type=Path, required=True)
     args = parser.parse_args()
+    python_root = args.python_root.resolve()
+    verified_python = verify_python_runtime(python_root)
+    python_executable = (
+        _relative_executable(args.python_executable)
+        if args.python_executable is not None
+        else verified_python.relative_to(python_root)
+    )
     manifest = assemble(
         args.output,
-        args.python_root.resolve(),
-        _relative_executable(args.python_executable),
+        python_root,
+        python_executable,
         args.ffmpeg_prefix.resolve(),
         args.vendor_source.resolve(),
     )

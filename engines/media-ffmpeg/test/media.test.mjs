@@ -6,6 +6,7 @@ class FakeWorker {
   calls = [];
   probeVideoCodec = "h264";
   probeAudioCodec = "aac";
+  probeVideoMetadata = {};
   async info() {
     return { name: "cevra-media-worker", version: "0.1.0", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
   }
@@ -30,7 +31,7 @@ class FakeWorker {
   async listTools() { return []; }
   async callTool(name, arguments_, jobId, signal) {
     this.calls.push({ name, arguments_, jobId, signal });
-    if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: this.probeVideoCodec }, audio: { codec: this.probeAudioCodec, sample_rate: 48000, channels: 2 } } };
+    if (name === "probe") return { structuredContent: { file: arguments_.inputs[0], duration: 2.5, video: { width: 1920, height: 1080, fps: 30, codec: this.probeVideoCodec, ...this.probeVideoMetadata }, audio: { codec: this.probeAudioCodec, sample_rate: 48000, channels: 2 } } };
     if (name === "silence") return { structuredContent: { silences: [[1.2, 2.4], [5.0, null]] } };
     if (name === "cevra-extract-frame") return { structuredContent: { status: "completed", output: arguments_.output, probe: { file: arguments_.output, video: { codec: "png", width: 1920, height: 1080 } }, effectiveProfile: { container: "png", videoCodec: "png", videoEncoder: "png" } } };
     const audioOnly = arguments_.drop_video === true;
@@ -54,6 +55,106 @@ test("probe maps worker measurement into CEVRA media result", async () => {
   assert.equal(result.probe.durationMs, 2500);
   assert.equal(result.probe.width, 1920);
   assert.equal(result.probe.hasAudio, true);
+});
+
+test("probe preserves SDR color, pixel, rotation, and exact frame-rate evidence", async () => {
+  const worker = new FakeWorker();
+  worker.probeVideoMetadata = {
+    avg_frame_rate: "30000/1001",
+    r_frame_rate: "30/1",
+    variable_frame_rate_suspected: true,
+    rotation: 90,
+    pix_fmt: "yuv420p",
+    bit_depth: 8,
+    color_space: "bt709",
+    color_primaries: "bt709",
+    color_transfer: "bt709",
+    color_range: "tv",
+    hdr: false
+  };
+  const result = await new FfmpegMediaEngine(worker).execute({ type: "probe", inputUri: "rotated-sdr.mp4" }, context);
+  assert.equal(result.type, "probe");
+  assert.deepEqual(result.probe, {
+    uri: "rotated-sdr.mp4",
+    durationMs: 2500,
+    width: 1920,
+    height: 1080,
+    frameRate: 30,
+    avgFrameRate: "30000/1001",
+    rFrameRate: "30/1",
+    variableFrameRateSuspected: true,
+    rotationDegrees: 90,
+    pixelFormat: "yuv420p",
+    bitDepth: 8,
+    colorSpace: "bt709",
+    colorPrimaries: "bt709",
+    colorTransfer: "bt709",
+    colorRange: "tv",
+    hdr: false,
+    hasVideo: true,
+    hasAudio: true,
+    videoCodec: "h264",
+    audioCodec: "aac",
+    sampleRate: 48000,
+    channels: 2
+  });
+});
+
+test("probe preserves 10-bit HDR evidence without interpreting or altering pixels", async () => {
+  const worker = new FakeWorker();
+  worker.probeVideoMetadata = {
+    avg_frame_rate: "24000/1001",
+    r_frame_rate: "24000/1001",
+    variable_frame_rate_suspected: false,
+    rotation: 0,
+    pix_fmt: "yuv420p10le",
+    bit_depth: 10,
+    color_space: "bt2020nc",
+    color_primaries: "bt2020",
+    color_transfer: "smpte2084",
+    color_range: "tv",
+    hdr: true,
+    hdr_format: "HDR10/PQ"
+  };
+  const result = await new FfmpegMediaEngine(worker).execute({ type: "probe", inputUri: "hdr.mov" }, context);
+  assert.equal(result.probe.pixelFormat, "yuv420p10le");
+  assert.equal(result.probe.bitDepth, 10);
+  assert.equal(result.probe.colorPrimaries, "bt2020");
+  assert.equal(result.probe.colorTransfer, "smpte2084");
+  assert.equal(result.probe.hdr, true);
+  assert.equal(result.probe.hdrFormat, "HDR10/PQ");
+});
+
+test("probe leaves unavailable optional metadata absent", async () => {
+  const result = await new FfmpegMediaEngine(new FakeWorker()).execute({ type: "probe", inputUri: "minimal.mp4" }, context);
+  for (const key of ["avgFrameRate", "rFrameRate", "rotationDegrees", "pixelFormat", "bitDepth", "colorSpace", "colorPrimaries", "colorTransfer", "colorRange", "hdr", "hdrFormat"]) {
+    assert.equal(Object.hasOwn(result.probe, key), false, key);
+  }
+});
+
+test("probe rejects malformed structured metadata at the adapter boundary", async () => {
+  const malformed = [
+    ["avg_frame_rate", "30000"],
+    ["r_frame_rate", "30/0"],
+    ["variable_frame_rate_suspected", "yes"],
+    ["rotation", 90.5],
+    ["pix_fmt", ["yuv420p"]],
+    ["bit_depth", 0],
+    ["color_space", { name: "bt709" }],
+    ["color_primaries", "bt709\n"],
+    ["color_transfer", ""],
+    ["color_range", 1],
+    ["hdr", "false"],
+    ["hdr_format", "x".repeat(129)]
+  ];
+  for (const [field, value] of malformed) {
+    const worker = new FakeWorker();
+    worker.probeVideoMetadata = { [field]: value };
+    await assert.rejects(
+      () => new FfmpegMediaEngine(worker).execute({ type: "probe", inputUri: "malformed.mp4" }, context),
+      new RegExp(`probe ${field} is invalid`)
+    );
+  }
 });
 
 test("trim maps milliseconds to accurate upstream cut", async () => {

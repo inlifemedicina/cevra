@@ -162,6 +162,18 @@ export interface MediaProbeResult {
   width?: number;
   height?: number;
   frameRate?: number;
+  avgFrameRate?: string;
+  rFrameRate?: string;
+  variableFrameRateSuspected?: boolean;
+  rotationDegrees?: number;
+  pixelFormat?: string;
+  bitDepth?: number;
+  colorSpace?: string;
+  colorPrimaries?: string;
+  colorTransfer?: string;
+  colorRange?: string;
+  hdr?: boolean;
+  hdrFormat?: string;
   hasVideo: boolean;
   hasAudio: boolean;
   videoCodec?: string;
