@@ -1349,7 +1349,7 @@ Foundation / Media Runtime       [CLOSED]
 → Local Forced Alignment V1      [CLOSED]
 → decision/document reconciliation [CLOSED]
 → ProjectHistory Scalability V2  [CLOSED]
-→ small cross-platform/runtime correctness prerequisites
+→ small cross-platform/runtime correctness prerequisites [CLOSED]
 → coordinated Media Runtime adjustment gate
 → Transcript Cache V1 reconciliation/final closeout
 → editorial transcript / analysis
