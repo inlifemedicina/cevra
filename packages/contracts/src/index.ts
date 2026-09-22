@@ -6,3 +6,4 @@ export * from "./alignment.js";
 export * from "./qa.js";
 export * from "./providers.js";
 export * from "./editor.js";
+export * from "./audio-measurement.js";

@@ -55,6 +55,23 @@ function cutArguments(output, pidFile, duration) {
   return { input: pidFile, output, start: 0, end: duration, accurate: true };
 }
 
+test("POSIX worker death terminates its owned native process group for existing operations", { skip: process.platform === "win32" }, async () => {
+  const runtime = createRuntime();
+  const output = path.join(runtime.directory, "death.txt");
+  const pidFile = path.join(runtime.directory, "death.pid");
+  try {
+    const pending = runtime.client.callTool("cut", cutArguments(output, pidFile, 30), "death");
+    const rejected = assert.rejects(pending, WorkerProcessExitedError);
+    await waitForFile(pidFile);
+    const childPid = Number(fs.readFileSync(pidFile, "utf8"));
+    process.kill(runtime.transport.workerPid, "SIGTERM");
+    await rejected;
+    const deadline = Date.now() + 3000;
+    while (processExists(childPid) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(processExists(childPid), false);
+  } finally { await runtime.client.close(); }
+});
+
 test("process transport starts once, executes serial jobs and closes the worker", async () => {
   const runtime = createRuntime();
   const firstOutput = path.join(runtime.directory, "first.txt");
@@ -242,7 +259,7 @@ test("close cancels and reaps an active subprocess without leaving the worker al
 test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async () => {
   const runtime = createRuntime();
   const tools = await runtime.client.listTools();
-  const expectedTools = ["cut", "cevra-extract-frame", "cevra-mux-audio", "cevra-overlay-media", "cevra-render-audio-sequence", "cevra-scale", "cevra-speed", "cevra-transcode"];
+  const expectedTools = ["cut", "cevra-extract-frame", "cevra-measure-audio", "cevra-mux-audio", "cevra-overlay-media", "cevra-render-audio-sequence", "cevra-scale", "cevra-speed", "cevra-transcode"];
   assert.deepEqual(tools.map((tool) => tool.name), expectedTools);
   const health = await runtime.client.health();
   assert.equal(Object.hasOwn(health.tools, "redact"), false);

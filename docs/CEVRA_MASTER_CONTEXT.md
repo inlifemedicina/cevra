@@ -1505,6 +1505,24 @@ coordinated Media Runtime adjustment gate is not closed. The next active slice
 inside that gate is typed audio measurement (MR-A02), which must establish
 measurement evidence before automatic audio policy or mastering decisions.
 
+**Audio Measurement V1 (MR-A02) — IN DEVELOPMENT / independent review pending.**
+Branch `feat/typed-audio-measurement-v1` extends the existing read-only typed
+Media execution path with one explicitly selected stream/interval, native-rate
+RMS/sample peak, eligible loudness, drained true-peak estimate and unrounded
+full-scale evidence. No mastering, QA verdict, editorial mutation or cache.
+[ADR 0021](adr/0021-audio-measurement-v1.md) records the method/coverage/lifecycle
+contract; the [evidence record](CEVRA_AUDIO_MEASUREMENT_V1_EVIDENCE.md) separates
+local characterization from exact managed runtime CI. CEVRA worker identity
+advances to 0.3.0; third-party pins and Alignment's existing PCM profile remain
+unchanged. Director receives compatible evidence, not worker editorial authority.
+
+**Permanent progress-prompt rule:** CEVRA Vids progress toward a fully usable
+functional version has Product Owner baseline **48%**. Carry that baseline in
+progress prompts/status handoffs; do not increase it for test counts, commits
+or an implementation awaiting independent review. Any future change must be
+explicitly grounded in accepted user-visible capability/acceptance evidence,
+not inferred from engineering activity. This MR-A02 branch leaves it at 48%.
+
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
 GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.

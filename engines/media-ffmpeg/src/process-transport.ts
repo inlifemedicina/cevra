@@ -91,6 +91,9 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       ...(this.options.cwd ? { cwd: this.options.cwd } : {}),
       env,
       shell: false,
+      // A private POSIX process group lets the existing transport settle owned
+      // native children even when the Python worker dies before job cleanup.
+      detached: process.platform !== "win32",
       windowsHide: true
     });
     this.child = child;
@@ -252,6 +255,14 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
 
   private failWorker(child: ChildProcessWithoutNullStreams, error: Error): void {
     if (this.child !== child) return;
+    if (process.platform !== "win32" && child.pid !== undefined) {
+      try { process.kill(-child.pid, "SIGKILL"); }
+      catch (cause) {
+        if ((cause as NodeJS.ErrnoException).code !== "ESRCH") {
+          error = new WorkerProcessExitedError(`Owned media process-group termination failed: ${String(cause)}`);
+        }
+      }
+    }
     this.child = undefined;
     for (const pending of this.pending.values()) {
       pending.cleanup();

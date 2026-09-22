@@ -15,8 +15,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import cevra_job_control as job_control
+import cevra_audio_measurement as audio_measurement
 
-CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio", "cevra-render-audio-sequence"}
+CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio", "cevra-render-audio-sequence", "cevra-measure-audio"}
 
 AUDIO_SEQUENCE_VERSION = 1
 AUDIO_SEQUENCE_SAMPLE_RATE = 48_000
@@ -851,6 +852,11 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
                 return _run_mux_audio(common, args)
             if name == "cevra-render-audio-sequence":
                 return _run_audio_sequence(common, args)
+            if name == "cevra-measure-audio":
+                report = audio_measurement.run(common, args)
+                return {"content": [{"type": "text", "text": json.dumps(report, allow_nan=False)}], "structuredContent": report}
+    except audio_measurement.MeasurementError as exc:
+        return {"isError": True, "content": [{"type": "text", "text": str(exc)}], "structuredContent": {"measurementError": str(exc)}}
     except SystemExit as exc:
         code = exc.code if isinstance(exc.code, int) else 1
         text = "\n".join(stderr.getvalue().strip().splitlines()[-12:]) or stdout.getvalue().strip()
