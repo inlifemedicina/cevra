@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-09-21
+**Updated:** 2026-09-22
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 
 ```text
@@ -15,8 +15,8 @@ CEVRA VIDS
 │   └─ ProjectHistory Scalability V2
 │
 ├─ 2. CURRENT RECONCILIATION / CORRECTNESS GATES
-│   ├─ small cross-platform/runtime correctness prerequisites
-│   ├─ approved coordinated Media Runtime adjustment gate
+│   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
+│   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
 │   └─ Transcript Cache V1 reconciliation/final closeout
 │
 ├─ 3. EDITORIAL INTELLIGENCE
@@ -89,4 +89,4 @@ The dependency roadmap was **not reset**. The explicit new checkpoint is **UX Su
 
 ## Reconciliation note — 2026-09-21
 
-ProjectHistory Scalability V2 is closed and preserved as a foundation after PR #30. The measured O(commits × transcript payload) failure was removed with compact snapshots and exact transcript blobs while preserving Project IR and V1 compatibility. The next active gate is the small cross-platform/runtime correctness prerequisites, followed by the approved coordinated Media Runtime adjustment gate and then Transcript Cache V1 reconciliation/final closeout. Revalidate the cache/history storage relationship during that later cache closeout; the two systems remain separate.
+ProjectHistory Scalability V2 is closed and preserved as a foundation after PR #30. The measured O(commits × transcript payload) failure was removed with compact snapshots and exact transcript blobs while preserving Project IR and V1 compatibility. The cross-platform/runtime correctness prerequisites are also closed. The current active gate is the approved coordinated Media Runtime adjustment gate, followed by Transcript Cache V1 reconciliation/final closeout. Revalidate the cache/history storage relationship during that later cache closeout; the two systems remain separate.
