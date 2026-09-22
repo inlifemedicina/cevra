@@ -24,7 +24,7 @@ if str(WORKER_DIRECTORY) not in sys.path:
 
 from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
-WORKER_VERSION = "0.2.0"
+WORKER_VERSION = "0.2.1"
 PROTOCOL_VERSION = 1
 UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"

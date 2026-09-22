@@ -324,6 +324,12 @@ def run():
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=limit)
     subprocess.Popen(full, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 def require_tool(name): pass
+def probe_audio(audio):
+    if audio:
+        return {
+            "sample_rate": _to_int(audio.get("sample_rate")),
+            "bitrate": _to_int(audio.get("bit_rate")),
+        }
 def ffmpeg_version():
     return subprocess.run(["ffprobe", "-version"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
 `);

@@ -7,8 +7,10 @@ import json
 import math
 import os
 import re
+import struct
 import sys
 import tempfile
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -27,6 +29,88 @@ MAX_AUDIO_SEQUENCE_INPUT_ARGUMENT_BYTES = 24 * 1024
 MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES = 0xFFFFFFFF - 256
 MAX_MEDIA_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 MAX_MEDIA_INPUTS = 128
+
+
+def _fraction(value: Any, label: str) -> Fraction:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError(f"{label} is unavailable")
+    try:
+        result = Fraction(str(value))
+    except (ValueError, ZeroDivisionError) as exc:
+        raise ValueError(f"{label} is unavailable") from exc
+    return result
+
+
+def _audio_coverage_ms(audio: Dict[str, Any], source_id: str) -> tuple[Fraction, Fraction]:
+    time_base_value = audio.get("time_base")
+    duration_ts = audio.get("duration_ts")
+    start_pts = audio.get("start_pts")
+    if isinstance(time_base_value, str) and isinstance(duration_ts, int) and not isinstance(duration_ts, bool):
+        time_base = _fraction(time_base_value, f"source {source_id} audio time_base")
+        if time_base <= 0 or duration_ts <= 0:
+            raise ValueError(f"source {source_id} audio timeline coverage is unavailable")
+        if isinstance(start_pts, int) and not isinstance(start_pts, bool):
+            start = start_pts * time_base
+        elif audio.get("start_time") is None:
+            start = Fraction(0)
+        else:
+            start = _fraction(audio.get("start_time"), f"source {source_id} audio start_time")
+        duration = duration_ts * time_base
+    else:
+        start = Fraction(0) if audio.get("start_time") is None else _fraction(audio.get("start_time"), f"source {source_id} audio start_time")
+        duration_value = audio.get("duration")
+        if duration_value is None and isinstance(audio.get("duration_tag"), str):
+            parts = audio["duration_tag"].split(":")
+            if len(parts) == 3:
+                duration_value = str(int(parts[0]) * 3600 + int(parts[1]) * 60 + _fraction(parts[2], f"source {source_id} audio duration tag"))
+        duration = _fraction(duration_value, f"source {source_id} audio duration")
+    if duration <= 0:
+        raise ValueError(f"source {source_id} audio timeline coverage is unavailable")
+    return start * 1000, (start + duration) * 1000
+
+
+def _measure_pcm_f32le_wav(path: Path) -> tuple[int, int]:
+    file_size = path.stat().st_size
+    with path.open("rb") as handle:
+        header = handle.read(12)
+        if len(header) != 12 or header[:4] != b"RIFF" or header[8:] != b"WAVE":
+            raise RuntimeError("audio sequence output is not an ordinary RIFF/WAVE file")
+        format_fields: Optional[tuple[int, int, int, int, int]] = None
+        data_bytes: Optional[int] = None
+        while handle.tell() + 8 <= file_size:
+            chunk_header = handle.read(8)
+            chunk_id, chunk_size = chunk_header[:4], struct.unpack("<I", chunk_header[4:])[0]
+            chunk_start = handle.tell()
+            chunk_end = chunk_start + chunk_size
+            if chunk_end > file_size:
+                raise RuntimeError("audio sequence WAV contains a truncated chunk")
+            if chunk_id == b"fmt ":
+                if format_fields is not None or chunk_size < 16:
+                    raise RuntimeError("audio sequence WAV format chunk is invalid")
+                payload = handle.read(chunk_size)
+                audio_format, channels, sample_rate, _, block_align, bits = struct.unpack("<HHIIHH", payload[:16])
+                if audio_format == 0xFFFE:
+                    if chunk_size < 40 or payload[24:26] != b"\x03\x00":
+                        raise RuntimeError("audio sequence WAV extensible subtype is not IEEE float")
+                    audio_format = 3
+                format_fields = (audio_format, channels, sample_rate, block_align, bits)
+            elif chunk_id == b"data":
+                if data_bytes is not None:
+                    raise RuntimeError("audio sequence WAV contains multiple data chunks")
+                data_bytes = chunk_size
+                handle.seek(chunk_size, os.SEEK_CUR)
+            else:
+                handle.seek(chunk_size, os.SEEK_CUR)
+            if chunk_size & 1:
+                handle.seek(1, os.SEEK_CUR)
+        if format_fields is None or data_bytes is None:
+            raise RuntimeError("audio sequence WAV is missing its format or data chunk")
+        audio_format, channels, sample_rate, block_align, bits = format_fields
+        if audio_format != 3 or sample_rate != AUDIO_SEQUENCE_SAMPLE_RATE or bits != 32 or block_align != channels * 4:
+            raise RuntimeError("audio sequence WAV format does not match interleaved float32/48 kHz")
+        if data_bytes <= 0 or data_bytes % block_align:
+            raise RuntimeError("audio sequence WAV data size is not sample-frame aligned")
+        return data_bytes // block_align, data_bytes
 
 DELIVERY_MATRIX: Dict[str, Dict[str, Any]] = {
     "mp4": {"video": {"h264", "h265", "av1"}, "audio": {"aac"}, "default_video": "h264", "default_audio": "aac", "format": "mp4", "audio_only": False},
@@ -614,6 +698,7 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     source_indexes: Dict[str, int] = {}
     source_paths: Dict[str, Path] = {}
     source_metadata: Dict[str, Dict[str, Any]] = {}
+    source_coverage_ms: Dict[str, tuple[Fraction, Fraction]] = {}
     canonical_source_paths: set[Path] = set()
     for input_index, source in enumerate(sources):
         source_id = str(source["id"])
@@ -634,19 +719,23 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
             audio["channel_layout"] = "stereo"
         else:
             raise ValueError(f"source {source_id} must have an unambiguous mono or stereo layout")
-        duration = metadata.get("duration")
-        if not isinstance(duration, (int, float)) or isinstance(duration, bool) or not math.isfinite(duration) or duration <= 0:
-            raise ValueError(f"source {source_id} duration is unavailable")
+        coverage = _audio_coverage_ms(audio, source_id)
         source_indexes[source_id] = input_index
         source_paths[source_id] = canonical
         source_metadata[source_id] = metadata
+        source_coverage_ms[source_id] = coverage
         canonical_source_paths.add(canonical)
 
     for item_index, item in enumerate(items):
         source_id = str(item["source_id"])
-        duration_ms = math.floor(float(source_metadata[source_id]["duration"]) * 1000 + 1e-6)
-        if int(item["source_end_ms"]) > duration_ms:
-            raise ValueError(f"item {item_index} exceeds source {source_id} duration")
+        coverage_start_ms, coverage_end_ms = source_coverage_ms[source_id]
+        source_start_ms = int(item["source_start_ms"])
+        source_end_ms = int(item["source_end_ms"])
+        if source_start_ms < coverage_start_ms or source_end_ms > coverage_end_ms:
+            raise ValueError(
+                f"item {item_index} exceeds proven audio timeline coverage for source {source_id} "
+                f"[{float(coverage_start_ms):.6f}, {float(coverage_end_ms):.6f}) ms"
+            )
 
     graph = _audio_sequence_graph(args, source_indexes, source_metadata)
     graph_path: Optional[Path] = None
@@ -680,6 +769,11 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
             if not isinstance(staged_audio, dict) or staged_audio.get("codec") != AUDIO_SEQUENCE_SAMPLE_FORMAT \
                     or staged_audio.get("sample_rate") != AUDIO_SEQUENCE_SAMPLE_RATE or staged_audio.get("channels") != channels:
                 raise RuntimeError("audio sequence output failed its float32/48 kHz/channel postcondition")
+            measured_samples, measured_data_bytes = _measure_pcm_f32le_wav(staging_output)
+            if measured_samples != output_samples or measured_data_bytes != output_bytes:
+                raise RuntimeError(
+                    "audio sequence output failed its measured sample-frame/data-size postcondition"
+                )
             os.link(staging_output, output, follow_symlinks=False)
             promoted_output = True
             result = _file_result(common, str(output), {
@@ -691,8 +785,9 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
                 "distinctSourceCount": len(sources),
                 "itemCount": len(items),
                 "maximumSimultaneousItemCount": maximum_active,
-                "outputSampleCount": output_samples,
+                "outputSampleCount": measured_samples,
                 "estimatedDataBytes": output_bytes,
+                "measuredDataBytes": measured_data_bytes,
                 "graphBytes": len(graph.encode("utf-8")),
             }
             })

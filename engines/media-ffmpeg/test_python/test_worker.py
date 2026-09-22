@@ -6,6 +6,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import struct
 from pathlib import Path
 from unittest import mock
 
@@ -21,6 +22,16 @@ import prepare_ffmpeg_source
 import prepare_vendor
 import schema_validator
 import _cevra_runtime as runtime_args
+
+
+def write_sparse_float_wav(path: Path, samples: int, channels: int = 2) -> None:
+    data_bytes = samples * channels * 4
+    with path.open("wb") as handle:
+        handle.write(b"RIFF" + struct.pack("<I", data_bytes + 36) + b"WAVE")
+        handle.write(b"fmt " + struct.pack("<IHHIIHH", 16, 3, channels, 48_000, 48_000 * channels * 4, channels * 4, 32))
+        handle.write(b"data" + struct.pack("<I", data_bytes))
+        handle.seek(data_bytes - 1, os.SEEK_CUR)
+        handle.write(b"\0")
 
 
 class JobControlTests(unittest.TestCase):
@@ -131,7 +142,7 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
             sources.append({"id": f"s{index}", "uri": str(path)})
             metadata[str(path.resolve())] = {
                 "duration": 60.0,
-                "audio": {"codec": "pcm_f32le", "channels": 1 if index % 2 == 0 else 2, "channel_layout": "mono" if index % 2 == 0 else "stereo", "sample_rate": 44_100 if index % 2 else 48_000},
+                "audio": {"codec": "pcm_f32le", "channels": 1 if index % 2 == 0 else 2, "channel_layout": "mono" if index % 2 == 0 else "stereo", "sample_rate": 44_100 if index % 2 else 48_000, "start_time": "0", "duration": "60.0"},
             }
         items = []
         for index in range(item_count):
@@ -196,9 +207,68 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
 
             args = self.arguments(root, source_count=1, item_count=1)
             metadata = args.pop("_metadata")
-            metadata[str(Path(str(args["sources"][0]["uri"])).resolve())]["duration"] = 0.099
-            with self.assertRaisesRegex(ValueError, "exceeds source"):
+            metadata[str(Path(str(args["sources"][0]["uri"])).resolve())]["audio"]["duration"] = "0.099"
+            with self.assertRaisesRegex(ValueError, "exceeds proven audio timeline coverage"):
                 native_tools._run_audio_sequence(ProbeOnlyCommon(metadata), args)
+
+    def test_audio_coverage_never_falls_back_to_container_duration(self) -> None:
+        class ProbeOnlyCommon:
+            def __init__(self, metadata: dict[str, object]) -> None:
+                self.metadata = metadata
+            def probe(self, path: str, role: str = "input") -> dict[str, object]:
+                return self.metadata[path]
+
+        with tempfile.TemporaryDirectory() as directory:
+            args = self.arguments(Path(directory), source_count=1, item_count=1)
+            metadata = args.pop("_metadata")
+            source_metadata = metadata[str(Path(str(args["sources"][0]["uri"])).resolve())]
+            source_metadata["duration"] = 10.0
+            source_metadata["audio"]["duration"] = "2.0"
+            args["items"][0]["source_start_ms"] = 7_000
+            args["items"][0]["source_end_ms"] = 8_000
+            args["output_duration_ms"] = 1_000
+            with self.assertRaisesRegex(ValueError, "proven audio timeline coverage"):
+                native_tools._run_audio_sequence(ProbeOnlyCommon(metadata), args)
+            source_metadata["audio"].pop("duration")
+            with self.assertRaisesRegex(ValueError, "audio duration is unavailable"):
+                native_tools._run_audio_sequence(ProbeOnlyCommon(metadata), args)
+
+    def test_measured_wav_samples_are_read_from_chunks_not_a_fixed_header(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            wav = Path(directory) / "measured.wav"
+            data_bytes = 480 * 2 * 4
+            junk = b"evidence"
+            with wav.open("wb") as handle:
+                riff_size = 4 + (8 + 16) + (8 + len(junk)) + (8 + data_bytes)
+                handle.write(b"RIFF" + struct.pack("<I", riff_size) + b"WAVE")
+                handle.write(b"fmt " + struct.pack("<IHHIIHH", 16, 3, 2, 48_000, 384_000, 8, 32))
+                handle.write(b"JUNK" + struct.pack("<I", len(junk)) + junk)
+                handle.write(b"data" + struct.pack("<I", data_bytes))
+                handle.seek(data_bytes - 1, os.SEEK_CUR)
+                handle.write(b"\0")
+            self.assertEqual(native_tools._measure_pcm_f32le_wav(wav), (480, data_bytes))
+
+    def test_measured_wav_sample_mismatch_fails_before_publication(self) -> None:
+        class ShortOutputCommon:
+            def __init__(self, metadata: dict[str, object]) -> None:
+                self.metadata = metadata
+            def probe(self, path: str, role: str = "input") -> dict[str, object]:
+                if role == "output":
+                    return {"file": path, "duration": 0.3, "audio": {"codec": "pcm_f32le", "sample_rate": 48_000, "channels": 2}}
+                return self.metadata[path]
+            def verify_output(self, path: str) -> dict[str, object]:
+                return self.probe(path, "output")
+            def ffmpeg_base(self, overwrite: bool = True) -> list[str]:
+                return ["ffmpeg", "-n"]
+            def run(self, command: list[str]) -> None:
+                write_sparse_float_wav(Path(command[-1]), 14_399)
+
+        with tempfile.TemporaryDirectory() as directory:
+            args = self.arguments(Path(directory))
+            metadata = args.pop("_metadata")
+            with self.assertRaisesRegex(RuntimeError, "measured sample-frame"):
+                native_tools._run_audio_sequence(ShortOutputCommon(metadata), args)
+            self.assertFalse(Path(str(args["output"])).exists())
 
     def test_eacces_and_enospc_are_fail_closed_at_the_custom_tool_boundary(self) -> None:
         class FailingCommon:
@@ -275,7 +345,7 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
                 return ["ffmpeg", "-n"]
 
             def run(self, command: list[str]) -> None:
-                Path(command[-1]).write_bytes(b"owned staging")
+                write_sparse_float_wav(Path(command[-1]), 14_400)
                 self.requested_output.write_bytes(b"foreign race winner")
 
         with tempfile.TemporaryDirectory() as directory:
@@ -305,7 +375,7 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
                 return ["ffmpeg", "-n"]
 
             def run(self, command: list[str]) -> None:
-                Path(command[-1]).write_bytes(b"valid")
+                write_sparse_float_wav(Path(command[-1]), 14_400)
 
         with tempfile.TemporaryDirectory() as directory:
             args = self.arguments(Path(directory))

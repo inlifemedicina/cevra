@@ -329,7 +329,7 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
 
 function parseAudioSequenceEvidence(value: unknown) {
   if (value === undefined) return undefined;
-  const allowedFields = new Set(["version", "sampleRate", "sampleFormat", "channelLayout", "distinctSourceCount", "itemCount", "maximumSimultaneousItemCount", "outputSampleCount", "estimatedDataBytes", "graphBytes"]);
+  const allowedFields = new Set(["version", "sampleRate", "sampleFormat", "channelLayout", "distinctSourceCount", "itemCount", "maximumSimultaneousItemCount", "outputSampleCount", "estimatedDataBytes", "measuredDataBytes", "graphBytes"]);
   if (!isRecord(value)
     || Object.keys(value).some((key) => !allowedFields.has(key))
     || value.version !== AUDIO_SEQUENCE_VERSION
@@ -338,7 +338,7 @@ function parseAudioSequenceEvidence(value: unknown) {
     || !["mono", "stereo"].includes(String(value.channelLayout))) {
     throw new Error("Media worker audio sequence evidence is invalid.");
   }
-  const integerFields = ["distinctSourceCount", "itemCount", "maximumSimultaneousItemCount", "outputSampleCount", "estimatedDataBytes", "graphBytes"] as const;
+  const integerFields = ["distinctSourceCount", "itemCount", "maximumSimultaneousItemCount", "outputSampleCount", "estimatedDataBytes", "measuredDataBytes", "graphBytes"] as const;
   if (integerFields.some((field) => !Number.isSafeInteger(value[field]) || (value[field] as number) < 0)) {
     throw new Error("Media worker audio sequence evidence is invalid.");
   }
@@ -347,6 +347,7 @@ function parseAudioSequenceEvidence(value: unknown) {
     || (value.maximumSimultaneousItemCount as number) < 1 || (value.maximumSimultaneousItemCount as number) > (value.itemCount as number)
     || (value.outputSampleCount as number) < 1
     || (value.estimatedDataBytes as number) < 1 || (value.estimatedDataBytes as number) > MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES
+    || (value.measuredDataBytes as number) < 1 || (value.measuredDataBytes as number) > MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES
     || (value.graphBytes as number) < 1 || (value.graphBytes as number) > MAX_AUDIO_SEQUENCE_GRAPH_BYTES) {
     throw new Error("Media worker audio sequence evidence is outside its bounded contract.");
   }

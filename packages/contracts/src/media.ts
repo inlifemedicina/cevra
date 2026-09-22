@@ -229,6 +229,7 @@ export interface AudioSequenceExecutionEvidence {
   maximumSimultaneousItemCount: number;
   outputSampleCount: number;
   estimatedDataBytes: number;
+  measuredDataBytes: number;
   graphBytes: number;
 }
 

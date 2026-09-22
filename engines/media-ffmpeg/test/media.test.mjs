@@ -8,7 +8,7 @@ class FakeWorker {
   probeAudioCodec = "aac";
   probeVideoMetadata = {};
   async info() {
-    return { name: "cevra-media-worker", version: "0.2.0", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
+    return { name: "cevra-media-worker", version: "0.2.1", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
   }
   async health() {
     return {
@@ -38,7 +38,7 @@ class FakeWorker {
       status: "completed", output: arguments_.output,
       probe: { file: arguments_.output, duration: arguments_.output_duration_ms / 1000, size_bytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4 + 114, audio: { codec: "pcm_f32le", sample_rate: 48000, channels: arguments_.output_channel_layout === "mono" ? 1 : 2 } },
       effectiveProfile: { container: "wav", audioCodec: "pcm", audioEncoder: "pcm_f32le" },
-      audioSequence: { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: arguments_.output_channel_layout, distinctSourceCount: arguments_.sources.length, itemCount: arguments_.items.length, maximumSimultaneousItemCount: 2, outputSampleCount: arguments_.output_duration_ms * 48, estimatedDataBytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4, graphBytes: 1024 }
+      audioSequence: { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: arguments_.output_channel_layout, distinctSourceCount: arguments_.sources.length, itemCount: arguments_.items.length, maximumSimultaneousItemCount: 2, outputSampleCount: arguments_.output_duration_ms * 48, estimatedDataBytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4, measuredDataBytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4, graphBytes: 1024 }
     } };
     const audioOnly = arguments_.drop_video === true;
     const audioCodec = arguments_.audio_codec ?? "aac";
@@ -387,8 +387,8 @@ test("render-audio-sequence maps the general typed value without a video deliver
 
 test("render-audio-sequence rejects malformed worker evidence", async () => {
   for (const audioSequence of [
-    { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: "mono", distinctSourceCount: 1, itemCount: 1, maximumSimultaneousItemCount: -1, outputSampleCount: 48000, estimatedDataBytes: 192000, graphBytes: 10 },
-    { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: "mono", distinctSourceCount: 1, itemCount: 1, maximumSimultaneousItemCount: 1, outputSampleCount: 48000, estimatedDataBytes: 192000, graphBytes: 10, arbitrary: true }
+    { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: "mono", distinctSourceCount: 1, itemCount: 1, maximumSimultaneousItemCount: -1, outputSampleCount: 48000, estimatedDataBytes: 192000, measuredDataBytes: 192000, graphBytes: 10 },
+    { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: "mono", distinctSourceCount: 1, itemCount: 1, maximumSimultaneousItemCount: 1, outputSampleCount: 48000, estimatedDataBytes: 192000, measuredDataBytes: 192000, graphBytes: 10, arbitrary: true }
   ]) {
     const worker = new FakeWorker();
     worker.callTool = async () => ({ structuredContent: {

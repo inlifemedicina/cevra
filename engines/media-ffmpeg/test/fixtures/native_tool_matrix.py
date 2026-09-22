@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import tempfile
+import struct
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict
@@ -13,6 +14,16 @@ sys.path.insert(0, str(WORKER))
 
 import cevra_native_tools as tools
 import cevra_media_worker as worker
+
+
+def write_sparse_float_wav(path: Path, samples: int = 192_000, channels: int = 2) -> None:
+    data_bytes = samples * channels * 4
+    with path.open("wb") as handle:
+        handle.write(b"RIFF" + struct.pack("<I", data_bytes + 36) + b"WAVE")
+        handle.write(b"fmt " + struct.pack("<IHHIIHH", 16, 3, channels, 48_000, 48_000 * channels * 4, channels * 4, 32))
+        handle.write(b"data" + struct.pack("<I", data_bytes))
+        handle.seek(data_bytes - 1, os.SEEK_CUR)
+        handle.write(b"\0")
 
 
 class FakeCommon:
@@ -44,7 +55,7 @@ class FakeCommon:
         if "-/filter_complex" in command:
             graph_path = Path(command[command.index("-/filter_complex") + 1])
             self.graph = graph_path.read_text(encoding="utf-8")
-            Path(command[-1]).write_bytes(b"fixture output")
+            write_sparse_float_wav(Path(command[-1]))
         return SimpleNamespace(stdout="", stderr="", returncode=0)
 
 
@@ -134,7 +145,7 @@ def main() -> int:
                     sources.append({"id": source["id"], "uri": str(source_path)})
                     metadata[str(source_path.resolve())] = {
                         "duration": source.get("duration", 10.0),
-                        "audio": {"codec": "pcm_f32le", "sample_rate": source.get("sample_rate", 48000), "channels": source.get("channels", 1), "channel_layout": source.get("channel_layout", "mono")},
+                        "audio": {"codec": "pcm_f32le", "sample_rate": source.get("sample_rate", 48000), "channels": source.get("channels", 1), "channel_layout": source.get("channel_layout", "mono"), "start_time": "0", "duration": str(source.get("duration", 10.0))},
                     }
                 common.metadata = metadata
                 output = root / "output.wav"

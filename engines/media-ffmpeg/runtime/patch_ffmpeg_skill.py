@@ -90,6 +90,21 @@ def patch(source: Path, runtime_module: Path) -> None:
         raise SystemExit("pinned ffmpeg-skill environment timeout hook changed")
     text = text.replace(env_timeout, "return DEFAULT_TIMEOUT", 1)
 
+    audio_probe_anchor = '''            "sample_rate": _to_int(audio.get("sample_rate")),
+            "bitrate": _to_int(audio.get("bit_rate")),'''
+    if text.count(audio_probe_anchor) != 1:
+        raise SystemExit("pinned ffmpeg-skill audio probe shape changed; review audio coverage evidence patch")
+    text = text.replace(audio_probe_anchor, '''            "sample_rate": _to_int(audio.get("sample_rate")),
+            "bitrate": _to_int(audio.get("bit_rate")),
+            # Raw selected-stream timeline evidence. CEVRA validates requested audio
+            # coverage exactly; container duration is not an audio-coverage authority.
+            "start_pts": _to_int(audio.get("start_pts")),
+            "start_time": audio.get("start_time"),
+            "duration_ts": _to_int(audio.get("duration_ts")),
+            "duration": audio.get("duration"),
+            "duration_tag": (audio.get("tags") or {}).get("DURATION"),
+            "time_base": audio.get("time_base"),''', 1)
+
     text = text.replace("def x264_args(", "def _upstream_x264_args(", 1)
     text = text.replace("def video_args(", "def _upstream_video_args(", 1)
     text = text.replace("def run(", "def _upstream_run(", 1)

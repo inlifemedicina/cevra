@@ -174,6 +174,6 @@ test("Python audio-sequence compiler uses one bounded float32 pass with source U
   assert.deepEqual(result.result.audioSequence, {
     version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: "stereo",
     distinctSourceCount: 3, itemCount: 4, maximumSimultaneousItemCount: 2,
-    outputSampleCount: 192000, estimatedDataBytes: 1536000, graphBytes: Buffer.byteLength(result.graph.trimEnd())
+    outputSampleCount: 192000, estimatedDataBytes: 1536000, measuredDataBytes: 1536000, graphBytes: Buffer.byteLength(result.graph.trimEnd())
   });
 });

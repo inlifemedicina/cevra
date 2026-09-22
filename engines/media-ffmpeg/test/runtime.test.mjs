@@ -43,7 +43,7 @@ test("runtime optimization benchmarks approved encoders and configures decode ac
     async info() {
       return {
         name: "cevra-media-worker",
-        version: "0.2.0",
+        version: "0.2.1",
         protocolVersion: 1,
         upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" },
         runtime: { platform: "darwin", arch: "arm64", encoders: ["h264_videotoolbox", "hevc_videotoolbox"], hwaccels: ["videotoolbox"] }
@@ -73,7 +73,7 @@ test("persistent worker starts once across calls and can close", async () => {
     async stop() { stops += 1; },
     async request(method, params) {
       calls.push({ method, params });
-      if (method === "cevra/info") return { name: "cevra-media-worker", version: "0.2.0", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
+      if (method === "cevra/info") return { name: "cevra-media-worker", version: "0.2.1", protocolVersion: 1, upstream: { id: "ffmpeg-skill", version: "1.4.2", contractVersion: "1.0" } };
       if (method === "cevra/health") return { ok: true, checkedAt: "2026-09-11T00:00:00Z", checks: [], tools: {} };
       if (method === "tools/list") return { tools: [] };
       if (method === "cevra/configure") return { configured: true };
