@@ -2,7 +2,7 @@
 
 Base: `8aea564b7cdfd7d235fa72964f07eeed961c1bbc`.
 Branch: `feat/typed-audio-measurement-v1`.
-Status: IN DEVELOPMENT / validation and independent review pending.
+Status: IN DEVELOPMENT / implementation validated; independent review pending.
 Contract/method authority: [ADR 0021](adr/0021-audio-measurement-v1.md).
 
 ## Feasibility before contract consolidation
@@ -32,6 +32,12 @@ Failed intermediate checks are retained as causes, not passing evidence:
 - Abrupt worker death left its measurement decoder alive after 3 seconds.
   The owned POSIX process-group correction and regression test address this
   reproduced lifecycle issue; no speculative filter topology rewrite occurred.
+- On `d40778379d13144893fbc524fdc2349e81d2d498`, normal CI run `35777311294`
+  exposed a stale five-file manifest-schema cardinality (the new worker has
+  seven files). The Media reproducibility job failed before that run was
+  superseded/cancelled by the corrective push. Commit `bca975e` adjusts the exact
+  cardinality and tests agreement with both build and integrity inventories;
+  hashes/signatures and closed file-set verification remain mandatory.
 
 ## Local development evidence (not release proof)
 
@@ -42,7 +48,7 @@ only, <512 MiB scratch budget per catalog, 120 s fixture-generation timeout,
 Python source loops generate short test fixtures only, never production PCM.
 
 The local actual adapter/worker/Application catalog with Homebrew FFmpeg 9.0.2
-measured (development evidence, to be complemented by final exact CI):
+measured (development evidence, separate from exact CI below):
 
 - 44.1/48 kHz sine amplitude 0.5: RMS 0.3535533853; tolerance 2e-6 against
   `0.5/sqrt(2)`. 4 s yields 176,400 / 192,000 measured frames.
@@ -59,9 +65,10 @@ measured (development evidence, to be complemented by final exact CI):
 - Amplitude 2: RMS ~1.41421357 and peak ~2.00000002; no limiter/normalization.
 - Native exact predicates distinguish `1-2^-24`, `1`, `1+2^-23`, independently
   of dB rounding. Saturated-signal evidence does not diagnose distortion.
-- Representative 30-minute compressed source late 1 s excerpt: ~73 ms per
+- Representative 30-minute compressed source late 1 s excerpt: ~74–75 ms per
   warm repeated call; long 120 s analysis ~1.11 s; reports ~0.7–0.9 KiB;
-  sampled worker-tree RSS ≤57.2 MiB; ≤2 processes; ~22.7 MiB fixture bytes.
+  sampled worker-tree RSS ≤57.2 MiB; ≤2 processes; 31,536,682 fixture bytes
+  (~30.1 MiB, including the 20 s EBU reference).
   These are observations, not latency/product guarantees. CPU is sampled
   percent, not integrated CPU time; I/O traffic is not measured.
 
@@ -84,6 +91,65 @@ Normal CI and exact-runtime CI are separate gates. The existing exact workflow
 builds FFmpeg once and runs both catalogs. Relevant feature pushes, PRs and
 main changes remain covered; docs-only changes do not rebuild FFmpeg.
 
-Final implementation suites/CI results will be recorded after execution.
+## Validated implementation checkpoint
+
+Implementation SHA: `bca975e6690c14d560a0881d2fbe1dc7548f5692`.
+Subsequent evidence-only documentation does not change this tested code tree.
+
+- [Normal CI 35777894595](https://github.com/inlifemedicina/cevra/actions/runs/35777894595):
+  **5/5 SUCCESS** — Monorepo, Tauri desktop shell, Media Runtime reproducibility,
+  Transcription, Alignment. The corrected sealed manifest pipeline executed.
+- [Exact runtime 35777894541](https://github.com/inlifemedicina/cevra/actions/runs/35777894541):
+  **SUCCESS**, macOS arm64, signature/hash-verified FFmpeg 9.0.1 and pinned
+  private CPython 3.12.14, CEVRA Media Runtime 0.3.0 / protocol 1. The preserved
+  Audio Sequence catalog, native feasibility checks, and measurement catalog
+  all actually executed in the same managed build. No Homebrew fallback.
+- `npm run ci`: build (including frontend/Desktop Host) and **328 Node + 45
+  frontend tests PASS**. `npm run test:python`: **62 PASS** (Media 41,
+  Transcription 10, Alignment 11). `npm audit --audit-level=low`: zero findings.
+- Tauri CI: **23 Rust supervisor tests PASS**, locked dependency check and
+  release shell compilation PASS. No local Rust/native Windows claim.
+- `git diff --check`: PASS. Local Markdown destination validation: 19 targets
+  PASS. Closed ADR 0020, its functional catalog, Project IR/Store, Alignment,
+  Transcription and dependency lockfile remain byte-unchanged from base.
+
+The exact measurement catalog recorded **25 successful reports** plus asserted
+rejection/cancellation/timeout/worker-death cases. Successful reports do not
+label the acoustic content PASS of quality.
+
+| Exact-runtime check | Measured result / acceptance |
+|---|---|
+| Sine 0.5, 44.1/48 kHz | RMS 0.353553385298; error <2e-6; 176,400 / 192,000 frames in 4 s |
+| Fractional-ms tail 3,991..3,999 | 352 / 384 actual frames, respectively |
+| Independent EBU 3341 test 1 | I -23.000; S max -22.993 LUFS; ±0.1 LU tolerance; 171 valid complete windows |
+| Analytic intersample fixture | sample peak 0.565685439; true peak 0.800037787; expected continuous amplitude 0.8 ±0.01 |
+| Float amplitude 2 | RMS 1.414213569; sample/true peak 2.000000020; unrounded full-scale flags true |
+| Digital zero / below gate / 50 ms | distinct silence / no-eligible-blocks / insufficient-duration evidence; no finite sentinel substitution |
+| Coverage and malformed signal | long-container/short-audio, partial range, absent/video stream, truncated input, unsupported layout and NaN/±Inf rejected |
+| Explicit audio stream / late start | second audio stream and source PTS interval 2,100..2,900 ms passed, without shifting the stream to zero |
+| Lifecycle / non-mutation | abort, timeout and abrupt worker death rejected; observed owned child settled; no report promotion or measurement artifact; Project IR/history unchanged |
+| Compatibility | derived float32 sequence headroom retained by measurement; legacy `extract-audio` remains `pcm_s16le`; existing Alignment suites pass |
+
+Exact-run resource observations (sampled every 20 ms, not OS peak guarantees):
+
+- 30-minute compressed AAC, late 1 s excerpt: **102.1 / 84.5 / 85.7 ms** for
+  three calls in one warmed worker (not a controlled cold-cache benchmark).
+- 120 s analysis: **2,720.3 ms**, 5,760,000 actual sample frames, **775-byte**
+  report; longest analysis tested is 120 s, not a complete 30-minute analysis.
+- Catalog maximum: **70,880 KiB = 69.22 MiB** worker-tree RSS, **2 processes**,
+  **898-byte** report, **119.7%** sampled CPU across the tree. Integrated CPU
+  time, filesystem I/O and unobserved transient peaks are NOT MEASURED.
+- Synthetic fixture storage: **31,536,682 bytes (~30.1 MiB)**. Measurement
+  itself creates **zero output/intermediate files**.
+- Regression guards: <768 MiB sampled RSS, ≤2 observed processes, <4 KiB
+  reports for these fixtures; sampling must actually return observations.
+  Fixed metadata/probe bounds and native fixed-window accumulators provide
+  structural memory bounds. These are not project duration/video limits.
+
+Remaining limitations are explicit in ADR 0021: common mono/stereo rates only,
+conservative ambiguous timeline/tiny-drain rejection, no complete EBU/ITU
+certification, and no native Windows process-tree validation. No independent
+review has yet approved this implementation.
+
 No claim of independent approval, complete D11-T1/D11-T3 workflow, certified
 meter conformity, Windows runtime validation, merge or CLOSED status is made.
