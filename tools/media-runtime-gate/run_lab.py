@@ -202,6 +202,19 @@ def write_tone_click_wav(path: Path, *, sample_rate: int, duration: float, tone_
         output.writeframes(frames)
 
 
+def write_stereo_tone_wav(path: Path, *, sample_rate: int, duration: float, left_hz: int, right_hz: int) -> None:
+    frames = bytearray()
+    for index in range(round(sample_rate * duration)):
+        left = round(0.1 * math.sin(2.0 * math.pi * left_hz * index / sample_rate) * 32767)
+        right = round(0.1 * math.sin(2.0 * math.pi * right_hz * index / sample_rate) * 32767)
+        frames.extend(struct.pack("<hh", left, right))
+    with wave.open(str(path), "wb") as output:
+        output.setnchannels(2)
+        output.setsampwidth(2)
+        output.setframerate(sample_rate)
+        output.writeframes(frames)
+
+
 def decode_audio_samples(ffmpeg: str, path: Path, *, sample_rate: int = 48000) -> tuple[int, ...]:
     return_code, raw, stderr = _communicate(
         [ffmpeg, "-v", "error", "-i", str(path), "-map", "0:a:0", "-ac", "1", "-ar", str(sample_rate), "-f", "s16le", "-"],
@@ -211,6 +224,17 @@ def decode_audio_samples(ffmpeg: str, path: Path, *, sample_rate: int = 48000) -
     if return_code != 0:
         raise RuntimeError(f"audio decode failed: {stderr.decode(errors='replace')}")
     return struct.unpack(f"<{len(raw) // 2}h", raw)
+
+
+def decode_audio_float_samples(ffmpeg: str, path: Path, *, channels: int) -> tuple[float, ...]:
+    return_code, raw, stderr = _communicate(
+        [ffmpeg, "-v", "error", "-i", str(path), "-map", "0:a:0", "-ac", str(channels), "-ar", "48000", "-f", "f32le", "-"],
+        timeout=30,
+        text=False,
+    )
+    if return_code != 0:
+        raise RuntimeError(f"float audio decode failed: {stderr.decode(errors='replace')}")
+    return struct.unpack(f"<{len(raw) // 4}f", raw)
 
 
 def detect_clicks(samples: tuple[int, ...], sample_rate: int, *, threshold: int = 20_000) -> list[float]:
@@ -359,6 +383,9 @@ def run_audio_jcut(ffmpeg: str, ffprobe: str, root: Path) -> dict[str, Any]:
     candidate = root / "jcut-corrected.mkv"
     negative = root / "jcut-old-mapping-negative-control.mkv"
     audio_only = root / "jcut-audio-only.wav"
+    overlap_output = root / "audio-only-overlap.wav"
+    stereo_source = root / "stereo-source.wav"
+    stereo_output = root / "stereo-output.wav"
     common_audio = (
         "[0:a]atrim=0:1.5,asetpts=PTS-STARTPTS,aformat=sample_rates=48000[a0];"
         "[1:a]atrim=0:2.5,asetpts=PTS-STARTPTS,aformat=sample_rates=48000,adelay=1500:all=1[a1];"
@@ -386,6 +413,19 @@ def run_audio_jcut(ffmpeg: str, ffprobe: str, root: Path) -> dict[str, Any]:
         "[a0][a1]amix=inputs=2:duration=longest:normalize=0[a]",
         "-map", "[a]", "-vn", "-c:a", "pcm_f32le", str(audio_only),
     ])
+    overlap_run = measured_run([
+        ffmpeg, "-y", "-v", "error", "-i", str(source_a), "-i", str(source_b),
+        "-filter_complex",
+        "[0:a]atrim=0.1:0.3,asetpts=PTS-STARTPTS,aformat=sample_rates=48000[a0];"
+        "[1:a]atrim=0.1:0.3,asetpts=PTS-STARTPTS,aformat=sample_rates=48000[a1];"
+        "[a0][a1]amix=inputs=2:duration=longest:normalize=0[a]",
+        "-map", "[a]", "-vn", "-c:a", "pcm_f32le", str(overlap_output),
+    ])
+    write_stereo_tone_wav(stereo_source, sample_rate=48_000, duration=0.5, left_hz=330, right_hz=550)
+    stereo_run = measured_run([
+        ffmpeg, "-y", "-v", "error", "-i", str(stereo_source), "-af", "volume=0.75,afade=t=in:st=0:d=0.02",
+        "-vn", "-c:a", "pcm_f32le", str(stereo_output),
+    ])
     candidate_probe = probe(ffprobe, candidate)
     audio_only_probe = probe(ffprobe, audio_only)
     positive_oracle = synchronization_oracle(ffmpeg, candidate, mapping="B picture source 0.5..2.5 at timeline 2..4")
@@ -401,7 +441,17 @@ def run_audio_jcut(ffmpeg: str, ffprobe: str, root: Path) -> dict[str, Any]:
         abs(actual - expected) <= (1 / 48_000 + 0.002)
         for actual, expected in zip(audio_only_clicks, [0.4, 0.9, 1.4, 1.75, 2.2, 2.7, 3.2, 3.7])
     )
-    passed = positive_oracle["classification"] == "PASS" and negative_oracle["classification"] == "FAIL" and no_overlap and abs(duration - 4.0) <= 1 / 30 and abs(audio_duration - 4.0) <= 1 / 48_000 and audio_only_timing
+    overlap_samples = decode_audio_float_samples(ffmpeg, overlap_output, channels=1)
+    overlap_peak = max(abs(sample) for sample in overlap_samples)
+    overlap_preserved_headroom = 0.1 < overlap_peak < 1.0
+    stereo_probe = probe(ffprobe, stereo_output)
+    stereo_samples = decode_audio_float_samples(ffmpeg, stereo_output, channels=2)
+    left = stereo_samples[0::2]
+    right = stereo_samples[1::2]
+    left_powers = tone_powers(left, 48_000, 0.05, 0.4, (330, 550))
+    right_powers = tone_powers(right, 48_000, 0.05, 0.4, (330, 550))
+    stereo_preserved = first_audio(stereo_probe).get("channels") == 2 and left_powers[330] > left_powers[550] * 100 and right_powers[550] > right_powers[330] * 100
+    passed = positive_oracle["classification"] == "PASS" and negative_oracle["classification"] == "FAIL" and no_overlap and abs(duration - 4.0) <= 1 / 30 and abs(audio_duration - 4.0) <= 1 / 48_000 and audio_only_timing and overlap_preserved_headroom and stereo_preserved
     return {
         "classification": "PASS" if passed else "FAIL",
         "evidenceLevel": "standalone laboratory A/V synchronization oracle plus separate audio-only prototype; not CEVRA end-to-end execution",
@@ -431,6 +481,19 @@ def run_audio_jcut(ffmpeg: str, ffprobe: str, root: Path) -> dict[str, Any]:
             "eventSeconds": audio_only_clicks,
             "videoEncodeGenerations": 0,
             "behavior": "explicit source trims/placements, per-item gain/fade, 44.1/48 kHz resampling, PCM output",
+            "explicitOverlap": {
+                "classification": "PASS" if overlap_preserved_headroom else "FAIL",
+                "rule": "linear sum with normalize=0; no implicit limiter or normalization",
+                "peakLinear": overlap_peak,
+                "run": overlap_run,
+            },
+            "stereoPreservation": {
+                "classification": "PASS" if stereo_preserved else "FAIL",
+                "channels": first_audio(stereo_probe).get("channels"),
+                "leftDominantHz": 330 if left_powers[330] > left_powers[550] else 550,
+                "rightDominantHz": 550 if right_powers[550] > right_powers[330] else 330,
+                "run": stereo_run,
+            },
         },
         "fixtures": {str(path.name): {"sha256": sha256(path), "bytes": path.stat().st_size} for path in (source_a, source_b)},
         "supersededEvidence": "80d260b dominant-frequency-only result did not prove source-time A/V synchronization",
