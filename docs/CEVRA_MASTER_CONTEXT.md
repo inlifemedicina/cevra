@@ -1522,9 +1522,13 @@ normal CI `35777894595` passed 5/5 and exact managed macOS arm64 run
 R128 signal→silence, MPEG-TS seek, Matroska/WebM duration-tag, true-peak excerpt
 edge and report-invariant defects. The same feature branch now applies the
 bounded remediations with no dependency, Project IR, runtime-identity or method-
-identity change; fresh managed-runtime validation and independent remediation
-review are required. Semantic ADTS/TS codec priming remains explicitly deferred
-despite proven decoded timeline coverage. **No PR/merge or CLOSED claim.**
+identity change. Remediation code `45a89c76e3f78bcaf79bbdb06e60d2edbe0fa29f`
+passed normal CI `35786488724` 5/5 and exact managed macOS arm64 run
+`35786488665`; the latter rebuilt the signed/pinned FFmpeg 9.0.1 runtime once
+and passed the preserved Audio Sequence, feasibility and expanded Audio
+Measurement catalogs. Independent remediation review is still required.
+Semantic ADTS/TS codec priming remains explicitly deferred despite proven
+decoded timeline coverage. **No PR/merge or CLOSED claim.**
 
 **Permanent progress-prompt rule:** CEVRA Vids progress toward a fully usable
 functional version has Product Owner baseline **48%**. Carry that baseline in

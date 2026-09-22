@@ -126,6 +126,43 @@ Normal CI and exact-runtime CI are separate gates. The existing exact workflow
 builds FFmpeg once and runs both catalogs. Relevant feature pushes, PRs and
 main changes remain covered; docs-only changes do not rebuild FFmpeg.
 
+## Independent-remediation validation checkpoint
+
+Remediation code SHA: `45a89c76e3f78bcaf79bbdb06e60d2edbe0fa29f`.
+
+- [Normal CI 35786488724](https://github.com/inlifemedicina/cevra/actions/runs/35786488724):
+  **5/5 SUCCESS** — Monorepo, Tauri desktop shell, Media Runtime reproducibility,
+  Transcription and Alignment.
+- [Exact runtime 35786488665](https://github.com/inlifemedicina/cevra/actions/runs/35786488665):
+  **SUCCESS** on native macOS arm64 with signature/hash-verified FFmpeg 9.0.1,
+  private CPython 3.12.14 and CEVRA Media Runtime 0.3.0 / protocol 1. The same
+  managed build passed the preserved Audio Sequence catalog, measurement
+  feasibility characterization and the expanded Audio Measurement catalog.
+
+The exact catalog produced 46 valid reports plus the existing asserted
+rejection/cancellation/timeout/worker-death cases. Key corrected evidence:
+
+- signal→zero: 240,000 frames, I **-11.309**, S max **-12.723** LUFS;
+- fade→zero: 240,000 frames, I **-15.494**, S max **-17.495** LUFS;
+- clip→1 s gap→clip: 240,000 frames, I **-11.309**, S max **-11.754** LUFS;
+- Audio Sequence real 500 ms gap: 144,000 frames, I **-11.916**, S max
+  **-12.723** LUFS;
+- MPEG-TS non-zero start: both 1 s windows produced 48,000 frames, contiguous
+  requested PTS and RMS ~0.08834;
+- MKV/AAC, MKV/FLAC and WebM/Vorbis duration-tag cases each produced 182,400
+  requested frames; the expected mono/stereo signal levels passed;
+- corrected 48 kHz 0.45×Nyquist edge case: sample/true peak
+  **0.790150738**, replacing the pre-fix false true peak 1.571228869;
+- NaN/±Inf decoded-signal fixtures still reject; the sequence and MP4/AAC
+  regression cases remain passing.
+
+Post-remediation exact resource observations: 30-minute-source late 1 s calls
+**95.45 / 74.52 / 51.75 ms**; 120 s analysis **2,072.24 ms** and 5,760,000
+frames; maximum sampled worker-tree RSS **66,368 KiB = 64.81 MiB**; maximum
+**2 processes**; largest report **898 bytes**; synthetic scratch **41,622,466
+bytes = 39.69 MiB**. The existing conservative regression ceilings remain
+768 MiB, two processes and 4 KiB; these are not product requirements.
+
 ## Historical pre-remediation implementation checkpoint
 
 Initial implementation checkpoint: `bca975e6690c14d560a0881d2fbe1dc7548f5692`.
