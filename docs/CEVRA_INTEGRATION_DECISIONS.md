@@ -131,6 +131,14 @@ Claude pode raciocinar sobre o material; Claude não é source of truth. Regras 
 
 A inteligência observável útil do EDVID será inventariada em detalhe e classificada clean-room em HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE-RUNTIME, evitando tanto omissão quanto um `SKILL.md` monolítico que replique a arquitetura do EDVID. Ver ADR 0023.
 
+### Creator tool surface and token efficiency — approved 2026-09-22
+
+Creator usa Tool Interface provider-neutral em duas camadas: uma superfície primária pequena e semântica para project/inspect/plan/apply/preview/QA/export/progress/cancel/discovery e capacidades especializadas mais granulares carregadas progressivamente quando a tarefa exigir. Nomes finais e schemas ficam para o contrato específico.
+
+**Eficiência de tokens/contexto é requisito arquitetural.** Usar progressive tool disclosure, evidências compactas e delimitadas, transcript editorial compacto, deltas/revisões em vez de reenvio de estado completo, cache determinístico válido e drill-down apenas sob demanda. Redução de custo não pode reduzir correção; o agente pode escalar evidência quando necessário.
+
+A Tool Interface do agente não substitui a interface humana. Creator Full mantém preview, timeline diretamente editável, controles visuais de legenda/headline/layout/assets/áudio e inspector progressivo sobre o mesmo Project IR/history. O objetivo é preservar e melhorar a combinação EDVID de conversa + superfície visual, não criar uma caixa de chat obrigatória para toda alteração. Ver ADR 0024.
+
 ## Creation Modes V1
 
 Faceless Explainer e Slideshow são direção V1; Music-to-video é condicional a análise proporcional de ritmo/beat/onset/energy. Todos são workflows sobre as mesmas fundações, não novos produtos/timelines/runtimes. Faceless pode usar roteiro e TTS provider-neutral; TTS genérico não autoriza voice clone. Brand Kit V1 cobre logo, fontes, cores e componentes/presets; Figma é importador opcional. Product Launch Video e WebGPU/TypeGPU ficam pós-V1.
