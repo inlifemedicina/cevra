@@ -6,6 +6,7 @@ on:
       - main
       - feat/audio-sequence-runtime-v1
       - feat/typed-audio-measurement-v1
+      - feat/application-resolved-audio-plan-v1
     paths:
       - .github/workflows/audio-sequence-runtime.yml
       - package.json
@@ -91,3 +92,9 @@ jobs:
           CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
           CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
         run: node engines/media-ffmpeg/test_functional/audio-measurement-runtime.mjs
+      - name: Execute Application resolved audio plan and final mux acceptance catalog
+        env:
+          CEVRA_AUDIO_SEQUENCE_RELEASE: "1"
+          CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
+          CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
+        run: node engines/media-ffmpeg/test_functional/application-audio-plan-runtime.mjs
