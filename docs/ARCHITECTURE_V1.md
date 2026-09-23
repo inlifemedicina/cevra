@@ -221,6 +221,14 @@ Short one-shot edits use a token-efficient fast path: compact project summary, m
 
 See [ADR 0025](adr/0025-creator-project-lifecycle-and-one-shot.md).
 
+### 9.4 Creator mobile and remote host experience
+
+Creator targets good mobile/remote-host usability. Claude Code mobile is the first concrete target, but the contract remains provider-neutral.
+
+The preferred initial model keeps media and heavy audiovisual execution on the trusted local/desktop node running standalone CEVRA Core while an official host mobile/remote-control surface drives the Creator session. Fully cloud-executed Creator remains optional future work and must not become a silent prerequisite.
+
+See [ADR 0026](adr/0026-creator-mobile-remote-host-experience.md).
+
 ## 10. Content Intelligence
 
 Content Intelligence is an optional, provider-neutral domain within Orbit. It preserves research, source records, signals, questions, trends, ideas, briefs, scripts, future analytics feedback, future publishing providers and future content memory. It may serve CEVRA Vids and other Orbit products through application services and stable references.
