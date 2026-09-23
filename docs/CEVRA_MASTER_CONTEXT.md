@@ -1595,8 +1595,10 @@ Pre-remediation runs `35818228308` and `35818228318` apply only to head
 `37036a0f31d0f69547facee97f0aed6a0581918f` passed normal CI run `35889604895`
 (5/5) and exact managed runtime run `35889604818`. Final pre-PR micro-remediation
 now derives publication identity from owned staging before confirming the linked
-destination and snapshots getter-backed requests before validating them; new
-run/SHA evidence remains pending its branch update and micro-review.
+destination and snapshots getter-backed requests before validating them. Code
+head `ddee31c84caedc52e60d2db1d36c5e4575360792` passed normal CI run
+`35907517116` (5/5) and exact managed macOS arm64 runtime run `35907517082`;
+micro-review remains pending.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
