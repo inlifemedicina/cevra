@@ -1,4 +1,5 @@
 import type { EngineAdapter, ExecutionContext } from "./base.js";
+import type { MeasureAudioOperationV1, AudioMeasurementReportV1 } from "./audio-measurement.js";
 
 export type FitMode = "contain" | "cover" | "stretch";
 export type MediaContainer = "mp4" | "mov" | "mkv" | "wav" | "m4a";
@@ -247,6 +248,7 @@ export interface EffectiveMediaProfile {
 }
 
 export type MediaOperation =
+  | MeasureAudioOperationV1
   | { type: "probe"; inputUri: string }
   | { type: "trim"; inputUri: string; outputUri: string; startMs: number; endMs: number }
   | { type: "concat"; inputUris: string[]; outputUri: string }
@@ -265,6 +267,7 @@ export type MediaOperation =
   | RenderAudioSequenceOperationV1;
 
 export type MediaOperationResult =
+  | { type: "measure-audio"; report: AudioMeasurementReportV1 }
   | { type: "probe"; probe: MediaProbeResult }
   | { type: "detect-silence"; ranges: SilenceRange[] }
   | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence };
@@ -278,6 +281,7 @@ const MEDIA_CONTAINERS = new Set(["mp4", "mov", "mkv", "wav", "m4a"]);
 const VIDEO_CODECS = new Set(["h264", "h265", "av1", "copy"]);
 const AUDIO_CODECS = new Set(["aac", "opus", "pcm", "copy"]);
 const OPERATION_FIELDS: Readonly<Record<MediaOperation["type"], ReadonlySet<string>>> = {
+  "measure-audio": new Set(["type", "version", "inputUri", "streamIndex", "startMs", "endMs"]),
   probe: new Set(["type", "inputUri"]),
   trim: new Set(["type", "inputUri", "outputUri", "startMs", "endMs"]),
   concat: new Set(["type", "inputUris", "outputUri"]),
@@ -332,6 +336,12 @@ export function validateMediaOperation(value: unknown): MediaOperation {
   };
 
   switch (value.type) {
+    case "measure-audio":
+      if (value.version !== 1 || !isAbsoluteLocalMediaPath(value.inputUri)) throw new Error("Invalid measure-audio version or local input path.");
+      if (typeof value.streamIndex !== "number" || !Number.isSafeInteger(value.streamIndex) || value.streamIndex < 0 || value.streamIndex > 0x7fff_ffff) throw new Error("streamIndex must be an absolute non-negative FFprobe stream index.");
+      requireSafeIntegerMs(value.startMs, "startMs"); requireSafeIntegerMs(value.endMs, "endMs", true);
+      if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs.");
+      break;
     case "probe": requireUri("inputUri"); break;
     case "trim": requireUri("inputUri"); requireUri("outputUri"); requireTimestamp("startMs"); requireTimestamp("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); resolveStandardAvDelivery(value.outputUri as string, true); break;
     case "concat": if (!Array.isArray(value.inputUris) || value.inputUris.length < 1 || value.inputUris.length > MAX_MEDIA_INPUTS || value.inputUris.some((uri) => !isSafeMediaUri(uri))) throw new Error(`inputUris must contain 1-${MAX_MEDIA_INPUTS} safe media URIs.`); requireUri("outputUri"); resolveStandardAvDelivery(value.outputUri as string, true); break;

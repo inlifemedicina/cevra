@@ -7,6 +7,7 @@ import tarfile
 import tempfile
 import unittest
 import struct
+from fractions import Fraction
 from pathlib import Path
 from unittest import mock
 
@@ -232,6 +233,13 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
             source_metadata["audio"].pop("duration")
             with self.assertRaisesRegex(ValueError, "audio duration is unavailable"):
                 native_tools._run_audio_sequence(ProbeOnlyCommon(metadata), args)
+
+    def test_audio_coverage_accepts_only_a_well_formed_stream_duration_tag(self) -> None:
+        audio = {"start_time": "1.250", "duration_tag": "00:00:03.500000000"}
+        self.assertEqual(native_tools._audio_coverage_ms(audio, "tagged"), (Fraction(1250), Fraction(4750)))
+        for malformed in ("03.500", "00:00:not-a-duration", "00:00:-1"):
+            with self.subTest(malformed=malformed), self.assertRaisesRegex(ValueError, "audio (duration|timeline coverage)"):
+                native_tools._audio_coverage_ms({"start_time": "0", "duration_tag": malformed}, "tagged")
 
     def test_measured_wav_samples_are_read_from_chunks_not_a_fixed_header(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

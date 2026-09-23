@@ -15,6 +15,9 @@ import {
   resolveTranscodeDelivery,
   validateCopyCompatibility,
   validateMediaOperation,
+  validateAudioMeasurementReport,
+  AUDIO_MEASUREMENT_ERROR_CODES,
+  AudioMeasurementError,
   type CapabilityDescriptor,
   type EngineHealth,
   type EngineIdentity,
@@ -76,6 +79,10 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     if (plannedDelivery) await this.assertDeliveryAvailable(plannedDelivery);
     const call = (name: string, args: Record<string, unknown>) => this.call(name, args, context.jobId, signal);
     switch (operation.type) {
+      case "measure-audio": {
+        const report = await call("cevra-measure-audio", { version: operation.version, input: operation.inputUri, stream_index: operation.streamIndex, start_ms: operation.startMs, end_ms: operation.endMs });
+        return { type: "measure-audio", report: validateAudioMeasurementReport(report, operation, context.jobId) };
+      }
       case "probe":
         return { type: "probe", probe: parseProbe(await call("probe", { inputs: [operation.inputUri] }), operation.inputUri) };
       case "trim":
@@ -209,7 +216,14 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
   private async call(name: string, args: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (signal?.aborted) throw abortError();
     const result = await this.worker.callTool(name, args, jobId, signal);
-    if (result.isError) throw new Error(readText(result) || `Media worker tool ${name} failed.`);
+    if (result.isError) {
+      if (name === "cevra-measure-audio") {
+        const error = result.structuredContent?.measurementError;
+        const code = AUDIO_MEASUREMENT_ERROR_CODES.find(code => error === `AUDIO_MEASUREMENT_${code}`);
+        if (code) throw new AudioMeasurementError(code);
+      }
+      throw new Error(readText(result) || `Media worker tool ${name} failed.`);
+    }
     const payload = result.structuredContent ?? parseTextJson(result);
     if (!isRecord(payload) || Object.keys(payload).length === 0) {
       throw new Error(`Media worker tool ${name} returned an invalid result.`);
@@ -365,7 +379,7 @@ function parseEffectiveProfile(value: unknown): EffectiveMediaProfile {
 
 function operationDelivery(operation: MediaOperation): ResolvedMediaDelivery | undefined {
   switch (operation.type) {
-    case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": return undefined;
+    case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
     case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
     case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
     case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);

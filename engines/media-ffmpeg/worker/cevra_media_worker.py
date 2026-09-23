@@ -24,7 +24,7 @@ if str(WORKER_DIRECTORY) not in sys.path:
 
 from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
-WORKER_VERSION = "0.2.1"
+WORKER_VERSION = "0.3.0"
 PROTOCOL_VERSION = 1
 UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
@@ -454,6 +454,14 @@ def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ff
         "usable": "no" if missing_audio_sequence else "yes",
         **({"missing": sorted(set(missing_audio_sequence))} if missing_audio_sequence else {"detail": "pcm_f32le/48000 with fixed bounded audio graph"}),
     }
+    required_measurement = {"astats", "ebur128", "aeval", "aresample", "aformat", "asplit", "asettb", "atrim", "asetpts", "ametadata", "anullsink"}
+    missing_measurement = sorted(required_measurement - available_filters)
+    if "pcm_f64le" not in available_encoders:
+        missing_measurement.append("encoder:pcm_f64le")
+    tools["cevra-measure-audio"] = {
+        "usable": "no" if missing_measurement else "yes",
+        **({"missing": missing_measurement} if missing_measurement else {"detail": "native-rate read-only astats/ebur128 with drained SWR 4x peak evidence"}),
+    }
 
 
 def health() -> Dict[str, Any]:
@@ -645,7 +653,8 @@ def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any
         _validate_tool_arguments(name, arguments)
     except (PermissionError, ValueError) as exc:
         return {"isError": True, "content": [{"type": "text", "text": str(exc)}]}
-    _ensure_profile()
+    if name != "cevra-measure-audio":
+        _ensure_profile()
     custom = call_custom_tool(name, arguments or {}, VENDOR_ROOT)
     if custom is not None:
         return _attach_effective_profile(custom, name, arguments)
@@ -738,6 +747,12 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
         "required": ["source_id", "source_start_ms", "source_end_ms", "timeline_start_ms"],
     }
     schemas = {
+        "cevra-measure-audio": {
+            "properties": {"version": {"type": "integer", "enum": [1]}, "input": path,
+                           "stream_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+                           "start_ms": millisecond, "end_ms": positive_millisecond},
+            "required": ["version", "input", "stream_index", "start_ms", "end_ms"],
+        },
         "cevra-extract-frame": {
             "properties": {"input": path, "output": path, "at": non_negative},
             "required": ["input", "output", "at"],

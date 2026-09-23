@@ -10,6 +10,7 @@ import {
   resolveStandardAvDelivery,
   resolveTranscodeDelivery,
   validateMediaOperation,
+  validateAudioMeasurementReport,
   type MediaEngineAdapter,
   type MediaOperation,
   type MediaOperationResult
@@ -211,7 +212,8 @@ export class MediaApplicationService {
         attempt.ownedOutputUris.push(result.outputUri);
         await this.executions.save(record);
       }
-      await this.validateResult(record.operation, result, outputUris);
+      await this.validateResult(record.operation, result, outputUris, attempt.jobId);
+      if (record.operation.type === "measure-audio" && signal?.aborted) throw abortMarker();
       if (result.type === "file") attempt.effectiveProfile = clone(result.effectiveProfile);
       const latest = this.history.current;
       if (record.mutation.type !== "none" && (latest.history.revision !== attempt.projectRevisionBefore || latest.history.headSnapshotId !== attempt.projectSnapshotBefore)) {
@@ -269,7 +271,12 @@ export class MediaApplicationService {
     }
   }
 
-  private async validateResult(operation: MediaOperation, result: MediaOperationResult, outputUris: readonly string[]): Promise<void> {
+  private async validateResult(operation: MediaOperation, result: MediaOperationResult, outputUris: readonly string[], jobId: string): Promise<void> {
+    if (operation.type === "measure-audio") {
+      if (result.type !== "measure-audio" || Object.keys(result).length !== 2) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Media engine returned an incompatible measurement result.");
+      validateAudioMeasurementReport(result.report, operation, jobId);
+      return;
+    }
     if (outputUris.length === 0) {
       const valid = (operation.type === "probe" && result.type === "probe")
         || (operation.type === "detect-silence" && result.type === "detect-silence");
@@ -378,6 +385,7 @@ function mutationCommand(
 function operationOutputUris(operation: MediaOperation): string[] {
   switch (operation.type) {
     case "probe":
+    case "measure-audio":
     case "detect-silence":
       return [];
     case "mux-audio":
@@ -503,7 +511,7 @@ function maximumSimultaneousAudioItems(operation: Extract<MediaOperation, { type
 
 function resolvedDelivery(operation: MediaOperation) {
   switch (operation.type) {
-    case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": return undefined;
+    case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
     case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
     case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
     case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);
