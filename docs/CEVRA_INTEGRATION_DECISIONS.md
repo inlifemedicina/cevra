@@ -119,6 +119,18 @@ O Core necessário ao Creator deve ser callable sem a camada de apresentação/T
 
 A experiência externa permanece EDVID-level simple: mídia + instrução natural → análise/estratégia → execução → preview → refinamento conversacional → resultado local. Project IR, engines, schemas e detalhes de runtime permanecem invisíveis ao usuário comum.
 
+### Creator intelligence layering — approved 2026-09-22
+
+Creator adota inteligência híbrida em três camadas:
+
+1. **Host AI** — conversa, interpretação, raciocínio aberto, criatividade, gosto editorial, contextualização por usuário/nicho/objetivo e interpretação de refinamentos. Pode usar evidência externa atual quando capability/permissão permitirem; isso permanece evidência consultiva, não estado audiovisual canônico.
+2. **Creator Skill** — maestro/orchestration playbook: ensina ao host como usar CEVRA, quais evidências/capabilities pedir, ordem de trabalho, progressive disclosure, strategy/approval, execução, preview, QA, refinamento e export. A Skill é intelectualmente relevante e preserva a dinâmica direta observada no EDVID.
+3. **CEVRA Creative Intelligence/Core** — conhecimento editorial reutilizável, playbooks, invariantes, políticas, validação, Project IR/history, regras de timing/áudio/caption/assets, QA, composição e execução tipada compartilhados entre Lite, Full e Vids.
+
+Claude pode raciocinar sobre o material; Claude não é source of truth. Regras críticas podem existir como orientação na Skill e como garantia validada no Core.
+
+A inteligência observável útil do EDVID será inventariada em detalhe e classificada clean-room em HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE-RUNTIME, evitando tanto omissão quanto um `SKILL.md` monolítico que replique a arquitetura do EDVID. Ver ADR 0023.
+
 ## Creation Modes V1
 
 Faceless Explainer e Slideshow são direção V1; Music-to-video é condicional a análise proporcional de ritmo/beat/onset/energy. Todos são workflows sobre as mesmas fundações, não novos produtos/timelines/runtimes. Faceless pode usar roteiro e TTS provider-neutral; TTS genérico não autoriza voice clone. Brand Kit V1 cobre logo, fontes, cores e componentes/presets; Figma é importador opcional. Product Launch Video e WebGPU/TypeGPU ficam pós-V1.
