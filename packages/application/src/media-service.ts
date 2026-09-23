@@ -120,7 +120,8 @@ export class MediaApplicationService {
     const reconciled: MediaRecoveryResult[] = [];
     for (const record of pending) {
       const attempt = record.attempts.at(-1);
-      if (record.status === "committing" && attempt?.result && mutationApplied(record, this.history.current)) {
+      if (record.status === "committing" && record.mutation.type !== "none"
+        && attempt?.result && mutationApplied(record, this.history.current)) {
         const project = this.history.current;
         const entry = committedEntry(record, this.history.entries);
         attempt.status = "succeeded";

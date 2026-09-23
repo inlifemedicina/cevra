@@ -50,10 +50,14 @@ The tests construct equivalent persisted crash states; they are labeled
 
 ## Directed validation checkpoint
 
-- Application Media/Resolved Audio tests: 55/55 PASS after additions.
+- Application Media/Resolved Audio directed tests: 58/58 PASS after additions.
 - Archive schema tests: 3/3 PASS.
-- Desktop archive/reopen/fault tests: 19/19 PASS.
-- Existing full regression and remote CI: pending final consolidated run.
+- Desktop archive/reopen/fault tests: 21/21 PASS.
+- Consolidated local regression: 433/433 Node/TypeScript and 77/77 Python
+  tests PASS; frontend and Desktop Host builds PASS; npm audit reports zero
+  vulnerabilities. Rust/Tauri was not run locally because the Rust toolchain is
+  unavailable; normal remote CI remains the required Tauri evidence.
+- Remote CI: pending on the final pushed feature head.
 
 ## Bounded resource characterization
 

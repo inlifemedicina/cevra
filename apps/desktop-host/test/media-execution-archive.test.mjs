@@ -14,6 +14,7 @@ import {
 import { __openDesktopProjectForTest } from "../dist/persistence.js";
 import { MediaApplicationService, ResolvedAudioPlanApplicationService } from "@cevra/application";
 import { NodeMediaArtifactStore } from "@cevra/media-ffmpeg";
+import { createEmptyProject, ProjectHistory } from "@cevra/project-ir";
 
 const now = "2026-09-23T12:00:00.000Z";
 
@@ -333,6 +334,28 @@ test("application commit followed by checkpoint failure never marks composite in
   const restored = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
   assert.equal(restored.history.current.exports.some(({ id }) => id === "not-durable"), false);
   await restored.persistence.close();
+});
+
+test("Desktop checkpoint finalization uses the request ID captured before asynchronous execution", async () => {
+  const marked = [];
+  const resolvedAudioPlan = {
+    async execute(request) {
+      request.id = "caller-mutated-after-start";
+      return { plan: request.plan, audioExecution: {}, muxExecution: {}, project: {}, audioCleanup: { removed: [], failed: [] } };
+    },
+    async markCheckpointSucceeded(id) { marked.push(id); }
+  };
+  const session = new DesktopSession({
+    history: new ProjectHistory(createEmptyProject({ id: "captured-id-project", name: "Captured", locale: "pt-BR", now })),
+    resolvedAudioPlan,
+    mediaCapability: { available: false, reason: "runtime-not-configured" },
+    transcriptionCapability: { available: false, reason: "runtime-not-configured" }
+  });
+  const request = { id: "captured-intent", plan: {}, visual: {}, outputUri: "/tmp/captured.mp4",
+    exportId: "captured-export", presetId: "fixture" };
+  await session.executeResolvedAudioPlan(request);
+  assert.deepEqual(marked, ["captured-intent"]);
+  assert.equal(request.id, "captured-intent");
 });
 
 test("production startup restores ProjectHistory before archive reconciliation and performs no automatic replay", async (t) => {

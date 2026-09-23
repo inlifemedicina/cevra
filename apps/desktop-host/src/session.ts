@@ -116,10 +116,12 @@ export class DesktopSession {
     signal?: AbortSignal
   ): Promise<ExecuteResolvedAudioPlanOutcome> {
     if (!this.services.resolvedAudioPlan) throw safeError("MEDIA_UNAVAILABLE");
+    const stableRequest = structuredClone(request);
+    const intentId = stableRequest.id;
     return this.runMutation(async () => {
-      const outcome = await this.services.resolvedAudioPlan!.execute(request, signal);
+      const outcome = await this.services.resolvedAudioPlan!.execute(stableRequest, signal);
       await this.persistMutation();
-      await this.services.resolvedAudioPlan!.markCheckpointSucceeded(request.id);
+      await this.services.resolvedAudioPlan!.markCheckpointSucceeded(intentId);
       return outcome;
     });
   }

@@ -913,7 +913,10 @@ test("atomic execution create permits at most one engine call for a duplicate id
   assert.equal((await repository.get("atomic-duplicate")).status, "succeeded");
 });
 
-test("restart reconciliation marks pending work interrupted without retry or engine execution and is idempotent", async () => {
+test("restart reconciliation interrupts noncanonical work without retry, cleans proven derived output, and is idempotent", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.files.add(audioSequence.outputUri);
+  const runningOperation = { ...audioSequence, outputUri: "/media/staging/running.wav" };
   const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [
     {
       id: "restart-requested", projectId: "project-1", locale: "pt-BR",
@@ -922,21 +925,35 @@ test("restart reconciliation marks pending work interrupted without retry or eng
     },
     {
       id: "restart-running", projectId: "project-1", locale: "pt-BR",
-      operation: audioSequence, mutation: { type: "none" }, actor: { type: "system" },
+      operation: runningOperation, mutation: { type: "none" }, actor: { type: "system" },
       status: "running", createdAt: now, attempts: [{
         number: 1, jobId: "restart-running:1", status: "running", requestedAt: now, startedAt: now,
-        outputUris: [audioSequence.outputUri], preexistingOutputUris: [], ownedOutputUris: [],
+        outputUris: [runningOperation.outputUri], preexistingOutputUris: [], ownedOutputUris: [],
         removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0
+      }]
+    },
+    {
+      id: "restart-committing-derived", projectId: "project-1", locale: "pt-BR",
+      operation: audioSequence, mutation: { type: "none" }, actor: { type: "system" },
+      status: "committing", createdAt: now, attempts: [{
+        number: 1, jobId: "restart-committing-derived:1", status: "committing", requestedAt: now, startedAt: now,
+        outputUris: [audioSequence.outputUri], preexistingOutputUris: [], ownedOutputUris: [audioSequence.outputUri],
+        ownedOutputPublications: [{ uri: audioSequence.outputUri, evidence: publication }],
+        removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0,
+        result: completedAudioSequence()
       }]
     }
   ] });
   const engine = new FakeEngine(async () => assert.fail("restart reconciliation must not execute the engine"));
-  const { service } = fixture(engine, new MemoryArtifacts(), repository);
+  const { service } = fixture(engine, artifacts, repository);
   const first = await service.reconcilePendingWithoutReplay();
   const second = await service.reconcilePendingWithoutReplay();
-  assert.deepEqual(first.map(({ status }) => status), ["interrupted", "interrupted"]);
+  assert.deepEqual(first.map(({ status }) => status), ["interrupted", "interrupted", "interrupted"]);
   assert.deepEqual(second, []);
   assert.equal(engine.calls.length, 0);
+  assert.equal(artifacts.files.has(audioSequence.outputUri), false);
   assert.equal((await repository.get("restart-requested")).attempts.length, 0);
   assert.equal((await repository.get("restart-running")).attempts.length, 1);
+  assert.deepEqual((await repository.get("restart-committing-derived")).attempts[0].removedPartialOutputUris,
+    [audioSequence.outputUri]);
 });
