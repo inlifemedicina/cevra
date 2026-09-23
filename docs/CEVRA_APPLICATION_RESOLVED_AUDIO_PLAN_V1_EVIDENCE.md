@@ -1,6 +1,6 @@
 # Application Resolved Audio Plan V1 — Evidence
 
-**Status:** implementation in development; independent review pending
+**Status:** IMPLEMENTED / CLOSED — bounded Application vertical
 
 **Base:** `54a49a624f7d9b28145af2692bec4485af08545c`
 
@@ -133,4 +133,24 @@ used as proof of the micro-remediation.
   authority moved into the worker.
 
 `runtime.filters: []` remains NOTE/DEFER because no impact was reproduced.
-Independent micro-review remains required before any PR may open.
+
+## Merge and canonical closeout evidence
+
+Final Pre-PR Adversarial Review concluded **APPROVE FOR PR WITH NON-BLOCKING
+NOTES**; no BLOCKER, HIGH or MEDIUM finding was reproduced. Feature PR #42
+merged reviewed head `b12304af046f36c86a4ee43aa06f19584cb1d550` by normal
+merge commit `ff744592e7cf14b40018e3781440fb74b343f7a0` on 2026-09-23.
+
+Feature-branch evidence remains distinct from main integration evidence:
+
+- PR-event CI run `35915963018` passed 5/5 on the feature head;
+- PR-event exact-runtime run `35915963002` passed on the feature head;
+- post-merge main CI run `35918380631` passed 5/5 on merge SHA `ff744592`;
+- post-merge exact managed macOS arm64 runtime run `35918380640` passed on the
+  same merge SHA.
+
+The bounded Application Resolved Audio Plan V1 vertical is **IMPLEMENTED /
+CLOSED**. Durable Media Execution Recovery V1, Composition attestation, the
+complete Desktop-visible workflow and target normalization/mastering remain
+outside this closure. The coordinated Media Runtime gate remains active and
+product progress remains 48%.

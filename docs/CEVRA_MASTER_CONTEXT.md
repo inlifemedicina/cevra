@@ -1449,6 +1449,7 @@ runtime run `35805137702` passed on macOS arm64.
 | ProjectHistory Scalability V2 | #30 | `b6f201afa73aae0aa85f8a3d4187a568ab749e72` | IMPLEMENTED / CLOSED |
 | Audio Sequence Runtime V1 | #36 | `a18f19a06b33669c149c58f57bc74f385c0a02f2` | IMPLEMENTED / CLOSED |
 | Audio Measurement V1 | #38 | `282d29ec2252f5f488050b3b4efba4ec2cfcfe76` | IMPLEMENTED / CLOSED |
+| Application Resolved Audio Plan V1 | #42 | `ff744592e7cf14b40018e3781440fb74b343f7a0` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1557,10 +1558,12 @@ explicitly grounded in accepted user-visible capability/acceptance evidence,
 not inferred from engineering activity. Closing MR-A02 alone leaves it at 48%
 until the Product Owner evaluates the user-visible capability evidence.
 
-**Application Resolved Audio Planning and Final Mux (MR-A05/MR-A06, Slice 3) —
-IN DEVELOPMENT / independent review pending.** Branch
-`feat/application-resolved-audio-plan-v1` starts from canonical `main`
-`54a49a624f7d9b28145af2692bec4485af08545c`. [ADR 0027](adr/0027-application-resolved-audio-plan-v1.md)
+**Application Resolved Audio Plan V1 (bounded MR-A05/MR-A06 vertical) —
+IMPLEMENTED / CLOSED.** PR #42 merged reviewed feature head
+`b12304af046f36c86a4ee43aa06f19584cb1d550` by normal merge commit
+`ff744592e7cf14b40018e3781440fb74b343f7a0` on 2026-09-23. Post-merge main CI
+run `35918380631` passed 5/5 and exact managed macOS arm64 runtime run
+`35918380640` passed on that merge SHA. [ADR 0027](adr/0027-application-resolved-audio-plan-v1.md)
 defines a reconstructible Application plan compiled from canonical audio tracks,
 bound to project revision/snapshot/journal state and resolved through closed
 Audio Sequence V1. The bounded `normalization=NONE` vertical accepts a caller-
@@ -1597,8 +1600,11 @@ Pre-remediation runs `35818228308` and `35818228318` apply only to head
 now derives publication identity from owned staging before confirming the linked
 destination and snapshots getter-backed requests before validating them. Code
 head `ddee31c84caedc52e60d2db1d36c5e4575360792` passed normal CI run
-`35907517116` (5/5) and exact managed macOS arm64 runtime run `35907517082`;
-micro-review remains pending.
+`35907517116` (5/5) and exact managed macOS arm64 runtime run `35907517082`.
+Final Pre-PR Adversarial Review concluded **APPROVE FOR PR WITH NON-BLOCKING
+NOTES**, with no reproduced BLOCKER, HIGH or MEDIUM finding. This closes only
+the bounded vertical; Slice 3 in full and the coordinated Media Runtime gate
+remain active. Product progress remains **48%**.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
@@ -1720,7 +1726,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Present the coordinated Media Runtime plan with MR-A/MR-V/MR-Q needs reconciled against ProjectHistory, Windows export, HDR/VFR, J-cut, preview/render and disk lifecycle evidence.
+1. Implement Durable Media Execution Archive V1 as the next recommended slice within Slice 3, preserving the approved no-auto-replay and ownership-proof recovery boundary.
 2. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
 3. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
 4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
