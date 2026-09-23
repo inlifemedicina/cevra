@@ -1681,6 +1681,16 @@ Current dependency blockers/gates:
 
 ---
 
+## 2026-09-23 — Creator mobile/remote host experience
+
+- **CANONICAL:** Creator should be easy to operate from compatible mobile/remote agent surfaces; Claude Code mobile is the first concrete target experience, not an architectural dependency.
+- **CANONICAL:** preferred initial topology keeps media and heavy CEVRA Core execution on a trusted local/desktop node while the mobile host provides conversation/control through official mechanisms.
+- **CANONICAL:** mobile support does not imply cloud render or permanent cloud media storage. Fully cloud-executed Creator is optional future work behind explicit staging/privacy/cost/retention/permission decisions.
+- **CANONICAL:** the same provider-neutral Agent Protocol/Core must remain adaptable to future Codex/local/other mobile or remote hosts.
+- **ADR:** docs/adr/0026-creator-mobile-remote-host-experience.md.
+
+---
+
 # 26. Explicitly unresolved decisions
 
 Do not guess these in future chats:
