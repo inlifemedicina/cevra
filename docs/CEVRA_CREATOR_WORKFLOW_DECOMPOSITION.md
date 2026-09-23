@@ -1,21 +1,24 @@
-# CEVRA Creator — EDVID end-to-end decomposition
+# CEVRA Creator — End-to-end workflow decomposition
 
-**Status:** AUDIT EVIDENCE / PRODUCT INPUT — not a new implementation approval by itself  
-**Audit date:** 2026-09-23  
-**EDVID baseline:** `fillrochaa/edvid@d8e6389db02e8de0b46ee680105c09d4250d4703`  
-**License at baseline:** MIT  
-**Tracked EDVID files covered by the existing canonical parity audit:** 83 / 83  
-**Related CEVRA authority:** `docs/EDVID_PARITY.md`, `docs/CEVRA_MASTER_CONTEXT.md`, `docs/CEVRA_INTEGRATION_DECISIONS.md`, ADRs 0022–0026.
+**Status:** WORKFLOW MAPPING / PRODUCT INPUT — not a new implementation approval by itself  
+**Mapping date:** 2026-09-23  
+**Reference baseline revision:** `d8e6389db02e8de0b46ee680105c09d4250d4703`  
+**Source identity and provenance:** the pinned public reference and its canonical parity audit are identified in `docs/CEVRA_MASTER_CONTEXT.md`, sections 9–10.  
+**License recorded at that baseline:** MIT; this is provenance, not permission to copy source into Creator.  
+**Files covered by the prior canonical parity audit:** 83 / 83, as recorded there.  
+**Related CEVRA authority:** `docs/CEVRA_MASTER_CONTEXT.md`, `docs/CEVRA_INTEGRATION_DECISIONS.md`, ADRs 0022–0026.
 
-## 1. Purpose
+## 1. Purpose and evidence scope
 
-This document re-reads the already-audited EDVID baseline specifically through the lens of the **CEVRA Creator Skill product**.
+This document maps the previously audited reference workflow to the **CEVRA Creator Skill product**. It reuses the prior canonical audit and targeted source reinspection; it is not a new independent execution audit of all 83 files.
 
-It does not replace `docs/EDVID_PARITY.md`. The parity audit is the capability/implementation map. This document answers a different question:
+It does not replace the canonical parity audit. That audit is the capability/implementation map. This document answers a different question:
 
-> What exactly makes EDVID simple and effective as an agent-native editing product, which parts should CEVRA Creator preserve, where should each behavior live in CEVRA, and which EDVID mechanisms must not become CEVRA architecture?
+> Which observed agent-native editing behaviors should CEVRA Creator preserve, where should each behavior live in CEVRA, and which reference mechanisms must not become CEVRA architecture?
 
-The required classification vocabulary used here is:
+The user journey is mapped end to end. Exhaustive row-by-row Creator mapping of every prior capability, fresh execution of every helper, rendered visual/mobile acceptance, and independent implementation/parity closure are not established by this document. They remain validation work, not completed capabilities.
+
+The classification vocabulary used here is:
 
 - **HOST** — open-ended reasoning/conversation in Claude Code, Codex or another compatible host.
 - **CREATOR SKILL** — host orchestration/playbook/progressive disclosure.
@@ -23,22 +26,22 @@ The required classification vocabulary used here is:
 - **CORE** — typed application/domain/runtime invariant or deterministic capability.
 - **VISUAL WORKSPACE** — direct human editing/preview surface over the same canonical project.
 - **PROVIDER/ADAPTER** — optional external integration.
-- **DO NOT PORT AS ARCHITECTURE** — useful behavior may be preserved, but the EDVID mechanism is rejected.
+- **DO NOT PORT AS ARCHITECTURE** — useful behavior may be preserved, but the reference mechanism is rejected.
 
-Current CEVRA state labels in this document are intentionally coarse and refer to the current canonical project state as of this audit:
+Current CEVRA state labels in this document are intentionally coarse and refer to the recorded canonical project state at the mapping date:
 
 - **FOUNDATION EXISTS**
 - **PARTIAL / NEXT SLICES**
 - **NOT IMPLEMENTED**
 - **DECISION PENDING**
 
-They are not substitutes for executable acceptance evidence.
+They are not substitutes for executable acceptance evidence. Numeric values quoted below describe reference behavior, not newly approved universal CEVRA defaults.
 
 ---
 
 # 2. Executive finding
 
-The EDVID experience is strong because it combines five properties:
+The reference experience combines five useful properties:
 
 1. **one-command / low-friction entry**;
 2. **a capable host model with a detailed editing playbook**;
@@ -46,20 +49,20 @@ The EDVID experience is strong because it combines five properties:
 4. **a real visual preview/timeline and style chooser, not chat alone**;
 5. **an iterative loop: ask → propose → approve → execute → preview → refine → persist**.
 
-CEVRA should preserve all five.
+CEVRA should preserve these properties through its own implementation.
 
-The EDVID implementation is weaker than the target CEVRA architecture in four areas:
+The reference implementation differs from the target CEVRA architecture in four material areas:
 
 1. durable state is spread across multiple loose files;
 2. execution depends on host-level scripts, PATH tools and mutable runtime assumptions;
 3. agent/provider behavior is entangled with execution mechanics;
 4. UI saves edits into intermediate files that the agent later consumes rather than committing through one canonical command/history system.
 
-Therefore the correct CEVRA strategy remains:
+The CEVRA strategy remains:
 
 ```text
-PRESERVE EDVID EXPERIENCE
-→ DECOMPOSE EDVID INTELLIGENCE
+PRESERVE USEFUL USER EXPERIENCE
+→ DECOMPOSE OBSERVED BEHAVIOR
 → MAP TO CEVRA LAYERS
 → REUSE SHARED CORE
 → VERIFY EQUAL OR BETTER USER EXPERIENCE
@@ -67,42 +70,42 @@ PRESERVE EDVID EXPERIENCE
 
 ---
 
-# 3. End-to-end EDVID journey → CEVRA Creator mapping
+# 3. End-to-end journey → CEVRA Creator mapping
 
 ## 3.1 Installation and discovery
 
-| EDVID behavior | Why it works | CEVRA Creator target | Current CEVRA state | Token/cost implication |
+| Reference behavior | Why it works | CEVRA Creator target | Current CEVRA state | Token/cost implication |
 |---|---|---|---|---|
-| One-command installer | Low setup friction | Creator installer + owner-scoped Skill management | PARTIAL / policy exists | None after install |
-| Detects Claude Code/Codex/Gemini skill directories | User does not choose host manually | Provider-neutral host detection/adapters | Policy exists; implementation later | None |
-| Installs skill payload plus dependencies | Skill is self-contained enough to work | Standalone Creator distribution with shared CEVRA Core | ADR 0022 approved; implementation later | None |
+| One-command installer | Low setup friction | Creator installer + owner-scoped Skill management | PARTIAL / policy exists | Installation itself does not require model reasoning |
+| Detects Claude Code/Codex/Gemini skill directories | User does not choose host manually | Provider-neutral host detection/adapters | Policy exists; implementation later | Deterministic detection |
+| Installs skill payload plus dependencies | Skill is self-contained enough to work | Standalone Creator distribution with shared CEVRA Core | ADR 0022 approved; implementation later | Local packaging, not context transfer |
 | Installs Remotion skill dependency | Domain knowledge is modular | Progressive playbook/skill discovery | Architecture approved | Metadata only until used |
-| First run verifies FFmpeg/Node/Python environment | Fail early rather than during edit | CEVRA managed runtime capability/healthcheck | FOUNDATIONS EXIST | No model need except compact error |
-| Re-running installer updates EDVID | Simple update mental model | Signed/versioned CEVRA update path | Decision/policy exists; implementation later | None |
+| First run verifies FFmpeg/Node/Python environment | Fail early rather than during edit | CEVRA managed runtime capability/healthcheck | FOUNDATIONS EXIST | Compact error or capability result |
+| Re-running installer updates the reference skill | Simple update mental model | Signed/versioned CEVRA update path | Decision/policy exists; implementation later | Deterministic update path |
 
-**Do not port as architecture:** EDVID floating download/update assumptions, global PATH FFmpeg/Node dependence, unpinned external runtime behavior.
+**Do not port as architecture:** floating download/update assumptions, global PATH FFmpeg/Node dependence, unpinned external runtime behavior.
 
 ---
 
 ## 3.2 Starting a project
 
-| EDVID behavior | CEVRA Creator destination | CEVRA treatment |
+| Reference behavior | CEVRA Creator destination | CEVRA treatment |
 |---|---|---|
-| Put media in a folder and open agent there | CREATOR SKILL + CORE | Preserve exactly as a first-class path |
+| Put media in a folder and open agent there | CREATOR SKILL + CORE | Preserve as a first-class path |
 | User says “edit this into a Reel” | HOST + SKILL | Preserve |
-| EDVID creates `edit/` automatically | CORE project lifecycle | Preserve the no-wizard experience, replace loose state with canonical CEVRA project |
+| Creates `edit/` automatically | CORE project lifecycle | Preserve the no-wizard experience, replace loose state with canonical CEVRA project |
 | Originals remain untouched | CORE invariant | Already canonical |
 | URL ingest available through helper | PROVIDER/ADAPTER | Optional, typed, permissioned |
 | Project can resume from `project.md` | CORE + compact project summary | Improve: resume from Project IR/history, not prose memory |
-| Single-file/direct attachment workflow is not the central EDVID path | HOST + CREATOR lifecycle | CEVRA should support both folder and direct-media start |
+| Single-file/direct attachment workflow is not the central reference path | HOST + CREATOR lifecycle | Support both folder and direct-media start when host transport permits |
 
-**Creator requirement already approved:** no mandatory wizard; automatic local project; provider conversation is not the project; one-shot fast path remains token-efficient.
+**Creator requirement already approved:** no mandatory wizard; automatic local project; provider conversation is not the project; one-shot fast path remains token-efficient. Availability of a directly supplied file must be verified in the execution environment, not inferred from its appearance in a host conversation.
 
 ---
 
 ## 3.3 Context/evidence acquisition
 
-| EDVID behavior | Destination | Preserve / improve |
+| Reference behavior | Destination | Preserve / improve |
 |---|---|---|
 | Probe every source | CORE | Preserve as deterministic evidence |
 | Transcribe locally | CORE | Preserve; CEVRA already has local transcription foundation |
@@ -113,50 +116,50 @@ PRESERVE EDVID EXPERIENCE
 | Long sources may use sub-agent so full transcript avoids main context | SKILL/HOST | Preserve principle; implementation host-specific |
 | Machine checks first, subjective inspection only when needed | CORE QA + SKILL | Preserve |
 
-**Token finding:** EDVID's “spend tokens where taste lives” is a core Creator product principle. CEVRA should go further with revision/delta projections, bounded evidence IDs and progressive tool disclosure.
+**Token finding:** prioritize reasoning and creative judgment over transporting machine data. CEVRA should use revision/delta projections, bounded evidence IDs and progressive tool disclosure. Savings are targets to measure, not benchmark results from this mapping.
 
 ---
 
 ## 3.4 Understanding user intent
 
-| EDVID behavior | Destination | CEVRA treatment |
+| Reference behavior | Destination | CEVRA treatment |
 |---|---|---|
 | No fixed questionnaire | HOST | Preserve |
 | Questions depend on the material | HOST + SKILL | Preserve |
 | Determine content type, target length/aspect, pacing, must-keep/must-cut | HOST + CREATIVE INTELLIGENCE | Preserve |
-| “Generalize; never assume the kind of video” | SKILL | Preserve |
+| Determine the kind of video from material and intent rather than assuming it | SKILL | Preserve |
 | Artistic freedom is default | HOST + CREATIVE INTELLIGENCE | Preserve, bounded by user intent and invariants |
 | Longform and shortform use different editorial intent | CREATIVE INTELLIGENCE playbooks | Preserve |
 
-**Creator improvement:** allow host reasoning to adapt to niche, user, audience and stated goals; current external trend/platform evidence may inform proposals only through explicit provider/capability boundaries and never becomes canonical state.
+**Creator improvement:** allow host reasoning to adapt to niche, user, audience and stated goals; current external trend/platform evidence may inform proposals only through explicit provider/capability boundaries and never becomes canonical audiovisual state.
 
 ---
 
 ## 3.5 Strategy gate
 
-| EDVID behavior | Destination | CEVRA treatment |
+| Reference behavior | Destination | CEVRA treatment |
 |---|---|---|
-| Propose 4–8 sentence cut strategy | HOST + SKILL | Preserve behavior |
-| Wait for confirmation before mutating | SKILL + configurable CEVRA policy | Preserve as default, allow future configurable autonomy |
+| Propose 4–8 sentence cut strategy | HOST + SKILL | Preserve the reviewable strategy concept; length is reference behavior |
+| Wait for confirmation before mutating | SKILL + configurable CEVRA policy | Preserve as default under approved autonomy policy |
 | Cut/grade direction and estimated length are explained | HOST | Preserve |
 | Phase 2 style is chosen after clean cut approval | VISUAL WORKSPACE + SKILL | Preserve concept; exact phase model may later be generalized |
 
-**Do not overfit:** EDVID's strict two-phase architecture is useful evidence, not necessarily the only future Creator workflow shape. The approval boundary is more important than the file/phase implementation.
+**Do not overfit:** the reference's strict two-phase architecture is useful evidence, not necessarily the only future Creator workflow shape. The approval boundary is more important than the file/phase implementation.
 
 ---
 
 ## 3.6 Phase 1 editorial intelligence — clean cut
 
-| EDVID behavior | Destination | CEVRA treatment / state |
+| Reference behavior | Destination | CEVRA treatment / state |
 |---|---|---|
 | Best take per beat, ordered by narrative beat not clip order | HOST + CREATIVE INTELLIGENCE | NOT IMPLEMENTED editorial layer yet |
 | Archetypes: launch/tutorial/interview/essay/vlog | CREATIVE PLAYBOOKS | Preserve as useful initial playbooks, not universal hard rules |
 | Detect false starts/restarts/mis-speaks | CORE evidence + HOST reasoning | PARTIAL foundations |
-| Speech boundaries more trustworthy for cut edges than raw transcript timings | CORE | Preserve |
-| Never cut inside a word | CORE invariant + SKILL guidance | Must enforce |
+| Acoustic speech boundaries supplement potentially inaccurate transcript timings | CORE | Preserve combined evidence rather than trusting text alone |
+| Never cut inside a word automatically | CORE invariant + SKILL guidance | Enforce approved word-boundary policy; explicit manual exceptions remain QA-visible |
 | Prefer silence boundaries | CORE policy + Director | Preserve |
 | 30–200 ms padding, trailing slightly longer | CORE/Editing Director | Preserve/improve through measured policy |
-| J-cut by default | CORE/Editing Director + Media Runtime | Audio Sequence foundation exists; full editable J-cut path remains later |
+| J-cut by default in the reference | CORE/Editing Director + Media Runtime | Audio Sequence foundation exists; full editable J-cut path remains later |
 | Preserve punchlines/reactions/emphasis | HOST + Director | Preserve |
 | Longform keeps breathing room | Creative Playbook | Preserve |
 | Shortform compresses more aggressively | Creative Playbook | Preserve |
@@ -165,9 +168,9 @@ PRESERVE EDVID EXPERIENCE
 
 ## 3.7 Audio intelligence
 
-| EDVID behavior | Destination | CEVRA treatment / state |
+| Reference behavior | Destination | CEVRA treatment / state |
 |---|---|---|
-| Voice level analysis catches quiet phrases that transcript misses | CORE evidence + Director | Audio Measurement foundation now exists |
+| Voice level analysis catches quiet phrases that transcript misses | CORE evidence + Director | Audio Measurement foundation now exists; phrase-level policy is additional work |
 | Per-range gain, not blind global compression | CORE/Director | Preserve |
 | Voice mastering optional | CORE Audio policy/runtime | PARTIAL / future slice |
 | Junction fades | CORE Audio policy/runtime | Preserve |
@@ -180,7 +183,7 @@ PRESERVE EDVID EXPERIENCE
 
 ## 3.8 Color / image treatment
 
-| EDVID behavior | Destination | CEVRA treatment |
+| Reference behavior | Destination | CEVRA treatment |
 |---|---|---|
 | Detect profile instead of asking user measurable question | CORE evidence | Preserve |
 | Ask only if confidence is low | SKILL/HOST | Preserve |
@@ -188,13 +191,13 @@ PRESERVE EDVID EXPERIENCE
 | Grade per segment | CORE typed color capability | Later capability |
 | Skin is visual guardrail | Creative Playbook + QA | Preserve as policy/evidence, not hard-coded universal metric |
 | Ensure downstream color interpretation matches approved preview | CORE render/QA | Preserve |
-| EDVID's specific 8-bit implementation workaround | Engine-specific evidence | Do not freeze into product semantics; benchmark current engine path |
+| Specific 8-bit implementation workaround in the reference | Engine-specific evidence | Do not freeze into product semantics; benchmark current engine path |
 
 ---
 
 ## 3.9 Visual preview and direct manipulation
 
-EDVID is **not chat-only**.
+The observed reference workflow is **not chat-only**.
 
 Observed interface behaviors include:
 
@@ -212,7 +215,7 @@ Observed interface behaviors include:
 - drag of insert/hook chips;
 - portrait and landscape adaptive layouts.
 
-| EDVID mechanism | CEVRA Creator target |
+| Reference mechanism | CEVRA Creator target |
 |---|---|
 | UI writes `preview_edits.json`; agent later applies | Improve: direct typed CEVRA commands → ProjectHistory → Project IR |
 | UI never directly edits `edl.json` | Preserve separation between presentation and canonical validation |
@@ -226,7 +229,7 @@ Observed interface behaviors include:
 
 ## 3.10 Style gate / visible creative choices
 
-EDVID shortform style catalog proves that the user should **see** a choice rather than choose style names blindly in chat.
+The reference shortform style catalog demonstrates visible alternatives rather than asking the user to choose style names blindly in chat.
 
 Observed options:
 
@@ -265,13 +268,13 @@ Observed options:
 - CORE owns typed parameters, capability checks and persistence.
 - HOST may recommend choices, but should not force users to choose unseen labels when a visual decision is materially easier to judge visually.
 
-This is a high-value EDVID behavior to preserve.
+These entries describe observed behavior. They do not authorize copying artwork, branding, proprietary contents or visual identity.
 
 ---
 
 ## 3.11 Phase 2 shortform composition
 
-| EDVID behavior | Destination | CEVRA treatment |
+| Reference behavior | Destination | CEVRA treatment |
 |---|---|---|
 | Data-driven composition | CORE/Composition adapter | Preserve |
 | Static visual hook/headline | Creative Playbook + Composition | Preserve |
@@ -291,7 +294,7 @@ This is a high-value EDVID behavior to preserve.
 
 ## 3.12 Longform behavior
 
-EDVID does not simply stretch shortform.
+The reference longform workflow does not simply stretch shortform.
 
 Observed longform differences:
 
@@ -309,20 +312,20 @@ Observed longform differences:
 - last ~20 seconds visually calmer for end cards;
 - screen-record/tutorial behavior uses crop-zoom/callouts.
 
-**Creator mapping:** these are Creative Playbook behaviors, not a second engine/product. Shortform/longform should route to the same Core with different editorial policies and composition presets.
+**Creator mapping:** these are Creative Playbook behaviors, not a second engine/product. Shortform/longform should route to the same Core with different editorial policies and composition presets. Platform-specific recommendations are dated reference guidance, not universal or currently verified rules.
 
 ---
 
 ## 3.13 Asset sourcing and generation
 
-| EDVID behavior | Destination | CEVRA treatment |
+| Reference behavior | Destination | CEVRA treatment |
 |---|---|---|
 | Pexels image helper | PROVIDER | Optional, current terms revalidate |
 | Wikimedia fallback | PROVIDER | Optional |
 | Google image search for brands/people/logos | PROVIDER | Do not assume as safe/default; terms/rights/relevance must be revalidated |
 | Local project assets first | CORE/Asset Planner | Strongly preserve |
 | AI music via Treblo | PROVIDER | Optional |
-| Ask for keys lazily only when feature is selected | Product/permission policy | Preserve |
+| Ask for keys lazily only when feature is selected | Product/permission policy | Preserve optional timing, not ad-hoc credential handling |
 | No key required for Phase 1 | Product independence | Preserve principle |
 | Found/generated assets become edit inputs | Project IR source/provenance | CEVRA improves with canonical provenance |
 
@@ -330,10 +333,10 @@ Observed longform differences:
 
 ## 3.14 QA and convergence
 
-| EDVID behavior | Destination | CEVRA treatment |
+| Reference behavior | Destination | CEVRA treatment |
 |---|---|---|
 | Numeric verification before subjective review | QA Core | Preserve |
-| Flagged junctions only for visual inspection | QA + Evidence | Preserve |
+| Flagged junctions only for visual inspection | QA + Evidence | Preserve targeted escalation |
 | Up to 3 correction loops before surfacing remaining flags | QA/Director policy | Useful reference, not frozen magic number |
 | Duration/junction/silence/level/sync checks | QA Core | Preserve |
 | Contact-sheet batching | Evidence builder | Preserve |
@@ -345,12 +348,12 @@ CEVRA improvement: QA findings and correction attempts should link to project re
 
 ## 3.15 Refinement loop
 
-EDVID supports two refinement channels:
+The reference supports two refinement channels:
 
 1. **chat:** user asks for changes;
 2. **preview UI:** user trims, removes, drags or marks a correction range.
 
-EDVID then re-reads intermediate files, validates and re-renders.
+It then re-reads intermediate files, validates and re-renders.
 
 CEVRA target:
 
@@ -364,13 +367,13 @@ direct UI manipulation
 
 Both then produce one new revision. The host sees compact deltas, not a parallel state.
 
-This is a direct product improvement and should be preserved as a Creator Full acceptance criterion.
+This should be preserved as a Creator Full acceptance criterion.
 
 ---
 
 ## 3.16 Persistence / resume
 
-| EDVID behavior | CEVRA target |
+| Reference behavior | CEVRA target |
 |---|---|
 | `project.md` stores session memory | compact project/session summary derived from canonical state |
 | `edl.json` stores cut | Project IR |
@@ -386,7 +389,7 @@ This is a direct product improvement and should be preserved as a Creator Full a
 
 ## 3.17 Render/export
 
-EDVID delivers predictable local artifacts, most importantly `cut.mp4` and `final.mp4`.
+The reference delivers predictable local artifacts, most importantly `cut.mp4` and `final.mp4`.
 
 CEVRA should preserve:
 
@@ -421,10 +424,10 @@ The following is the working decomposition that future decisions should refine r
 | Choose shortform vs longform strategy | ✓ | ✓ | ✓ |  |  |
 | Recommend style | ✓ | ✓ | ✓ | capabilities | ✓ |
 | Approve strategy | user interaction | ✓ | policy | revision gate |  |
-| Never cut inside word | guidance | ✓ | policy | **enforce** | warn |
+| Word-boundary safety | guidance | ✓ | policy | **enforce** | warn |
 | Cut padding |  | ✓ | ✓ | enforce/compile |  |
 | J-cut policy |  | ✓ | ✓ | execute/validate | visualize |
-| Transcript packing |  | ✓ |  | **project** |  |
+| Transcript packing |  | ✓ |  | **projection** |  |
 | Evidence escalation | ✓ | ✓ |  | bounded interface | preview |
 | Color/profile detection |  | ✓ |  | **execute** | show candidates |
 | Take leveling | reasoning | ✓ | ✓ | measure/apply | visualize |
@@ -440,20 +443,20 @@ The following is the working decomposition that future decisions should refine r
 
 ---
 
-# 5. Token/cost audit findings
+# 5. Token/cost findings
 
-EDVID already contains several unusually good context-economy decisions:
+Useful context-economy patterns in the reference include:
 
 1. phrase-level transcript packing instead of raw JSON;
 2. no machine JSON in model context;
 3. numeric QA before visual inspection;
-4. visual inspection only at flagged junctions;
+4. visual inspection targeted to flagged junctions;
 5. batched contact sheets instead of many image reads;
 6. longform delegation to avoid placing massive transcripts in the main context;
 7. reusing cached transcripts;
 8. not re-rendering clean-cut Phase 1 for Phase-2-only changes.
 
-CEVRA should preserve all eight and add:
+CEVRA should preserve these principles and add:
 
 - capability metadata only at startup;
 - specialized tool schemas only when activated;
@@ -463,15 +466,15 @@ CEVRA should preserve all eight and add:
 - no full Project IR in ordinary agent context;
 - media/frame/audio evidence only by explicit escalation.
 
-**Audit conclusion:** token efficiency is not an EDVID compromise; it is part of what makes its agent UX viable. CEVRA should treat it as a measurable acceptance dimension.
+**Conclusion:** token efficiency is part of agent UX viability and must be a measurable acceptance dimension. No numeric overhead or savings benchmark is claimed here.
 
 ---
 
 # 6. Mobile/remote implications
 
-EDVID assumes a local terminal/browser-style environment.
+The reference assumes a local terminal/browser-style environment.
 
-CEVRA Creator should preserve the same product loop from mobile/remote hosts by separating control from execution:
+CEVRA Creator should preserve the product loop from mobile/remote hosts by separating control from execution:
 
 ```text
 mobile host conversation/control
@@ -480,13 +483,13 @@ mobile host conversation/control
 → preview/status/result
 ```
 
-This makes the EDVID-like conversational loop portable without requiring the phone to run Whisper, FFmpeg or composition engines.
+This is a target architecture, not evidence that a particular phone/host can transfer arbitrary media or access a local preview. Host transport, media access, authenticated preview access, permissions and result delivery must be validated independently. The phone is not required to run Whisper, FFmpeg or composition engines.
 
 Fully cloud-executed editing remains a separate later decision.
 
 ---
 
-# 7. Important EDVID mechanisms CEVRA should NOT copy literally
+# 7. Reference mechanisms CEVRA should not copy literally
 
 1. `edl.json`, `state.json`, `preview_edits.json`, `preview_style.json`, `edit-data.json` and `project.md` acting together as quasi-state.
 2. global/PATH FFmpeg as release runtime.
@@ -505,7 +508,7 @@ These are implementation conveniences or limitations, not user-experience requir
 
 ---
 
-# 8. EDVID behaviors that should become explicit Creator acceptance criteria
+# 8. Candidate Creator acceptance criteria
 
 The Creator should eventually prove, with real media, that a normal user can:
 
@@ -530,9 +533,11 @@ The Creator should eventually prove, with real media, that a normal user can:
 19. do the common one-shot path without large token overhead;
 20. use the control/refinement loop from mobile/remote host surfaces when supported.
 
+These are candidates to reconcile with the existing Product Owner acceptance catalog, not a duplicate acceptance authority or a claim of passed tests.
+
 ---
 
-# 9. Current CEVRA readiness against this journey
+# 9. Recorded CEVRA readiness against this journey
 
 ## Foundations already present or closed
 
@@ -555,7 +560,7 @@ The Creator should eventually prove, with real media, that a normal user can:
 - coordinated Media Runtime gate remains active;
 - audio mastering/J-cut complete editable workflow remains incomplete.
 
-## Still required for EDVID-like Creator flow
+## Still required for the intended Creator flow
 
 - compact editorial evidence projection;
 - editorial analysis;
@@ -576,9 +581,11 @@ The Creator should eventually prove, with real media, that a normal user can:
 - permission/security UX;
 - mobile/remote-host acceptance tests.
 
+These are recorded status summaries, not fresh execution verification. Revalidate the active main and unmerged decisions before implementation.
+
 ---
 
-# 10. Decisions this audit says should come next
+# 10. Pending decisions
 
 This section is a **decision queue**, not an approval.
 
@@ -593,18 +600,18 @@ This section is a **decision queue**, not an approval.
 9. **Provider-neutral mobile/remote acceptance contract details.**
 10. **Implementation-readiness gate and first Creator slice.**
 
-The composition engine, specific provider choices and pricing remain separate decisions and should not be pulled forward merely to complete this audit.
+Composition-engine selection, specific providers and pricing remain separate decisions and should not be pulled forward merely to complete this mapping.
 
 ---
 
-# 11. Final audit conclusion
+# 11. Conclusion
 
-The Creator should **feel more like EDVID than like a traditional editor with a chatbot**, while internally behaving very differently.
+The Creator should feel like a direct conversational creation workflow with useful visual controls, rather than a traditional editor with a chatbot appended.
 
-The correct target is:
+The target is:
 
 ```text
-EDVID-level directness
+simple conversational workflow
 + host-level creative reasoning
 + visible direct editing
 + CEVRA shared Core
@@ -615,4 +622,12 @@ EDVID-level directness
 + mobile/remote control path
 ```
 
-No discovered EDVID user-experience behavior requires abandoning the approved CEVRA architecture. The main risk is the opposite: over-engineering the agent surface until the EDVID simplicity is lost. Future Creator decisions should therefore treat **simplicity, token efficiency and direct visual control** as acceptance criteria alongside correctness and reuse.
+No conflict requiring reversal of the approved architecture was identified in this workflow mapping. That is not proof that all implementation paths are complete or feasible without additional work. Future decisions must treat **simplicity, token efficiency and direct visual control** as acceptance criteria alongside correctness and reuse.
+
+## Naming and continuity — 2026-09-23
+
+Product-owned Creator filenames, feature names, package names and visible identity use CEVRA naming, not competitor branding. Historical source identities, source citations and license/provenance records remain in the existing research/legal authorities; naming cleanup does not authorize removing required attribution or rewriting historical evidence.
+
+This neutrally named document is the current Creator workflow mapping. Earlier ledger references to its former filename are historical; use this path for current navigation. The renaming preserves the mapped journey and layer assignments while clarifying the limits of the review evidence.
+
+The Product Owner paused this discussion after Decisions 1–4 and the mobile-use requirement. **Decision 5 remains pending and must not be advanced or approved without the next Product Owner turn.** No Creator implementation or merge is authorized by this checkpoint.
