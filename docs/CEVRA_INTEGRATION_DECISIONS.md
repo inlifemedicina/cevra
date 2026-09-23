@@ -151,6 +151,16 @@ Creator deve funcionar bem a partir de superfícies mobile/remote compatíveis, 
 
 Execução totalmente cloud fica opcional e futura, condicionada a staging, privacidade, custo, retenção, permissões e distribuição do Core. Mobile não implica cloud render nem storage permanente. Ver ADR 0026.
 
+### Creator Lite/Full boundary — approved 2026-09-23
+
+Lite e Full compartilham o mesmo núcleo editorial/criativo/QA, Project IR/ProjectHistory, Agent Protocol e arquitetura de execução.
+
+**Lite** é conversational-first e deve conseguir completar o fluxo inteiro até preview, refinamento e export final local. Não é demo nem meia edição. Pode ter preview/review leve, mas não promete o workspace visual completo.
+
+**Full** contém todo o Lite e adiciona workspace visual diretamente editável com timeline, inspector, controles de captions/text/layout/assets/audio, More Controls e Advanced sobre o mesmo projeto.
+
+Engines/capabilities não são artificialmente separados entre Lite e Full por esta decisão. Hardware, packs, providers, entitlement e pricing ficam separados. `Lite`/`Full` são nomes internos provisórios; direção de naming preferida para avaliação futura: **CEVRA Creator** e **CEVRA Creator Studio**. Ver ADR 0027.
+
 ## Creation Modes V1
 
 Faceless Explainer e Slideshow são direção V1; Music-to-video é condicional a análise proporcional de ritmo/beat/onset/energy. Todos são workflows sobre as mesmas fundações, não novos produtos/timelines/runtimes. Faceless pode usar roteiro e TTS provider-neutral; TTS genérico não autoriza voice clone. Brand Kit V1 cobre logo, fontes, cores e componentes/presets; Figma é importador opcional. Product Launch Video e WebGPU/TypeGPU ficam pós-V1.
