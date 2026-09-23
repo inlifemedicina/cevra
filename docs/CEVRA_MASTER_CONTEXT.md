@@ -1591,8 +1591,12 @@ publication cleanup requires POSIX dev/inode identity evidence; and managed
 FFprobe proves selected input/output stream durations instead of container
 duration. The caller visual remains an assertion, not independent pixel proof.
 Pre-remediation runs `35818228308` and `35818228318` apply only to head
-`038fdc19bde7fa518a3e5609da1a2bc79ebe797c`; remediated exact-runtime evidence
-is pending the new branch push.
+`038fdc19bde7fa518a3e5609da1a2bc79ebe797c`. Remediation head
+`37036a0f31d0f69547facee97f0aed6a0581918f` passed normal CI run `35889604895`
+(5/5) and exact managed runtime run `35889604818`. Final pre-PR micro-remediation
+now derives publication identity from owned staging before confirming the linked
+destination and snapshots getter-backed requests before validating them; new
+run/SHA evidence remains pending its branch update and micro-review.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 

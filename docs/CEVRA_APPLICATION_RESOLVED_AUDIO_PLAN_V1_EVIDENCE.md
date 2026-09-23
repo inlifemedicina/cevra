@@ -49,11 +49,11 @@ path. No Homebrew/PATH result is release evidence.
 | Foreign output race | unknown mux destination survives engine failure/cancel ambiguity | local PASS |
 | Known-owned invalid output | removed without touching sources/caller visual | local PASS |
 | Mux staging | non-symlink inputs, owner staging, exclusive link, cleanup | local PASS |
-| Corrected J-cut oracle | corrected mapping passes; executed old mapping fails by about 500 ms | local development-runtime PASS; exact runtime pending |
-| Video stream-copy | packet payload hashes and packet timing/order identical | local development-runtime PASS; exact runtime pending |
-| Per-stream duration | managed FFprobe checks selected input/output video and audio streams; short visual/PCM fail closed; AAC bound applies only after encode | local development-runtime PASS; exact runtime pending after remediation |
-| Final decode/duration | one video + one audio stream, valid decode, bounded duration | local development-runtime PASS; exact runtime pending after remediation |
-| Resource envelope | ≤2 sampled worker-tree processes; <768 MiB sampled RSS; zero owned staging leftovers | local development-runtime PASS; exact runtime pending |
+| Corrected J-cut oracle | corrected mapping passes; executed old mapping fails by about 500 ms | local development-runtime PASS; exact runtime PASS at `37036a0`; micro-remediation rerun pending |
+| Video stream-copy | packet payload hashes and packet timing/order identical | local development-runtime PASS; exact runtime PASS at `37036a0`; micro-remediation rerun pending |
+| Per-stream duration | managed FFprobe checks selected input/output video and audio streams; short visual/PCM fail closed; AAC bound applies only after encode | local development-runtime PASS; exact runtime PASS at `37036a0`; micro-remediation rerun pending |
+| Final decode/duration | one video + one audio stream, valid decode, bounded duration | local development-runtime PASS; exact runtime PASS at `37036a0`; micro-remediation rerun pending |
+| Resource envelope | ≤2 sampled worker-tree processes; <768 MiB sampled RSS; zero owned staging leftovers | local development-runtime PASS; exact runtime PASS at `37036a0`; micro-remediation rerun pending |
 
 The same catalog passed locally on macOS arm64 through the real Application,
 adapter and persistent worker using a development-only Homebrew FFmpeg 9.0.2;
@@ -104,8 +104,16 @@ insensitive structural comparison; POSIX publication identity evidence through
 worker, adapter and attempt cleanup; managed selected-stream FFprobe duration
 checks before and after mux; and recovery-class post-commit errors. The exact
 managed macOS arm64 catalog now also requires short visual and short PCM
-rejection and records all four stream-duration measurements. New normal and
-exact-runtime CI evidence remains pending until this branch is pushed.
+rejection and records all four stream-duration measurements. At remediation head
+`37036a0f31d0f69547facee97f0aed6a0581918f`, normal CI run `35889604895`
+passed 5/5 and exact managed runtime run `35889604818` passed.
+
+The final pre-PR micro-remediation derives POSIX publication identity from the
+owned staging inode, confirms the linked destination before ownership is
+claimed, and snapshots getter-backed Application requests before validating the
+captured value. Its new normal and exact-runtime run/SHA evidence remains pending
+until the scoped branch update is pushed; the `37036a0` runs are retained as
+historical evidence and are not proof of the new code.
 
 ## Self-review
 
@@ -124,6 +132,6 @@ exact-runtime CI evidence remains pending until this branch is pushed.
   authority moved into the worker.
 
 `runtime.filters: []` remains NOTE/DEFER because no impact was reproduced.
-Exact runtime and remote CI run/SHA evidence will be reported after the scoped
-branch is pushed. Independent focused re-review remains required before any PR
-may open.
+Exact runtime and remote CI run/SHA evidence for the micro-remediation will be
+reported after the scoped branch is pushed. Independent micro-review remains
+required before any PR may open.

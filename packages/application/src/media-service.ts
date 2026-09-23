@@ -73,13 +73,15 @@ export class MediaApplicationService {
 
   async execute(request: MediaExecutionRequest, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
     const defaultLocale = this.history.current.project.defaultLocale;
+    let candidate: MediaExecutionRequest | undefined;
     let stableRequest: Required<Pick<MediaExecutionRequest, "id" | "locale" | "operation" | "mutation" | "actor">>
       & Pick<MediaExecutionRequest, "projectBinding" | "expectedOutput">;
     try {
-      stableRequest = snapshotExecutionRequest(request, defaultLocale, this.idGenerator);
+      candidate = clone(request);
+      stableRequest = snapshotExecutionRequest(candidate, defaultLocale, this.idGenerator);
     } catch (cause) {
-      const locale = request?.locale === "en-US" ? "en-US" : defaultLocale;
-      const executionId = typeof request?.id === "string" ? request.id : "invalid-media-execution";
+      const locale = candidate?.locale === "en-US" ? "en-US" : defaultLocale;
+      const executionId = typeof candidate?.id === "string" ? candidate.id : "invalid-media-execution";
       throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId, {}, cause);
     }
     const executionId = stableRequest.id;

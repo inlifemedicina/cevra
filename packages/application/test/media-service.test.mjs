@@ -812,6 +812,32 @@ test("execute snapshots every validated request field before its first await", a
   assert.equal(outcome.record.locale, "en-US");
 });
 
+test("execute clones getter-backed output expectations before validating the captured value", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async (operation) => {
+    artifacts.files.add(operation.outputUri);
+    return completedFile(operation.outputUri);
+  });
+  const { service, history } = fixture(engine, artifacts);
+  const current = history.current;
+  let toleranceReads = 0;
+  const expectedOutput = {
+    durationMs: 1000,
+    get durationToleranceMs() {
+      toleranceReads += 1;
+      return toleranceReads === 1 ? 0 : 999;
+    }
+  };
+  const outcome = await service.execute({
+    id: "getter-snapshot", operation: trim, mutation: sourceMutation,
+    projectBinding: { projectId: current.project.id, projectRevision: 0,
+      projectSnapshotId: current.history.headSnapshotId, projectJournalEntryCount: 0 },
+    expectedOutput
+  });
+  assert.equal(toleranceReads, 1);
+  assert.equal(outcome.record.expectedOutput.durationToleranceMs, 0);
+});
+
 test("closed execution schemas reject extra nested fields and invalid locales before engine execution", async () => {
   const engine = new FakeEngine(async () => assert.fail("closed-schema request must not execute"));
   const { service, history } = fixture(engine);

@@ -92,9 +92,11 @@ Only the ProjectHistory command promotes the validated final output. A stale pla
 or late result cannot commit an export; undo/redo requires a newly compiled plan.
 
 `render-audio-sequence` and `mux-audio` publish through owner-scoped staging and
-exclusive hard links. On POSIX the worker records the published file's `st_dev`
-and `st_ino`; worker rollback and Application cleanup re-check that identity with
-`lstat` and never follow a replacement symlink. Missing, legacy or platform-
+exclusive hard links. On POSIX the worker records the owned staging file's
+`st_dev` and `st_ino`, creates the exclusive destination link, then confirms that
+the destination still has that identity before claiming publication ownership;
+worker rollback and Application cleanup re-check the identity with `lstat` and
+never follow a replacement symlink. Missing, legacy or platform-
 unsupported identity evidence fails safe: ambiguous content is preserved and
 cleanup uncertainty remains observable. Known attempt-owned PCM and invalid
 final outputs are eligible for bounded cleanup; sources, caller visual media,

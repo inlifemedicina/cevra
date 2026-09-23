@@ -377,6 +377,24 @@ test("resolved execution snapshots plan, visual, output, export, preset, locale 
   assert.deepEqual(fixture.history.entries.at(-1).actor, { type: "agent", id: "original" });
 });
 
+test("resolved execution validates and uses one getter-backed request snapshot", async () => {
+  const fixture = services();
+  const plan = fixture.service.compile({ id: "getter-plan", audioOutputUri: "/render/getter.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  let outputReads = 0;
+  const request = {
+    id: "getter-execution", plan, visual: visual(plan), exportId: "getter-export",
+    presetId: "fixture",
+    get outputUri() {
+      outputReads += 1;
+      return outputReads === 1 ? "/render/getter.mp4" : "/render/changed-by-getter.mp4";
+    }
+  };
+  const outcome = await fixture.service.execute(request);
+  assert.equal(outputReads, 1);
+  assert.deepEqual(fixture.engine.calls.map(({ operation }) => operation.outputUri), ["/render/getter.wav", "/render/getter.mp4"]);
+  assert.equal(outcome.project.exports[0].outputUri, "/render/getter.mp4");
+});
+
 test("closed resolved-plan schemas reject every requested boundary extra and malformed locale/normalization", async () => {
   const fixture = services();
   const plan = fixture.service.compile({ id: "closed", audioOutputUri: "/render/closed.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });

@@ -115,11 +115,11 @@ export class ResolvedAudioPlanApplicationService {
 
   async execute(request: ExecuteResolvedAudioPlanRequest, signal?: AbortSignal): Promise<ExecuteResolvedAudioPlanOutcome> {
     const defaultLocale = this.history.current.project.defaultLocale;
-    let stableRequest: ExecuteResolvedAudioPlanRequest;
+    let stableRequest: ExecuteResolvedAudioPlanRequest | undefined;
     let plan: ResolvedAudioPlanV1;
     try {
-      validateExecutionRequest(request);
       stableRequest = clone(request);
+      validateExecutionRequest(stableRequest);
       plan = validatePlanAgainstProject(this.history, stableRequest.plan);
       validateVisualReference(stableRequest.visual, plan);
       validateMediaOperation({
@@ -134,8 +134,8 @@ export class ResolvedAudioPlanApplicationService {
         throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Visual, PCM and final output paths must be distinct.");
       }
     } catch (cause) {
-      const locale = request?.locale === "en-US" ? "en-US" : defaultLocale;
-      throw mapApplicationError(cause, locale, typeof request?.id === "string" ? request.id : "invalid-audio-plan-execution");
+      const locale = stableRequest?.locale === "en-US" ? "en-US" : defaultLocale;
+      throw mapApplicationError(cause, locale, typeof stableRequest?.id === "string" ? stableRequest.id : "invalid-audio-plan-execution");
     }
 
     const locale = stableRequest.locale ?? defaultLocale;
