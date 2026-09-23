@@ -1647,6 +1647,17 @@ Current dependency blockers/gates:
 
 ---
 
+## 2026-09-22 — Creator Skill hybrid intelligence layering
+
+- **CANONICAL:** Creator uses three coordinated intelligence layers: Host AI for conversation/open-ended creative reasoning; Creator Skill for orchestration/playbook/progressive disclosure; CEVRA Creative Intelligence/Core for reusable editorial knowledge, invariants, validation, typed execution and QA.
+- **CANONICAL:** Claude Code may personalize reasoning to the user's stated audience, niche, format and goals and may consume authorized current external evidence, but neither Claude nor external research becomes canonical audiovisual state.
+- **CANONICAL:** the Creator Skill remains intellectually meaningful and EDVID-like in workflow directness; it is not reduced to a thin command catalog. Reusable invariants and semantics nevertheless remain shared and enforceable outside the host.
+- **CANONICAL:** critical rules may be duplicated intentionally as Skill guidance plus Core enforcement.
+- **CANONICAL:** perform a detailed clean-room inventory of useful observable EDVID intelligence and explicitly classify each behavior into HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE-RUNTIME before Creator implementation closure.
+- **ADR:** docs/adr/0023-creator-skill-intelligence-layering.md.
+
+---
+
 # 26. Explicitly unresolved decisions
 
 Do not guess these in future chats:
