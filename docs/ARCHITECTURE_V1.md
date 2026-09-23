@@ -201,6 +201,16 @@ The user-facing Creator experience should preserve EDVID-level directness: natur
 
 See [ADR 0022](adr/0022-creator-skill-runtime-topology.md).
 
+### 9.2 Creator Tool Interface and visual workspace
+
+Creator exposes a provider-neutral two-layer agent tool surface: a small semantic default catalog and progressively disclosed specialized typed editing capabilities. Both compile through the same Agent Protocol/application/ProjectHistory/Project IR path. Raw shell, FFmpeg/filtergraph internals and unrestricted engine access remain excluded.
+
+Token/context efficiency is a first-class constraint. Prefer bounded projections, compact editorial transcripts, revision/delta state, cached deterministic analysis and drill-down evidence over repeatedly loading raw machine data or a complete tool catalog.
+
+This agent surface is independent from the human visual workspace. Creator Full retains preview, a directly editable timeline, caption/headline/style/layout/asset/audio controls and contextual progressive controls over the same canonical project/history. AI and direct user edits remain interoperable rather than requiring chat for every adjustment.
+
+See [ADR 0024](adr/0024-creator-tool-interface-and-token-efficiency.md).
+
 ## 10. Content Intelligence
 
 Content Intelligence is an optional, provider-neutral domain within Orbit. It preserves research, source records, signals, questions, trends, ideas, briefs, scripts, future analytics feedback, future publishing providers and future content memory. It may serve CEVRA Vids and other Orbit products through application services and stable references.
