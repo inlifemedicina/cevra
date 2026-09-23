@@ -2,7 +2,7 @@
 
 Base: `8aea564b7cdfd7d235fa72964f07eeed961c1bbc`.
 Branch: `feat/typed-audio-measurement-v1`.
-Status: IN DEVELOPMENT / final review complete, PR pending.
+Status: IMPLEMENTED / CLOSED.
 Contract/method authority: [ADR 0021](adr/0021-audio-measurement-v1.md).
 
 ## Independent adversarial findings and remediation
@@ -173,6 +173,29 @@ Normal CI and exact-runtime CI are separate gates. The existing exact workflow
 builds FFmpeg once and runs both catalogs. Relevant feature pushes, PRs and
 main changes remain covered; docs-only changes do not rebuild FFmpeg.
 
+## Final merge and post-merge checkpoint
+
+PR #38 merged independently reviewed feature head
+`6ca81b3709c703884e4ff4104b52ae5bb9487c2d` by normal merge commit
+`282d29ec2252f5f488050b3b4efba4ec2cfcfe76`, which is the canonical `main` for
+this closeout. Post-merge normal CI run
+[35805137771](https://github.com/inlifemedicina/cevra/actions/runs/35805137771)
+passed all five required jobs: Monorepo, Tauri desktop shell, Media Runtime
+reproducibility, Transcription and Alignment. Post-merge exact managed runtime
+run [35805137702](https://github.com/inlifemedicina/cevra/actions/runs/35805137702)
+passed on native macOS arm64 with the signature/hash-verified FFmpeg 9.0.1 and
+private CPython 3.12.14. The same build passed the preserved Audio Sequence
+catalog, measurement characterization and final Audio Measurement catalog.
+
+This evidence closes MR-A02 at its typed read-only measurement scope. It does
+not close MR-Q01, mastering, complete D11 workflows, the coordinated Media
+Runtime gate, certified meter conformity or native Windows validation. Semantic
+ADTS/TS priming, Matroska/WebM seek granularity/sample-exact identity,
+tiny-interval error classification, periodic WAV/M2TS autodetection,
+stdout/stderr separation, residual ultra-low short-term windows, timeout/cancel
+refinements, relative-gate quantization, native Windows process-tree validation
+and complete EBU/ITU certification remain **DEFERRED / non-blocking**.
+
 ## Independent-remediation validation checkpoint
 
 Remediation code SHA: `45a89c76e3f78bcaf79bbdb06e60d2edbe0fa29f`.
@@ -270,8 +293,6 @@ Exact-run resource observations (sampled every 20 ms, not OS peak guarantees):
 Remaining limitations are explicit in ADR 0021: common mono/stereo rates only,
 unresolved semantic ADTS/TS priming despite proven decoded coverage,
 conservative tiny-drain rejection, no complete EBU/ITU certification, and no
-native Windows process-tree validation. No independent remediation review has
-yet approved this implementation.
-
-No claim of independent approval, complete D11-T1/D11-T3 workflow, certified
-meter conformity, Windows runtime validation, merge or CLOSED status is made.
+native Windows process-tree validation. Independent review approved the final
+feature head before PR #38 merged; the broader workflows and certifications
+listed above remain outside this closed slice.

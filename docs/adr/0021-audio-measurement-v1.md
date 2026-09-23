@@ -1,6 +1,6 @@
 # ADR 0021 — Audio Measurement V1
 
-**Status:** Accepted for implementation — IN DEVELOPMENT / final review complete, PR pending
+**Status:** Accepted by this implementation — IMPLEMENTED / CLOSED
 **Date:** 2026-09-22
 
 ## Authority and scope
@@ -225,6 +225,17 @@ original-preservation and resource evidence, not blanket workflow PASS.
   These require specific new evidence or scope, not guessed values or hidden
   transforms. Closed ADR 0020 LOW/NOTE hardening is not reopened opportunistically.
 
+## Implementation and closeout status
+
+Independent review completed before integration. PR #38 merged the reviewed
+feature head `6ca81b3709c703884e4ff4104b52ae5bb9487c2d` by normal merge commit
+`282d29ec2252f5f488050b3b4efba4ec2cfcfe76`; that commit is the canonical
+`main` for this closeout. Post-merge normal CI run `35805137771` passed all five
+required jobs, and post-merge exact managed macOS arm64 run `35805137702`
+passed the signature/hash-verified FFmpeg 9.0.1 build, preserved Audio Sequence
+catalog, measurement characterization and Audio Measurement acceptance catalog.
+
 The coordinated Media Runtime gate remains active. No MR-A04, Cut Compiler,
 Composition, HDR/H.264, UI/Tauri, Project IR/History/Store or Transcript Cache
-implementation is included. Independent review precedes PR; no merge is claimed.
+implementation is included. The deferred limitations above remain non-blocking
+and are not closed by this implementation.
