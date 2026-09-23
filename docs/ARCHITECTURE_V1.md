@@ -187,6 +187,20 @@ CEVRA Vids may detect supported local agent installations and, only after explic
 
 Skill management uses an owner-scoped manifest with version, hashes, minimum and maximum compatibility, rollback metadata and provenance. It never modifies non-CEVRA skills, follows destructive symlinks, blindly overwrites a Git checkout, removes user configuration or secrets, or requires administrator privileges when user-scoped installation is possible. An embedded agent may use an internal skill or control surface without global installation.
 
+### 9.1 Creator Skill standalone runtime
+
+The Creator Skill is an agent-native product surface, distinct from the Bridge Skill. Creator Full must be able to produce and export a final local video without requiring CEVRA Vids Desktop to be installed, open or running.
+
+Creator is distributed with access to a compatible standalone form of the **same reusable CEVRA Core** consumed by Vids. Reusable application/domain/runtime capabilities needed by Creator must therefore remain callable without React/Tauri presentation state. Desktop and Creator do not own separate audiovisual semantics, Project IR variants, FFmpeg runtimes or editorial engines.
+
+The final local process/IPC packaging is intentionally deferred. “Headless” here is a separation-of-concerns requirement, not a commitment to a daemon or service architecture.
+
+Claude Code is the first priority external Creator host, but the Creator contract and Core are provider-neutral. Codex, local/self-hosted and future compatible hosts target the same Agent Protocol and typed CEVRA capabilities.
+
+The user-facing Creator experience should preserve EDVID-level directness: natural-language request, strategy/approval when applicable, execution, preview, conversational refinement and final local result. CEVRA's internal Project IR, engines, schemas and runtime topology are not exposed unless an advanced diagnostic/developer surface explicitly requires them.
+
+See [ADR 0022](adr/0022-creator-skill-runtime-topology.md).
+
 ## 10. Content Intelligence
 
 Content Intelligence is an optional, provider-neutral domain within Orbit. It preserves research, source records, signals, questions, trends, ideas, briefs, scripts, future analytics feedback, future publishing providers and future content memory. It may serve CEVRA Vids and other Orbit products through application services and stable references.
