@@ -189,7 +189,7 @@ Skill management uses an owner-scoped manifest with version, hashes, minimum and
 
 ### 9.1 Creator Skill standalone runtime
 
-The Creator Skill is an agent-native product surface, distinct from the Bridge Skill. Creator Full must be able to produce and export a final local video without requiring CEVRA Vids Desktop to be installed, open or running.
+The Creator Skill is an agent-native product surface, distinct from the Bridge Skill. CEVRA Studio must be able to produce and export a final local video without requiring CEVRA Vids Desktop to be installed, open or running.
 
 Creator is distributed with access to a compatible standalone form of the **same reusable CEVRA Core** consumed by Vids. Reusable application/domain/runtime capabilities needed by Creator must therefore remain callable without React/Tauri presentation state. Desktop and Creator do not own separate audiovisual semantics, Project IR variants, FFmpeg runtimes or editorial engines.
 
@@ -207,7 +207,7 @@ Creator exposes a provider-neutral two-layer agent tool surface: a small semanti
 
 Token/context efficiency is a first-class constraint. Prefer bounded projections, compact editorial transcripts, revision/delta state, cached deterministic analysis and drill-down evidence over repeatedly loading raw machine data or a complete tool catalog.
 
-This agent surface is independent from the human visual workspace. Creator Full retains preview, a directly editable timeline, caption/headline/style/layout/asset/audio controls and contextual progressive controls over the same canonical project/history. AI and direct user edits remain interoperable rather than requiring chat for every adjustment.
+This agent surface is independent from the human visual workspace. CEVRA Studio retains preview, a directly editable timeline, caption/headline/style/layout/asset/audio controls and contextual progressive controls over the same canonical project/history. AI and direct user edits remain interoperable rather than requiring chat for every adjustment.
 
 See [ADR 0024](adr/0024-creator-tool-interface-and-token-efficiency.md).
 
@@ -239,7 +239,7 @@ CEVRA Creator / CEVRA Studio do not represent separate editorial brains or audio
 
 The approved surface names are **CEVRA Creator** for the conversational-first product and **CEVRA Studio** for the visual-workspace product.
 
-See [ADR 0027](adr/0027-creator-lite-full-product-boundary.md).
+See [ADR 0027](adr/0027-creator-studio-product-boundary.md).
 
 ## 10. Content Intelligence
 
@@ -293,7 +293,7 @@ Creator uses three coordinated intelligence layers:
 
 - **Host AI:** conversation, contextual interpretation, open-ended creative reasoning and proposal generation over bounded CEVRA evidence.
 - **Creator Skill:** orchestration/playbook and progressive-disclosure layer that defines how the host requests evidence and capabilities, proposes strategy, executes, previews, refines and exports.
-- **CEVRA Creative Intelligence/Core:** reusable editorial knowledge, invariants, typed validation, Project IR/history, QA and execution semantics shared by Creator Lite, Creator Full and Vids.
+- **CEVRA Creative Intelligence/Core:** reusable editorial knowledge, invariants, typed validation, Project IR/history, QA and execution semantics shared by CEVRA Creator, CEVRA Studio and Vids.
 
 The host may personalize creative reasoning to the user's stated audience, niche, format and goals, and may consume current external evidence when an authorized provider/capability exists. External recommendations remain non-canonical evidence. Provider-specific or transient social-platform guidance must not become generic Core truth.
 
