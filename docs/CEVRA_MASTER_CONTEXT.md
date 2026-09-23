@@ -1572,11 +1572,27 @@ workflow remain outside this slice.
 
 The Desktop Host still wires an in-memory Media execution repository. Full
 process-crash recovery of the composite sequence → mux → promotion intent is
-therefore not claimed and requires a Product Owner-approved durable integration
-with the existing recovery boundary; no second project model or automatic
-mutation replay is introduced. Runtime identity advances to 0.3.1 with protocol
+therefore not claimed. **Durable Media Execution Recovery V1 is a canonical,
+Product Owner-approved direction with implementation pending:** a small,
+versioned operational archive lives under the trusted Desktop project root,
+separate from Project IR and the canonical Project Store package, stores no
+media, and reconciles without automatic render/edit/mux replay. Cleanup requires
+ownership proof; ambiguous artifacts and proven persisted canonical exports are
+preserved. ADR 0027 records the boundary and future integration with
+DesktopProjectPersistence. Runtime identity advances to 0.3.1 with protocol
 and third-party pins unchanged. Audio Sequence/Measurement, Alignment and
 `extract-audio` semantics remain preserved. Product progress remains **48%**.
+
+The adversarial remediation on the same feature branch closes the confirmed
+pre-review gaps: final state is rechecked after the `committing` archive save
+with no suspension before ProjectHistory commit; requests and schemas are
+snapshotted/closed; `musicDuckDb` fails closed; plan comparison is structural;
+publication cleanup requires POSIX dev/inode identity evidence; and managed
+FFprobe proves selected input/output stream durations instead of container
+duration. The caller visual remains an assertion, not independent pixel proof.
+Pre-remediation runs `35818228308` and `35818228318` apply only to head
+`038fdc19bde7fa518a3e5609da1a2bc79ebe797c`; remediated exact-runtime evidence
+is pending the new branch push.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 

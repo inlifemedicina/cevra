@@ -14,7 +14,7 @@ The implementation covers MR-A05/MR-A06's bounded Application-level vertical:
 pure planning from current Project IR, existing Audio Sequence execution,
 revision-bound caller visual reference, exclusive final mux, validation,
 `export.add` promotion and owned PCM cleanup. It does not claim a Desktop-visible
-workflow, Composition, mastering or durable crash recovery.
+workflow, Composition, mastering or Durable Media Execution Archive V1.
 
 Local deterministic suites:
 
@@ -45,14 +45,15 @@ path. No Homebrew/PATH result is release evidence.
 | Gain/timing | speed 1; equal exact ranges; volume conversion + master gain once; no clamp | local PASS |
 | Normalization | NONE executes; explicit target rejects | local PASS |
 | Revision binding | late edit and commit→undo reject old plan | local PASS |
-| Vertical promotion | sequence → mux → `export.add`; PCM cleaned after durable export | local PASS |
+| Vertical promotion | sequence → mux → `export.add`; PCM cleaned after canonical ProjectHistory commit | local PASS |
 | Foreign output race | unknown mux destination survives engine failure/cancel ambiguity | local PASS |
 | Known-owned invalid output | removed without touching sources/caller visual | local PASS |
 | Mux staging | non-symlink inputs, owner staging, exclusive link, cleanup | local PASS |
-| Corrected J-cut oracle | corrected mapping passes; executed old mapping fails by about 500 ms | exact runtime pending |
-| Video stream-copy | packet payload hashes and packet timing/order identical | exact runtime pending |
-| Final decode/duration | one video + one audio stream, valid decode, bounded duration | exact runtime pending |
-| Resource envelope | ≤2 sampled worker-tree processes; <768 MiB sampled RSS; zero owned staging leftovers | exact runtime pending |
+| Corrected J-cut oracle | corrected mapping passes; executed old mapping fails by about 500 ms | local development-runtime PASS; exact runtime pending |
+| Video stream-copy | packet payload hashes and packet timing/order identical | local development-runtime PASS; exact runtime pending |
+| Per-stream duration | managed FFprobe checks selected input/output video and audio streams; short visual/PCM fail closed; AAC bound applies only after encode | local development-runtime PASS; exact runtime pending after remediation |
+| Final decode/duration | one video + one audio stream, valid decode, bounded duration | local development-runtime PASS; exact runtime pending after remediation |
+| Resource envelope | ≤2 sampled worker-tree processes; <768 MiB sampled RSS; zero owned staging leftovers | local development-runtime PASS; exact runtime pending |
 
 The same catalog passed locally on macOS arm64 through the real Application,
 adapter and persistent worker using a development-only Homebrew FFmpeg 9.0.2;
@@ -60,8 +61,8 @@ this is characterization, **not release-runtime evidence**. Observed values were
 
 - corrected J-cut maximum error: 4.979 ms against a 25 ms codec-aware bound;
 - executed wrong-placement minimum error: 504.979 ms;
-- wall time for sequence + mux + promotion: 1,288.014 ms;
-- sampled process-tree peak: 2 processes and 71,632 KiB RSS;
+- wall time for sequence + mux + promotion: 1,473.288 ms;
+- sampled process-tree peak: 2 processes and 66,128 KiB RSS;
 - final output: 381,125 bytes; resolved plan JSON: 1,234 bytes;
 - owned staging artifacts after success: zero;
 - copied video packet payload hashes and timing/order: identical.
@@ -73,17 +74,38 @@ count and audio/video encode generations.
 
 ## Failure and recovery evidence
 
-Unit tests cover invalid ranges/source/speed/gain, no renderable audio, explicit
-normalization target, stale results, commit followed by undo, final-duration
-failure, cleanup failure after export, pre-existing/symlink destinations and
-foreign race winners. Worker tests inject publication races and verify that only
-owned staging/output is removed.
+Unit tests cover invalid ranges/source/speed/gain, explicit ducking and
+normalization rejection, closed runtime schemas, immutable request snapshots,
+structural plan comparison, stale results, mutation/undo/abort barriers during
+the pre-commit archive save, post-commit archive failure, and each input/output
+stream-duration failure. Worker and Application tests exercise publication
+races, post-link regular-file and symlink replacement, staging failure,
+historical records without identity evidence, and prove that only a matching
+published POSIX dev/inode is eligible for removal.
 
 Fault injection is simulated. It is not evidence of a real full disk or native
 process crash. The execution repository used by the Desktop Host is currently
 in-memory; full restart recovery of the composite multi-stage intent is therefore
-**BLOCKED pending the durable integration decision recorded in ADR 0027**. No
-automatic editorial mutation replay was added.
+**BLOCKED pending implementation of the approved Durable Media Execution
+Recovery V1 direction recorded in ADR 0027**. No automatic editorial mutation
+replay was added.
+
+## Adversarial remediation checkpoint
+
+The independently reviewed pre-remediation head
+`038fdc19bde7fa518a3e5609da1a2bc79ebe797c` passed normal CI run `35818228308`
+(5/5) and exact managed runtime run `35818228318`. Those runs prove only that old
+head, not this remediation.
+
+Confirmed findings were corrected by a suspension-free final binding/abort
+check-to-ProjectHistory-commit boundary after saving `committing`; pre-await
+request snapshots; closed schemas; explicit `musicDuckDb` rejection; order-
+insensitive structural comparison; POSIX publication identity evidence through
+worker, adapter and attempt cleanup; managed selected-stream FFprobe duration
+checks before and after mux; and recovery-class post-commit errors. The exact
+managed macOS arm64 catalog now also requires short visual and short PCM
+rejection and records all four stream-duration measurements. New normal and
+exact-runtime CI evidence remains pending until this branch is pushed.
 
 ## Self-review
 
@@ -95,10 +117,13 @@ automatic editorial mutation replay was added.
   hashes.
 - Project binding includes journal count, so undo cannot resurrect an obsolete
   attempt.
-- Ownership follows successful exclusive publication, never caller URI alone.
+- Ownership follows successful exclusive publication identity, never caller URI
+  alone; ambiguous or legacy evidence is preserved and reported.
 - The caller visual binding is a contract, not a claim that Composition exists.
 - Director impact is a compatible typed execution target only; no editorial
   authority moved into the worker.
 
-Exact runtime and remote CI run/SHA evidence will be recorded after the scoped
-branch is pushed. Independent review remains required before any PR may open.
+`runtime.filters: []` remains NOTE/DEFER because no impact was reproduced.
+Exact runtime and remote CI run/SHA evidence will be reported after the scoped
+branch is pushed. Independent focused re-review remains required before any PR
+may open.

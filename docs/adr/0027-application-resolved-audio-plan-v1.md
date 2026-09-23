@@ -36,7 +36,8 @@ The pure compiler:
 - converts positive linear `clip.volume` with `20 × log10(volume)` and adds
   `masterGainDb` exactly once;
 - rejects a result outside ADR 0020's existing gain bound instead of clamping;
-- invents no fade, ducking, overlap, repair or normalization decision;
+- rejects canonical `musicDuckDb` explicitly because this slice has no approved
+  ducking executor; it invents no fade, ducking, repair or normalization decision;
 - produces the existing `render-audio-sequence` V1 operation with explicit
   duration and mono/stereo output;
 - rejects projects with no renderable canonical audio instead of fabricating a
@@ -66,9 +67,13 @@ not claim Composition or preview/export parity delivered.
 The final operation reuses typed `mux-audio`, intentionally replaces the source
 audio, copies compatible H.264 video and encodes one AAC track under the existing
 delivery matrix. It does not use `-shortest`, silent padding, visual recoding or a
-weakened codec matrix. Application requires the final duration within 23 ms of
-the resolved duration; the bound covers one 1024-sample AAC frame at 48 kHz plus
-millisecond serialization, not editorial trimming.
+weakened codec matrix. Before mux, managed FFprobe proves the selected video
+stream duration and PCM duration derived from Audio Sequence's measured sample
+count. After mux, it proves video and audio stream durations independently.
+Application requires video/PCM evidence within 1 ms and permits the encoded AAC
+stream at most 23 ms from the resolved duration; the latter covers one 1024-
+sample AAC frame at 48 kHz plus millisecond serialization, not editorial
+trimming. Container duration is not substitute stream evidence.
 
 The exact-runtime catalog compares every copied video packet payload hash and
 packet timing/order, decodes the final audio, checks the corrected J-cut with an
@@ -77,40 +82,51 @@ control to fail that same oracle.
 
 ## Revision, promotion and ownership
 
-Application validates the binding before sequence execution, after sequence,
-before mux, after mux and immediately before the existing `export.add` commit.
+Application snapshots each validated request before its first suspension and
+validates closed runtime schemas at both Application boundaries. It validates
+the binding before sequence execution, after sequence, before mux, after mux and
+again after the `committing` attempt has been saved. From that final state read
+through the existing `export.add` ProjectHistory commit there is no asynchronous
+suspension.
 Only the ProjectHistory command promotes the validated final output. A stale plan
 or late result cannot commit an export; undo/redo requires a newly compiled plan.
 
 `render-audio-sequence` and `mux-audio` publish through owner-scoped staging and
-exclusive hard links. Application records output ownership only after a worker
-returns successful exclusive-publication evidence. Failure, cancellation or
-worker loss before that evidence preserves an unknown/race-winning destination.
-Known attempt-owned PCM and invalid final outputs are eligible for bounded
-cleanup; source media, caller visual media, pre-existing exports and history-
-retained URIs remain protected. Cleanup failure remains observable. After a
-durable export commit, PCM cleanup cannot delete the export.
+exclusive hard links. On POSIX the worker records the published file's `st_dev`
+and `st_ino`; worker rollback and Application cleanup re-check that identity with
+`lstat` and never follow a replacement symlink. Missing, legacy or platform-
+unsupported identity evidence fails safe: ambiguous content is preserved and
+cleanup uncertainty remains observable. Known attempt-owned PCM and invalid
+final outputs are eligible for bounded cleanup; sources, caller visual media,
+pre-existing exports and history-retained URIs remain protected. This narrows,
+but cannot eliminate, the residual POSIX `lstat`→`unlink` TOCTOU interval. After
+the canonical ProjectHistory export commit, later archive/cleanup failure is a
+recovery failure and cannot roll back or delete the canonical export.
 
 Runtime identity becomes `0.3.1`; protocol V1 and third-party pins are unchanged.
 Audio Sequence, Audio Measurement, `extract-audio` and Alignment PCM semantics
 are unchanged. PR #24 must later reconcile the Media Engine identity change,
 without sharing ProjectHistory storage or adding PCM to Transcript Cache.
 
-## Recovery boundary and pending decision
+## Durable Media Execution Recovery V1 — approved direction, implementation pending
 
-The existing `MediaExecutionRepository` abstraction can archive attempts, and
-bounded tests cover interruption/recovery logic. The Desktop Host currently wires
-`InMemoryMediaExecutionRepository`, however. Consequently, full process-crash
-recovery for a multi-stage sequence → mux → promotion intent is **not proven or
-claimed** by this slice.
+The Product Owner-approved canonical direction is a small, versioned operational
+Media Execution Archive V1 under the trusted Desktop project root, alongside but
+separate from Project Store/ProjectHistory. It is not part of Project IR, the
+canonical audiovisual package or another audiovisual source of truth; it stores
+no media and is expected to require neither a database nor a new dependency. It
+will record only execution/project revision/snapshot binding, stage, child
+execution ids, owned-artifact identity, export intent and status needed for
+reconciliation.
 
-**PENDING PRODUCT OWNER DECISION:** choose the bounded integration of execution-
-attempt archives with the existing trusted Project Store/recovery boundary (or
-another approved durable mechanism) before full Slice 3 crash recovery can be
-declared complete. This cannot be hidden in Project IR extensions or solved by
-automatic mutation replay, which would conflict with ADR 0016. The implemented
-compiler, live revision checks, worker ownership and normal/cancel/failure path
-remain independently reviewable.
+Recovery is `CRASH → REOPEN → RECONCILE → CLEAN/PRESERVE WITH PROOF → MARK
+INTERRUPTED/RECONCILED`. It never auto-replays render, edit or mux. Ambiguous
+ownership and a proven persisted canonical export are preserved; a final file
+without persisted promotion is not a canonical export. Integration with
+`DesktopProjectPersistence.checkpoint`, startup reconciliation and historical
+`MediaApplicationService.recoverPending()` semantics remains a future slice.
+This archive is **approved direction / implementation pending**; full process-
+crash recovery is not claimed here.
 
 ## Acceptance and status
 
