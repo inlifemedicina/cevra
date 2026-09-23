@@ -1557,6 +1557,27 @@ explicitly grounded in accepted user-visible capability/acceptance evidence,
 not inferred from engineering activity. Closing MR-A02 alone leaves it at 48%
 until the Product Owner evaluates the user-visible capability evidence.
 
+**Application Resolved Audio Planning and Final Mux (MR-A05/MR-A06, Slice 3) —
+IN DEVELOPMENT / independent review pending.** Branch
+`feat/application-resolved-audio-plan-v1` starts from canonical `main`
+`54a49a624f7d9b28145af2692bec4485af08545c`. [ADR 0027](adr/0027-application-resolved-audio-plan-v1.md)
+defines a reconstructible Application plan compiled from canonical audio tracks,
+bound to project revision/snapshot/journal state and resolved through closed
+Audio Sequence V1. The bounded `normalization=NONE` vertical accepts a caller-
+provided visual result with the same binding, performs an exclusive staged
+`mux-audio`, validates duration/packet-copy evidence, promotes only through
+`export.add` and cleans only known-owned PCM. Explicit LUFS targets reject rather
+than being ignored; Composition, UI, mastering and the full editable J-cut
+workflow remain outside this slice.
+
+The Desktop Host still wires an in-memory Media execution repository. Full
+process-crash recovery of the composite sequence → mux → promotion intent is
+therefore not claimed and requires a Product Owner-approved durable integration
+with the existing recovery boundary; no second project model or automatic
+mutation replay is introduced. Runtime identity advances to 0.3.1 with protocol
+and third-party pins unchanged. Audio Sequence/Measurement, Alignment and
+`extract-audio` semantics remain preserved. Product progress remains **48%**.
+
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
 GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.
