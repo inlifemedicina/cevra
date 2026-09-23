@@ -178,24 +178,31 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
   const opened = await DesktopProjectPersistence.open(persistenceRoot, {
     recoveredSession: environment.CEVRA_HOST_RECOVERY === "1"
   });
-  const history = opened.history;
-  const executions = await opened.persistence.openMediaExecutionRepository(history.current.project.id);
-  const media = await createMediaServices(history, environment, executions);
-  await media.application.reconcilePendingWithoutReplay();
-  await media.resolvedAudioPlan.reconcilePendingWithoutReplay();
-  const transcription = await createTranscriptionServices(history, environment, media.runtimeRoot);
-  return new DesktopSession({
-    history,
-    ...(media.ingest ? { ingest: media.ingest } : {}),
-    ...(transcription.service ? { transcription: transcription.service } : {}),
-    mediaCapability: media.capability,
-    transcriptionCapability: transcription.capability,
-    persistence: opened.persistence,
-    resolvedAudioPlan: media.resolvedAudioPlan,
-    close: async () => {
-      await media.close?.();
-    }
-  });
+  let media: Awaited<ReturnType<typeof createMediaServices>> | undefined;
+  try {
+    const history = opened.history;
+    const executions = await opened.persistence.openMediaExecutionRepository(history.current.project.id);
+    media = await createMediaServices(history, environment, executions);
+    await media.application.reconcilePendingWithoutReplay();
+    await media.resolvedAudioPlan.reconcilePendingWithoutReplay();
+    const transcription = await createTranscriptionServices(history, environment, media.runtimeRoot);
+    return new DesktopSession({
+      history,
+      ...(media.ingest ? { ingest: media.ingest } : {}),
+      ...(transcription.service ? { transcription: transcription.service } : {}),
+      mediaCapability: media.capability,
+      transcriptionCapability: transcription.capability,
+      persistence: opened.persistence,
+      resolvedAudioPlan: media.resolvedAudioPlan,
+      close: async () => {
+        await media?.close?.();
+      }
+    });
+  } catch (cause) {
+    await media?.close?.().catch(() => undefined);
+    await opened.persistence.close();
+    throw cause;
+  }
 }
 
 async function createMediaServices(

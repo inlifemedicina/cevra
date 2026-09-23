@@ -99,6 +99,7 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
 
   async get(id: string): Promise<MediaExecutionRecord | undefined> {
     await this.queue;
+    this.assertReadable();
     const record = this.state.records.find((item) => item.id === id);
     return record ? clone(record) : undefined;
   }
@@ -125,6 +126,7 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
 
   async listByStatus(projectId: string, statuses: readonly MediaExecutionStatus[]): Promise<MediaExecutionRecord[]> {
     await this.queue;
+    this.assertReadable();
     this.assertProject(projectId);
     const allowed = new Set(statuses);
     return this.state.records.filter((record) => allowed.has(record.status))
@@ -133,6 +135,7 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
 
   async getIntent(id: string): Promise<MediaExecutionIntentV1 | undefined> {
     await this.queue;
+    this.assertReadable();
     const intent = this.state.intents.find((item) => item.id === id);
     return intent ? clone(intent) : undefined;
   }
@@ -159,13 +162,18 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
 
   async listIntentsByStatus(projectId: string, statuses: readonly MediaExecutionIntentStatus[]): Promise<MediaExecutionIntentV1[]> {
     await this.queue;
+    this.assertReadable();
     this.assertProject(projectId);
     const allowed = new Set(statuses);
     return this.state.intents.filter((intent) => allowed.has(intent.status))
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt)).map(clone);
   }
 
-  snapshot(): PersistedMediaExecutionArchiveV1 { return clone(this.state); }
+  snapshot(): PersistedMediaExecutionArchiveV1 { this.assertReadable(); return clone(this.state); }
+
+  private assertReadable(): void {
+    if (this.writeBlocked) throw unavailable();
+  }
 
   private assertProject(projectId: string): void {
     if (projectId !== this.options.projectId) throw invalid();
@@ -243,7 +251,11 @@ async function readEnvelope(path: string): Promise<PersistedMediaExecutionArchiv
   }
   const expected = createHash("sha256").update(JSON.stringify(parsed.archive), "utf8").digest("hex");
   if (expected !== parsed.integrity.value) throw invalid();
-  return validatePersistedMediaExecutionArchive(parsed.archive);
+  try {
+    return validatePersistedMediaExecutionArchive(parsed.archive);
+  } catch {
+    throw invalid();
+  }
 }
 
 async function rejectUnsafeTempArtifacts(root: string): Promise<void> {
