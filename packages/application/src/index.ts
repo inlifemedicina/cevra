@@ -6,3 +6,4 @@ export * from "./transcription-service.js";
 export * from "./alignment-service.js";
 export * from "./resolved-audio-plan.js";
 export * from "./types.js";
+export * from "./execution-archive.js";
