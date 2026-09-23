@@ -211,6 +211,16 @@ This agent surface is independent from the human visual workspace. Creator Full 
 
 See [ADR 0024](adr/0024-creator-tool-interface-and-token-efficiency.md).
 
+### 9.3 Creator local project lifecycle
+
+Creator automatically creates or opens a local CEVRA project from a media folder or directly supplied media without a mandatory setup wizard. Provider conversation/session state is never canonical audiovisual state.
+
+Projects remain resumable across compatible hosts and Creator/Vids surfaces because Project IR/ProjectHistory and CEVRA-managed project storage own the state.
+
+Short one-shot edits use a token-efficient fast path: compact project summary, minimum evidence, revision/delta references and no whole-project Project IR transfer by default. This fast path reuses the same typed command/history/Core semantics rather than introducing a separate disposable editor.
+
+See [ADR 0025](adr/0025-creator-project-lifecycle-and-one-shot.md).
+
 ## 10. Content Intelligence
 
 Content Intelligence is an optional, provider-neutral domain within Orbit. It preserves research, source records, signals, questions, trends, ideas, briefs, scripts, future analytics feedback, future publishing providers and future content memory. It may serve CEVRA Vids and other Orbit products through application services and stable references.
