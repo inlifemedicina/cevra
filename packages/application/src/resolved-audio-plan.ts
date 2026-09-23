@@ -1,0 +1,388 @@
+import {
+  MAX_AUDIO_SEQUENCE_GAIN_DB,
+  MIN_AUDIO_SEQUENCE_GAIN_DB,
+  validateMediaOperation,
+  type AudioSequenceChannelLayout,
+  type RenderAudioSequenceOperationV1
+} from "@cevra/contracts";
+import type { JournalActor, ProjectHistory, ProjectIR, TimelineClip } from "@cevra/project-ir";
+import { MediaApplicationError } from "./errors.js";
+import type { MediaApplicationService } from "./media-service.js";
+import type { MediaExecutionOutcome, MediaProjectBinding } from "./types.js";
+
+export const RESOLVED_AUDIO_PLAN_VERSION = 1 as const;
+export const FINAL_MUX_DURATION_TOLERANCE_MS = 23 as const;
+
+export type AudioNormalizationDecision =
+  | { type: "none" }
+  | { type: "target-lufs"; targetLufs: number };
+
+export type ResolvedAudioPlanErrorCode =
+  | "AUDIO_PLAN_INVALID_REQUEST"
+  | "AUDIO_PLAN_PROJECT_CONFLICT"
+  | "AUDIO_PLAN_NO_RENDERABLE_AUDIO"
+  | "AUDIO_PLAN_UNSUPPORTED_TIMING"
+  | "AUDIO_PLAN_UNSUPPORTED_SOURCE"
+  | "AUDIO_PLAN_GAIN_UNSUPPORTED"
+  | "AUDIO_PLAN_NORMALIZATION_UNSUPPORTED"
+  | "AUDIO_PLAN_VISUAL_BINDING_INVALID";
+
+export class ResolvedAudioPlanError extends Error {
+  constructor(readonly code: ResolvedAudioPlanErrorCode, message: string, readonly cause?: unknown) {
+    super(message);
+    this.name = "ResolvedAudioPlanError";
+  }
+}
+
+export interface CompileResolvedAudioPlanRequest {
+  id: string;
+  audioOutputUri: string;
+  outputChannelLayout: AudioSequenceChannelLayout;
+  normalization: AudioNormalizationDecision;
+  projectJournalEntryCount: number;
+}
+
+export interface ResolvedAudioSourceBinding {
+  sourceId: string;
+  uri: string;
+  checksum?: string;
+}
+
+export interface ResolvedAudioPlanV1 {
+  version: typeof RESOLVED_AUDIO_PLAN_VERSION;
+  id: string;
+  projectBinding: MediaProjectBinding;
+  normalization: { type: "none" };
+  outputDurationMs: number;
+  outputChannelLayout: AudioSequenceChannelLayout;
+  sourceBindings: ResolvedAudioSourceBinding[];
+  audioClipIds: string[];
+  operation: RenderAudioSequenceOperationV1;
+}
+
+export interface ResolvedVisualReferenceV1 {
+  version: 1;
+  uri: string;
+  projectBinding: MediaProjectBinding;
+  durationMs: number;
+  producerExecutionId: string;
+}
+
+export interface ExecuteResolvedAudioPlanRequest {
+  id: string;
+  plan: ResolvedAudioPlanV1;
+  visual: ResolvedVisualReferenceV1;
+  outputUri: string;
+  exportId: string;
+  presetId: string;
+  locale?: "pt-BR" | "en-US";
+  actor?: JournalActor;
+}
+
+export interface ExecuteResolvedAudioPlanOutcome {
+  plan: ResolvedAudioPlanV1;
+  audioExecution: MediaExecutionOutcome["record"];
+  muxExecution: MediaExecutionOutcome["record"];
+  project: ProjectIR;
+  audioCleanup: { removed: string[]; failed: string[] };
+}
+
+export interface ResolvedAudioPlanApplicationServiceOptions {
+  history: ProjectHistory;
+  media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs">;
+  idGenerator?: () => string;
+}
+
+export class ResolvedAudioPlanApplicationService {
+  private readonly history: ProjectHistory;
+  private readonly media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs">;
+  private readonly idGenerator: () => string;
+
+  constructor(options: ResolvedAudioPlanApplicationServiceOptions) {
+    this.history = options.history;
+    this.media = options.media;
+    this.idGenerator = options.idGenerator ?? defaultId;
+  }
+
+  compile(request: Omit<CompileResolvedAudioPlanRequest, "id" | "projectJournalEntryCount"> & { id?: string }): ResolvedAudioPlanV1 {
+    return compileResolvedAudioPlan(this.history.current, {
+      ...request,
+      id: request.id ?? this.idGenerator(),
+      projectJournalEntryCount: this.history.entries.length
+    });
+  }
+
+  async execute(request: ExecuteResolvedAudioPlanRequest, signal?: AbortSignal): Promise<ExecuteResolvedAudioPlanOutcome> {
+    const locale = request.locale ?? this.history.current.project.defaultLocale;
+    let plan: ResolvedAudioPlanV1;
+    try {
+      validateExecutionRequest(request);
+      plan = validatePlanAgainstProject(this.history, request.plan);
+      validateVisualReference(request.visual, plan);
+      validateMediaOperation({
+        type: "mux-audio",
+        videoUri: request.visual.uri,
+        audioUri: plan.operation.outputUri,
+        outputUri: request.outputUri,
+        replaceExisting: true
+      });
+      if (new Set([request.visual.uri, plan.operation.outputUri, request.outputUri]).size !== 3) {
+        throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Visual, PCM and final output paths must be distinct.");
+      }
+    } catch (cause) {
+      throw mapApplicationError(cause, locale, request.id);
+    }
+
+    const audioExecutionId = `${request.id}:audio`;
+    const muxExecutionId = `${request.id}:mux`;
+    let audioOutcome: MediaExecutionOutcome | undefined;
+    try {
+      audioOutcome = await this.media.execute({
+        id: audioExecutionId,
+        locale,
+        operation: plan.operation,
+        mutation: { type: "none" },
+        projectBinding: plan.projectBinding,
+        actor: request.actor ?? { type: "user" }
+      }, signal);
+      assertCurrentBinding(this.history, plan.projectBinding);
+
+      const muxOutcome = await this.media.execute({
+        id: muxExecutionId,
+        locale,
+        operation: {
+          type: "mux-audio",
+          videoUri: request.visual.uri,
+          audioUri: plan.operation.outputUri,
+          outputUri: request.outputUri,
+          replaceExisting: true
+        },
+        mutation: { type: "export.add", exportId: request.exportId, presetId: request.presetId },
+        projectBinding: plan.projectBinding,
+        expectedOutput: {
+          durationMs: plan.outputDurationMs,
+          durationToleranceMs: FINAL_MUX_DURATION_TOLERANCE_MS
+        },
+        actor: request.actor ?? { type: "user" }
+      }, signal);
+
+      const audioCleanup = await this.media.cleanupOwnedOutputs(audioExecutionId);
+      return {
+        plan: clone(plan),
+        audioExecution: clone(audioOutcome.record),
+        muxExecution: clone(muxOutcome.record),
+        project: clone(muxOutcome.project),
+        audioCleanup
+      };
+    } catch (cause) {
+      if (audioOutcome) {
+        const cleanup = await this.media.cleanupOwnedOutputs(audioExecutionId);
+        if (cleanup.failed.length) {
+          throw new MediaApplicationError("MEDIA_RECOVERY_FAILED", locale, request.id, {}, { operation: cause, cleanup });
+        }
+      }
+      throw mapApplicationError(cause, locale, request.id);
+    }
+  }
+}
+
+export function compileResolvedAudioPlan(project: ProjectIR, request: CompileResolvedAudioPlanRequest): ResolvedAudioPlanV1 {
+  validateCompileRequest(request);
+  const snapshotId = project.history.headSnapshotId;
+  if (!snapshotId) throw new ResolvedAudioPlanError("AUDIO_PLAN_PROJECT_CONFLICT", "Project has no authoritative history snapshot.");
+  if (request.normalization.type !== "none" || project.audio.normalizeTargetLufs !== undefined) {
+    throw new ResolvedAudioPlanError(
+      "AUDIO_PLAN_NORMALIZATION_UNSUPPORTED",
+      "Explicit loudness normalization is not available in this slice and cannot be ignored."
+    );
+  }
+  if (!Number.isSafeInteger(project.timeline.durationMs) || project.timeline.durationMs <= 0) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_NO_RENDERABLE_AUDIO", "Project timeline has no positive output duration.");
+  }
+
+  const tracks = new Map(project.timeline.tracks.map((track, index) => [track.id, { track, index }]));
+  const sources = new Map(project.sources.map((source) => [source.id, source]));
+  const candidates: Array<{ clip: TimelineClip; trackIndex: number; clipIndex: number }> = [];
+  for (const [clipIndex, clip] of project.timeline.clips.entries()) {
+    const trackRecord = tracks.get(clip.trackId);
+    if (!trackRecord || trackRecord.track.kind !== "audio" || trackRecord.track.muted || clip.volume === 0) continue;
+    candidates.push({ clip, trackIndex: trackRecord.index, clipIndex });
+  }
+  if (candidates.length === 0) {
+    throw new ResolvedAudioPlanError(
+      "AUDIO_PLAN_NO_RENDERABLE_AUDIO",
+      "No unmuted non-zero clips exist on canonical audio tracks; video-track audio is not inferred implicitly."
+    );
+  }
+
+  candidates.sort((left, right) => left.clip.timelineStartMs - right.clip.timelineStartMs
+    || left.trackIndex - right.trackIndex
+    || left.clipIndex - right.clipIndex
+    || left.clip.id.localeCompare(right.clip.id));
+
+  const sourceBindings = new Map<string, ResolvedAudioSourceBinding>();
+  const items: RenderAudioSequenceOperationV1["items"] = [];
+  for (const { clip } of candidates) {
+    const source = sources.get(clip.sourceId);
+    if (!source || (source.kind !== "audio" && source.kind !== "video")) {
+      throw new ResolvedAudioPlanError("AUDIO_PLAN_UNSUPPORTED_SOURCE", `Audio clip ${clip.id} does not reference an eligible audio/video source.`);
+    }
+    if (clip.speed !== 1) {
+      throw new ResolvedAudioPlanError("AUDIO_PLAN_UNSUPPORTED_TIMING", `Audio clip ${clip.id} uses unsupported speed ${clip.speed}.`);
+    }
+    const timelineDuration = clip.timelineEndMs - clip.timelineStartMs;
+    const sourceDuration = clip.sourceEndMs - clip.sourceStartMs;
+    if (!Number.isSafeInteger(timelineDuration) || timelineDuration <= 0 || timelineDuration !== sourceDuration) {
+      throw new ResolvedAudioPlanError("AUDIO_PLAN_UNSUPPORTED_TIMING", `Audio clip ${clip.id} has inconsistent source and timeline ranges.`);
+    }
+    if (clip.timelineEndMs > project.timeline.durationMs || (source.durationMs !== undefined && clip.sourceEndMs > source.durationMs)) {
+      throw new ResolvedAudioPlanError("AUDIO_PLAN_UNSUPPORTED_TIMING", `Audio clip ${clip.id} exceeds canonical timeline/source duration.`);
+    }
+    const gainDb = 20 * Math.log10(clip.volume) + project.audio.masterGainDb;
+    if (!Number.isFinite(gainDb) || gainDb < MIN_AUDIO_SEQUENCE_GAIN_DB || gainDb > MAX_AUDIO_SEQUENCE_GAIN_DB) {
+      throw new ResolvedAudioPlanError(
+        "AUDIO_PLAN_GAIN_UNSUPPORTED",
+        `Audio clip ${clip.id} plus master gain is outside the existing audio-sequence bounds.`
+      );
+    }
+    if (!sourceBindings.has(source.id)) {
+      sourceBindings.set(source.id, {
+        sourceId: source.id,
+        uri: source.uri,
+        ...(source.checksum ? { checksum: source.checksum } : {})
+      });
+    }
+    items.push({
+      sourceId: source.id,
+      sourceStartMs: clip.sourceStartMs,
+      sourceEndMs: clip.sourceEndMs,
+      timelineStartMs: clip.timelineStartMs,
+      ...(Math.abs(gainDb) > 1e-12 ? { gainDb } : {})
+    });
+  }
+
+  const bindings = [...sourceBindings.values()];
+  const operation = validateMediaOperation({
+    type: "render-audio-sequence",
+    version: 1,
+    sources: bindings.map((source) => ({ id: source.sourceId, uri: source.uri })),
+    items,
+    outputUri: request.audioOutputUri,
+    outputDurationMs: project.timeline.durationMs,
+    outputChannelLayout: request.outputChannelLayout
+  });
+  if (operation.type !== "render-audio-sequence") throw new Error("Resolved operation type changed unexpectedly.");
+
+  return clone({
+    version: RESOLVED_AUDIO_PLAN_VERSION,
+    id: request.id,
+    projectBinding: {
+      projectId: project.project.id,
+      projectRevision: project.history.revision,
+      projectSnapshotId: snapshotId,
+      projectJournalEntryCount: request.projectJournalEntryCount
+    },
+    normalization: { type: "none" },
+    outputDurationMs: project.timeline.durationMs,
+    outputChannelLayout: request.outputChannelLayout,
+    sourceBindings: bindings,
+    audioClipIds: candidates.map(({ clip }) => clip.id),
+    operation
+  });
+}
+
+function validateCompileRequest(request: CompileResolvedAudioPlanRequest): void {
+  if (!isRecord(request) || typeof request.id !== "string" || request.id.trim().length === 0
+    || typeof request.audioOutputUri !== "string"
+    || (request.outputChannelLayout !== "mono" && request.outputChannelLayout !== "stereo")
+    || !isRecord(request.normalization)
+    || (request.normalization.type !== "none" && request.normalization.type !== "target-lufs")
+    || !Number.isSafeInteger(request.projectJournalEntryCount) || request.projectJournalEntryCount < 0) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio plan request is invalid.");
+  }
+  if (request.normalization.type === "target-lufs" && !Number.isFinite(request.normalization.targetLufs)) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Normalization target must be finite.");
+  }
+}
+
+function validateExecutionRequest(request: ExecuteResolvedAudioPlanRequest): void {
+  if (!isRecord(request) || typeof request.id !== "string" || request.id.trim().length === 0
+    || typeof request.outputUri !== "string" || typeof request.exportId !== "string" || !request.exportId.trim()
+    || typeof request.presetId !== "string" || !request.presetId.trim()) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio execution request is invalid.");
+  }
+}
+
+function validatePlanAgainstProject(history: ProjectHistory, plan: ResolvedAudioPlanV1): ResolvedAudioPlanV1 {
+  const project = history.current;
+  if (!isRecord(plan) || plan.version !== RESOLVED_AUDIO_PLAN_VERSION || typeof plan.id !== "string"
+    || !isRecord(plan.operation) || plan.operation.type !== "render-audio-sequence"
+    || !isRecord(plan.normalization) || plan.normalization.type !== "none") {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio plan is malformed.");
+  }
+  assertCurrentBinding(history, plan.projectBinding);
+  const expected = compileResolvedAudioPlan(project, {
+    id: plan.id,
+    audioOutputUri: plan.operation.outputUri,
+    outputChannelLayout: plan.outputChannelLayout,
+    normalization: plan.normalization,
+    projectJournalEntryCount: history.entries.length
+  });
+  if (JSON.stringify(expected) !== JSON.stringify(plan)) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio plan no longer matches its canonical project state.");
+  }
+  return clone(expected);
+}
+
+function validateVisualReference(visual: ResolvedVisualReferenceV1, plan: ResolvedAudioPlanV1): void {
+  if (!isRecord(visual) || visual.version !== 1 || typeof visual.uri !== "string"
+    || typeof visual.producerExecutionId !== "string" || !visual.producerExecutionId.trim()
+    || !Number.isSafeInteger(visual.durationMs) || visual.durationMs !== plan.outputDurationMs
+    || !sameBinding(visual.projectBinding, plan.projectBinding)) {
+    throw new ResolvedAudioPlanError(
+      "AUDIO_PLAN_VISUAL_BINDING_INVALID",
+      "Caller-provided visual result is not bound to the same project snapshot and duration as the audio plan."
+    );
+  }
+}
+
+function assertCurrentBinding(history: ProjectHistory, binding: MediaProjectBinding): void {
+  const project = history.current;
+  if (!sameBinding(binding, {
+    projectId: project.project.id,
+    projectRevision: project.history.revision,
+    projectSnapshotId: project.history.headSnapshotId ?? "",
+    projectJournalEntryCount: history.entries.length
+  })) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_PROJECT_CONFLICT", "Resolved audio plan is stale for the current project snapshot.");
+  }
+}
+
+function sameBinding(left: unknown, right: MediaProjectBinding): boolean {
+  return isRecord(left)
+    && left.projectId === right.projectId
+    && left.projectRevision === right.projectRevision
+    && left.projectSnapshotId === right.projectSnapshotId
+    && left.projectJournalEntryCount === right.projectJournalEntryCount;
+}
+
+function mapApplicationError(cause: unknown, locale: "pt-BR" | "en-US", executionId: string): Error {
+  if (cause instanceof MediaApplicationError) return cause;
+  if (cause instanceof ResolvedAudioPlanError && cause.code === "AUDIO_PLAN_PROJECT_CONFLICT") {
+    return new MediaApplicationError("MEDIA_PROJECT_CONFLICT", locale, executionId, {}, cause);
+  }
+  return new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId, {}, cause);
+}
+
+function defaultId(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
+  return `audio_plan_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}

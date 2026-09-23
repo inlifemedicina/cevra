@@ -37,6 +37,18 @@ export interface MediaExecutionProvenance {
   engineDisplayName: string;
 }
 
+export interface MediaProjectBinding {
+  projectId: string;
+  projectRevision: number;
+  projectSnapshotId: string;
+  projectJournalEntryCount: number;
+}
+
+export interface MediaOutputExpectation {
+  durationMs: number;
+  durationToleranceMs: number;
+}
+
 export interface MediaExecutionAttempt {
   number: number;
   jobId: string;
@@ -68,6 +80,8 @@ export interface MediaExecutionRecord {
   operation: MediaOperation;
   mutation: MediaProjectMutation;
   actor: JournalActor;
+  projectBinding?: MediaProjectBinding;
+  expectedOutput?: MediaOutputExpectation;
   status: MediaExecutionStatus;
   createdAt: string;
   attempts: MediaExecutionAttempt[];
@@ -79,6 +93,8 @@ export interface MediaExecutionRequest {
   operation: MediaOperation;
   mutation: MediaProjectMutation;
   actor?: JournalActor;
+  projectBinding?: MediaProjectBinding;
+  expectedOutput?: MediaOutputExpectation;
 }
 
 export interface MediaExecutionOutcome {

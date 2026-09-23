@@ -23,6 +23,8 @@ import {
   type MediaApplicationErrorCode,
   type MediaExecutionAttempt,
   type MediaExecutionOutcome,
+  type MediaOutputExpectation,
+  type MediaProjectBinding,
   type MediaExecutionRecord,
   type MediaExecutionRequest,
   type MediaProjectMutation,
@@ -74,6 +76,8 @@ export class MediaApplicationService {
     try {
       operation = validateMediaOperation(request.operation);
       validateMutation(operation, request.mutation);
+      validateProjectBinding(request.projectBinding);
+      validateOutputExpectation(request.expectedOutput, operation);
     } catch (cause) {
       throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId, {}, cause);
     }
@@ -87,6 +91,8 @@ export class MediaApplicationService {
       operation: clone(operation),
       mutation: clone(request.mutation),
       actor: clone(request.actor ?? { type: "user" }),
+      ...(request.projectBinding ? { projectBinding: clone(request.projectBinding) } : {}),
+      ...(request.expectedOutput ? { expectedOutput: clone(request.expectedOutput) } : {}),
       status: "requested",
       createdAt: this.clock(),
       attempts: []
@@ -133,7 +139,7 @@ export class MediaApplicationService {
         continue;
       }
       if (attempt) {
-        const cleanupUris = record.operation.type === "render-audio-sequence" ? attempt.ownedOutputUris ?? [] : attempt.outputUris;
+        const cleanupUris = cleanupCandidates(record.operation, attempt);
         const cleanup = await this.cleanup(cleanupUris, attempt.preexistingOutputUris);
         attempt.removedPartialOutputUris.push(...cleanup.removed);
         attempt.cleanupFailedOutputUris.push(...cleanup.failed);
@@ -166,6 +172,18 @@ export class MediaApplicationService {
     return recovered;
   }
 
+  async cleanupOwnedOutputs(executionId: string): Promise<{ removed: string[]; failed: string[] }> {
+    const record = await this.executions.get(executionId);
+    if (!record) throw new MediaApplicationError("MEDIA_OPERATION_NOT_FOUND", this.history.current.project.defaultLocale, executionId);
+    const attempt = record.attempts.at(-1);
+    if (!attempt) return { removed: [], failed: [] };
+    const cleanup = await this.cleanup(attempt.ownedOutputUris, attempt.preexistingOutputUris);
+    attempt.removedPartialOutputUris.push(...cleanup.removed.filter((uri) => !attempt.removedPartialOutputUris.includes(uri)));
+    attempt.cleanupFailedOutputUris.push(...cleanup.failed.filter((uri) => !attempt.cleanupFailedOutputUris.includes(uri)));
+    await this.executions.save(record);
+    return cleanup;
+  }
+
   private async runAttempt(record: MediaExecutionRecord, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
     const outputUris = operationOutputUris(record.operation);
     const current = this.history.current;
@@ -188,6 +206,7 @@ export class MediaApplicationService {
     let projectStateFinalized = false;
 
     try {
+      assertProjectBinding(this.history, current, record.projectBinding);
       prevalidateMutation(current, record, outputUris[0]);
       for (const uri of outputUris) {
         const kind = await this.artifacts.kind(uri);
@@ -208,17 +227,19 @@ export class MediaApplicationService {
       await this.executions.save(record);
 
       const result = await this.engine.execute(record.operation, { jobId: attempt.jobId, locale: record.locale, ...(signal ? { signal } : {}) });
-      if (record.operation.type === "render-audio-sequence" && result.type === "file" && result.outputUri === outputUris[0]) {
+      if (hasExclusivePublication(record.operation) && result.type === "file" && result.outputUri === outputUris[0]) {
         attempt.ownedOutputUris.push(result.outputUri);
         await this.executions.save(record);
       }
-      await this.validateResult(record.operation, result, outputUris, attempt.jobId);
+      await this.validateResult(record.operation, result, outputUris, attempt.jobId, record.expectedOutput);
       if (record.operation.type === "measure-audio" && signal?.aborted) throw abortMarker();
       if (result.type === "file") attempt.effectiveProfile = clone(result.effectiveProfile);
       const latest = this.history.current;
-      if (record.mutation.type !== "none" && (latest.history.revision !== attempt.projectRevisionBefore || latest.history.headSnapshotId !== attempt.projectSnapshotBefore)) {
+      if ((record.projectBinding || record.mutation.type !== "none")
+        && (latest.history.revision !== attempt.projectRevisionBefore || latest.history.headSnapshotId !== attempt.projectSnapshotBefore)) {
         throw new AttemptFailure("MEDIA_PROJECT_CONFLICT", "Project changed while media execution was active.");
       }
+      assertProjectBinding(this.history, latest, record.projectBinding);
 
       const command = mutationCommand(record, result, attempt, this.clock);
       attempt.status = "committing";
@@ -251,7 +272,7 @@ export class MediaApplicationService {
       const cancelled = isAbort(cause, signal);
       const failure = cause instanceof AttemptFailure ? cause : undefined;
       const code: MediaApplicationErrorCode = cancelled ? "MEDIA_OPERATION_CANCELLED" : failure?.code ?? "MEDIA_OPERATION_FAILED";
-      const cleanupUris = record.operation.type === "render-audio-sequence" ? attempt.ownedOutputUris : outputUris;
+      const cleanupUris = cleanupCandidates(record.operation, attempt);
       const cleanup = await this.cleanup(cleanupUris, attempt.preexistingOutputUris);
       attempt.removedPartialOutputUris.push(...cleanup.removed);
       attempt.cleanupFailedOutputUris.push(...cleanup.failed);
@@ -271,7 +292,13 @@ export class MediaApplicationService {
     }
   }
 
-  private async validateResult(operation: MediaOperation, result: MediaOperationResult, outputUris: readonly string[], jobId: string): Promise<void> {
+  private async validateResult(
+    operation: MediaOperation,
+    result: MediaOperationResult,
+    outputUris: readonly string[],
+    jobId: string,
+    expectedOutput?: MediaOutputExpectation
+  ): Promise<void> {
     if (operation.type === "measure-audio") {
       if (result.type !== "measure-audio" || Object.keys(result).length !== 2) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Media engine returned an incompatible measurement result.");
       validateAudioMeasurementReport(result.report, operation, jobId);
@@ -290,6 +317,11 @@ export class MediaApplicationService {
       throw new AttemptFailure("MEDIA_OUTPUT_MISSING", "Media engine output is absent from the artifact store.");
     }
     validateDeliveryPostcondition(operation, result);
+    if (expectedOutput) {
+      if (result.durationMs === undefined || Math.abs(result.durationMs - expectedOutput.durationMs) > expectedOutput.durationToleranceMs) {
+        throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Media output duration does not satisfy the application postcondition.");
+      }
+    }
   }
 
   private async cleanup(outputUris: readonly string[], preexisting: readonly string[]): Promise<{ removed: string[]; failed: string[] }> {
@@ -310,6 +342,43 @@ export class MediaApplicationService {
     }
     return { removed, failed };
   }
+}
+
+function validateProjectBinding(binding: MediaProjectBinding | undefined): void {
+  if (!binding) return;
+  if (typeof binding.projectId !== "string" || binding.projectId.trim().length === 0
+    || !Number.isSafeInteger(binding.projectRevision) || binding.projectRevision < 0
+    || typeof binding.projectSnapshotId !== "string" || binding.projectSnapshotId.trim().length === 0
+    || !Number.isSafeInteger(binding.projectJournalEntryCount) || binding.projectJournalEntryCount < 0) {
+    throw new Error("Invalid project binding.");
+  }
+}
+
+function validateOutputExpectation(expectation: MediaOutputExpectation | undefined, operation: MediaOperation): void {
+  if (!expectation) return;
+  if (operationOutputUris(operation).length !== 1
+    || !Number.isSafeInteger(expectation.durationMs) || expectation.durationMs <= 0
+    || !Number.isSafeInteger(expectation.durationToleranceMs) || expectation.durationToleranceMs < 0) {
+    throw new Error("Invalid media output expectation.");
+  }
+}
+
+function assertProjectBinding(history: ProjectHistory, project: ProjectIR, binding: MediaProjectBinding | undefined): void {
+  if (!binding) return;
+  if (project.project.id !== binding.projectId
+    || project.history.revision !== binding.projectRevision
+    || project.history.headSnapshotId !== binding.projectSnapshotId
+    || history.entries.length !== binding.projectJournalEntryCount) {
+    throw new AttemptFailure("MEDIA_PROJECT_CONFLICT", "Project binding is stale.");
+  }
+}
+
+function hasExclusivePublication(operation: MediaOperation): boolean {
+  return operation.type === "render-audio-sequence" || operation.type === "mux-audio";
+}
+
+function cleanupCandidates(operation: MediaOperation, attempt: MediaExecutionAttempt): readonly string[] {
+  return hasExclusivePublication(operation) ? attempt.ownedOutputUris : attempt.outputUris;
 }
 
 function validateMutation(operation: MediaOperation, mutation: MediaProjectMutation): void {

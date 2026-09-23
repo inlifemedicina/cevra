@@ -22,6 +22,10 @@ const audioSequence = {
   ],
   outputUri: "/media/staging/audio.wav", outputDurationMs: 4000, outputChannelLayout: "stereo"
 };
+const muxAudio = {
+  type: "mux-audio", videoUri: "/media/picture.mp4", audioUri: audioSequence.outputUri,
+  outputUri: "/media/final.mp4", replaceExisting: true
+};
 
 class MemoryArtifacts {
   files = new Set();
@@ -52,6 +56,14 @@ function completedAudioSequence(operation = audioSequence) {
     probe: { uri: operation.outputUri, durationMs: operation.outputDurationMs, sizeBytes: operation.outputDurationMs * 48 * channels * 4 + 114, hasVideo: false, hasAudio: true, audioCodec: "pcm_f32le", sampleRate: 48000, channels },
     effectiveProfile: { container: "wav", audioCodec: "pcm", audioEncoder: "pcm_f32le" },
     audioSequence: { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: operation.outputChannelLayout, distinctSourceCount: operation.sources.length, itemCount: operation.items.length, maximumSimultaneousItemCount, outputSampleCount: operation.outputDurationMs * 48, estimatedDataBytes: operation.outputDurationMs * 48 * channels * 4, measuredDataBytes: operation.outputDurationMs * 48 * channels * 4, graphBytes: 1024 }
+  };
+}
+
+function completedMuxAudio(operation = muxAudio) {
+  return {
+    type: "file", outputUri: operation.outputUri, durationMs: 4000,
+    probe: { uri: operation.outputUri, durationMs: 4000, width: 1920, height: 1080, frameRate: 30, hasVideo: true, hasAudio: true, videoCodec: "h264", audioCodec: "aac" },
+    effectiveProfile: { container: "mp4", videoCodec: "h264", audioCodec: "aac", videoEncoder: "copy", audioEncoder: "aac" }
   };
 }
 
@@ -534,6 +546,50 @@ test("audio sequence engine failures preserve a race-winning foreign destination
     const record = await repository.get(`audio-failure-${detail.slice(0, 6)}`);
     assert.equal(record.attempts[0].technicalError, detail);
   }
+});
+
+test("mux engine failures preserve a race-winning foreign destination", async () => {
+  const artifacts = new MemoryArtifacts();
+  const sentinel = new TextEncoder().encode("foreign mux winner");
+  artifacts.bytes = new Map();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(muxAudio.outputUri);
+    artifacts.bytes.set(muxAudio.outputUri, sentinel);
+    throw new Error("exclusive publication lost to foreign file");
+  });
+  const { service, history, repository } = fixture(engine, artifacts);
+
+  await assert.rejects(
+    service.execute({ id: "mux-foreign-race", operation: muxAudio, mutation: { type: "export.add", exportId: "foreign-race", presetId: "fixture" } }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED"
+  );
+
+  assert.equal(artifacts.files.has(muxAudio.outputUri), true);
+  assert.deepEqual(artifacts.bytes.get(muxAudio.outputUri), sentinel);
+  assert.deepEqual(artifacts.removed, []);
+  assert.equal(history.current.history.revision, 0);
+  assert.deepEqual((await repository.get("mux-foreign-race")).attempts[0].ownedOutputUris, []);
+});
+
+test("mux output becomes owned only after successful exclusive publication evidence", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(muxAudio.outputUri);
+    const result = completedMuxAudio();
+    result.probe.videoCodec = "h265";
+    return result;
+  });
+  const { service, repository } = fixture(engine, artifacts);
+
+  await assert.rejects(
+    service.execute({ id: "mux-owned-invalid", operation: muxAudio, mutation: { type: "export.add", exportId: "owned-invalid", presetId: "fixture" } }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED"
+  );
+
+  const record = await repository.get("mux-owned-invalid");
+  assert.deepEqual(record.attempts[0].ownedOutputUris, [muxAudio.outputUri]);
+  assert.deepEqual(record.attempts[0].removedPartialOutputUris, [muxAudio.outputUri]);
+  assert.equal(artifacts.files.has(muxAudio.outputUri), false);
 });
 
 test("audio sequence cancellation preserves a race-winning foreign destination", async () => {
