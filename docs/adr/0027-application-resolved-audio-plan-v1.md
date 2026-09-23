@@ -1,6 +1,6 @@
 # ADR 0027 — Application Resolved Audio Plan V1
 
-**Status:** Accepted for implementation — IN DEVELOPMENT / independent review pending
+**Status:** IMPLEMENTED / CLOSED
 **Date:** 2026-09-23
 
 ## Context and authority
@@ -138,6 +138,17 @@ Desktop-visible J-cut workflow, Composition output and subjective Product Owner
 acceptance remain BLOCKED/NOT RUN.
 
 The companion [evidence record](../CEVRA_APPLICATION_RESOLVED_AUDIO_PLAN_V1_EVIDENCE.md)
-separates unit/regression evidence from exact managed macOS arm64 execution. This
-ADR remains IN DEVELOPMENT until independent review and merge; the coordinated
-Media Runtime gate remains active.
+separates unit/regression evidence from exact managed macOS arm64 execution.
+Independent final pre-PR review concluded **APPROVE FOR PR WITH NON-BLOCKING
+NOTES**, with no reproduced BLOCKER, HIGH or MEDIUM finding. PR #42 merged the
+reviewed feature head `b12304af046f36c86a4ee43aa06f19584cb1d550` by normal
+merge commit `ff744592e7cf14b40018e3781440fb74b343f7a0` on 2026-09-23.
+Post-merge main CI run `35918380631` passed all five jobs, and exact managed
+macOS arm64 runtime run `35918380640` passed on that merge SHA.
+
+Application Resolved Audio Plan V1 is therefore **IMPLEMENTED / CLOSED** for
+the bounded vertical defined by this ADR. This does not close Slice 3 in full,
+MR-A05/MR-A06 in full, the coordinated Media Runtime gate, Composition, the
+Desktop-visible workflow, target normalization/mastering or Durable Media
+Execution Recovery V1. The latter remains **APPROVED DIRECTION /
+IMPLEMENTATION PENDING**.
