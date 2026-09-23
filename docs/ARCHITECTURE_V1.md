@@ -229,6 +229,18 @@ The preferred initial model keeps media and heavy audiovisual execution on the t
 
 See [ADR 0026](adr/0026-creator-mobile-remote-host-experience.md).
 
+### 9.5 Creator conversational and visual product boundary
+
+The provisional Lite surface is a complete conversational-first editing product capable of reaching final local export through the shared Creator Core. It does not require the full directly editable visual workspace.
+
+The provisional Full surface includes all Lite capabilities and adds the visual editing workspace, layered timeline, inspector and progressive manual controls over the same canonical project/history.
+
+Lite/Full do not represent separate editorial brains or audiovisual runtimes. Capability entitlements and commercial packaging remain separate concerns.
+
+`Lite` and `Full` remain internal provisional names. A preferred later naming direction is **CEVRA Creator** for the conversational-first surface and **CEVRA Creator Studio** for the visual-workspace surface.
+
+See [ADR 0027](adr/0027-creator-lite-full-product-boundary.md).
+
 ## 10. Content Intelligence
 
 Content Intelligence is an optional, provider-neutral domain within Orbit. It preserves research, source records, signals, questions, trends, ideas, briefs, scripts, future analytics feedback, future publishing providers and future content memory. It may serve CEVRA Vids and other Orbit products through application services and stable references.
