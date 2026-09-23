@@ -57,7 +57,10 @@ The tests construct equivalent persisted crash states; they are labeled
   tests PASS; frontend and Desktop Host builds PASS; npm audit reports zero
   vulnerabilities. Rust/Tauri was not run locally because the Rust toolchain is
   unavailable; normal remote CI remains the required Tauri evidence.
-- Remote CI: pending on the final pushed feature head.
+- Normal remote CI run `35928179816` passed all five required jobs on
+  implementation head `373ae2fbaf235fa45284a692afee434447ce1afe`. The exact
+  FFmpeg runtime workflow did not trigger because this slice does not change a
+  Media Runtime path; it was not forced with an unrelated file change.
 
 ## Bounded resource characterization
 
