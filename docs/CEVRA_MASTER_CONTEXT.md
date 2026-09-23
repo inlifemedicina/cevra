@@ -1670,6 +1670,17 @@ Current dependency blockers/gates:
 
 ---
 
+## 2026-09-22 — Creator local project lifecycle
+
+- **CANONICAL:** Creator creates/opens a local CEVRA project automatically from a media folder or directly supplied media; no mandatory setup wizard for ordinary use.
+- **CANONICAL:** provider conversation/session is never the project. Project IR/ProjectHistory and CEVRA-managed storage own canonical audiovisual state.
+- **CANONICAL:** projects can be resumed by another compatible host or visual surface without reconstructing state from chat history.
+- **CANONICAL:** short one-shot edits use a token-efficient fast path with compact state/evidence, revision/delta references and no whole-project Project IR transfer by default; this is not a second editing engine.
+- **CANONICAL:** original media stays immutable; caches/previews/intermediates are derived; exports remain predictably user-accessible.
+- **ADR:** docs/adr/0025-creator-project-lifecycle-and-one-shot.md.
+
+---
+
 # 26. Explicitly unresolved decisions
 
 Do not guess these in future chats:
