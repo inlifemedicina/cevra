@@ -1,4 +1,4 @@
-# ADR 0027 — Creator conversational-first and visual-full product boundary
+# ADR 0027 — CEVRA Creator and CEVRA Studio product boundary
 
 Status: Accepted
 
@@ -6,17 +6,17 @@ Date: 2026-09-23
 
 ## Context
 
-CEVRA Creator has two planned product surfaces currently referred to provisionally as Lite and Full. Prior decisions require both to share one editorial/creative/QA core, one Project IR/ProjectHistory model and one provider-neutral execution architecture. Creator Full must include a directly editable visual workspace and must be able to deliver final video without CEVRA Vids Desktop.
+CEVRA Creator has two approved product surfaces: **CEVRA Creator** and **CEVRA Studio**. Prior decisions require both to share one editorial/creative/QA core, one Project IR/ProjectHistory model and one provider-neutral execution architecture. Creator CEVRA Studio must include a directly editable visual workspace and must be able to deliver final video without CEVRA Vids Desktop.
 
-The remaining product boundary is whether Lite is merely a reduced demo or a complete agent-native editing product without the full visual editing workspace.
+The remaining product boundary is whether CEVRA Creator is merely a reduced demo or a complete agent-native editing product without the full visual editing workspace.
 
 ## Decision
 
-Lite and Full share the same underlying Creator intelligence and execution foundation.
+CEVRA Creator and CEVRA Studio share the same underlying intelligence and execution foundation.
 
-### Creator Lite — conversational-first complete editing
+### CEVRA Creator — conversational-first complete editing
 
-Lite is a complete agent-native editing flow, not a partial editor. It must be able to:
+CEVRA Creator is a complete agent-native editing flow, not a partial editor. It must be able to:
 
 - receive one or more media sources;
 - create/open a local CEVRA project automatically;
@@ -31,13 +31,13 @@ Lite is a complete agent-native editing flow, not a partial editor. It must be a
 - persist and resume the project;
 - work through compatible desktop and mobile/remote host surfaces.
 
-Lite does not include the complete directly editable visual editing workspace.
+CEVRA Creator does not include the complete directly editable visual editing workspace.
 
-Lite may expose lightweight preview/review interactions appropriate to the host, including playback, scrub, comments or range marking when supported, but it does not promise the full NLE-like timeline/inspector/Advanced surface.
+CEVRA Creator may expose lightweight preview/review interactions appropriate to the host, including playback, scrub, comments or range marking when supported, but it does not promise the full NLE-like timeline/inspector/Advanced surface.
 
-### Creator Full — conversational plus direct visual editing
+### CEVRA Studio — conversational plus direct visual editing
 
-Full includes the entire Lite workflow and adds a directly editable visual workspace over the same canonical project state, including as capabilities mature:
+CEVRA Studio includes the entire CEVRA Creator workflow and adds a directly editable visual workspace over the same canonical project state, including as capabilities mature:
 
 - editable layered timeline;
 - contextual inspector;
@@ -52,20 +52,18 @@ AI and manual edits remain interoperable and reversible through the same typed c
 
 ## Capability and entitlement boundary
 
-This ADR does not define Lite and Full by artificially assigning different underlying engines or intelligence quality.
+This ADR does not define CEVRA Creator and CEVRA Studio by artificially assigning different underlying engines or intelligence quality.
 
 Availability of expensive or optional capabilities may later depend on hardware, installed packs, provider availability, entitlement or commercial plan. Those are separate decisions and must not create divergent audiovisual semantics or separate editorial brains.
 
 ## Naming
 
-`Lite` and `Full` are provisional internal names only. Because Lite remains a complete editing product, final product naming should avoid implying that it is crippled or lower-quality intelligence.
+The Product Owner approved the final working names for these two surfaces:
 
-Preferred naming direction for later brand/product decision:
+- **CEVRA Creator** — conversational-first complete editing product;
+- **CEVRA Studio** — CEVRA Creator plus full visual editing workspace.
 
-- **CEVRA Creator** — conversational-first product;
-- **CEVRA Creator Studio** — conversational + full visual editing workspace.
-
-Other names may be evaluated later without changing this architectural/product boundary.
+Future branding changes would require an explicit Product Owner decision, but no longer use Lite/Full as product names.
 
 ## Consequences
 
@@ -83,5 +81,5 @@ This ADR does not set:
 - pricing;
 - feature entitlements;
 - pack/provider availability;
-- exact Lite preview UI;
-- exact Full workspace layout.
+- exact CEVRA Creator preview UI;
+- exact CEVRA Studio workspace layout.
