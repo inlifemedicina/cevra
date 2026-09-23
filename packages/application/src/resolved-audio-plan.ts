@@ -8,7 +8,7 @@ import {
 import type { JournalActor, ProjectHistory, ProjectIR, TimelineClip } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
 import type { MediaApplicationService } from "./media-service.js";
-import type { MediaExecutionOutcome, MediaProjectBinding } from "./types.js";
+import type { MediaExecutionOutcome, MediaExecutionRecord, MediaProjectBinding } from "./types.js";
 
 export const RESOLVED_AUDIO_PLAN_VERSION = 1 as const;
 export const FINAL_MUX_DURATION_TOLERANCE_MS = 23 as const;
@@ -23,6 +23,7 @@ export type ResolvedAudioPlanErrorCode =
   | "AUDIO_PLAN_NO_RENDERABLE_AUDIO"
   | "AUDIO_PLAN_UNSUPPORTED_TIMING"
   | "AUDIO_PLAN_UNSUPPORTED_SOURCE"
+  | "AUDIO_PLAN_DUCKING_UNSUPPORTED"
   | "AUDIO_PLAN_GAIN_UNSUPPORTED"
   | "AUDIO_PLAN_NORMALIZATION_UNSUPPORTED"
   | "AUDIO_PLAN_VISUAL_BINDING_INVALID";
@@ -113,28 +114,34 @@ export class ResolvedAudioPlanApplicationService {
   }
 
   async execute(request: ExecuteResolvedAudioPlanRequest, signal?: AbortSignal): Promise<ExecuteResolvedAudioPlanOutcome> {
-    const locale = request.locale ?? this.history.current.project.defaultLocale;
+    const defaultLocale = this.history.current.project.defaultLocale;
+    let stableRequest: ExecuteResolvedAudioPlanRequest;
     let plan: ResolvedAudioPlanV1;
     try {
       validateExecutionRequest(request);
-      plan = validatePlanAgainstProject(this.history, request.plan);
-      validateVisualReference(request.visual, plan);
+      stableRequest = clone(request);
+      plan = validatePlanAgainstProject(this.history, stableRequest.plan);
+      validateVisualReference(stableRequest.visual, plan);
       validateMediaOperation({
         type: "mux-audio",
-        videoUri: request.visual.uri,
+        videoUri: stableRequest.visual.uri,
         audioUri: plan.operation.outputUri,
-        outputUri: request.outputUri,
-        replaceExisting: true
+        outputUri: stableRequest.outputUri,
+        replaceExisting: true,
+        durationValidation: durationValidation(plan)
       });
-      if (new Set([request.visual.uri, plan.operation.outputUri, request.outputUri]).size !== 3) {
+      if (new Set([stableRequest.visual.uri, plan.operation.outputUri, stableRequest.outputUri]).size !== 3) {
         throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Visual, PCM and final output paths must be distinct.");
       }
     } catch (cause) {
-      throw mapApplicationError(cause, locale, request.id);
+      const locale = request?.locale === "en-US" ? "en-US" : defaultLocale;
+      throw mapApplicationError(cause, locale, typeof request?.id === "string" ? request.id : "invalid-audio-plan-execution");
     }
 
-    const audioExecutionId = `${request.id}:audio`;
-    const muxExecutionId = `${request.id}:mux`;
+    const locale = stableRequest.locale ?? defaultLocale;
+
+    const audioExecutionId = `${stableRequest.id}:audio`;
+    const muxExecutionId = `${stableRequest.id}:mux`;
     let audioOutcome: MediaExecutionOutcome | undefined;
     try {
       audioOutcome = await this.media.execute({
@@ -143,27 +150,29 @@ export class ResolvedAudioPlanApplicationService {
         operation: plan.operation,
         mutation: { type: "none" },
         projectBinding: plan.projectBinding,
-        actor: request.actor ?? { type: "user" }
+        actor: stableRequest.actor ?? { type: "user" }
       }, signal);
       assertCurrentBinding(this.history, plan.projectBinding);
+      const muxDurationValidation = durationValidation(plan, audioOutcome.record);
 
       const muxOutcome = await this.media.execute({
         id: muxExecutionId,
         locale,
         operation: {
           type: "mux-audio",
-          videoUri: request.visual.uri,
+          videoUri: stableRequest.visual.uri,
           audioUri: plan.operation.outputUri,
-          outputUri: request.outputUri,
-          replaceExisting: true
+          outputUri: stableRequest.outputUri,
+          replaceExisting: true,
+          durationValidation: muxDurationValidation
         },
-        mutation: { type: "export.add", exportId: request.exportId, presetId: request.presetId },
+        mutation: { type: "export.add", exportId: stableRequest.exportId, presetId: stableRequest.presetId },
         projectBinding: plan.projectBinding,
         expectedOutput: {
           durationMs: plan.outputDurationMs,
           durationToleranceMs: FINAL_MUX_DURATION_TOLERANCE_MS
         },
-        actor: request.actor ?? { type: "user" }
+        actor: stableRequest.actor ?? { type: "user" }
       }, signal);
 
       const audioCleanup = await this.media.cleanupOwnedOutputs(audioExecutionId);
@@ -178,10 +187,10 @@ export class ResolvedAudioPlanApplicationService {
       if (audioOutcome) {
         const cleanup = await this.media.cleanupOwnedOutputs(audioExecutionId);
         if (cleanup.failed.length) {
-          throw new MediaApplicationError("MEDIA_RECOVERY_FAILED", locale, request.id, {}, { operation: cause, cleanup });
+          throw new MediaApplicationError("MEDIA_RECOVERY_FAILED", locale, stableRequest.id, {}, { operation: cause, cleanup });
         }
       }
-      throw mapApplicationError(cause, locale, request.id);
+      throw mapApplicationError(cause, locale, stableRequest.id);
     }
   }
 }
@@ -194,6 +203,12 @@ export function compileResolvedAudioPlan(project: ProjectIR, request: CompileRes
     throw new ResolvedAudioPlanError(
       "AUDIO_PLAN_NORMALIZATION_UNSUPPORTED",
       "Explicit loudness normalization is not available in this slice and cannot be ignored."
+    );
+  }
+  if (project.audio.musicDuckDb !== undefined) {
+    throw new ResolvedAudioPlanError(
+      "AUDIO_PLAN_DUCKING_UNSUPPORTED",
+      "Canonical music ducking requires an explicit approved audio-plan capability and cannot be ignored."
     );
   }
   if (!Number.isSafeInteger(project.timeline.durationMs) || project.timeline.durationMs <= 0) {
@@ -292,11 +307,11 @@ export function compileResolvedAudioPlan(project: ProjectIR, request: CompileRes
 }
 
 function validateCompileRequest(request: CompileResolvedAudioPlanRequest): void {
+  rejectUnexpectedKeys(request, ["id", "audioOutputUri", "outputChannelLayout", "normalization", "projectJournalEntryCount"], "resolved audio compile request");
+  validateNormalization(request.normalization);
   if (!isRecord(request) || typeof request.id !== "string" || request.id.trim().length === 0
     || typeof request.audioOutputUri !== "string"
     || (request.outputChannelLayout !== "mono" && request.outputChannelLayout !== "stereo")
-    || !isRecord(request.normalization)
-    || (request.normalization.type !== "none" && request.normalization.type !== "target-lufs")
     || !Number.isSafeInteger(request.projectJournalEntryCount) || request.projectJournalEntryCount < 0) {
     throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio plan request is invalid.");
   }
@@ -306,15 +321,19 @@ function validateCompileRequest(request: CompileResolvedAudioPlanRequest): void 
 }
 
 function validateExecutionRequest(request: ExecuteResolvedAudioPlanRequest): void {
+  rejectUnexpectedKeys(request, ["id", "plan", "visual", "outputUri", "exportId", "presetId", "locale", "actor"], "resolved audio execution request");
   if (!isRecord(request) || typeof request.id !== "string" || request.id.trim().length === 0
     || typeof request.outputUri !== "string" || typeof request.exportId !== "string" || !request.exportId.trim()
-    || typeof request.presetId !== "string" || !request.presetId.trim()) {
+    || typeof request.presetId !== "string" || !request.presetId.trim()
+    || (request.locale !== undefined && request.locale !== "pt-BR" && request.locale !== "en-US")) {
     throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio execution request is invalid.");
   }
+  validateJournalActor(request.actor ?? { type: "user" });
 }
 
 function validatePlanAgainstProject(history: ProjectHistory, plan: ResolvedAudioPlanV1): ResolvedAudioPlanV1 {
   const project = history.current;
+  validatePlanSchema(plan);
   if (!isRecord(plan) || plan.version !== RESOLVED_AUDIO_PLAN_VERSION || typeof plan.id !== "string"
     || !isRecord(plan.operation) || plan.operation.type !== "render-audio-sequence"
     || !isRecord(plan.normalization) || plan.normalization.type !== "none") {
@@ -328,13 +347,15 @@ function validatePlanAgainstProject(history: ProjectHistory, plan: ResolvedAudio
     normalization: plan.normalization,
     projectJournalEntryCount: history.entries.length
   });
-  if (JSON.stringify(expected) !== JSON.stringify(plan)) {
+  if (!structurallyEqual(expected, plan)) {
     throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio plan no longer matches its canonical project state.");
   }
   return clone(expected);
 }
 
 function validateVisualReference(visual: ResolvedVisualReferenceV1, plan: ResolvedAudioPlanV1): void {
+  rejectUnexpectedKeys(visual, ["version", "uri", "projectBinding", "durationMs", "producerExecutionId"], "resolved visual reference");
+  validateProjectBindingSchema(visual.projectBinding);
   if (!isRecord(visual) || visual.version !== 1 || typeof visual.uri !== "string"
     || typeof visual.producerExecutionId !== "string" || !visual.producerExecutionId.trim()
     || !Number.isSafeInteger(visual.durationMs) || visual.durationMs !== plan.outputDurationMs
@@ -344,6 +365,36 @@ function validateVisualReference(visual: ResolvedVisualReferenceV1, plan: Resolv
       "Caller-provided visual result is not bound to the same project snapshot and duration as the audio plan."
     );
   }
+}
+
+function durationValidation(plan: ResolvedAudioPlanV1, audioExecution?: MediaExecutionRecord) {
+  let audioDurationMs = plan.outputDurationMs;
+  if (audioExecution) {
+    const result = audioExecution.attempts.at(-1)?.result;
+    const evidence = result?.type === "file" ? result.audioSequence : undefined;
+    if (!evidence || evidence.sampleRate <= 0
+      || !Number.isSafeInteger(evidence.outputSampleCount)
+      || evidence.outputSampleCount * 1000 % evidence.sampleRate !== 0) {
+      throw new ResolvedAudioPlanError(
+        "AUDIO_PLAN_INVALID_REQUEST",
+        "Audio Sequence did not return exact measured sample-count duration evidence."
+      );
+    }
+    audioDurationMs = evidence.outputSampleCount * 1000 / evidence.sampleRate;
+    if (audioDurationMs !== plan.outputDurationMs) {
+      throw new ResolvedAudioPlanError(
+        "AUDIO_PLAN_INVALID_REQUEST",
+        "Audio Sequence measured sample-count duration does not match the resolved project duration."
+      );
+    }
+  }
+  return {
+    version: 1 as const,
+    videoDurationMs: plan.outputDurationMs,
+    audioDurationMs,
+    inputToleranceMs: 1,
+    outputAudioToleranceMs: FINAL_MUX_DURATION_TOLERANCE_MS
+  };
 }
 
 function assertCurrentBinding(history: ProjectHistory, binding: MediaProjectBinding): void {
@@ -364,6 +415,89 @@ function sameBinding(left: unknown, right: MediaProjectBinding): boolean {
     && left.projectRevision === right.projectRevision
     && left.projectSnapshotId === right.projectSnapshotId
     && left.projectJournalEntryCount === right.projectJournalEntryCount;
+}
+
+function validatePlanSchema(plan: ResolvedAudioPlanV1): void {
+  rejectUnexpectedKeys(plan, ["version", "id", "projectBinding", "normalization", "outputDurationMs", "outputChannelLayout", "sourceBindings", "audioClipIds", "operation"], "resolved audio plan");
+  validateProjectBindingSchema(plan.projectBinding);
+  validateNormalization(plan.normalization);
+  if (!Array.isArray(plan.sourceBindings) || plan.sourceBindings.length === 0) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio source bindings are invalid.");
+  }
+  for (const source of plan.sourceBindings) {
+    rejectUnexpectedKeys(source, ["sourceId", "uri", "checksum"], "resolved audio source binding");
+    if (!isRecord(source) || typeof source.sourceId !== "string" || !source.sourceId.trim()
+      || typeof source.uri !== "string" || !source.uri
+      || (source.checksum !== undefined && typeof source.checksum !== "string")) {
+      throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio source binding is invalid.");
+    }
+  }
+  if (!Array.isArray(plan.audioClipIds) || plan.audioClipIds.length === 0
+    || plan.audioClipIds.some((id) => typeof id !== "string" || !id.trim())
+    || !Number.isSafeInteger(plan.outputDurationMs) || plan.outputDurationMs <= 0
+    || (plan.outputChannelLayout !== "mono" && plan.outputChannelLayout !== "stereo")) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio plan fields are invalid.");
+  }
+  try {
+    validateMediaOperation(plan.operation);
+  } catch (cause) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Resolved audio operation is invalid.", cause);
+  }
+}
+
+function validateProjectBindingSchema(binding: MediaProjectBinding): void {
+  rejectUnexpectedKeys(binding, ["projectId", "projectRevision", "projectSnapshotId", "projectJournalEntryCount"], "project binding");
+  if (!isRecord(binding) || typeof binding.projectId !== "string" || !binding.projectId.trim()
+    || !Number.isSafeInteger(binding.projectRevision) || binding.projectRevision < 0
+    || typeof binding.projectSnapshotId !== "string" || !binding.projectSnapshotId.trim()
+    || !Number.isSafeInteger(binding.projectJournalEntryCount) || binding.projectJournalEntryCount < 0) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Project binding is invalid.");
+  }
+}
+
+function validateNormalization(value: AudioNormalizationDecision): void {
+  if (!isRecord(value) || (value.type !== "none" && value.type !== "target-lufs")) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Normalization decision is invalid.");
+  }
+  if (value.type === "none") {
+    rejectUnexpectedKeys(value, ["type"], "normalization decision");
+    return;
+  }
+  rejectUnexpectedKeys(value, ["type", "targetLufs"], "normalization decision");
+  if (!Number.isFinite(value.targetLufs)) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Normalization target must be finite.");
+  }
+}
+
+function validateJournalActor(actor: JournalActor): void {
+  rejectUnexpectedKeys(actor, ["type", "id"], "journal actor");
+  if (!isRecord(actor) || !["user", "agent", "system"].includes(String(actor.type))
+    || (actor.id !== undefined && (typeof actor.id !== "string" || !actor.id.trim()))) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", "Journal actor is invalid.");
+  }
+}
+
+function structurallyEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right)
+      && left.length === right.length
+      && left.every((value, index) => structurallyEqual(value, right[index]));
+  }
+  if (!isRecord(left) || !isRecord(right)) return false;
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  return leftKeys.length === rightKeys.length
+    && leftKeys.every((key, index) => key === rightKeys[index] && structurallyEqual(left[key], right[key]));
+}
+
+function rejectUnexpectedKeys(value: unknown, allowed: readonly string[], label: string): void {
+  if (!isRecord(value)) throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", `${label} must be an object.`);
+  const accepted = new Set(allowed);
+  const extras = Object.keys(value).filter((key) => !accepted.has(key));
+  if (extras.length) {
+    throw new ResolvedAudioPlanError("AUDIO_PLAN_INVALID_REQUEST", `${label} contains unexpected fields: ${extras.sort().join(", ")}.`);
+  }
 }
 
 function mapApplicationError(cause: unknown, locale: "pt-BR" | "en-US", executionId: string): Error {

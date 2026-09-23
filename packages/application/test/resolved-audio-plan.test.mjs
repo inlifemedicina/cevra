@@ -16,6 +16,7 @@ const now = "2026-09-23T00:00:00.000Z";
 
 class MemoryArtifacts {
   files = new Map();
+  identities = new Map();
   removed = [];
   failRemoval = new Set();
   async kind(uri) { return this.files.has(uri) ? "file" : "missing"; }
@@ -25,7 +26,13 @@ class MemoryArtifacts {
     this.files.delete(uri);
     this.removed.push(uri);
   }
+  async matchesPublication(uri, evidence) {
+    return this.files.has(uri) && evidence.scheme === "posix-dev-inode"
+      && evidence.device === "1" && evidence.inode === (this.identities.get(uri) ?? "1");
+  }
 }
+
+const publication = { version: 1, scheme: "posix-dev-inode", device: "1", inode: "1" };
 
 class FakeEngine {
   calls = [];
@@ -81,6 +88,7 @@ function sequenceResult(operation) {
     type: "file", outputUri: operation.outputUri, durationMs: operation.outputDurationMs,
     probe: { uri: operation.outputUri, durationMs: operation.outputDurationMs, hasVideo: false, hasAudio: true, audioCodec: "pcm_f32le", sampleRate: 48_000, channels },
     effectiveProfile: { container: "wav", audioCodec: "pcm", audioEncoder: "pcm_f32le" },
+    publication,
     audioSequence: {
       version: 1, sampleRate: 48_000, sampleFormat: "pcm_f32le", channelLayout: operation.outputChannelLayout,
       distinctSourceCount: operation.sources.length, itemCount: operation.items.length,
@@ -108,7 +116,15 @@ function muxResult(operation, durationMs = 4_000) {
   return {
     type: "file", outputUri: operation.outputUri, durationMs,
     probe: { uri: operation.outputUri, durationMs, hasVideo: true, hasAudio: true, videoCodec: "h264", audioCodec: "aac" },
-    effectiveProfile: { container: "mp4", videoCodec: "h264", audioCodec: "aac", videoEncoder: "copy", audioEncoder: "aac" }
+    effectiveProfile: { container: "mp4", videoCodec: "h264", audioCodec: "aac", videoEncoder: "copy", audioEncoder: "aac" },
+    publication,
+    ...(operation.durationValidation ? { muxDuration: {
+      version: 1,
+      inputVideoDurationMs: operation.durationValidation.videoDurationMs,
+      inputAudioDurationMs: operation.durationValidation.audioDurationMs,
+      outputVideoDurationMs: operation.durationValidation.videoDurationMs,
+      outputAudioDurationMs: operation.durationValidation.audioDurationMs
+    } } : {})
   };
 }
 
@@ -282,7 +298,7 @@ test("duration failure removes attempt-owned mux output and PCM without promotin
   assert.equal(fixture.history.current.exports.length, 0);
 });
 
-test("cleanup failure after durable export remains visible without deleting the export", async () => {
+test("cleanup failure after canonical ProjectHistory export commit remains visible without deleting the export", async () => {
   const fixture = services();
   const plan = fixture.service.compile({ id: "cleanup-plan", audioOutputUri: "/render/cleanup.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
   fixture.artifacts.failRemoval.add("/render/cleanup.wav");
@@ -292,4 +308,124 @@ test("cleanup failure after durable export remains visible without deleting the 
   assert.deepEqual(outcome.audioCleanup, { removed: [], failed: ["/render/cleanup.wav"] });
   assert.equal(outcome.project.exports[0].outputUri, "/render/cleanup.mp4");
   assert.equal(fixture.artifacts.files.has("/render/cleanup.mp4"), true);
+});
+
+test("compiler fails closed when canonical music ducking is present", () => {
+  const project = projectFixture();
+  project.audio.musicDuckDb = -9;
+  const history = historyFixture(project);
+  assert.throws(() => compileResolvedAudioPlan(history.current, {
+    id: "duck", audioOutputUri: "/render/duck.wav", outputChannelLayout: "stereo",
+    normalization: { type: "none" }, projectJournalEntryCount: 0
+  }), (error) => error instanceof ResolvedAudioPlanError && error.code === "AUDIO_PLAN_DUCKING_UNSUPPORTED");
+});
+
+test("resolved plan comparison ignores object key order but rejects changed values and extra fields", async () => {
+  const fixture = services();
+  const plan = fixture.service.compile({ id: "structural", audioOutputUri: "/render/structural.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  const reorder = (value) => Array.isArray(value) ? value.map(reorder)
+    : value && typeof value === "object"
+      ? Object.fromEntries(Object.entries(value).reverse().map(([key, child]) => [key, reorder(child)]))
+      : value;
+  await fixture.service.execute({ id: "reordered", plan: reorder(plan), visual: visual(plan), outputUri: "/render/reordered.mp4", exportId: "reordered", presetId: "fixture" });
+
+  const changedFixture = services();
+  const changed = changedFixture.service.compile({ id: "changed-plan", audioOutputUri: "/render/changed.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  changed.operation.items[0].timelineStartMs = 1;
+  await assert.rejects(changedFixture.service.execute({ id: "changed", plan: changed, visual: visual(changed), outputUri: "/render/changed.mp4", exportId: "changed", presetId: "fixture" }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_INVALID_REQUEST");
+  const extraFixture = services();
+  const extra = extraFixture.service.compile({ id: "extra-plan", audioOutputUri: "/render/extra.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  extra.future = true;
+  await assert.rejects(extraFixture.service.execute({ id: "extra", plan: extra, visual: visual(extra), outputUri: "/render/extra.mp4", exportId: "extra", presetId: "fixture" }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_INVALID_REQUEST");
+});
+
+test("resolved execution snapshots plan, visual, output, export, preset, locale and actor before its first await", async () => {
+  let release;
+  let entered;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const reached = new Promise((resolve) => { entered = resolve; });
+  const fixture = services(async (operation) => {
+    if (operation.type === "render-audio-sequence") {
+      entered();
+      await gate;
+    }
+    fixture.artifacts.files.set(operation.outputUri, Buffer.from(operation.type));
+    return operation.type === "render-audio-sequence" ? sequenceResult(operation) : muxResult(operation);
+  });
+  const plan = fixture.service.compile({ id: "snapshot-plan", audioOutputUri: "/render/snapshot.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  const request = {
+    id: "snapshot-execution", plan, visual: visual(plan), outputUri: "/render/snapshot.mp4",
+    exportId: "snapshot-export", presetId: "fixture", locale: "en-US", actor: { type: "agent", id: "original" }
+  };
+  const execution = fixture.service.execute(request);
+  await reached;
+  request.plan.operation.outputUri = "/render/attacker.wav";
+  request.visual.uri = "/render/attacker-video.mp4";
+  request.visual.projectBinding.projectRevision = 99;
+  request.outputUri = "/render/attacker.mp4";
+  request.exportId = "attacker-export";
+  request.presetId = "attacker-preset";
+  request.locale = "pt-BR";
+  request.actor.id = "attacker";
+  release();
+  const outcome = await execution;
+  assert.deepEqual(fixture.engine.calls.map(({ operation }) => operation.outputUri), ["/render/snapshot.wav", "/render/snapshot.mp4"]);
+  assert.equal(outcome.project.exports[0].id, "snapshot-export");
+  assert.equal(outcome.project.exports[0].presetId, "fixture");
+  assert.deepEqual(fixture.history.entries.at(-1).actor, { type: "agent", id: "original" });
+});
+
+test("closed resolved-plan schemas reject every requested boundary extra and malformed locale/normalization", async () => {
+  const fixture = services();
+  const plan = fixture.service.compile({ id: "closed", audioOutputUri: "/render/closed.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  const base = { id: "closed-exec", plan, visual: visual(plan), outputUri: "/render/closed.mp4", exportId: "closed", presetId: "fixture" };
+  const requests = [
+    { ...base, future: 1 },
+    { ...base, locale: "fr-FR" },
+    { ...base, actor: { type: "user", future: 1 } },
+    { ...base, visual: { ...base.visual, future: 1 } },
+    { ...base, visual: { ...base.visual, projectBinding: { ...base.visual.projectBinding, future: 1 } } },
+    { ...base, plan: { ...plan, normalization: { type: "none", targetLufs: -14 } } }
+  ];
+  for (const [index, request] of requests.entries()) {
+    await assert.rejects(fixture.service.execute({ ...request, id: `closed-${index}` }),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_INVALID_REQUEST");
+  }
+  assert.equal(fixture.engine.calls.length, 0);
+  assert.throws(() => compileResolvedAudioPlan(fixture.history.current, {
+    id: "extra-compile", audioOutputUri: "/render/x.wav", outputChannelLayout: "stereo",
+    normalization: { type: "none" }, projectJournalEntryCount: 0, future: 1
+  }), ResolvedAudioPlanError);
+  assert.throws(() => compileResolvedAudioPlan(fixture.history.current, {
+    id: "extra-normalization", audioOutputUri: "/render/x.wav", outputChannelLayout: "stereo",
+    normalization: { type: "none", targetLufs: -14 }, projectJournalEntryCount: 0
+  }), ResolvedAudioPlanError);
+});
+
+test("mux duration evidence rejects each truncated selected stream and accepts bounded AAC duration", async () => {
+  for (const field of ["inputVideoDurationMs", "inputAudioDurationMs", "outputVideoDurationMs", "outputAudioDurationMs"]) {
+    const fixture = services(async (operation) => {
+      fixture.artifacts.files.set(operation.outputUri, Buffer.from(operation.type));
+      if (operation.type === "render-audio-sequence") return sequenceResult(operation);
+      const result = muxResult(operation);
+      result.muxDuration[field] = 3_900;
+      return result;
+    });
+    const plan = fixture.service.compile({ id: `duration-${field}`, audioOutputUri: `/render/${field}.wav`, outputChannelLayout: "stereo", normalization: { type: "none" } });
+    await assert.rejects(fixture.service.execute({ id: `duration-${field}`, plan, visual: visual(plan), outputUri: `/render/${field}.mp4`, exportId: field, presetId: "fixture" }),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED");
+    assert.equal(fixture.history.current.exports.length, 0);
+  }
+  const accepted = services(async (operation) => {
+    accepted.artifacts.files.set(operation.outputUri, Buffer.from(operation.type));
+    if (operation.type === "render-audio-sequence") return sequenceResult(operation);
+    const result = muxResult(operation);
+    result.muxDuration.outputAudioDurationMs = 4_023;
+    return result;
+  });
+  const plan = accepted.service.compile({ id: "aac-bound", audioOutputUri: "/render/aac.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  const outcome = await accepted.service.execute({ id: "aac-bound", plan, visual: visual(plan), outputUri: "/render/aac.mp4", exportId: "aac", presetId: "fixture" });
+  assert.equal(outcome.project.exports.length, 1);
 });

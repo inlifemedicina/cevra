@@ -234,6 +234,29 @@ export interface AudioSequenceExecutionEvidence {
   graphBytes: number;
 }
 
+export interface MediaPublicationEvidenceV1 {
+  version: 1;
+  scheme: "posix-dev-inode";
+  device: string;
+  inode: string;
+}
+
+export interface MuxAudioDurationValidationV1 {
+  version: 1;
+  videoDurationMs: number;
+  audioDurationMs: number;
+  inputToleranceMs: number;
+  outputAudioToleranceMs: number;
+}
+
+export interface MuxAudioDurationEvidenceV1 {
+  version: 1;
+  inputVideoDurationMs: number;
+  inputAudioDurationMs: number;
+  outputVideoDurationMs: number;
+  outputAudioDurationMs: number;
+}
+
 export interface SilenceRange {
   startMs: number;
   endMs: number | null;
@@ -263,14 +286,14 @@ export type MediaOperation =
   | { type: "extract-frame"; inputUri: string; outputUri: string; atMs: number }
   | { type: "detect-silence"; inputUri: string; thresholdDb: number; minDurationMs: number }
   | { type: "overlay-media"; baseUri: string; overlayUri: string; outputUri: string; startMs: number; endMs: number; x: number; y: number; width: number; height: number; opacity?: number }
-  | { type: "mux-audio"; videoUri: string; audioUri: string; outputUri: string; replaceExisting?: boolean }
+  | { type: "mux-audio"; videoUri: string; audioUri: string; outputUri: string; replaceExisting?: boolean; durationValidation?: MuxAudioDurationValidationV1 }
   | RenderAudioSequenceOperationV1;
 
 export type MediaOperationResult =
   | { type: "measure-audio"; report: AudioMeasurementReportV1 }
   | { type: "probe"; probe: MediaProbeResult }
   | { type: "detect-silence"; ranges: SilenceRange[] }
-  | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence };
+  | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence; publication?: MediaPublicationEvidenceV1; muxDuration?: MuxAudioDurationEvidenceV1 };
 
 export interface MediaEngineAdapter extends EngineAdapter {
   execute(operation: MediaOperation, context: ExecutionContext): Promise<MediaOperationResult>;
@@ -296,7 +319,7 @@ const OPERATION_FIELDS: Readonly<Record<MediaOperation["type"], ReadonlySet<stri
   "extract-frame": new Set(["type", "inputUri", "outputUri", "atMs"]),
   "detect-silence": new Set(["type", "inputUri", "thresholdDb", "minDurationMs"]),
   "overlay-media": new Set(["type", "baseUri", "overlayUri", "outputUri", "startMs", "endMs", "x", "y", "width", "height", "opacity"]),
-  "mux-audio": new Set(["type", "videoUri", "audioUri", "outputUri", "replaceExisting"]),
+  "mux-audio": new Set(["type", "videoUri", "audioUri", "outputUri", "replaceExisting", "durationValidation"]),
   "render-audio-sequence": new Set(["type", "version", "sources", "items", "outputUri", "outputDurationMs", "outputChannelLayout"])
 };
 
@@ -371,6 +394,7 @@ export function validateMediaOperation(value: unknown): MediaOperation {
     case "mux-audio": {
       requireUri("videoUri"); requireUri("audioUri"); requireUri("outputUri");
       if (value.replaceExisting !== undefined && typeof value.replaceExisting !== "boolean") throw new Error("replaceExisting must be boolean.");
+      if (value.durationValidation !== undefined) validateMuxAudioDurationValidation(value.durationValidation);
       const container = resolveMediaContainer(value.outputUri as string);
       if (MEDIA_DELIVERY_MATRIX[container].audioOnly) throw new Error(`${container.toUpperCase()} is audio-only and cannot be used by mux-audio.`);
       break;
@@ -379,6 +403,24 @@ export function validateMediaOperation(value: unknown): MediaOperation {
     default: throw new Error(`Unsupported media operation ${String(value.type)}.`);
   }
   return value as unknown as MediaOperation;
+}
+
+function validateMuxAudioDurationValidation(value: unknown): void {
+  if (!isRecord(value)) throw new Error("durationValidation must be an object.");
+  const allowed = new Set(["version", "videoDurationMs", "audioDurationMs", "inputToleranceMs", "outputAudioToleranceMs"]);
+  const extras = Object.keys(value).filter((key) => !allowed.has(key));
+  if (extras.length) throw new Error(`durationValidation contains unexpected fields: ${extras.sort().join(", ")}.`);
+  if (value.version !== 1) throw new Error("durationValidation version must be 1.");
+  for (const key of ["videoDurationMs", "audioDurationMs"] as const) {
+    if (!Number.isSafeInteger(value[key]) || (value[key] as number) <= 0 || (value[key] as number) > MAX_MEDIA_DURATION_MS) {
+      throw new Error(`durationValidation.${key} must be a positive bounded integer.`);
+    }
+  }
+  for (const key of ["inputToleranceMs", "outputAudioToleranceMs"] as const) {
+    if (!Number.isSafeInteger(value[key]) || (value[key] as number) < 0 || (value[key] as number) > 1000) {
+      throw new Error(`durationValidation.${key} must be a bounded non-negative integer.`);
+    }
+  }
 }
 
 function validateAudioSequence(value: Record<string, unknown>): void {

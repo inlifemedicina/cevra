@@ -1,4 +1,4 @@
-import type { EffectiveMediaProfile, EngineIdentity, MediaOperation, MediaOperationResult } from "@cevra/contracts";
+import type { EffectiveMediaProfile, EngineIdentity, MediaOperation, MediaOperationResult, MediaPublicationEvidenceV1 } from "@cevra/contracts";
 import type { ExtensionMap, JournalActor, ProjectIR, SourceKind } from "@cevra/project-ir";
 
 export type MediaExecutionStatus = "requested" | "running" | "committing" | "succeeded" | "failed" | "cancelled" | "interrupted";
@@ -49,6 +49,11 @@ export interface MediaOutputExpectation {
   durationToleranceMs: number;
 }
 
+export interface MediaOwnedPublication {
+  uri: string;
+  evidence: MediaPublicationEvidenceV1;
+}
+
 export interface MediaExecutionAttempt {
   number: number;
   jobId: string;
@@ -59,6 +64,7 @@ export interface MediaExecutionAttempt {
   outputUris: string[];
   preexistingOutputUris: string[];
   ownedOutputUris: string[];
+  ownedOutputPublications?: MediaOwnedPublication[];
   removedPartialOutputUris: string[];
   cleanupFailedOutputUris: string[];
   projectRevisionBefore: number;
