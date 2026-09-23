@@ -8,7 +8,18 @@ import {
 import type { JournalActor, ProjectHistory, ProjectIR, TimelineClip } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
 import type { MediaApplicationService } from "./media-service.js";
-import type { MediaExecutionOutcome, MediaExecutionRecord, MediaProjectBinding } from "./types.js";
+import {
+  InMemoryMediaExecutionRepository,
+  MediaExecutionAlreadyExistsError,
+  type MediaExecutionIntentRepository
+} from "./repository.js";
+import type {
+  MediaExecutionIntentV1,
+  MediaExecutionOutcome,
+  MediaExecutionRecord,
+  MediaProjectBinding,
+  MediaRecoveryResult
+} from "./types.js";
 
 export const RESOLVED_AUDIO_PLAN_VERSION = 1 as const;
 export const FINAL_MUX_DURATION_TOLERANCE_MS = 23 as const;
@@ -91,6 +102,8 @@ export interface ExecuteResolvedAudioPlanOutcome {
 export interface ResolvedAudioPlanApplicationServiceOptions {
   history: ProjectHistory;
   media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs">;
+  intents?: MediaExecutionIntentRepository;
+  clock?: () => string;
   idGenerator?: () => string;
 }
 
@@ -98,11 +111,15 @@ export class ResolvedAudioPlanApplicationService {
   private readonly history: ProjectHistory;
   private readonly media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs">;
   private readonly idGenerator: () => string;
+  private readonly intents: MediaExecutionIntentRepository;
+  private readonly clock: () => string;
 
   constructor(options: ResolvedAudioPlanApplicationServiceOptions) {
     this.history = options.history;
     this.media = options.media;
     this.idGenerator = options.idGenerator ?? defaultId;
+    this.intents = options.intents ?? new InMemoryMediaExecutionRepository();
+    this.clock = options.clock ?? (() => new Date().toISOString());
   }
 
   compile(request: Omit<CompileResolvedAudioPlanRequest, "id" | "projectJournalEntryCount"> & { id?: string }): ResolvedAudioPlanV1 {
@@ -142,8 +159,34 @@ export class ResolvedAudioPlanApplicationService {
 
     const audioExecutionId = `${stableRequest.id}:audio`;
     const muxExecutionId = `${stableRequest.id}:mux`;
+    const now = this.clock();
+    const intent: MediaExecutionIntentV1 = {
+      version: 1,
+      id: stableRequest.id,
+      kind: "resolved-audio-plan",
+      projectId: plan.projectBinding.projectId,
+      projectBinding: clone(plan.projectBinding),
+      status: "requested",
+      childExecutionIds: { audio: audioExecutionId, mux: muxExecutionId },
+      exportIntent: {
+        exportId: stableRequest.exportId,
+        presetId: stableRequest.presetId,
+        expectedOutputUri: stableRequest.outputUri
+      },
+      createdAt: now,
+      updatedAt: now
+    };
+    try {
+      await this.intents.createIntent(intent);
+    } catch (cause) {
+      if (cause instanceof MediaExecutionAlreadyExistsError) {
+        throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, stableRequest.id, {}, cause);
+      }
+      throw cause;
+    }
     let audioOutcome: MediaExecutionOutcome | undefined;
     try {
+      await this.transitionIntent(intent, "audio-running");
       audioOutcome = await this.media.execute({
         id: audioExecutionId,
         locale,
@@ -152,9 +195,11 @@ export class ResolvedAudioPlanApplicationService {
         projectBinding: plan.projectBinding,
         actor: stableRequest.actor ?? { type: "user" }
       }, signal);
+      await this.transitionIntent(intent, "audio-succeeded");
       assertCurrentBinding(this.history, plan.projectBinding);
       const muxDurationValidation = durationValidation(plan, audioOutcome.record);
 
+      await this.transitionIntent(intent, "mux-running");
       const muxOutcome = await this.media.execute({
         id: muxExecutionId,
         locale,
@@ -175,6 +220,8 @@ export class ResolvedAudioPlanApplicationService {
         actor: stableRequest.actor ?? { type: "user" }
       }, signal);
 
+      await this.transitionIntent(intent, "application-committed");
+
       const audioCleanup = await this.media.cleanupOwnedOutputs(audioExecutionId);
       return {
         plan: clone(plan),
@@ -190,9 +237,80 @@ export class ResolvedAudioPlanApplicationService {
           throw new MediaApplicationError("MEDIA_RECOVERY_FAILED", locale, stableRequest.id, {}, { operation: cause, cleanup });
         }
       }
+      await this.transitionIntent(intent, "interrupted", true);
       throw mapApplicationError(cause, locale, stableRequest.id);
     }
   }
+
+  async markCheckpointSucceeded(intentId: string): Promise<void> {
+    const intent = await this.intents.getIntent(intentId);
+    if (!intent || intent.projectId !== this.history.current.project.id || intent.status !== "application-committed") {
+      throw new Error("Resolved audio intent is not awaiting a durable checkpoint.");
+    }
+    if (!canonicalExportMatches(this.history.current, intent)) {
+      throw new Error("Resolved audio export is not present in canonical ProjectHistory.");
+    }
+    await this.transitionIntent(intent, "durable-succeeded");
+  }
+
+  async reconcilePendingWithoutReplay(): Promise<MediaRecoveryResult[]> {
+    const statuses = ["requested", "audio-running", "audio-succeeded", "mux-running", "application-committed"] as const;
+    const pending = await this.intents.listIntentsByStatus(this.history.current.project.id, statuses);
+    const results: MediaRecoveryResult[] = [];
+    for (const intent of pending) {
+      if (canonicalExportMatches(this.history.current, intent)) {
+        try {
+          const cleanup = await this.media.cleanupOwnedOutputs(intent.childExecutionIds.audio);
+          intent.cleanupUncertainUris = cleanup.failed;
+        } catch {
+          intent.cleanupUncertainUris = [intent.childExecutionIds.audio];
+        }
+        intent.reconciledAt = this.clock();
+        await this.transitionIntent(intent, "durable-succeeded");
+        results.push({ executionId: intent.id, status: "succeeded" });
+        continue;
+      }
+      const failed = new Set<string>();
+      for (const executionId of [intent.childExecutionIds.audio, intent.childExecutionIds.mux]) {
+        try {
+          const cleanup = await this.media.cleanupOwnedOutputs(executionId);
+          for (const uri of cleanup.failed) failed.add(uri);
+        } catch {
+          failed.add(executionId);
+        }
+      }
+      intent.reconciledAt = this.clock();
+      intent.cleanupUncertainUris = [...failed];
+      await this.transitionIntent(intent, failed.size ? "recovery-incomplete" : "interrupted");
+      results.push({
+        executionId: intent.id,
+        status: failed.size ? "failed" : "interrupted",
+        errorCode: failed.size ? "MEDIA_RECOVERY_FAILED" : "MEDIA_OPERATION_INTERRUPTED"
+      });
+    }
+    return results;
+  }
+
+  private async transitionIntent(
+    intent: MediaExecutionIntentV1,
+    status: MediaExecutionIntentV1["status"],
+    bestEffort = false
+  ): Promise<void> {
+    intent.status = status;
+    intent.updatedAt = this.clock();
+    try {
+      await this.intents.saveIntent(intent);
+    } catch (cause) {
+      if (!bestEffort) throw cause;
+    }
+  }
+}
+
+function canonicalExportMatches(project: ProjectIR, intent: MediaExecutionIntentV1): boolean {
+  return project.exports.some((item) => item.id === intent.exportIntent.exportId
+    && item.presetId === intent.exportIntent.presetId
+    && item.outputUri === intent.exportIntent.expectedOutputUri
+    && item.status === "completed");
 }
 
 export function compileResolvedAudioPlan(project: ProjectIR, request: CompileResolvedAudioPlanRequest): ResolvedAudioPlanV1 {

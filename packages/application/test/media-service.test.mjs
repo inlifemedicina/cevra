@@ -898,3 +898,45 @@ test("historical exclusive records without publication identity preserve ambiguo
   assert.deepEqual(await service.cleanupOwnedOutputs("legacy-owned"), { removed: [], failed: [audioSequence.outputUri] });
   assert.equal(artifacts.files.has(audioSequence.outputUri), true);
 });
+
+test("atomic execution create permits at most one engine call for a duplicate id", async () => {
+  const engine = new FakeEngine(async (operation) => ({
+    type: "probe",
+    probe: { uri: operation.inputUri, hasVideo: true, hasAudio: true, videoCodec: "h264", audioCodec: "aac" }
+  }));
+  const { service, repository } = fixture(engine);
+  const request = { id: "atomic-duplicate", operation: { type: "probe", inputUri: "/media/in.mp4" }, mutation: { type: "none" } };
+  const outcomes = await Promise.allSettled([service.execute(request), service.execute(request)]);
+  assert.equal(outcomes.filter(({ status }) => status === "fulfilled").length, 1);
+  assert.equal(outcomes.filter(({ status }) => status === "rejected").length, 1);
+  assert.equal(engine.calls.length, 1);
+  assert.equal((await repository.get("atomic-duplicate")).status, "succeeded");
+});
+
+test("restart reconciliation marks pending work interrupted without retry or engine execution and is idempotent", async () => {
+  const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [
+    {
+      id: "restart-requested", projectId: "project-1", locale: "pt-BR",
+      operation: { type: "probe", inputUri: "/media/in.mp4" }, mutation: { type: "none" }, actor: { type: "system" },
+      status: "requested", createdAt: now, attempts: []
+    },
+    {
+      id: "restart-running", projectId: "project-1", locale: "pt-BR",
+      operation: audioSequence, mutation: { type: "none" }, actor: { type: "system" },
+      status: "running", createdAt: now, attempts: [{
+        number: 1, jobId: "restart-running:1", status: "running", requestedAt: now, startedAt: now,
+        outputUris: [audioSequence.outputUri], preexistingOutputUris: [], ownedOutputUris: [],
+        removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0
+      }]
+    }
+  ] });
+  const engine = new FakeEngine(async () => assert.fail("restart reconciliation must not execute the engine"));
+  const { service } = fixture(engine, new MemoryArtifacts(), repository);
+  const first = await service.reconcilePendingWithoutReplay();
+  const second = await service.reconcilePendingWithoutReplay();
+  assert.deepEqual(first.map(({ status }) => status), ["interrupted", "interrupted"]);
+  assert.deepEqual(second, []);
+  assert.equal(engine.calls.length, 0);
+  assert.equal((await repository.get("restart-requested")).attempts.length, 0);
+  assert.equal((await repository.get("restart-running")).attempts.length, 1);
+});

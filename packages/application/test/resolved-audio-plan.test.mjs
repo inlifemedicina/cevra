@@ -137,7 +137,7 @@ function services(executeImpl, project = projectFixture()) {
     return operation.type === "render-audio-sequence" ? sequenceResult(operation) : muxResult(operation);
   }));
   const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
-  const service = new ResolvedAudioPlanApplicationService({ history, media, idGenerator: () => "plan-generated" });
+  const service = new ResolvedAudioPlanApplicationService({ history, media, intents: repository, idGenerator: () => "plan-generated", clock: () => now });
   return { history, artifacts, repository, engine, media, service };
 }
 
@@ -446,4 +446,38 @@ test("mux duration evidence rejects each truncated selected stream and accepts b
   const plan = accepted.service.compile({ id: "aac-bound", audioOutputUri: "/render/aac.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
   const outcome = await accepted.service.execute({ id: "aac-bound", plan, visual: visual(plan), outputUri: "/render/aac.mp4", exportId: "aac", presetId: "fixture" });
   assert.equal(outcome.project.exports.length, 1);
+});
+
+test("composite intent precedes children, remains application-committed until checkpoint, then becomes durable", async () => {
+  const fixture = services();
+  const plan = fixture.service.compile({ id: "intent-plan", audioOutputUri: "/render/intent.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  const outcome = await fixture.service.execute({ id: "intent", plan, visual: visual(plan), outputUri: "/render/intent.mp4", exportId: "intent-export", presetId: "fixture" });
+  const beforeCheckpoint = await fixture.repository.getIntent("intent");
+  assert.equal(beforeCheckpoint.status, "application-committed");
+  assert.deepEqual(beforeCheckpoint.childExecutionIds, { audio: "intent:audio", mux: "intent:mux" });
+  assert.equal(outcome.project.exports[0].id, "intent-export");
+  await fixture.service.markCheckpointSucceeded("intent");
+  assert.equal((await fixture.repository.getIntent("intent")).status, "durable-succeeded");
+});
+
+test("composite startup reconciliation never executes children and is idempotent", async () => {
+  const history = historyFixture();
+  const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [], intents: [{
+    version: 1, id: "pending-intent", kind: "resolved-audio-plan", projectId: history.current.project.id,
+    projectBinding: { projectId: history.current.project.id, projectRevision: history.current.history.revision,
+      projectSnapshotId: history.current.history.headSnapshotId, projectJournalEntryCount: history.entries.length },
+    status: "audio-running", childExecutionIds: { audio: "pending-intent:audio", mux: "pending-intent:mux" },
+    exportIntent: { exportId: "pending-export", presetId: "fixture", expectedOutputUri: "/render/pending.mp4" },
+    createdAt: now, updatedAt: now
+  }] });
+  let executeCalls = 0;
+  const media = {
+    async execute() { executeCalls += 1; assert.fail("startup reconciliation must not execute media"); },
+    async cleanupOwnedOutputs() { return { removed: [], failed: [] }; }
+  };
+  const service = new ResolvedAudioPlanApplicationService({ history, media, intents: repository, clock: () => now });
+  assert.deepEqual((await service.reconcilePendingWithoutReplay()).map(({ status }) => status), ["interrupted"]);
+  assert.deepEqual(await service.reconcilePendingWithoutReplay(), []);
+  assert.equal(executeCalls, 0);
+  assert.equal((await repository.getIntent("pending-intent")).status, "interrupted");
 });

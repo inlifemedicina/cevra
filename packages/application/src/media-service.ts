@@ -18,7 +18,7 @@ import {
 } from "@cevra/contracts";
 import { applyCommand, type EditCommand, type JournalActor, type ProjectHistory, type ProjectIR } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
-import type { MediaExecutionRepository } from "./repository.js";
+import { MediaExecutionAlreadyExistsError, type MediaExecutionRepository } from "./repository.js";
 import {
   provenanceFrom,
   type MediaApplicationErrorCode,
@@ -86,9 +86,6 @@ export class MediaApplicationService {
     }
     const executionId = stableRequest.id;
     const locale = stableRequest.locale;
-    if (await this.executions.get(executionId)) {
-      throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId);
-    }
     const record: MediaExecutionRecord = {
       id: executionId,
       projectId: this.history.current.project.id,
@@ -102,8 +99,64 @@ export class MediaApplicationService {
       createdAt: this.clock(),
       attempts: []
     };
-    await this.executions.save(record);
+    try {
+      await this.executions.create(record);
+    } catch (cause) {
+      if (cause instanceof MediaExecutionAlreadyExistsError) {
+        throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId, {}, cause);
+      }
+      throw cause;
+    }
     return this.runAttempt(record, signal);
+  }
+
+  /**
+   * Desktop restart reconciliation. Unlike recoverPending(), this method never
+   * invokes retry or the Media Engine.
+   */
+  async reconcilePendingWithoutReplay(): Promise<MediaRecoveryResult[]> {
+    const projectId = this.history.current.project.id;
+    const pending = await this.executions.listByStatus(projectId, ["requested", "running", "committing"]);
+    const reconciled: MediaRecoveryResult[] = [];
+    for (const record of pending) {
+      const attempt = record.attempts.at(-1);
+      if (record.status === "committing" && attempt?.result && mutationApplied(record, this.history.current)) {
+        const project = this.history.current;
+        const entry = committedEntry(record, this.history.entries);
+        attempt.status = "succeeded";
+        attempt.completedAt = this.clock();
+        attempt.projectRevisionAfter = project.history.revision;
+        if (project.history.headSnapshotId) attempt.projectSnapshotAfter = project.history.headSnapshotId;
+        if (entry) attempt.projectJournalEntryId = entry.id;
+        record.status = "succeeded";
+        await this.executions.save(record);
+        reconciled.push({ executionId: record.id, status: "succeeded" });
+        continue;
+      }
+      if (!attempt) {
+        record.status = "interrupted";
+        await this.executions.save(record);
+        reconciled.push({ executionId: record.id, status: "interrupted", errorCode: "MEDIA_OPERATION_INTERRUPTED" });
+        continue;
+      }
+      const cleanup = hasExclusivePublication(record.operation)
+        ? await this.cleanupPublished(attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
+        : await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);
+      attempt.removedPartialOutputUris.push(...cleanup.removed.filter((uri) => !attempt.removedPartialOutputUris.includes(uri)));
+      attempt.cleanupFailedOutputUris.push(...cleanup.failed.filter((uri) => !attempt.cleanupFailedOutputUris.includes(uri)));
+      attempt.status = "interrupted";
+      attempt.completedAt = this.clock();
+      attempt.errorCode = cleanup.failed.length ? "MEDIA_RECOVERY_FAILED" : "MEDIA_OPERATION_INTERRUPTED";
+      attempt.technicalError = "Desktop restarted before the media operation completed; execution was not replayed.";
+      record.status = cleanup.failed.length ? "failed" : "interrupted";
+      await this.executions.save(record);
+      reconciled.push({
+        executionId: record.id,
+        status: record.status,
+        errorCode: attempt.errorCode
+      });
+    }
+    return reconciled;
   }
 
   async retry(executionId: string, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
@@ -388,6 +441,7 @@ export class MediaApplicationService {
     for (const publication of publications) {
       if (protectedUris.has(publication.uri)) continue;
       try {
+        if (await this.artifacts.kind(publication.uri) === "missing") continue;
         if (!this.artifacts.matchesPublication
           || !await this.artifacts.matchesPublication(publication.uri, publication.evidence)) {
           failed.push(publication.uri);
