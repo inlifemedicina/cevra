@@ -38,6 +38,7 @@ class FakeWorker {
       status: "completed", output: arguments_.output,
       probe: { file: arguments_.output, duration: arguments_.output_duration_ms / 1000, size_bytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4 + 114, audio: { codec: "pcm_f32le", sample_rate: 48000, channels: arguments_.output_channel_layout === "mono" ? 1 : 2 } },
       effectiveProfile: { container: "wav", audioCodec: "pcm", audioEncoder: "pcm_f32le" },
+      publication: { version: 1, scheme: "posix-dev-inode", device: "1", inode: "2" },
       audioSequence: { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: arguments_.output_channel_layout, distinctSourceCount: arguments_.sources.length, itemCount: arguments_.items.length, maximumSimultaneousItemCount: 2, outputSampleCount: arguments_.output_duration_ms * 48, estimatedDataBytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4, measuredDataBytes: arguments_.output_duration_ms * 48 * (arguments_.output_channel_layout === "mono" ? 1 : 2) * 4, graphBytes: 1024 }
     } };
     const audioOnly = arguments_.drop_video === true;
@@ -46,7 +47,17 @@ class FakeWorker {
     return { structuredContent: {
       status: "completed", output: arguments_.output,
       probe: { file: arguments_.output, duration: 1.0, ...(!audioOnly ? { video: { codec: videoCodec === "copy" ? this.probeVideoCodec : videoCodec, width: 1920, height: 1080, fps: 30 } } : {}), audio: { codec: audioCodec === "pcm" ? "pcm_s16le" : audioCodec } },
-      effectiveProfile: { container: arguments_.container ?? (String(arguments_.output).split(".").pop()), ...(!audioOnly ? { videoCodec: videoCodec === "copy" ? this.probeVideoCodec : videoCodec, videoEncoder: videoCodec === "copy" ? "copy" : "h264_videotoolbox" } : {}), audioCodec, audioEncoder: audioCodec === "copy" ? "copy" : audioCodec }
+      effectiveProfile: { container: arguments_.container ?? (String(arguments_.output).split(".").pop()), ...(!audioOnly ? { videoCodec: videoCodec === "copy" ? this.probeVideoCodec : videoCodec, videoEncoder: videoCodec === "copy" ? "copy" : "h264_videotoolbox" } : {}), audioCodec, audioEncoder: audioCodec === "copy" ? "copy" : audioCodec },
+      ...(name === "cevra-mux-audio" ? {
+        publication: { version: 1, scheme: "posix-dev-inode", device: "1", inode: "3" },
+        ...(arguments_.duration_validation ? { muxDuration: {
+          version: 1,
+          inputVideoDurationMs: arguments_.duration_validation.video_duration_ms,
+          inputAudioDurationMs: arguments_.duration_validation.audio_duration_ms,
+          outputVideoDurationMs: arguments_.duration_validation.video_duration_ms,
+          outputAudioDurationMs: arguments_.duration_validation.audio_duration_ms
+        } } : {})
+      } : {})
     } };
   }
 }
@@ -341,6 +352,35 @@ test("mux-audio preserves or replaces existing audio according to replaceExistin
   worker.calls.length = 0;
   await engine.execute({ type: "mux-audio", videoUri: "video.mp4", audioUri: "new.wav", outputUri: "replaced.mp4" }, context);
   assert.equal(worker.calls[1].arguments_.replace_existing, true);
+});
+
+test("mux-audio maps closed per-stream duration validation and parses publication evidence", async () => {
+  const worker = new FakeWorker();
+  const result = await new FfmpegMediaEngine(worker).execute({
+    type: "mux-audio", videoUri: "video.mp4", audioUri: "audio.wav", outputUri: "out.mp4",
+    durationValidation: { version: 1, videoDurationMs: 4000, audioDurationMs: 4000, inputToleranceMs: 1, outputAudioToleranceMs: 23 }
+  }, context);
+  assert.deepEqual(worker.calls[1].arguments_.duration_validation, {
+    version: 1, video_duration_ms: 4000, audio_duration_ms: 4000, input_tolerance_ms: 1, output_audio_tolerance_ms: 23
+  });
+  assert.deepEqual(result.publication, { version: 1, scheme: "posix-dev-inode", device: "1", inode: "3" });
+  assert.equal(result.muxDuration.outputAudioDurationMs, 4000);
+});
+
+test("adapter rejects malformed publication and mux-duration evidence", async () => {
+  for (const patch of [
+    { publication: { version: 1, scheme: "posix-dev-inode", device: "1", inode: "0" } },
+    { muxDuration: { version: 1, inputVideoDurationMs: 4000, inputAudioDurationMs: 4000, outputVideoDurationMs: 4000, outputAudioDurationMs: -1 } }
+  ]) {
+    const worker = new FakeWorker();
+    const original = worker.callTool.bind(worker);
+    worker.callTool = async (...args) => {
+      const response = await original(...args);
+      if (args[0] === "cevra-mux-audio") Object.assign(response.structuredContent, patch);
+      return response;
+    };
+    await assert.rejects(() => new FfmpegMediaEngine(worker).execute({ type: "mux-audio", videoUri: "video.mp4", audioUri: "audio.wav", outputUri: "out.mp4" }, context), /evidence is invalid/);
+  }
 });
 
 test("audio mutations validate copied input video against the output container", async () => {

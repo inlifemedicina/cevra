@@ -56,6 +56,11 @@ async function main() {
       "-y", "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=30:duration=4",
       "-an", "-c:v", "h264_videotoolbox", "-b:v", "1500000", "-pix_fmt", "yuv420p", "-movflags", "+faststart", visual
     ]);
+    const shortVisual = path.join(root, "caller-visual-short.mp4");
+    runFfmpeg([
+      "-y", "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=30:duration=3.5",
+      "-an", "-c:v", "h264_videotoolbox", "-b:v", "1500000", "-pix_fmt", "yuv420p", shortVisual
+    ]);
 
     const correct = await runVertical({ sourceA, sourceB, visual, wrongPlacement: false, prefix: "correct" });
     const correctAudio = decodeAudio(correct.output, "correct-decoded.wav");
@@ -68,6 +73,23 @@ async function main() {
     assert.equal(correct.project.exports.length, 1);
     assert.equal(correct.project.exports[0].outputUri, correct.output);
     assert.equal(correct.pcmExistsAfterPromotion, false);
+    assert.ok(Math.abs(correct.muxDuration.inputVideoDurationMs - 4_000) <= 1);
+    assert.ok(Math.abs(correct.muxDuration.inputAudioDurationMs - 4_000) <= 1);
+    assert.ok(Math.abs(correct.muxDuration.outputVideoDurationMs - 4_000) <= 1);
+    assert.ok(Math.abs(correct.muxDuration.outputAudioDurationMs - 4_000) <= 23);
+
+    await assert.rejects(
+      runVertical({ sourceA, sourceB, visual: shortVisual, wrongPlacement: false, prefix: "short-visual" }),
+      (error) => causesContain(error, "mux input video stream duration")
+    );
+    const shortAudio = path.join(root, "short-audio.wav");
+    writeFloatWav(shortAudio, 48_000, 3_500, [250]);
+    await assert.rejects(engine.execute({
+      type: "mux-audio", videoUri: visual, audioUri: shortAudio, outputUri: path.join(root, "short-audio-final.mp4"),
+      replaceExisting: true,
+      durationValidation: { version: 1, videoDurationMs: 4_000, audioDurationMs: 4_000, inputToleranceMs: 1, outputAudioToleranceMs: 23 }
+    }, { jobId: "short-audio-duration-rejection", locale: "en-US" }),
+    (error) => causesContain(error, "mux input audio stream duration"));
 
     const wrong = await runVertical({ sourceA, sourceB, visual, wrongPlacement: true, prefix: "wrong" });
     const wrongAudio = decodeAudio(wrong.output, "wrong-decoded.wav");
@@ -94,7 +116,10 @@ async function main() {
         callerVisualBinding: "project id + revision + snapshot + journal count + producer execution id",
         videoGenerationAtMux: 0,
         audioLossyGenerationsAtMux: 1,
-        packetPayloadAndTimingIdentity: true
+        packetPayloadAndTimingIdentity: true,
+        perStreamDurationEvidence: correct.muxDuration,
+        shortVisualRejected: true,
+        shortAudioRejected: true
       },
       oracle: {
         toleranceMs: TIMING_TOLERANCE_MS,
@@ -129,26 +154,34 @@ async function runVertical({ sourceA, sourceB, visual, wrongPlacement, prefix })
   const plan = service.compile({ audioOutputUri: pcm, outputChannelLayout: "stereo", normalization: { type: "none" } });
   const sampler = sampleProcessTree(() => transport.workerPid);
   const started = performance.now();
-  const outcome = await service.execute({
-    id: `${prefix}-vertical`,
-    plan,
-    visual: {
-      version: 1,
-      uri: visual,
-      projectBinding: plan.projectBinding,
-      durationMs: 4_000,
-      producerExecutionId: "synthetic-caller-visual-fixture"
-    },
-    outputUri: output,
-    exportId: `${prefix}-export`,
-    presetId: "application-audio-plan-functional"
-  });
-  const resources = { ...sampler.stop(), wallMs: round(performance.now() - started) };
-  assert.ok(resources.processCountPeak <= PROCESS_COUNT_CEILING, `process topology exceeded ${PROCESS_COUNT_CEILING}`);
-  assert.ok(resources.rssKiBPeak <= RSS_KIB_CEILING, `RSS exceeded ${RSS_KIB_CEILING} KiB`);
-  assert.deepEqual(outcome.audioCleanup, { removed: [pcm], failed: [] });
-  assert.equal(ownedStagingArtifacts(), 0);
-  return { output, plan, project: outcome.project, resources, pcmExistsAfterPromotion: exists(pcm) };
+  let resources;
+  try {
+    const outcome = await service.execute({
+      id: `${prefix}-vertical`,
+      plan,
+      visual: {
+        version: 1,
+        uri: visual,
+        projectBinding: plan.projectBinding,
+        durationMs: 4_000,
+        producerExecutionId: "synthetic-caller-visual-fixture"
+      },
+      outputUri: output,
+      exportId: `${prefix}-export`,
+      presetId: "application-audio-plan-functional"
+    });
+    resources = { ...sampler.stop(), wallMs: round(performance.now() - started) };
+    assert.ok(resources.processCountPeak <= PROCESS_COUNT_CEILING, `process topology exceeded ${PROCESS_COUNT_CEILING}`);
+    assert.ok(resources.rssKiBPeak <= RSS_KIB_CEILING, `RSS exceeded ${RSS_KIB_CEILING} KiB`);
+    assert.deepEqual(outcome.audioCleanup, { removed: [pcm], failed: [] });
+    assert.equal(ownedStagingArtifacts(), 0);
+    return {
+      output, plan, project: outcome.project, resources, pcmExistsAfterPromotion: exists(pcm),
+      muxDuration: outcome.muxExecution.attempts.at(-1).result.muxDuration
+    };
+  } finally {
+    if (!resources) sampler.stop();
+  }
 }
 
 function projectFixture(sourceA, sourceB, wrongPlacement) {
@@ -303,5 +336,11 @@ function exists(file) { try { statSync(file); return true; } catch { return fals
 function required(name) { const value = process.env[name]; if (!value) throw new Error(`${name} is required`); return value; }
 function round(value) { return Math.round(value * 1000) / 1000; }
 function firstLine(value) { return value.split(/\r?\n/u)[0]; }
+function causesContain(error, fragment) {
+  for (let current = error; current; current = current.cause) {
+    if (String(current.message ?? current).includes(fragment)) return true;
+  }
+  return false;
+}
 
 await main();

@@ -746,6 +746,17 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
         },
         "required": ["source_id", "source_start_ms", "source_end_ms", "timeline_start_ms"],
     }
+    mux_duration_validation = {
+        "type": "object", "additionalProperties": False,
+        "properties": {
+            "version": {"type": "integer", "enum": [1]},
+            "video_duration_ms": positive_millisecond,
+            "audio_duration_ms": positive_millisecond,
+            "input_tolerance_ms": {"type": "integer", "minimum": 0, "maximum": 1000},
+            "output_audio_tolerance_ms": {"type": "integer", "minimum": 0, "maximum": 1000},
+        },
+        "required": ["version", "video_duration_ms", "audio_duration_ms", "input_tolerance_ms", "output_audio_tolerance_ms"],
+    }
     schemas = {
         "cevra-measure-audio": {
             "properties": {"version": {"type": "integer", "enum": [1]}, "input": path,
@@ -774,7 +785,7 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
             "required": ["input", "output"],
         },
         "cevra-mux-audio": {
-            "properties": {"video": path, "audio": path, "output": path, "container": {"type": "string", "enum": sorted(DELIVERY_CONTAINERS)}, "audio_codec": {"type": "string", "enum": sorted(DELIVERY_AUDIO_CODECS)}, "replace_existing": {"type": "boolean"}},
+            "properties": {"video": path, "audio": path, "output": path, "container": {"type": "string", "enum": sorted(DELIVERY_CONTAINERS)}, "audio_codec": {"type": "string", "enum": sorted(DELIVERY_AUDIO_CODECS)}, "replace_existing": {"type": "boolean"}, "duration_validation": mux_duration_validation},
             "required": ["video", "audio", "output"],
         },
         "cevra-render-audio-sequence": {

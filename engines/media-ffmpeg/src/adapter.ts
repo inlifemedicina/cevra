@@ -138,7 +138,14 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
           output: operation.outputUri,
           container,
           audio_codec: rule.defaultAudioCodec,
-          replace_existing: operation.replaceExisting ?? true
+          replace_existing: operation.replaceExisting ?? true,
+          ...(operation.durationValidation ? { duration_validation: {
+            version: operation.durationValidation.version,
+            video_duration_ms: operation.durationValidation.videoDurationMs,
+            audio_duration_ms: operation.durationValidation.audioDurationMs,
+            input_tolerance_ms: operation.durationValidation.inputToleranceMs,
+            output_audio_tolerance_ms: operation.durationValidation.outputAudioToleranceMs
+          } } : {})
         }), operation.outputUri);
       }
       case "render-audio-sequence":
@@ -331,14 +338,44 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
   if (!parsedProbe.hasVideo && !parsedProbe.hasAudio) throw new Error("Media worker output probe contains no audio or video stream.");
   const effectiveProfile = parseEffectiveProfile(payload.effectiveProfile);
   const audioSequence = parseAudioSequenceEvidence(payload.audioSequence);
+  const publication = parsePublicationEvidence(payload.publication);
+  const muxDuration = parseMuxDurationEvidence(payload.muxDuration);
   return {
     type: "file",
     outputUri: typeof payload.output === "string" ? payload.output : fallbackUri,
     ...(probe && finite(probe.duration) ? { durationMs: Math.round(probe.duration * 1000) } : {}),
     probe: parsedProbe,
     effectiveProfile,
-    ...(audioSequence ? { audioSequence } : {})
+    ...(audioSequence ? { audioSequence } : {}),
+    ...(publication ? { publication } : {}),
+    ...(muxDuration ? { muxDuration } : {})
   };
+}
+
+function parsePublicationEvidence(value: unknown) {
+  if (value === undefined) return undefined;
+  const allowed = new Set(["version", "scheme", "device", "inode"]);
+  if (!isRecord(value) || Object.keys(value).some((key) => !allowed.has(key))
+    || value.version !== 1 || value.scheme !== "posix-dev-inode"
+    || typeof value.device !== "string" || !/^\d+$/.test(value.device)
+    || typeof value.inode !== "string" || !/^[1-9]\d*$/.test(value.inode)) {
+    throw new Error("Media worker publication evidence is invalid.");
+  }
+  return value as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["publication"]>;
+}
+
+function parseMuxDurationEvidence(value: unknown) {
+  if (value === undefined) return undefined;
+  const allowed = new Set(["version", "inputVideoDurationMs", "inputAudioDurationMs", "outputVideoDurationMs", "outputAudioDurationMs"]);
+  if (!isRecord(value) || Object.keys(value).some((key) => !allowed.has(key)) || value.version !== 1) {
+    throw new Error("Media worker mux duration evidence is invalid.");
+  }
+  for (const field of ["inputVideoDurationMs", "inputAudioDurationMs", "outputVideoDurationMs", "outputAudioDurationMs"] as const) {
+    if (!Number.isSafeInteger(value[field]) || (value[field] as number) < 1) {
+      throw new Error("Media worker mux duration evidence is invalid.");
+    }
+  }
+  return value as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["muxDuration"]>;
 }
 
 function parseAudioSequenceEvidence(value: unknown) {

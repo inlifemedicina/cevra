@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import io
+import json
 import sys
 import tarfile
 import tempfile
@@ -114,6 +115,18 @@ class WorkerContractTests(unittest.TestCase):
             })
         with self.assertRaisesRegex(ValueError, "outside its allowed values"):
             worker._validate_tool_arguments("cevra-render-audio-sequence", {**arguments, "output_channel_layout": "surround"})
+
+    def test_mux_duration_rpc_schema_is_closed_and_bounded(self) -> None:
+        arguments = {
+            "video": "/media/video.mp4", "audio": "/media/audio.wav", "output": "/media/out.mp4",
+            "duration_validation": {"version": 1, "video_duration_ms": 4000, "audio_duration_ms": 4000,
+                                    "input_tolerance_ms": 1, "output_audio_tolerance_ms": 23},
+        }
+        worker._validate_tool_arguments("cevra-mux-audio", arguments)
+        with self.assertRaisesRegex(ValueError, "unexpected fields: future"):
+            worker._validate_tool_arguments("cevra-mux-audio", {
+                **arguments, "duration_validation": {**arguments["duration_validation"], "future": True},
+            })
 
     def test_configure_rejects_gpl_encoder_outside_runtime_allowlist(self) -> None:
         caps = {"platform": "darwin", "arch": "arm64", "encoders": ["libx264", "h264_videotoolbox"], "hwaccels": ["videotoolbox"]}
@@ -453,6 +466,7 @@ class MuxAudioNativeToolTests(unittest.TestCase):
             common = self.Common(video, audio, output)
             result = native_tools._run_mux_audio(common, args)
             self.assertEqual(result["structuredContent"]["output"], str(output))
+            self.assertEqual(result["structuredContent"]["publication"]["scheme"], "posix-dev-inode")
             self.assertEqual(output.read_bytes(), b"owned staged mux")
             self.assertEqual(len(common.commands), 1)
             self.assertIn("-c:v", common.commands[0])
@@ -466,6 +480,41 @@ class MuxAudioNativeToolTests(unittest.TestCase):
                 native_tools._run_mux_audio(common, args)
             self.assertEqual(output.read_bytes(), b"foreign race winner")
             self.assertEqual(list(Path(directory).glob(".cevra-mux-audio-*")), [])
+
+    def test_mux_file_result_failure_preserves_a_post_link_foreign_replacement(self) -> None:
+        class ReplacementCommon(self.Common):
+            verify_calls = 0
+            def verify_output(inner_self, path: str) -> dict[str, object]:
+                inner_self.verify_calls += 1
+                if inner_self.verify_calls == 2:
+                    replacement = inner_self.output.with_suffix(".foreign")
+                    replacement.write_bytes(b"foreign replacement")
+                    os.replace(replacement, inner_self.output)
+                    raise RuntimeError("injected file result failure")
+                return super().verify_output(path)
+
+        with tempfile.TemporaryDirectory() as directory:
+            args, video, audio, output = self.arguments(Path(directory))
+            common = ReplacementCommon(video, audio, output)
+            with self.assertRaisesRegex(RuntimeError, "publication identity changed"):
+                native_tools._run_mux_audio(common, args)
+            self.assertEqual(output.read_bytes(), b"foreign replacement")
+
+    def test_mux_staging_cleanup_failure_rolls_back_only_the_exact_published_inode(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            args, video, audio, output = self.arguments(Path(directory))
+            common = self.Common(video, audio, output)
+            original_unlink = Path.unlink
+
+            def fail_staging_cleanup(path: Path, *call_args: object, **call_kwargs: object) -> None:
+                if path.name == "output.mp4" and path.parent.name.startswith(".cevra-mux-audio-"):
+                    raise OSError("injected mux staging cleanup failure")
+                original_unlink(path, *call_args, **call_kwargs)
+
+            with mock.patch.object(Path, "unlink", fail_staging_cleanup):
+                with self.assertRaisesRegex(RuntimeError, "staging output cleanup failed"):
+                    native_tools._run_mux_audio(common, args)
+            self.assertFalse(output.exists())
 
     def test_mux_rejects_symlink_inputs_and_preexisting_outputs_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -481,6 +530,56 @@ class MuxAudioNativeToolTests(unittest.TestCase):
                 native_tools._run_mux_audio(common, args)
             self.assertEqual(output.read_bytes(), b"preexisting")
             self.assertEqual(common.commands, [])
+
+    def test_published_identity_guard_preserves_foreign_file_and_symlink_replacements(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX dev/inode identity is not available")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output.mp4"
+            output.write_bytes(b"owned")
+            evidence = native_tools._publication_evidence(output)
+            self.assertIsNotNone(evidence)
+
+            replacement = root / "replacement"
+            replacement.write_bytes(b"foreign")
+            os.replace(replacement, output)
+            with self.assertRaisesRegex(RuntimeError, "identity changed"):
+                native_tools._unlink_published(output, evidence, "mux output")
+            self.assertEqual(output.read_bytes(), b"foreign")
+
+            output.unlink()
+            target = root / "target"
+            target.write_bytes(b"target")
+            output.symlink_to(target)
+            with self.assertRaisesRegex(RuntimeError, "identity changed"):
+                native_tools._unlink_published(output, evidence, "mux output")
+            self.assertTrue(output.is_symlink())
+            self.assertEqual(target.read_bytes(), b"target")
+
+    def test_published_identity_guard_removes_only_the_exact_published_inode(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX dev/inode identity is not available")
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output.mp4"
+            output.write_bytes(b"owned")
+            evidence = native_tools._publication_evidence(output)
+            native_tools._unlink_published(output, evidence, "mux output")
+            self.assertFalse(output.exists())
+
+    def test_selected_stream_duration_uses_managed_ffprobe_and_never_container_duration(self) -> None:
+        class ProbeCommon:
+            @staticmethod
+            def require_tool(name: str) -> str:
+                self.assertEqual(name, "ffprobe")
+                return "/managed/ffprobe"
+
+        payload = {"streams": [{"index": 0, "time_base": "1/48000", "duration_ts": 192000, "duration": "9.0"}]}
+        with mock.patch.object(job_control, "run", return_value=mock.Mock(stdout=json.dumps(payload))):
+            self.assertEqual(native_tools._selected_stream_duration_ms(ProbeCommon(), Path("input"), "a:0", "audio"), 4000)
+        with mock.patch.object(job_control, "run", return_value=mock.Mock(stdout=json.dumps({"format": {"duration": "4.0"}, "streams": [{}]}))):
+            with self.assertRaisesRegex(RuntimeError, "duration is unavailable"):
+                native_tools._selected_stream_duration_ms(ProbeCommon(), Path("input"), "v:0", "video")
 
 
 class RuntimeBuildTests(unittest.TestCase):
