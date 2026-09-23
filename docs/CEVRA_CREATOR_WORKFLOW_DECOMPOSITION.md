@@ -223,7 +223,7 @@ Observed interface behaviors include:
 | Preview server polls loose `state.json` | Replace with CEVRA project/application state projection |
 | Shared immutable preview app across sessions | Preserve reusable UI component concept |
 
-**Full requirement:** Creator Full keeps a real visual workspace. Conversation and manual controls are peers over the same project.
+**Full requirement:** CEVRA Studio keeps a real visual workspace. Conversation and manual controls are peers over the same project.
 
 ---
 
@@ -367,7 +367,7 @@ direct UI manipulation
 
 Both then produce one new revision. The host sees compact deltas, not a parallel state.
 
-This should be preserved as a Creator Full acceptance criterion.
+This should be preserved as a CEVRA Studio acceptance criterion.
 
 ---
 
@@ -575,8 +575,8 @@ These are candidates to reconcile with the existing Product Owner acceptance cat
 - richer audio/music/SFX;
 - Agent Protocol concrete tool surface;
 - Creator standalone packaging;
-- Creator Full visual workspace packaging;
-- Lite/Full final boundary;
+- CEVRA Studio visual workspace packaging;
+- CEVRA Creator / CEVRA Studio final boundary;
 - installation/update implementation for Creator;
 - permission/security UX;
 - mobile/remote-host acceptance tests.
@@ -589,11 +589,11 @@ These are recorded status summaries, not fresh execution verification. Revalidat
 
 This section is a **decision queue**, not an approval.
 
-1. **Creator Lite vs Full exact product boundary.**
+1. **CEVRA Creator vs CEVRA Studio exact product boundary.**
 2. **Host experience in Claude Code:** activation, session start, progress, preview/result presentation.
 3. **Evidence contract:** what the model sees first, and escalation levels.
 4. **Strategy/approval/autonomy policy.**
-5. **Creator Full workspace minimum visual surface.**
+5. **CEVRA Studio workspace minimum visual surface.**
 6. **Media/file/staging lifecycle and cleanup/retention.**
 7. **Security/permissions for local files, network/providers and external actions.**
 8. **Installation/update/compatibility contract.**
