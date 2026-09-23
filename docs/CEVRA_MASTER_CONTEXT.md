@@ -1702,6 +1702,17 @@ Current dependency blockers/gates:
 
 ---
 
+## 2026-09-23 — Creator Lite/Full product boundary
+
+- **CANONICAL:** provisional Lite and Full share one Creator editorial/creative/QA core, Project IR/ProjectHistory, Agent Protocol and execution architecture.
+- **CANONICAL:** Lite is a complete conversational-first editing product: it can analyze, edit, preview, refine and export a final local video; it is not a demo or partial editor.
+- **CANONICAL:** Full includes the entire Lite workflow and adds the directly editable visual workspace, timeline, inspector, More Controls and Advanced over the same project/history.
+- **CANONICAL:** Lite/Full are not defined by separate intelligence quality or duplicated runtimes. Optional capability entitlement/hardware/provider/commercial limits remain separate decisions.
+- **NAMING:** `Lite` / `Full` are provisional internal labels. Preferred later naming direction: **CEVRA Creator** and **CEVRA Creator Studio**; final commercial names remain undecided.
+- **ADR:** docs/adr/0027-creator-lite-full-product-boundary.md.
+
+---
+
 # 26. Explicitly unresolved decisions
 
 Do not guess these in future chats:
