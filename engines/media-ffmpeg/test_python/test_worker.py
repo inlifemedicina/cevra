@@ -401,6 +401,88 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
                     native_tools._run_audio_sequence(common, args)
 
 
+class MuxAudioNativeToolTests(unittest.TestCase):
+    class Common:
+        def __init__(self, video: Path, audio: Path, output: Path, race: bool = False) -> None:
+            self.video = video.resolve()
+            self.audio = audio.resolve()
+            self.output = output
+            self.race = race
+            self.commands: list[list[str]] = []
+
+        def probe(self, path: str, role: str = "input") -> dict[str, object]:
+            resolved = Path(path).resolve()
+            if role == "output" or resolved == self.output.resolve(strict=False):
+                return {"file": path, "duration": 4.0, "video": {"codec": "h264"}, "audio": {"codec": "aac"}}
+            if resolved == self.video:
+                return {"duration": 4.0, "video": {"codec": "h264"}, "audio": {"codec": "aac"}}
+            if resolved == self.audio:
+                return {"duration": 4.0, "video": None, "audio": {"codec": "pcm_f32le"}}
+            raise AssertionError(f"unexpected probe path: {path}")
+
+        def verify_output(self, path: str) -> dict[str, object]:
+            return {"file": path, "duration": 4.0, "video": {"codec": "h264"}, "audio": {"codec": "aac"}}
+
+        def ffmpeg_base(self, overwrite: bool = True) -> list[str]:
+            return ["ffmpeg", "-y" if overwrite else "-n"]
+
+        def require_tool(self, name: str) -> str:
+            return name
+
+        def run(self, command: list[str], **_: object) -> object:
+            if "-encoders" in command:
+                return mock.Mock(stdout=" A..... aac", stderr="", returncode=0)
+            self.commands.append(command)
+            Path(command[-1]).write_bytes(b"owned staged mux")
+            if self.race:
+                self.output.write_bytes(b"foreign race winner")
+            return mock.Mock(stdout="", stderr="", returncode=0)
+
+    @staticmethod
+    def arguments(root: Path) -> tuple[dict[str, object], Path, Path, Path]:
+        video = root / "picture.mp4"
+        audio = root / "mix.wav"
+        output = root / "final.mp4"
+        video.write_bytes(b"video fixture")
+        audio.write_bytes(b"audio fixture")
+        return ({"video": str(video), "audio": str(audio), "output": str(output), "replace_existing": True}, video, audio, output)
+
+    def test_mux_publishes_exclusively_and_cleans_owned_staging(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            args, video, audio, output = self.arguments(Path(directory))
+            common = self.Common(video, audio, output)
+            result = native_tools._run_mux_audio(common, args)
+            self.assertEqual(result["structuredContent"]["output"], str(output))
+            self.assertEqual(output.read_bytes(), b"owned staged mux")
+            self.assertEqual(len(common.commands), 1)
+            self.assertIn("-c:v", common.commands[0])
+            self.assertEqual(list(Path(directory).glob(".cevra-mux-audio-*")), [])
+
+    def test_mux_preserves_a_foreign_race_winner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            args, video, audio, output = self.arguments(Path(directory))
+            common = self.Common(video, audio, output, race=True)
+            with self.assertRaises(FileExistsError):
+                native_tools._run_mux_audio(common, args)
+            self.assertEqual(output.read_bytes(), b"foreign race winner")
+            self.assertEqual(list(Path(directory).glob(".cevra-mux-audio-*")), [])
+
+    def test_mux_rejects_symlink_inputs_and_preexisting_outputs_before_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args, video, audio, output = self.arguments(root)
+            linked = root / "linked.mp4"
+            linked.symlink_to(video)
+            common = self.Common(video, audio, output)
+            with self.assertRaisesRegex(ValueError, "video input must be a non-symlink regular file"):
+                native_tools._run_mux_audio(common, {**args, "video": str(linked)})
+            output.write_bytes(b"preexisting")
+            with self.assertRaises(FileExistsError):
+                native_tools._run_mux_audio(common, args)
+            self.assertEqual(output.read_bytes(), b"preexisting")
+            self.assertEqual(common.commands, [])
+
+
 class RuntimeBuildTests(unittest.TestCase):
     def test_sdr_encoder_bt709_tagging_honors_compatibility_flag(self) -> None:
         tagged = runtime_args.sdr_encoder_args("h264_videotoolbox")

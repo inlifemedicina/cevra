@@ -473,17 +473,21 @@ def _run_transcode(common: Any, runtime: Any, args: Dict[str, Any]) -> Dict[str,
 
 
 def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
-    video_path = _required_string(args, "video")
-    audio_path = _required_string(args, "audio")
-    output = _required_string(args, "output")
+    video_path = _absolute_regular_input(_required_string(args, "video"), "video input")
+    audio_path = _absolute_regular_input(_required_string(args, "audio"), "audio input")
+    output = _absolute_new_mux_output(_required_string(args, "output"))
+    if video_path == audio_path:
+        raise ValueError("video and audio inputs must be distinct")
+    if output.resolve(strict=False) in {video_path, audio_path}:
+        raise ValueError("mux output aliases an input")
     replace_existing = _optional_boolean(args, "replace_existing", True)
-    video_meta = common.probe(video_path)
-    audio_meta = common.probe(audio_path)
+    video_meta = common.probe(str(video_path))
+    audio_meta = common.probe(str(audio_path))
     if not video_meta.get("video"):
         raise ValueError("video input has no video stream")
     if not audio_meta.get("audio"):
         raise ValueError("audio input has no audio stream")
-    container = _resolve_container(args, output)
+    container = _resolve_container(args, str(output))
     rule = DELIVERY_MATRIX[container]
     if rule["audio_only"]:
         raise ValueError(f"{container} is audio-only and cannot be used for muxing")
@@ -496,13 +500,56 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     elif audio_codec not in rule["audio"]:
         raise ValueError(f"audio codec {audio_codec} is incompatible with {container}")
 
-    cmd = common.ffmpeg_base() + ["-i", video_path, "-i", audio_path, "-map", "0:v:0", "-c:v", "copy", "-map", "1:a:0"]
-    if not replace_existing and video_meta.get("audio"):
-        cmd += ["-map", "0:a:0"]
-    cmd += _audio_args(common, audio_codec, True)
-    cmd += _container_args(container)
-    common.run(cmd + [output])
-    return _file_result(common, output, {"replacedExistingAudio": replace_existing})
+    staging_directory: Optional[Path] = None
+    staging_output: Optional[Path] = None
+    promoted_output = False
+    cleanup_errors: List[str] = []
+    try:
+        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-mux-audio-", dir=output.parent))
+        staging_output = staging_directory / f"output{output.suffix.lower()}"
+        cmd = common.ffmpeg_base(overwrite=False) + [
+            "-i", str(video_path), "-i", str(audio_path),
+            "-map", "0:v:0", "-c:v", "copy", "-map", "1:a:0",
+        ]
+        if not replace_existing and video_meta.get("audio"):
+            cmd += ["-map", "0:a:0"]
+        cmd += _audio_args(common, audio_codec, True)
+        cmd += _container_args(container)
+        try:
+            common.run(cmd + [str(staging_output)])
+            staged_probe = common.verify_output(str(staging_output))
+            if not isinstance(staged_probe, dict) or not staged_probe.get("video") or not staged_probe.get("audio"):
+                raise RuntimeError("mux output failed its audio/video postcondition")
+            os.link(staging_output, output, follow_symlinks=False)
+            promoted_output = True
+            return _file_result(common, str(output), {"replacedExistingAudio": replace_existing})
+        except BaseException as execution_error:
+            if promoted_output:
+                try:
+                    output.unlink(missing_ok=True)
+                except OSError as output_cleanup_error:
+                    raise RuntimeError(
+                        f"mux failed and its owned promoted output cleanup failed: {output_cleanup_error}"
+                    ) from execution_error
+            raise
+    finally:
+        if staging_output is not None:
+            try:
+                staging_output.unlink(missing_ok=True)
+            except OSError as exc:
+                cleanup_errors.append(f"staging output cleanup failed: {exc}")
+        if staging_directory is not None:
+            try:
+                staging_directory.rmdir()
+            except OSError as exc:
+                cleanup_errors.append(f"staging directory cleanup failed: {exc}")
+        if cleanup_errors:
+            if promoted_output:
+                try:
+                    output.unlink(missing_ok=True)
+                except OSError as exc:
+                    cleanup_errors.append(f"promoted output rollback failed: {exc}")
+            raise RuntimeError(f"mux owned artifact cleanup failed: {'; '.join(cleanup_errors)}")
 
 
 def _absolute_regular_input(raw: str, label: str) -> Path:
@@ -532,6 +579,26 @@ def _absolute_new_output(raw: str) -> Path:
     else:
         if path.is_symlink():
             raise ValueError("media output path must not be a symlink")
+        raise FileExistsError(f"refusing to overwrite existing output: {path}")
+    return path.absolute()
+
+
+def _absolute_new_mux_output(raw: str) -> Path:
+    path = Path(raw)
+    if not path.is_absolute() or path.suffix.lower().removeprefix(".") not in DELIVERY_MATRIX:
+        raise ValueError("mux output must be an absolute supported media path")
+    if DELIVERY_MATRIX[path.suffix.lower().removeprefix(".")]["audio_only"]:
+        raise ValueError("mux output must use an audio/video container")
+    parent = path.parent
+    if not parent.is_dir() or parent.is_symlink():
+        raise ValueError("mux output parent must be an existing non-symlink directory")
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        if path.is_symlink():
+            raise ValueError("mux output path must not be a symlink")
         raise FileExistsError(f"refusing to overwrite existing output: {path}")
     return path.absolute()
 
