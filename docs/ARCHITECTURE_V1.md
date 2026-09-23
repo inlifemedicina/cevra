@@ -247,6 +247,20 @@ A router selects only the skills and playbooks relevant to the current task. It 
 
 Before incorporating an external skill, CEVRA verifies source, version, license and commercial compatibility. MIT, Apache and BSD sources are preferred. Paid or proprietary skills, including BUDOSKILL, are not copied or redistributed without an explicit license. Public descriptions may guide an original implementation; permissive public skills may be studied or reused according to their licenses.
 
+### 13.1 Creator hybrid intelligence layering
+
+Creator uses three coordinated intelligence layers:
+
+- **Host AI:** conversation, contextual interpretation, open-ended creative reasoning and proposal generation over bounded CEVRA evidence.
+- **Creator Skill:** orchestration/playbook and progressive-disclosure layer that defines how the host requests evidence and capabilities, proposes strategy, executes, previews, refines and exports.
+- **CEVRA Creative Intelligence/Core:** reusable editorial knowledge, invariants, typed validation, Project IR/history, QA and execution semantics shared by Creator Lite, Creator Full and Vids.
+
+The host may personalize creative reasoning to the user's stated audience, niche, format and goals, and may consume current external evidence when an authorized provider/capability exists. External recommendations remain non-canonical evidence. Provider-specific or transient social-platform guidance must not become generic Core truth.
+
+Critical invariants may be taught in the Skill and independently enforced by Core validation. No provider owns canonical audiovisual state.
+
+Useful EDVID behavior is inventoried and clean-room classified into HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE-RUNTIME rather than copied wholesale into one host-specific skill. See [ADR 0023](adr/0023-creator-skill-intelligence-layering.md).
+
 ## 14. Marketplace and package direction
 
 Marketplace belongs to Orbit. The Vids core must be excellent and complete; Marketplace provides specialization and expansion. It cannot sell back basic functionality needed to reach the improved EDVID baseline.
