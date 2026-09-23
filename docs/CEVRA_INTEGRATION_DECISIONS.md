@@ -109,6 +109,16 @@ Export local é sempre independente. Publishing e performance analytics ficam p�
 
 **Creator Skill** é superfície agent-native standalone. Lite e Full compartilham um único núcleo editorial/criativo/QA; Full possui workspace visual e entrega vídeo final sem Desktop. Reutilizar Project IR, runtimes, composição e UI quando prático; subset necessário é versionado/conversível, não semântica divergente. Handoff Creator→Vids é opcional.
 
+### Creator runtime topology — approved 2026-09-22
+
+Creator segue o modelo de simplicidade agent-native observado no EDVID, mas não replica um segundo stack audiovisual. A distribuição Creator é independente do CEVRA Vids Desktop e não exige Desktop instalado, aberto ou em execução. Ela consome uma distribuição standalone compatível do **mesmo CEVRA Core reutilizável** usado pelo Vids.
+
+O Core necessário ao Creator deve ser callable sem a camada de apresentação/Tauri e preservar Project IR/ProjectHistory, application services, Media Runtime, transcription/alignment, Creative Intelligence, QA, composition adapters, preview/render/export e demais fundações pertinentes. Desktop e Creator são consumidores distintos do mesmo núcleo; melhorias compartilháveis não são reimplementadas em paralelo.
+
+“Headless” define a fronteira arquitetural, não o processo final: biblioteca + launcher, processo local dedicado ou outra topologia ficam para decisão posterior. Ver ADR 0022.
+
+A experiência externa permanece EDVID-level simple: mídia + instrução natural → análise/estratégia → execução → preview → refinamento conversacional → resultado local. Project IR, engines, schemas e detalhes de runtime permanecem invisíveis ao usuário comum.
+
 ## Creation Modes V1
 
 Faceless Explainer e Slideshow são direção V1; Music-to-video é condicional a análise proporcional de ritmo/beat/onset/energy. Todos são workflows sobre as mesmas fundações, não novos produtos/timelines/runtimes. Faceless pode usar roteiro e TTS provider-neutral; TTS genérico não autoriza voice clone. Brand Kit V1 cobre logo, fontes, cores e componentes/presets; Figma é importador opcional. Product Launch Video e WebGPU/TypeGPU ficam pós-V1.
