@@ -213,6 +213,18 @@ def _publication_evidence(path: Path) -> Optional[Dict[str, Any]]:
     }
 
 
+def _matches_publication(path: Path, evidence: Optional[Dict[str, Any]]) -> bool:
+    if evidence is None or evidence.get("scheme") != "posix-dev-inode":
+        return False
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISREG(metadata.st_mode) \
+        and str(metadata.st_dev) == evidence.get("device") \
+        and str(metadata.st_ino) == evidence.get("inode")
+
+
 def _unlink_published(path: Path, evidence: Optional[Dict[str, Any]], label: str) -> None:
     if evidence is None:
         raise RuntimeError(f"{label} ownership cannot be re-proven on this platform; preserving destination")
@@ -648,9 +660,12 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
                     "outputVideoDurationMs": output_video_duration_ms,
                     "outputAudioDurationMs": output_audio_duration_ms,
                 })
+            promoted_evidence = _publication_evidence(staging_output)
             os.link(staging_output, output, follow_symlinks=False)
-            promoted_output = True
-            promoted_evidence = _publication_evidence(output)
+            if promoted_evidence is not None:
+                if not _matches_publication(output, promoted_evidence):
+                    raise RuntimeError("mux output publication identity changed; preserving destination")
+                promoted_output = True
             return _file_result(common, str(output), {
                 "replacedExistingAudio": replace_existing,
                 **({"publication": promoted_evidence} if promoted_evidence else {}),
@@ -980,9 +995,12 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
                 raise RuntimeError(
                     "audio sequence output failed its measured sample-frame/data-size postcondition"
                 )
+            promoted_evidence = _publication_evidence(staging_output)
             os.link(staging_output, output, follow_symlinks=False)
-            promoted_output = True
-            promoted_evidence = _publication_evidence(output)
+            if promoted_evidence is not None:
+                if not _matches_publication(output, promoted_evidence):
+                    raise RuntimeError("audio sequence output publication identity changed; preserving destination")
+                promoted_output = True
             result = _file_result(common, str(output), {
                 **({"publication": promoted_evidence} if promoted_evidence else {}),
                 "audioSequence": {

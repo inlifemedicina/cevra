@@ -379,6 +379,47 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
             self.assertEqual(requested_output.read_bytes(), b"foreign race winner")
             self.assertEqual(list(Path(directory).glob(".cevra-audio-sequence-*")), [])
 
+    def test_audio_sequence_confirms_staging_identity_after_link_before_claiming_ownership(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX dev/inode identity is not available")
+
+        class SuccessfulCommon:
+            def __init__(self, metadata: dict[str, object]) -> None:
+                self.metadata = metadata
+
+            def probe(self, path: str, role: str = "input") -> dict[str, object]:
+                if role == "output":
+                    return {"file": path, "duration": 0.3, "size_bytes": 115_314,
+                            "audio": {"codec": "pcm_f32le", "sample_rate": 48_000, "channels": 2}}
+                return self.metadata[path]
+
+            def verify_output(self, path: str) -> dict[str, object]:
+                return self.probe(path, "output")
+
+            def ffmpeg_base(self, overwrite: bool = True) -> list[str]:
+                return ["ffmpeg", "-n"]
+
+            def run(self, command: list[str]) -> None:
+                write_sparse_float_wav(Path(command[-1]), 14_400)
+
+        with tempfile.TemporaryDirectory() as directory:
+            args = self.arguments(Path(directory))
+            metadata = args.pop("_metadata")
+            output = Path(str(args["output"]))
+            common = SuccessfulCommon(metadata)
+            original_link = os.link
+
+            def replace_after_link(source: object, destination: object, **kwargs: object) -> None:
+                original_link(source, destination, **kwargs)
+                Path(destination).unlink()
+                Path(destination).write_bytes(b"foreign post-link replacement")
+
+            with mock.patch.object(os, "link", replace_after_link):
+                with self.assertRaisesRegex(RuntimeError, "publication identity changed"):
+                    native_tools._run_audio_sequence(common, args)
+            self.assertEqual(output.read_bytes(), b"foreign post-link replacement")
+            self.assertEqual(list(Path(directory).glob(".cevra-audio-sequence-*")), [])
+
     def test_graph_cleanup_failure_is_reported(self) -> None:
         class SuccessfulCommon:
             def __init__(self, metadata: dict[str, object]) -> None:
@@ -479,6 +520,25 @@ class MuxAudioNativeToolTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 native_tools._run_mux_audio(common, args)
             self.assertEqual(output.read_bytes(), b"foreign race winner")
+            self.assertEqual(list(Path(directory).glob(".cevra-mux-audio-*")), [])
+
+    def test_mux_confirms_staging_identity_after_link_before_claiming_ownership(self) -> None:
+        if os.name != "posix":
+            self.skipTest("POSIX dev/inode identity is not available")
+        with tempfile.TemporaryDirectory() as directory:
+            args, video, audio, output = self.arguments(Path(directory))
+            common = self.Common(video, audio, output)
+            original_link = os.link
+
+            def replace_after_link(source: object, destination: object, **kwargs: object) -> None:
+                original_link(source, destination, **kwargs)
+                Path(destination).unlink()
+                Path(destination).write_bytes(b"foreign post-link replacement")
+
+            with mock.patch.object(os, "link", replace_after_link):
+                with self.assertRaisesRegex(RuntimeError, "publication identity changed"):
+                    native_tools._run_mux_audio(common, args)
+            self.assertEqual(output.read_bytes(), b"foreign post-link replacement")
             self.assertEqual(list(Path(directory).glob(".cevra-mux-audio-*")), [])
 
     def test_mux_file_result_failure_preserves_a_post_link_foreign_replacement(self) -> None:
