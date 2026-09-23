@@ -1691,6 +1691,17 @@ Current dependency blockers/gates:
 
 ---
 
+## 2026-09-23 — Creator-oriented EDVID end-to-end decomposition — COMPLETED
+
+- **AUDIT COMPLETED:** the pinned 83-file EDVID baseline was re-decomposed specifically for Creator product/architecture using the existing canonical parity evidence plus direct reinspection of Skill, preview UI, style catalog, shortform/longform references, installer/runtime workflow and helper topology.
+- **EVIDENCE:** `docs/CEVRA_CREATOR_EDVID_DECOMPOSITION.md` maps the complete user journey to HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE / VISUAL WORKSPACE / PROVIDER boundaries.
+- **FINDING:** no observed EDVID user-experience requirement forces a reversal of ADRs 0022–0026. The primary product risk is losing EDVID simplicity through overexposed internal complexity, not inability of CEVRA architecture to reproduce the workflow.
+- **FINDING:** EDVID's direct visual preview/timeline/style chooser is a first-class part of its experience and must remain represented in Creator Full planning; EDVID is not a chat-only product.
+- **FINDING:** EDVID's token-economy patterns (packed transcript, bounded visual review, numeric-first QA, cached analysis, selective context) are high-value behaviors to preserve and extend.
+- **PROCESS:** the decision queue in the decomposition document is product input only; it does not pre-approve Lite/Full, host UX, evidence, autonomy, workspace, security, installation or implementation details.
+
+---
+
 # 26. Explicitly unresolved decisions
 
 Do not guess these in future chats:
