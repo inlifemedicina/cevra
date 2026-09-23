@@ -32,6 +32,7 @@ class FakeCommon:
         self.command = []
         self.graph = ""
         self.encoders = encoders if encoders is not None else ["aac", "opus", "pcm_s16le"]
+        self.write_output = False
 
     def probe(self, path: str, role: str = "input") -> Dict[str, Any]:
         if role == "output":
@@ -39,7 +40,9 @@ class FakeCommon:
         return self.metadata[path]
 
     def verify_output(self, path: str) -> Dict[str, Any]:
-        return self.probe(path, "output")
+        if Path(path).suffix.lower() == ".wav":
+            return self.probe(path, "output")
+        return {"file": path, "duration": 4.0, "size_bytes": 10, "video": {"codec": "h264"}, "audio": {"codec": "aac"}}
 
     def ffmpeg_base(self, overwrite: bool = True) -> list[str]:
         return ["ffmpeg", "-y" if overwrite else "-n"]
@@ -56,6 +59,8 @@ class FakeCommon:
             graph_path = Path(command[command.index("-/filter_complex") + 1])
             self.graph = graph_path.read_text(encoding="utf-8")
             write_sparse_float_wav(Path(command[-1]))
+        elif self.write_output:
+            Path(command[-1]).write_bytes(b"fixture mux")
         return SimpleNamespace(stdout="", stderr="", returncode=0)
 
 
@@ -130,7 +135,24 @@ def main() -> int:
         if request["operation"] == "transcode":
             tools._run_transcode(common, FakeRuntime(), request["arguments"])
         elif request["operation"] == "mux":
-            tools._run_mux_audio(common, request["arguments"])
+            with tempfile.TemporaryDirectory(prefix="cevra-mux-fixture-") as directory:
+                root = Path(directory)
+                arguments = request["arguments"]
+                video = root / "video.mp4"
+                audio = root / "new.wav"
+                output = root / "out.mp4"
+                video.write_bytes(b"video fixture")
+                audio.write_bytes(b"audio fixture")
+                common.metadata = {
+                    str(video.resolve()): request["metadata"][str(arguments["video"])],
+                    str(audio.resolve()): request["metadata"][str(arguments["audio"])],
+                }
+                common.write_output = True
+                tools._run_mux_audio(common, {
+                    **arguments, "video": str(video), "audio": str(audio), "output": str(output),
+                })
+                print(json.dumps({"command": common.command, "graph": common.graph}))
+                return 0
         elif request["operation"] == "extract-frame":
             tools._run_extract_frame(common, request["arguments"])
         elif request["operation"] == "audio-sequence":

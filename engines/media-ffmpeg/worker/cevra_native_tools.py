@@ -7,7 +7,9 @@ import json
 import math
 import os
 import re
+import stat
 import struct
+import subprocess
 import sys
 import tempfile
 from fractions import Fraction
@@ -195,6 +197,100 @@ def _file_result(common: Any, output: str, extra: Optional[Dict[str, Any]] = Non
     if extra:
         payload.update(extra)
     return {"content": [{"type": "text", "text": json.dumps(payload)}], "structuredContent": payload}
+
+
+def _publication_evidence(path: Path) -> Optional[Dict[str, Any]]:
+    if os.name != "posix":
+        return None
+    metadata = path.lstat()
+    if not stat.S_ISREG(metadata.st_mode):
+        raise RuntimeError("published media artifact is not a non-symlink regular file")
+    return {
+        "version": 1,
+        "scheme": "posix-dev-inode",
+        "device": str(metadata.st_dev),
+        "inode": str(metadata.st_ino),
+    }
+
+
+def _matches_publication(path: Path, evidence: Optional[Dict[str, Any]]) -> bool:
+    if evidence is None or evidence.get("scheme") != "posix-dev-inode":
+        return False
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISREG(metadata.st_mode) \
+        and str(metadata.st_dev) == evidence.get("device") \
+        and str(metadata.st_ino) == evidence.get("inode")
+
+
+def _unlink_published(path: Path, evidence: Optional[Dict[str, Any]], label: str) -> None:
+    if evidence is None:
+        raise RuntimeError(f"{label} ownership cannot be re-proven on this platform; preserving destination")
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return
+    if not stat.S_ISREG(metadata.st_mode) \
+            or str(metadata.st_dev) != evidence.get("device") or str(metadata.st_ino) != evidence.get("inode"):
+        raise RuntimeError(f"{label} publication identity changed; preserving destination")
+    path.unlink()
+
+
+def _duration_tag_seconds(value: Any, label: str) -> Optional[Fraction]:
+    if not isinstance(value, str):
+        return None
+    parts = value.split(":")
+    if len(parts) != 3:
+        raise RuntimeError(f"{label} duration tag is malformed")
+    return Fraction(int(parts[0]) * 3600 + int(parts[1]) * 60) + _fraction(parts[2], f"{label} duration tag")
+
+
+def _selected_stream_duration_ms(common: Any, path: Path, selector: str, label: str) -> int:
+    ffprobe = common.require_tool("ffprobe")
+    command = [
+        ffprobe, "-v", "error", "-select_streams", selector,
+        "-show_entries", "stream=index,codec_type,time_base,duration_ts,duration:stream_tags=DURATION",
+        "-of", "json", str(path),
+    ]
+    completed = job_control.run(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30.0, check=True
+    )
+    raw = completed.stdout or ""
+    if len(raw.encode("utf-8")) > 16 * 1024:
+        raise RuntimeError(f"{label} stream-duration probe exceeded its bounded output")
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{label} stream-duration probe returned invalid JSON") from exc
+    streams = payload.get("streams") if isinstance(payload, dict) else None
+    if not isinstance(streams, list) or len(streams) != 1 or not isinstance(streams[0], dict):
+        raise RuntimeError(f"{label} selected stream duration is unavailable")
+    stream = streams[0]
+    duration: Optional[Fraction] = None
+    if isinstance(stream.get("duration_ts"), int) and not isinstance(stream.get("duration_ts"), bool) \
+            and isinstance(stream.get("time_base"), str):
+        time_base = _fraction(stream["time_base"], f"{label} stream time_base")
+        duration = int(stream["duration_ts"]) * time_base
+    elif stream.get("duration") not in {None, "N/A"}:
+        duration = _fraction(stream["duration"], f"{label} stream duration")
+    elif isinstance(stream.get("tags"), dict):
+        duration = _duration_tag_seconds(stream["tags"].get("DURATION"), label)
+    if duration is None or duration <= 0:
+        raise RuntimeError(f"{label} selected stream duration is unavailable")
+    duration_ms = duration * 1000
+    rounded = int(duration_ms + Fraction(1, 2))
+    if rounded <= 0 or rounded > MAX_MEDIA_DURATION_MS:
+        raise RuntimeError(f"{label} selected stream duration is outside its bounded range")
+    return rounded
+
+
+def _validate_duration(actual: int, expected: int, tolerance: int, label: str) -> None:
+    if abs(actual - expected) > tolerance:
+        raise RuntimeError(
+            f"{label} stream duration {actual} ms does not satisfy expected {expected} ms ± {tolerance} ms"
+        )
 
 
 def _video_audio_maps(meta: Dict[str, Any]) -> List[str]:
@@ -473,17 +569,21 @@ def _run_transcode(common: Any, runtime: Any, args: Dict[str, Any]) -> Dict[str,
 
 
 def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
-    video_path = _required_string(args, "video")
-    audio_path = _required_string(args, "audio")
-    output = _required_string(args, "output")
+    video_path = _absolute_regular_input(_required_string(args, "video"), "video input")
+    audio_path = _absolute_regular_input(_required_string(args, "audio"), "audio input")
+    output = _absolute_new_mux_output(_required_string(args, "output"))
+    if video_path == audio_path:
+        raise ValueError("video and audio inputs must be distinct")
+    if output.resolve(strict=False) in {video_path, audio_path}:
+        raise ValueError("mux output aliases an input")
     replace_existing = _optional_boolean(args, "replace_existing", True)
-    video_meta = common.probe(video_path)
-    audio_meta = common.probe(audio_path)
+    video_meta = common.probe(str(video_path))
+    audio_meta = common.probe(str(audio_path))
     if not video_meta.get("video"):
         raise ValueError("video input has no video stream")
     if not audio_meta.get("audio"):
         raise ValueError("audio input has no audio stream")
-    container = _resolve_container(args, output)
+    container = _resolve_container(args, str(output))
     rule = DELIVERY_MATRIX[container]
     if rule["audio_only"]:
         raise ValueError(f"{container} is audio-only and cannot be used for muxing")
@@ -496,13 +596,112 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     elif audio_codec not in rule["audio"]:
         raise ValueError(f"audio codec {audio_codec} is incompatible with {container}")
 
-    cmd = common.ffmpeg_base() + ["-i", video_path, "-i", audio_path, "-map", "0:v:0", "-c:v", "copy", "-map", "1:a:0"]
-    if not replace_existing and video_meta.get("audio"):
-        cmd += ["-map", "0:a:0"]
-    cmd += _audio_args(common, audio_codec, True)
-    cmd += _container_args(container)
-    common.run(cmd + [output])
-    return _file_result(common, output, {"replacedExistingAudio": replace_existing})
+    duration_validation = args.get("duration_validation")
+    duration_evidence: Optional[Dict[str, Any]] = None
+    if duration_validation is not None:
+        assert isinstance(duration_validation, dict)
+        input_video_duration_ms = _selected_stream_duration_ms(common, video_path, "v:0", "mux input video")
+        input_audio_duration_ms = _selected_stream_duration_ms(common, audio_path, "a:0", "mux input audio")
+        _validate_duration(
+            input_video_duration_ms,
+            int(duration_validation["video_duration_ms"]),
+            int(duration_validation["input_tolerance_ms"]),
+            "mux input video",
+        )
+        _validate_duration(
+            input_audio_duration_ms,
+            int(duration_validation["audio_duration_ms"]),
+            int(duration_validation["input_tolerance_ms"]),
+            "mux input audio",
+        )
+        duration_evidence = {
+            "version": 1,
+            "inputVideoDurationMs": input_video_duration_ms,
+            "inputAudioDurationMs": input_audio_duration_ms,
+        }
+
+    staging_directory: Optional[Path] = None
+    staging_output: Optional[Path] = None
+    promoted_output = False
+    promoted_evidence: Optional[Dict[str, Any]] = None
+    cleanup_errors: List[str] = []
+    try:
+        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-mux-audio-", dir=output.parent))
+        staging_output = staging_directory / f"output{output.suffix.lower()}"
+        cmd = common.ffmpeg_base(overwrite=False) + [
+            "-i", str(video_path), "-i", str(audio_path),
+            "-map", "0:v:0", "-c:v", "copy", "-map", "1:a:0",
+        ]
+        if not replace_existing and video_meta.get("audio"):
+            cmd += ["-map", "0:a:0"]
+        cmd += _audio_args(common, audio_codec, True)
+        cmd += _container_args(container)
+        try:
+            common.run(cmd + [str(staging_output)])
+            staged_probe = common.verify_output(str(staging_output))
+            if not isinstance(staged_probe, dict) or not staged_probe.get("video") or not staged_probe.get("audio"):
+                raise RuntimeError("mux output failed its audio/video postcondition")
+            if duration_evidence is not None:
+                output_video_duration_ms = _selected_stream_duration_ms(common, staging_output, "v:0", "mux output video")
+                output_audio_duration_ms = _selected_stream_duration_ms(common, staging_output, "a:0", "mux output audio")
+                _validate_duration(
+                    output_video_duration_ms,
+                    int(duration_validation["video_duration_ms"]),
+                    int(duration_validation["input_tolerance_ms"]),
+                    "mux output video",
+                )
+                _validate_duration(
+                    output_audio_duration_ms,
+                    int(duration_validation["audio_duration_ms"]),
+                    int(duration_validation["output_audio_tolerance_ms"]),
+                    "mux output audio",
+                )
+                duration_evidence.update({
+                    "outputVideoDurationMs": output_video_duration_ms,
+                    "outputAudioDurationMs": output_audio_duration_ms,
+                })
+            promoted_evidence = _publication_evidence(staging_output)
+            os.link(staging_output, output, follow_symlinks=False)
+            if promoted_evidence is not None:
+                if not _matches_publication(output, promoted_evidence):
+                    raise RuntimeError("mux output publication identity changed; preserving destination")
+                promoted_output = True
+            return _file_result(common, str(output), {
+                "replacedExistingAudio": replace_existing,
+                **({"publication": promoted_evidence} if promoted_evidence else {}),
+                **({"muxDuration": duration_evidence} if duration_evidence else {}),
+            })
+        except BaseException as execution_error:
+            if promoted_output:
+                try:
+                    _unlink_published(output, promoted_evidence, "mux output")
+                except OSError as output_cleanup_error:
+                    raise RuntimeError(
+                        f"mux failed and its owned promoted output cleanup failed: {output_cleanup_error}"
+                    ) from execution_error
+                except RuntimeError as output_cleanup_error:
+                    raise RuntimeError(
+                        f"mux failed and its owned promoted output cleanup failed: {output_cleanup_error}"
+                    ) from execution_error
+            raise
+    finally:
+        if staging_output is not None:
+            try:
+                staging_output.unlink(missing_ok=True)
+            except OSError as exc:
+                cleanup_errors.append(f"staging output cleanup failed: {exc}")
+        if staging_directory is not None:
+            try:
+                staging_directory.rmdir()
+            except OSError as exc:
+                cleanup_errors.append(f"staging directory cleanup failed: {exc}")
+        if cleanup_errors:
+            if promoted_output:
+                try:
+                    _unlink_published(output, promoted_evidence, "mux output")
+                except (OSError, RuntimeError) as exc:
+                    cleanup_errors.append(f"promoted output rollback failed: {exc}")
+            raise RuntimeError(f"mux owned artifact cleanup failed: {'; '.join(cleanup_errors)}")
 
 
 def _absolute_regular_input(raw: str, label: str) -> Path:
@@ -532,6 +731,26 @@ def _absolute_new_output(raw: str) -> Path:
     else:
         if path.is_symlink():
             raise ValueError("media output path must not be a symlink")
+        raise FileExistsError(f"refusing to overwrite existing output: {path}")
+    return path.absolute()
+
+
+def _absolute_new_mux_output(raw: str) -> Path:
+    path = Path(raw)
+    if not path.is_absolute() or path.suffix.lower().removeprefix(".") not in DELIVERY_MATRIX:
+        raise ValueError("mux output must be an absolute supported media path")
+    if DELIVERY_MATRIX[path.suffix.lower().removeprefix(".")]["audio_only"]:
+        raise ValueError("mux output must use an audio/video container")
+    parent = path.parent
+    if not parent.is_dir() or parent.is_symlink():
+        raise ValueError("mux output parent must be an existing non-symlink directory")
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        if path.is_symlink():
+            raise ValueError("mux output path must not be a symlink")
         raise FileExistsError(f"refusing to overwrite existing output: {path}")
     return path.absolute()
 
@@ -743,6 +962,7 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     staging_directory: Optional[Path] = None
     staging_output: Optional[Path] = None
     promoted_output = False
+    promoted_evidence: Optional[Dict[str, Any]] = None
     cleanup_errors: List[str] = []
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="cevra-audio-sequence-", suffix=".ffgraph", delete=False) as handle:
@@ -775,29 +995,34 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
                 raise RuntimeError(
                     "audio sequence output failed its measured sample-frame/data-size postcondition"
                 )
+            promoted_evidence = _publication_evidence(staging_output)
             os.link(staging_output, output, follow_symlinks=False)
-            promoted_output = True
+            if promoted_evidence is not None:
+                if not _matches_publication(output, promoted_evidence):
+                    raise RuntimeError("audio sequence output publication identity changed; preserving destination")
+                promoted_output = True
             result = _file_result(common, str(output), {
-            "audioSequence": {
-                "version": AUDIO_SEQUENCE_VERSION,
-                "sampleRate": AUDIO_SEQUENCE_SAMPLE_RATE,
-                "sampleFormat": AUDIO_SEQUENCE_SAMPLE_FORMAT,
-                "channelLayout": output_layout,
-                "distinctSourceCount": len(sources),
-                "itemCount": len(items),
-                "maximumSimultaneousItemCount": maximum_active,
-                "outputSampleCount": measured_samples,
-                "estimatedDataBytes": output_bytes,
-                "measuredDataBytes": measured_data_bytes,
-                "graphBytes": len(graph.encode("utf-8")),
-            }
+                **({"publication": promoted_evidence} if promoted_evidence else {}),
+                "audioSequence": {
+                    "version": AUDIO_SEQUENCE_VERSION,
+                    "sampleRate": AUDIO_SEQUENCE_SAMPLE_RATE,
+                    "sampleFormat": AUDIO_SEQUENCE_SAMPLE_FORMAT,
+                    "channelLayout": output_layout,
+                    "distinctSourceCount": len(sources),
+                    "itemCount": len(items),
+                    "maximumSimultaneousItemCount": maximum_active,
+                    "outputSampleCount": measured_samples,
+                    "estimatedDataBytes": output_bytes,
+                    "measuredDataBytes": measured_data_bytes,
+                    "graphBytes": len(graph.encode("utf-8")),
+                },
             })
             return result
         except BaseException as execution_error:
             if promoted_output:
                 try:
-                    output.unlink(missing_ok=True)
-                except OSError as output_cleanup_error:
+                    _unlink_published(output, promoted_evidence, "audio sequence output")
+                except (OSError, RuntimeError) as output_cleanup_error:
                     raise RuntimeError(
                         f"audio sequence failed and its owned promoted output cleanup failed: {output_cleanup_error}"
                     ) from execution_error
@@ -821,8 +1046,8 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
         if cleanup_errors:
             if promoted_output:
                 try:
-                    output.unlink(missing_ok=True)
-                except OSError as exc:
+                    _unlink_published(output, promoted_evidence, "audio sequence output")
+                except (OSError, RuntimeError) as exc:
                     cleanup_errors.append(f"promoted output rollback failed: {exc}")
             raise RuntimeError(f"audio sequence owned artifact cleanup failed: {'; '.join(cleanup_errors)}")
 

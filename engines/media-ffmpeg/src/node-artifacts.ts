@@ -1,5 +1,6 @@
 import { lstat, unlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import type { MediaPublicationEvidenceV1 } from "@cevra/contracts";
 
 export class NodeMediaArtifactStore {
   async kind(uri: string): Promise<"missing" | "file" | "symlink" | "other"> {
@@ -20,6 +21,19 @@ export class NodeMediaArtifactStore {
 
   async remove(uri: string): Promise<void> {
     await unlink(localPath(uri));
+  }
+
+  async matchesPublication(uri: string, evidence: MediaPublicationEvidenceV1): Promise<boolean> {
+    if (evidence.version !== 1 || evidence.scheme !== "posix-dev-inode" || process.platform === "win32") return false;
+    try {
+      const metadata = await lstat(localPath(uri), { bigint: true });
+      return metadata.isFile() && !metadata.isSymbolicLink()
+        && metadata.dev.toString() === evidence.device
+        && metadata.ino.toString() === evidence.inode;
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") return false;
+      throw error;
+    }
   }
 }
 

@@ -22,16 +22,28 @@ const audioSequence = {
   ],
   outputUri: "/media/staging/audio.wav", outputDurationMs: 4000, outputChannelLayout: "stereo"
 };
+const muxAudio = {
+  type: "mux-audio", videoUri: "/media/picture.mp4", audioUri: audioSequence.outputUri,
+  outputUri: "/media/final.mp4", replaceExisting: true
+};
 
 class MemoryArtifacts {
   files = new Set();
   symlinks = new Set();
+  identities = new Map();
   removed = [];
 
   async kind(uri) { return this.symlinks.has(uri) ? "symlink" : this.files.has(uri) ? "file" : "missing"; }
   async exists(uri) { return this.files.has(uri); }
   async remove(uri) { this.files.delete(uri); this.symlinks.delete(uri); this.removed.push(uri); }
+  async matchesPublication(uri, evidence) {
+    return this.files.has(uri) && !this.symlinks.has(uri)
+      && evidence.scheme === "posix-dev-inode" && evidence.device === "1"
+      && evidence.inode === (this.identities.get(uri) ?? "1");
+  }
 }
+
+const publication = { version: 1, scheme: "posix-dev-inode", device: "1", inode: "1" };
 
 function completedFile(outputUri, durationMs = 1000) {
   return {
@@ -51,7 +63,24 @@ function completedAudioSequence(operation = audioSequence) {
     type: "file", outputUri: operation.outputUri, durationMs: operation.outputDurationMs,
     probe: { uri: operation.outputUri, durationMs: operation.outputDurationMs, sizeBytes: operation.outputDurationMs * 48 * channels * 4 + 114, hasVideo: false, hasAudio: true, audioCodec: "pcm_f32le", sampleRate: 48000, channels },
     effectiveProfile: { container: "wav", audioCodec: "pcm", audioEncoder: "pcm_f32le" },
+    publication,
     audioSequence: { version: 1, sampleRate: 48000, sampleFormat: "pcm_f32le", channelLayout: operation.outputChannelLayout, distinctSourceCount: operation.sources.length, itemCount: operation.items.length, maximumSimultaneousItemCount, outputSampleCount: operation.outputDurationMs * 48, estimatedDataBytes: operation.outputDurationMs * 48 * channels * 4, measuredDataBytes: operation.outputDurationMs * 48 * channels * 4, graphBytes: 1024 }
+  };
+}
+
+function completedMuxAudio(operation = muxAudio) {
+  return {
+    type: "file", outputUri: operation.outputUri, durationMs: 4000,
+    probe: { uri: operation.outputUri, durationMs: 4000, width: 1920, height: 1080, frameRate: 30, hasVideo: true, hasAudio: true, videoCodec: "h264", audioCodec: "aac" },
+    effectiveProfile: { container: "mp4", videoCodec: "h264", audioCodec: "aac", videoEncoder: "copy", audioEncoder: "aac" },
+    publication,
+    ...(operation.durationValidation ? { muxDuration: {
+      version: 1,
+      inputVideoDurationMs: operation.durationValidation.videoDurationMs,
+      inputAudioDurationMs: operation.durationValidation.audioDurationMs,
+      outputVideoDurationMs: operation.durationValidation.videoDurationMs,
+      outputAudioDurationMs: operation.durationValidation.audioDurationMs
+    } } : {})
   };
 }
 
@@ -67,6 +96,14 @@ class FakeEngine {
   async execute(operation, context) {
     this.calls.push({ operation, context });
     return this.executeImpl(operation, context);
+  }
+}
+
+class HookRepository extends InMemoryMediaExecutionRepository {
+  constructor(hook) { super(); this.hook = hook; }
+  async save(record) {
+    await this.hook?.(record);
+    return super.save(record);
   }
 }
 
@@ -536,6 +573,50 @@ test("audio sequence engine failures preserve a race-winning foreign destination
   }
 });
 
+test("mux engine failures preserve a race-winning foreign destination", async () => {
+  const artifacts = new MemoryArtifacts();
+  const sentinel = new TextEncoder().encode("foreign mux winner");
+  artifacts.bytes = new Map();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(muxAudio.outputUri);
+    artifacts.bytes.set(muxAudio.outputUri, sentinel);
+    throw new Error("exclusive publication lost to foreign file");
+  });
+  const { service, history, repository } = fixture(engine, artifacts);
+
+  await assert.rejects(
+    service.execute({ id: "mux-foreign-race", operation: muxAudio, mutation: { type: "export.add", exportId: "foreign-race", presetId: "fixture" } }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED"
+  );
+
+  assert.equal(artifacts.files.has(muxAudio.outputUri), true);
+  assert.deepEqual(artifacts.bytes.get(muxAudio.outputUri), sentinel);
+  assert.deepEqual(artifacts.removed, []);
+  assert.equal(history.current.history.revision, 0);
+  assert.deepEqual((await repository.get("mux-foreign-race")).attempts[0].ownedOutputUris, []);
+});
+
+test("mux output becomes owned only after successful exclusive publication evidence", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(muxAudio.outputUri);
+    const result = completedMuxAudio();
+    result.probe.videoCodec = "h265";
+    return result;
+  });
+  const { service, repository } = fixture(engine, artifacts);
+
+  await assert.rejects(
+    service.execute({ id: "mux-owned-invalid", operation: muxAudio, mutation: { type: "export.add", exportId: "owned-invalid", presetId: "fixture" } }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED"
+  );
+
+  const record = await repository.get("mux-owned-invalid");
+  assert.deepEqual(record.attempts[0].ownedOutputUris, [muxAudio.outputUri]);
+  assert.deepEqual(record.attempts[0].removedPartialOutputUris, [muxAudio.outputUri]);
+  assert.equal(artifacts.files.has(muxAudio.outputUri), false);
+});
+
 test("audio sequence cancellation preserves a race-winning foreign destination", async () => {
   const artifacts = new MemoryArtifacts();
   const controller = new AbortController();
@@ -633,4 +714,187 @@ test("audio sequence recovery preserves an ambiguous crash-time destination", as
   assert.deepEqual(artifacts.removed, []);
   assert.equal(recovered[0].status, "failed");
   assert.equal((await repository.get("audio-ambiguous-crash")).attempts[0].status, "interrupted");
+});
+
+test("final commit boundary rechecks project state and abort after the committing save without an intervening await", async (t) => {
+  for (const scenario of ["mutation", "commit-undo", "abort", "save-failure"]) {
+    await t.test(scenario, async () => {
+      const artifacts = new MemoryArtifacts();
+      const controller = new AbortController();
+      let context;
+      const repository = new HookRepository(async (record) => {
+        if (record.status !== "committing") return;
+        if (scenario === "mutation") context.history.commit({ type: "project.rename", name: "Concurrent" });
+        if (scenario === "commit-undo") {
+          context.history.commit({ type: "project.rename", name: "Transient" });
+          context.history.undo();
+        }
+        if (scenario === "abort") controller.abort();
+        if (scenario === "save-failure") throw new Error("injected pre-commit archive failure");
+      });
+      const engine = new FakeEngine(async () => {
+        artifacts.files.add(trim.outputUri);
+        return completedFile(trim.outputUri);
+      });
+      context = fixture(engine, artifacts, repository);
+      const current = context.history.current;
+      await assert.rejects(context.service.execute({
+        id: `commit-boundary-${scenario}`, operation: trim, mutation: sourceMutation,
+        projectBinding: {
+          projectId: current.project.id, projectRevision: current.history.revision,
+          projectSnapshotId: current.history.headSnapshotId,
+          projectJournalEntryCount: context.history.entries.length
+        }
+      }, controller.signal), (error) => error instanceof MediaApplicationError
+        && error.code === (scenario === "abort" ? "MEDIA_OPERATION_CANCELLED"
+          : scenario === "save-failure" ? "MEDIA_OPERATION_FAILED" : "MEDIA_PROJECT_CONFLICT"));
+      assert.equal(context.history.current.sources.length, 0);
+      assert.equal(context.history.entries.some((entry) => entry.command.type === "source.add"), false);
+    });
+  }
+});
+
+test("a post-commit archive failure reports recovery failure and preserves the canonical commit", async () => {
+  const artifacts = new MemoryArtifacts();
+  const repository = new HookRepository(async (record) => {
+    if (record.status === "succeeded") throw new Error("injected post-commit archive failure");
+  });
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(trim.outputUri);
+    return completedFile(trim.outputUri);
+  });
+  const { service, history } = fixture(engine, artifacts, repository);
+  await assert.rejects(service.execute({ id: "post-commit-failure", operation: trim, mutation: sourceMutation }),
+    (error) => error instanceof MediaApplicationError && error.code === "MEDIA_RECOVERY_FAILED");
+  assert.equal(history.entries.filter((entry) => entry.command.type === "source.add").length, 1);
+  assert.equal(history.current.sources[0].uri, trim.outputUri);
+  assert.equal(artifacts.files.has(trim.outputUri), true);
+});
+
+test("execute snapshots every validated request field before its first await", async () => {
+  let release;
+  let entered;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const reached = new Promise((resolve) => { entered = resolve; });
+  let first = true;
+  const repository = new HookRepository(async () => {
+    if (!first) return;
+    first = false;
+    entered();
+    await gate;
+  });
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async (operation) => {
+    artifacts.files.add(operation.outputUri);
+    return completedFile(operation.outputUri);
+  });
+  const { service, history } = fixture(engine, artifacts, repository);
+  const current = history.current;
+  const request = {
+    id: "snapshot-request", locale: "en-US", operation: structuredClone(trim), mutation: structuredClone(sourceMutation),
+    actor: { type: "agent", id: "original" },
+    projectBinding: { projectId: current.project.id, projectRevision: 0, projectSnapshotId: current.history.headSnapshotId, projectJournalEntryCount: 0 },
+    expectedOutput: { durationMs: 1000, durationToleranceMs: 0 }
+  };
+  const execution = service.execute(request);
+  await reached;
+  request.operation.outputUri = "/media/attacker.mp4";
+  request.mutation.source.id = "attacker";
+  request.actor.id = "attacker";
+  request.projectBinding.projectRevision = 99;
+  request.expectedOutput.durationMs = 2;
+  request.locale = "pt-BR";
+  release();
+  const outcome = await execution;
+  assert.equal(engine.calls[0].operation.outputUri, trim.outputUri);
+  assert.equal(outcome.project.sources[0].id, sourceMutation.source.id);
+  assert.deepEqual(history.entries[0].actor, { type: "agent", id: "original" });
+  assert.equal(outcome.record.locale, "en-US");
+});
+
+test("execute clones getter-backed output expectations before validating the captured value", async () => {
+  const artifacts = new MemoryArtifacts();
+  const engine = new FakeEngine(async (operation) => {
+    artifacts.files.add(operation.outputUri);
+    return completedFile(operation.outputUri);
+  });
+  const { service, history } = fixture(engine, artifacts);
+  const current = history.current;
+  let toleranceReads = 0;
+  const expectedOutput = {
+    durationMs: 1000,
+    get durationToleranceMs() {
+      toleranceReads += 1;
+      return toleranceReads === 1 ? 0 : 999;
+    }
+  };
+  const outcome = await service.execute({
+    id: "getter-snapshot", operation: trim, mutation: sourceMutation,
+    projectBinding: { projectId: current.project.id, projectRevision: 0,
+      projectSnapshotId: current.history.headSnapshotId, projectJournalEntryCount: 0 },
+    expectedOutput
+  });
+  assert.equal(toleranceReads, 1);
+  assert.equal(outcome.record.expectedOutput.durationToleranceMs, 0);
+});
+
+test("closed execution schemas reject extra nested fields and invalid locales before engine execution", async () => {
+  const engine = new FakeEngine(async () => assert.fail("closed-schema request must not execute"));
+  const { service, history } = fixture(engine);
+  const current = history.current;
+  const base = {
+    id: "closed", operation: trim, mutation: sourceMutation, actor: { type: "agent", id: "a" },
+    projectBinding: { projectId: current.project.id, projectRevision: 0, projectSnapshotId: current.history.headSnapshotId, projectJournalEntryCount: 0 },
+    expectedOutput: { durationMs: 1000, durationToleranceMs: 0 }
+  };
+  const invalid = [
+    { ...base, unexpected: true },
+    { ...base, locale: "fr-FR" },
+    { ...base, actor: { ...base.actor, role: "admin" } },
+    { ...base, projectBinding: { ...base.projectBinding, future: 1 } },
+    { ...base, expectedOutput: { ...base.expectedOutput, future: 1 } },
+    { ...base, mutation: { ...base.mutation, future: 1 } },
+    { ...base, mutation: { ...base.mutation, source: { ...base.mutation.source, future: 1 } } }
+  ];
+  for (const [index, request] of invalid.entries()) {
+    await assert.rejects(service.execute({ ...request, id: `closed-${index}` }),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_INVALID_REQUEST");
+  }
+  assert.equal(engine.calls.length, 0);
+});
+
+test("publication identity mismatch preserves a foreign replacement and records cleanup uncertainty", async () => {
+  const artifacts = new MemoryArtifacts();
+  const sentinel = new TextEncoder().encode("foreign replacement");
+  artifacts.bytes = new Map();
+  const engine = new FakeEngine(async () => {
+    artifacts.files.add(muxAudio.outputUri);
+    artifacts.bytes.set(muxAudio.outputUri, sentinel);
+    artifacts.identities.set(muxAudio.outputUri, "2");
+    const result = completedMuxAudio();
+    result.probe.videoCodec = "h265";
+    return result;
+  });
+  const { service, repository } = fixture(engine, artifacts);
+  await assert.rejects(service.execute({ id: "foreign-replacement", operation: muxAudio,
+    mutation: { type: "export.add", exportId: "foreign", presetId: "fixture" } }),
+  (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_FAILED");
+  assert.equal(artifacts.files.has(muxAudio.outputUri), true);
+  assert.deepEqual(artifacts.bytes.get(muxAudio.outputUri), sentinel);
+  assert.deepEqual((await repository.get("foreign-replacement")).attempts[0].cleanupFailedOutputUris, [muxAudio.outputUri]);
+});
+
+test("historical exclusive records without publication identity preserve ambiguous files", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.files.add(audioSequence.outputUri);
+  const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [{
+    id: "legacy-owned", projectId: "project-1", locale: "pt-BR", operation: audioSequence,
+    mutation: { type: "none" }, actor: { type: "system" }, status: "failed", createdAt: now,
+    attempts: [{ number: 1, jobId: "legacy-owned:1", status: "failed", requestedAt: now,
+      outputUris: [audioSequence.outputUri], preexistingOutputUris: [], ownedOutputUris: [audioSequence.outputUri],
+      removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0 }]
+  }] });
+  const { service } = fixture(new FakeEngine(async () => assert.fail()), artifacts, repository);
+  assert.deepEqual(await service.cleanupOwnedOutputs("legacy-owned"), { removed: [], failed: [audioSequence.outputUri] });
+  assert.equal(artifacts.files.has(audioSequence.outputUri), true);
 });

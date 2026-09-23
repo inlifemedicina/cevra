@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lstat, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -39,6 +39,33 @@ test("Node media artifact adapter distinguishes valid and dangling symlinks with
     await store.remove(validLink);
     assert.equal(await readFile(target, "utf8"), "preserve");
     assert.equal((await lstat(danglingLink)).isSymbolicLink(), true);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Node media artifact adapter matches only the exact POSIX publication identity", async (t) => {
+  if (process.platform === "win32") return t.skip("POSIX dev/inode evidence is intentionally unavailable on Windows");
+  const directory = await mkdtemp(join(tmpdir(), "cevra-artifact-identity-"));
+  const output = join(directory, "output.mp4");
+  const replacement = join(directory, "replacement.mp4");
+  const target = join(directory, "target.mp4");
+  const store = new NodeMediaArtifactStore();
+  try {
+    await writeFile(output, "owned");
+    const metadata = await lstat(output, { bigint: true });
+    const evidence = { version: 1, scheme: "posix-dev-inode", device: metadata.dev.toString(), inode: metadata.ino.toString() };
+    assert.equal(await store.matchesPublication(output, evidence), true);
+
+    await writeFile(replacement, "foreign");
+    await rename(replacement, output);
+    assert.equal(await store.matchesPublication(output, evidence), false);
+
+    await unlink(output);
+    await writeFile(target, "target");
+    await symlink(target, output);
+    assert.equal(await store.matchesPublication(output, evidence), false);
+    assert.equal(await readFile(target, "utf8"), "target");
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

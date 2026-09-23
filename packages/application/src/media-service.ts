@@ -13,9 +13,10 @@ import {
   validateAudioMeasurementReport,
   type MediaEngineAdapter,
   type MediaOperation,
-  type MediaOperationResult
+  type MediaOperationResult,
+  type MediaPublicationEvidenceV1
 } from "@cevra/contracts";
-import { applyCommand, type EditCommand, type ProjectHistory, type ProjectIR } from "@cevra/project-ir";
+import { applyCommand, type EditCommand, type JournalActor, type ProjectHistory, type ProjectIR } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
 import type { MediaExecutionRepository } from "./repository.js";
 import {
@@ -23,6 +24,8 @@ import {
   type MediaApplicationErrorCode,
   type MediaExecutionAttempt,
   type MediaExecutionOutcome,
+  type MediaOutputExpectation,
+  type MediaProjectBinding,
   type MediaExecutionRecord,
   type MediaExecutionRequest,
   type MediaProjectMutation,
@@ -33,6 +36,7 @@ export interface MediaArtifactStore {
   kind(uri: string): Promise<"missing" | "file" | "symlink" | "other">;
   exists(uri: string): Promise<boolean>;
   remove(uri: string): Promise<void>;
+  matchesPublication?(uri: string, evidence: MediaPublicationEvidenceV1): Promise<boolean>;
 }
 
 export interface MediaApplicationServiceOptions {
@@ -68,15 +72,20 @@ export class MediaApplicationService {
   }
 
   async execute(request: MediaExecutionRequest, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
-    const executionId = request.id ?? this.idGenerator();
-    const locale = request.locale ?? this.history.current.project.defaultLocale;
-    let operation: MediaOperation;
+    const defaultLocale = this.history.current.project.defaultLocale;
+    let candidate: MediaExecutionRequest | undefined;
+    let stableRequest: Required<Pick<MediaExecutionRequest, "id" | "locale" | "operation" | "mutation" | "actor">>
+      & Pick<MediaExecutionRequest, "projectBinding" | "expectedOutput">;
     try {
-      operation = validateMediaOperation(request.operation);
-      validateMutation(operation, request.mutation);
+      candidate = clone(request);
+      stableRequest = snapshotExecutionRequest(candidate, defaultLocale, this.idGenerator);
     } catch (cause) {
+      const locale = candidate?.locale === "en-US" ? "en-US" : defaultLocale;
+      const executionId = typeof candidate?.id === "string" ? candidate.id : "invalid-media-execution";
       throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId, {}, cause);
     }
+    const executionId = stableRequest.id;
+    const locale = stableRequest.locale;
     if (await this.executions.get(executionId)) {
       throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId);
     }
@@ -84,9 +93,11 @@ export class MediaApplicationService {
       id: executionId,
       projectId: this.history.current.project.id,
       locale,
-      operation: clone(operation),
-      mutation: clone(request.mutation),
-      actor: clone(request.actor ?? { type: "user" }),
+      operation: stableRequest.operation,
+      mutation: stableRequest.mutation,
+      actor: stableRequest.actor,
+      ...(stableRequest.projectBinding ? { projectBinding: stableRequest.projectBinding } : {}),
+      ...(stableRequest.expectedOutput ? { expectedOutput: stableRequest.expectedOutput } : {}),
       status: "requested",
       createdAt: this.clock(),
       attempts: []
@@ -105,6 +116,11 @@ export class MediaApplicationService {
     try {
       record.operation = clone(validateMediaOperation(record.operation));
       validateMutation(record.operation, record.mutation);
+      validateProjectMutation(record.mutation);
+      validateJournalActor(record.actor);
+      validateProjectBinding(record.projectBinding);
+      validateOutputExpectation(record.expectedOutput, record.operation);
+      if (record.locale !== "pt-BR" && record.locale !== "en-US") throw new Error("Media execution locale is invalid.");
     } catch (cause) {
       record.status = "failed";
       await this.executions.save(record);
@@ -133,8 +149,9 @@ export class MediaApplicationService {
         continue;
       }
       if (attempt) {
-        const cleanupUris = record.operation.type === "render-audio-sequence" ? attempt.ownedOutputUris ?? [] : attempt.outputUris;
-        const cleanup = await this.cleanup(cleanupUris, attempt.preexistingOutputUris);
+        const cleanup = hasExclusivePublication(record.operation)
+          ? await this.cleanupPublished(attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
+          : await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);
         attempt.removedPartialOutputUris.push(...cleanup.removed);
         attempt.cleanupFailedOutputUris.push(...cleanup.failed);
         attempt.status = "interrupted";
@@ -166,6 +183,18 @@ export class MediaApplicationService {
     return recovered;
   }
 
+  async cleanupOwnedOutputs(executionId: string): Promise<{ removed: string[]; failed: string[] }> {
+    const record = await this.executions.get(executionId);
+    if (!record) throw new MediaApplicationError("MEDIA_OPERATION_NOT_FOUND", this.history.current.project.defaultLocale, executionId);
+    const attempt = record.attempts.at(-1);
+    if (!attempt) return { removed: [], failed: [] };
+    const cleanup = await this.cleanupPublished(attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris);
+    attempt.removedPartialOutputUris.push(...cleanup.removed.filter((uri) => !attempt.removedPartialOutputUris.includes(uri)));
+    attempt.cleanupFailedOutputUris.push(...cleanup.failed.filter((uri) => !attempt.cleanupFailedOutputUris.includes(uri)));
+    await this.executions.save(record);
+    return cleanup;
+  }
+
   private async runAttempt(record: MediaExecutionRecord, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
     const outputUris = operationOutputUris(record.operation);
     const current = this.history.current;
@@ -177,6 +206,7 @@ export class MediaApplicationService {
       outputUris,
       preexistingOutputUris: [],
       ownedOutputUris: [],
+      ownedOutputPublications: [],
       removedPartialOutputUris: [],
       cleanupFailedOutputUris: [],
       projectRevisionBefore: current.history.revision,
@@ -188,6 +218,7 @@ export class MediaApplicationService {
     let projectStateFinalized = false;
 
     try {
+      assertProjectBinding(this.history, current, record.projectBinding);
       prevalidateMutation(current, record, outputUris[0]);
       for (const uri of outputUris) {
         const kind = await this.artifacts.kind(uri);
@@ -208,23 +239,36 @@ export class MediaApplicationService {
       await this.executions.save(record);
 
       const result = await this.engine.execute(record.operation, { jobId: attempt.jobId, locale: record.locale, ...(signal ? { signal } : {}) });
-      if (record.operation.type === "render-audio-sequence" && result.type === "file" && result.outputUri === outputUris[0]) {
+      if (hasExclusivePublication(record.operation) && result.type === "file" && result.outputUri === outputUris[0]) {
         attempt.ownedOutputUris.push(result.outputUri);
+        if (result.publication) {
+          attempt.ownedOutputPublications?.push({ uri: result.outputUri, evidence: clone(result.publication) });
+        }
         await this.executions.save(record);
       }
-      await this.validateResult(record.operation, result, outputUris, attempt.jobId);
+      await this.validateResult(record.operation, result, outputUris, attempt.jobId, record.expectedOutput);
       if (record.operation.type === "measure-audio" && signal?.aborted) throw abortMarker();
       if (result.type === "file") attempt.effectiveProfile = clone(result.effectiveProfile);
       const latest = this.history.current;
-      if (record.mutation.type !== "none" && (latest.history.revision !== attempt.projectRevisionBefore || latest.history.headSnapshotId !== attempt.projectSnapshotBefore)) {
+      if ((record.projectBinding || record.mutation.type !== "none")
+        && (latest.history.revision !== attempt.projectRevisionBefore || latest.history.headSnapshotId !== attempt.projectSnapshotBefore)) {
         throw new AttemptFailure("MEDIA_PROJECT_CONFLICT", "Project changed while media execution was active.");
       }
+      assertProjectBinding(this.history, latest, record.projectBinding);
 
       const command = mutationCommand(record, result, attempt, this.clock);
       attempt.status = "committing";
       attempt.result = clone(result);
       record.status = "committing";
       await this.executions.save(record);
+      if (signal?.aborted) throw abortMarker();
+      const commitProject = this.history.current;
+      if ((record.projectBinding || record.mutation.type !== "none")
+        && (commitProject.history.revision !== attempt.projectRevisionBefore
+          || commitProject.history.headSnapshotId !== attempt.projectSnapshotBefore)) {
+        throw new AttemptFailure("MEDIA_PROJECT_CONFLICT", "Project changed before the canonical commit.");
+      }
+      assertProjectBinding(this.history, commitProject, record.projectBinding);
       if (command) {
         try {
           this.history.commit(command, record.actor);
@@ -251,8 +295,9 @@ export class MediaApplicationService {
       const cancelled = isAbort(cause, signal);
       const failure = cause instanceof AttemptFailure ? cause : undefined;
       const code: MediaApplicationErrorCode = cancelled ? "MEDIA_OPERATION_CANCELLED" : failure?.code ?? "MEDIA_OPERATION_FAILED";
-      const cleanupUris = record.operation.type === "render-audio-sequence" ? attempt.ownedOutputUris : outputUris;
-      const cleanup = await this.cleanup(cleanupUris, attempt.preexistingOutputUris);
+      const cleanup = hasExclusivePublication(record.operation)
+        ? await this.cleanupPublished(attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
+        : await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);
       attempt.removedPartialOutputUris.push(...cleanup.removed);
       attempt.cleanupFailedOutputUris.push(...cleanup.failed);
       attempt.status = cancelled ? "cancelled" : "failed";
@@ -271,7 +316,13 @@ export class MediaApplicationService {
     }
   }
 
-  private async validateResult(operation: MediaOperation, result: MediaOperationResult, outputUris: readonly string[], jobId: string): Promise<void> {
+  private async validateResult(
+    operation: MediaOperation,
+    result: MediaOperationResult,
+    outputUris: readonly string[],
+    jobId: string,
+    expectedOutput?: MediaOutputExpectation
+  ): Promise<void> {
     if (operation.type === "measure-audio") {
       if (result.type !== "measure-audio" || Object.keys(result).length !== 2) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Media engine returned an incompatible measurement result.");
       validateAudioMeasurementReport(result.report, operation, jobId);
@@ -290,6 +341,11 @@ export class MediaApplicationService {
       throw new AttemptFailure("MEDIA_OUTPUT_MISSING", "Media engine output is absent from the artifact store.");
     }
     validateDeliveryPostcondition(operation, result);
+    if (expectedOutput) {
+      if (result.durationMs === undefined || Math.abs(result.durationMs - expectedOutput.durationMs) > expectedOutput.durationToleranceMs) {
+        throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Media output duration does not satisfy the application postcondition.");
+      }
+    }
   }
 
   private async cleanup(outputUris: readonly string[], preexisting: readonly string[]): Promise<{ removed: string[]; failed: string[] }> {
@@ -310,6 +366,105 @@ export class MediaApplicationService {
     }
     return { removed, failed };
   }
+
+  private async cleanupPublished(
+    claimedUris: readonly string[],
+    publications: readonly { uri: string; evidence: MediaPublicationEvidenceV1 }[],
+    preexisting: readonly string[]
+  ): Promise<{ removed: string[]; failed: string[] }> {
+    const protectedUris = new Set(preexisting);
+    for (const uri of this.history.retainedMediaUris()) protectedUris.add(uri);
+    const removed: string[] = [];
+    const failed: string[] = [];
+    const evidencedUris = new Set(publications.map(({ uri }) => uri));
+    for (const uri of claimedUris) {
+      if (protectedUris.has(uri) || evidencedUris.has(uri)) continue;
+      try {
+        if (await this.artifacts.kind(uri) !== "missing") failed.push(uri);
+      } catch {
+        failed.push(uri);
+      }
+    }
+    for (const publication of publications) {
+      if (protectedUris.has(publication.uri)) continue;
+      try {
+        if (!this.artifacts.matchesPublication
+          || !await this.artifacts.matchesPublication(publication.uri, publication.evidence)) {
+          failed.push(publication.uri);
+          continue;
+        }
+        await this.artifacts.remove(publication.uri);
+        if (await this.artifacts.exists(publication.uri)) failed.push(publication.uri);
+        else removed.push(publication.uri);
+      } catch {
+        failed.push(publication.uri);
+      }
+    }
+    return { removed, failed };
+  }
+}
+
+function snapshotExecutionRequest(
+  request: MediaExecutionRequest,
+  defaultLocale: "pt-BR" | "en-US",
+  idGenerator: () => string
+): Required<Pick<MediaExecutionRequest, "id" | "locale" | "operation" | "mutation" | "actor">>
+  & Pick<MediaExecutionRequest, "projectBinding" | "expectedOutput"> {
+  rejectUnexpectedKeys(request, ["id", "locale", "operation", "mutation", "actor", "projectBinding", "expectedOutput"], "media execution request");
+  const id = request.id ?? idGenerator();
+  if (typeof id !== "string" || id.trim().length === 0) throw new Error("Media execution id is invalid.");
+  const locale = request.locale ?? defaultLocale;
+  if (locale !== "pt-BR" && locale !== "en-US") throw new Error("Media execution locale is invalid.");
+  const operation = clone(validateMediaOperation(request.operation));
+  validateMutation(operation, request.mutation);
+  validateProjectMutation(request.mutation);
+  validateJournalActor(request.actor ?? { type: "user" });
+  validateProjectBinding(request.projectBinding);
+  validateOutputExpectation(request.expectedOutput, operation);
+  return {
+    id,
+    locale,
+    operation,
+    mutation: clone(request.mutation),
+    actor: clone(request.actor ?? { type: "user" }),
+    ...(request.projectBinding ? { projectBinding: clone(request.projectBinding) } : {}),
+    ...(request.expectedOutput ? { expectedOutput: clone(request.expectedOutput) } : {})
+  };
+}
+
+function validateProjectBinding(binding: MediaProjectBinding | undefined): void {
+  if (!binding) return;
+  rejectUnexpectedKeys(binding, ["projectId", "projectRevision", "projectSnapshotId", "projectJournalEntryCount"], "project binding");
+  if (typeof binding.projectId !== "string" || binding.projectId.trim().length === 0
+    || !Number.isSafeInteger(binding.projectRevision) || binding.projectRevision < 0
+    || typeof binding.projectSnapshotId !== "string" || binding.projectSnapshotId.trim().length === 0
+    || !Number.isSafeInteger(binding.projectJournalEntryCount) || binding.projectJournalEntryCount < 0) {
+    throw new Error("Invalid project binding.");
+  }
+}
+
+function validateOutputExpectation(expectation: MediaOutputExpectation | undefined, operation: MediaOperation): void {
+  if (!expectation) return;
+  rejectUnexpectedKeys(expectation, ["durationMs", "durationToleranceMs"], "media output expectation");
+  if (operationOutputUris(operation).length !== 1
+    || !Number.isSafeInteger(expectation.durationMs) || expectation.durationMs <= 0
+    || !Number.isSafeInteger(expectation.durationToleranceMs) || expectation.durationToleranceMs < 0) {
+    throw new Error("Invalid media output expectation.");
+  }
+}
+
+function assertProjectBinding(history: ProjectHistory, project: ProjectIR, binding: MediaProjectBinding | undefined): void {
+  if (!binding) return;
+  if (project.project.id !== binding.projectId
+    || project.history.revision !== binding.projectRevision
+    || project.history.headSnapshotId !== binding.projectSnapshotId
+    || history.entries.length !== binding.projectJournalEntryCount) {
+    throw new AttemptFailure("MEDIA_PROJECT_CONFLICT", "Project binding is stale.");
+  }
+}
+
+function hasExclusivePublication(operation: MediaOperation): boolean {
+  return operation.type === "render-audio-sequence" || operation.type === "mux-audio";
 }
 
 function validateMutation(operation: MediaOperation, mutation: MediaProjectMutation): void {
@@ -319,6 +474,45 @@ function validateMutation(operation: MediaOperation, mutation: MediaProjectMutat
   }
   const producesFile = operationOutputUris(operation).length > 0;
   if (producesFile === (mutation.type === "none")) throw new Error("File-producing media operations require a typed Project IR mutation.");
+}
+
+function validateProjectMutation(mutation: MediaProjectMutation): void {
+  if (!isRecord(mutation) || typeof mutation.type !== "string") throw new Error("Project mutation is invalid.");
+  if (mutation.type === "none") {
+    rejectUnexpectedKeys(mutation, ["type"], "project mutation");
+    return;
+  }
+  if (mutation.type === "export.add") {
+    rejectUnexpectedKeys(mutation, ["type", "exportId", "presetId"], "project mutation");
+    if (typeof mutation.exportId !== "string" || mutation.exportId.trim().length === 0
+      || typeof mutation.presetId !== "string" || mutation.presetId.trim().length === 0) {
+      throw new Error("Export mutation is invalid.");
+    }
+    return;
+  }
+  if (mutation.type === "source.add") {
+    rejectUnexpectedKeys(mutation, ["type", "source"], "project mutation");
+    if (!isRecord(mutation.source)) throw new Error("Source mutation is invalid.");
+    rejectUnexpectedKeys(mutation.source, ["id", "kind", "displayName", "checksum", "extensions"], "source mutation");
+    if (typeof mutation.source.id !== "string" || mutation.source.id.trim().length === 0
+      || !["video", "audio", "image"].includes(String(mutation.source.kind))
+      || typeof mutation.source.displayName !== "string" || mutation.source.displayName.trim().length === 0
+      || (mutation.source.checksum !== undefined && typeof mutation.source.checksum !== "string")
+      || (mutation.source.extensions !== undefined && !isRecord(mutation.source.extensions))) {
+      throw new Error("Source mutation is invalid.");
+    }
+    return;
+  }
+  throw new Error("Project mutation type is invalid.");
+}
+
+function validateJournalActor(actor: JournalActor): void {
+  if (!isRecord(actor)) throw new Error("Journal actor is invalid.");
+  rejectUnexpectedKeys(actor, ["type", "id"], "journal actor");
+  if (!new Set(["user", "agent", "system"]).has(String(actor.type))
+    || (actor.id !== undefined && (typeof actor.id !== "string" || actor.id.trim().length === 0))) {
+    throw new Error("Journal actor is invalid.");
+  }
 }
 
 function prevalidateMutation(project: ProjectIR, record: MediaExecutionRecord, outputUri: string | undefined): void {
@@ -481,6 +675,17 @@ function validateDeliveryPostcondition(operation: MediaOperation, result: Extrac
     }
     return;
   }
+  if (operation.type === "mux-audio" && operation.durationValidation) {
+    const evidence = result.muxDuration;
+    const expected = operation.durationValidation;
+    if (!evidence
+      || Math.abs(evidence.inputVideoDurationMs - expected.videoDurationMs) > expected.inputToleranceMs
+      || Math.abs(evidence.inputAudioDurationMs - expected.audioDurationMs) > expected.inputToleranceMs
+      || Math.abs(evidence.outputVideoDurationMs - expected.videoDurationMs) > expected.inputToleranceMs
+      || Math.abs(evidence.outputAudioDurationMs - expected.audioDurationMs) > expected.outputAudioToleranceMs) {
+      throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Mux output does not satisfy its per-stream duration contract.");
+    }
+  }
   const delivery = resolvedDelivery(operation);
   if (!delivery) return;
   const actualVideo = normalizeVideoCodec(result.probe.videoCodec);
@@ -523,6 +728,17 @@ function resolvedDelivery(operation: MediaOperation) {
 function defaultId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
   return `media_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function rejectUnexpectedKeys(value: unknown, allowed: readonly string[], label: string): void {
+  if (!isRecord(value)) throw new Error(`${label} must be an object.`);
+  const accepted = new Set(allowed);
+  const extras = Object.keys(value).filter((key) => !accepted.has(key));
+  if (extras.length) throw new Error(`${label} contains unexpected fields: ${extras.sort().join(", ")}.`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function clone<T>(value: T): T {

@@ -48,6 +48,16 @@ test("unsupported codec and container values are rejected", () => {
   assert.throws(() => validateMediaOperation({ type: "extract-audio", inputUri: "in.mp4", outputUri: "out.wav", audioCodec: "mystery" }), /Invalid audio codec/);
 });
 
+test("mux duration validation is a closed bounded contract", () => {
+  const operation = {
+    type: "mux-audio", videoUri: "video.mp4", audioUri: "audio.wav", outputUri: "out.mp4",
+    durationValidation: { version: 1, videoDurationMs: 4000, audioDurationMs: 4000, inputToleranceMs: 1, outputAudioToleranceMs: 23 }
+  };
+  assert.doesNotThrow(() => validateMediaOperation(operation));
+  assert.throws(() => validateMediaOperation({ ...operation, durationValidation: { ...operation.durationValidation, future: true } }), /unexpected fields/);
+  assert.throws(() => validateMediaOperation({ ...operation, durationValidation: { ...operation.durationValidation, inputToleranceMs: 1001 } }), /bounded/);
+});
+
 test("codec and container fields require exact scalar string types", () => {
   assert.throws(() => validateMediaOperation({ type: "transcode", inputUri: "in.mp4", outputUri: "out.mp4", container: ["mp4"] }), /Invalid media container/);
   assert.throws(() => validateMediaOperation({ type: "transcode", inputUri: "in.mp4", outputUri: "out.mp4", videoCodec: ["h264"] }), /Invalid video codec/);

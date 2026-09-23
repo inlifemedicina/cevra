@@ -1557,6 +1557,49 @@ explicitly grounded in accepted user-visible capability/acceptance evidence,
 not inferred from engineering activity. Closing MR-A02 alone leaves it at 48%
 until the Product Owner evaluates the user-visible capability evidence.
 
+**Application Resolved Audio Planning and Final Mux (MR-A05/MR-A06, Slice 3) —
+IN DEVELOPMENT / independent review pending.** Branch
+`feat/application-resolved-audio-plan-v1` starts from canonical `main`
+`54a49a624f7d9b28145af2692bec4485af08545c`. [ADR 0027](adr/0027-application-resolved-audio-plan-v1.md)
+defines a reconstructible Application plan compiled from canonical audio tracks,
+bound to project revision/snapshot/journal state and resolved through closed
+Audio Sequence V1. The bounded `normalization=NONE` vertical accepts a caller-
+provided visual result with the same binding, performs an exclusive staged
+`mux-audio`, validates duration/packet-copy evidence, promotes only through
+`export.add` and cleans only known-owned PCM. Explicit LUFS targets reject rather
+than being ignored; Composition, UI, mastering and the full editable J-cut
+workflow remain outside this slice.
+
+The Desktop Host still wires an in-memory Media execution repository. Full
+process-crash recovery of the composite sequence → mux → promotion intent is
+therefore not claimed. **Durable Media Execution Recovery V1 is a canonical,
+Product Owner-approved direction with implementation pending:** a small,
+versioned operational archive lives under the trusted Desktop project root,
+separate from Project IR and the canonical Project Store package, stores no
+media, and reconciles without automatic render/edit/mux replay. Cleanup requires
+ownership proof; ambiguous artifacts and proven persisted canonical exports are
+preserved. ADR 0027 records the boundary and future integration with
+DesktopProjectPersistence. Runtime identity advances to 0.3.1 with protocol
+and third-party pins unchanged. Audio Sequence/Measurement, Alignment and
+`extract-audio` semantics remain preserved. Product progress remains **48%**.
+
+The adversarial remediation on the same feature branch closes the confirmed
+pre-review gaps: final state is rechecked after the `committing` archive save
+with no suspension before ProjectHistory commit; requests and schemas are
+snapshotted/closed; `musicDuckDb` fails closed; plan comparison is structural;
+publication cleanup requires POSIX dev/inode identity evidence; and managed
+FFprobe proves selected input/output stream durations instead of container
+duration. The caller visual remains an assertion, not independent pixel proof.
+Pre-remediation runs `35818228308` and `35818228318` apply only to head
+`038fdc19bde7fa518a3e5609da1a2bc79ebe797c`. Remediation head
+`37036a0f31d0f69547facee97f0aed6a0581918f` passed normal CI run `35889604895`
+(5/5) and exact managed runtime run `35889604818`. Final pre-PR micro-remediation
+now derives publication identity from owned staging before confirming the linked
+destination and snapshots getter-backed requests before validating them. Code
+head `ddee31c84caedc52e60d2db1d36c5e4575360792` passed normal CI run
+`35907517116` (5/5) and exact managed macOS arm64 runtime run `35907517082`;
+micro-review remains pending.
+
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
 GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.
