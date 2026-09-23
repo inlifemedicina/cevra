@@ -50,7 +50,7 @@ The tests construct equivalent persisted crash states; they are labeled
 
 ## Directed validation checkpoint
 
-- Application Media/Resolved Audio directed tests: 58/58 PASS after additions.
+- Application Media/Resolved Audio directed tests: 55/55 PASS after additions.
 - Archive schema tests: 3/3 PASS.
 - Desktop archive/reopen/fault tests: 21/21 PASS.
 - Consolidated local regression: 433/433 Node/TypeScript and 77/77 Python
