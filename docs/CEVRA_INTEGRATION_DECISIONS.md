@@ -145,6 +145,12 @@ Creator cria/abre automaticamente um projeto CEVRA local a partir de pasta de m�
 
 Para edições rápidas one-shot, a robustez local não deve virar custo de contexto: usar resumo compacto, revisão/delta, evidência mínima e nenhum dump completo de Project IR. O mesmo Core/command/history é usado; não existe um segundo engine descartável. Artefatos derivados podem seguir cleanup posterior, enquanto export humano permanece previsível e acessível. Ver ADR 0025.
 
+### Creator mobile/remote host experience — approved 2026-09-23
+
+Creator deve funcionar bem a partir de superfícies mobile/remote compatíveis, com Claude Code mobile como primeiro alvo concreto, sem tornar Anthropic dependência arquitetural. O caminho preferencial inicial mantém o CEVRA Core e a mídia no desktop/local node confiável e usa transporte/remote-control oficial do host para conversa, progresso, cancelamento, preview/resultados e refinamentos.
+
+Execução totalmente cloud fica opcional e futura, condicionada a staging, privacidade, custo, retenção, permissões e distribuição do Core. Mobile não implica cloud render nem storage permanente. Ver ADR 0026.
+
 ## Creation Modes V1
 
 Faceless Explainer e Slideshow são direção V1; Music-to-video é condicional a análise proporcional de ritmo/beat/onset/energy. Todos são workflows sobre as mesmas fundações, não novos produtos/timelines/runtimes. Faceless pode usar roteiro e TTS provider-neutral; TTS genérico não autoriza voice clone. Brand Kit V1 cobre logo, fontes, cores e componentes/presets; Figma é importador opcional. Product Launch Video e WebGPU/TypeGPU ficam pós-V1.
