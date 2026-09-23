@@ -1658,6 +1658,18 @@ Current dependency blockers/gates:
 
 ---
 
+## 2026-09-22 — Creator Tool Interface and token efficiency
+
+- **CANONICAL:** Creator uses a two-layer provider-neutral Tool Interface: a small semantic default surface plus progressively disclosed specialized typed editing tools.
+- **CANONICAL:** token/context cost is a first-class design constraint. Prefer compact bounded evidence, progressive tool disclosure, delta/revision state, valid deterministic cache reuse and on-demand drill-down; do not load complete raw Project IR/machine JSON/tool catalogs into normal host context.
+- **CANONICAL:** cost efficiency never authorizes silent correctness degradation; detailed evidence remains available by escalation.
+- **CANONICAL:** capability/version discovery, structured progress, cancellation and stable errors are part of the eventual Creator/Agent Protocol contract.
+- **CANONICAL:** Agent Tool Interface and human visual workspace are separate surfaces. Creator Full retains preview, directly editable timeline and visible controls such as captions, headline/style/layout/assets/audio as capabilities mature; ordinary visual adjustments must not require chat-only interaction.
+- **CANONICAL:** AI edits and direct user edits converge on the same Project IR/history/typed command system.
+- **ADR:** docs/adr/0024-creator-tool-interface-and-token-efficiency.md.
+
+---
+
 # 26. Explicitly unresolved decisions
 
 Do not guess these in future chats:
