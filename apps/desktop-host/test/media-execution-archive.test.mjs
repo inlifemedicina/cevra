@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstat, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -260,8 +260,9 @@ test("real close/reopen reconciles owned, foreign, ambiguous, canonical, and red
   await fixture.project.persistence.checkpoint(fixture.project.history);
 
   const oldForeignEvidence = await evidence(paths.foreign);
-  await rm(paths.foreign);
-  await writeFile(paths.foreign, "foreign replacement", "utf8");
+  const foreignReplacement = resolve(artifactRoot, "foreign-replacement.tmp");
+  await writeFile(foreignReplacement, "foreign replacement", "utf8");
+  await rename(foreignReplacement, paths.foreign);
   assert.notDeepEqual(await evidence(paths.foreign), oldForeignEvidence);
   await fixture.project.persistence.close();
 
