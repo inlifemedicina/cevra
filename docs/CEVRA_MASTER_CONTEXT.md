@@ -1625,7 +1625,7 @@ Current dependency blockers/gates:
 
 - **CANONICAL:** PR #25 Director direction is incorporated in the dedicated Director record without its stale branch handoff.
 - **CANONICAL:** PR #26 decision families D1–D23 and I1–I19 are reconciled into dedicated editorial, visual, composition and integration records; provider-specific claims remain implementation-time verification gates.
-- **CANONICAL:** Bridge Skill supports Vids through the typed Agent Protocol; Creator Skill is a standalone agent-native product surface. Lite/Full share one editorial core, and Creator Full must deliver final output without Desktop.
+- **CANONICAL:** Bridge Skill supports Vids through the typed Agent Protocol; Creator Skill is a standalone agent-native product surface. CEVRA Creator / CEVRA Studio share one editorial core, and CEVRA Studio must deliver final output without Desktop.
 - **CANONICAL:** the fix-now/defer, execution-feasibility, Product Owner pause, coordinated Media Runtime, acceptance-catalog and Director-impact rules are permanent agent policy in `AGENTS.md`.
 - **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
@@ -1664,7 +1664,7 @@ Current dependency blockers/gates:
 - **CANONICAL:** token/context cost is a first-class design constraint. Prefer compact bounded evidence, progressive tool disclosure, delta/revision state, valid deterministic cache reuse and on-demand drill-down; do not load complete raw Project IR/machine JSON/tool catalogs into normal host context.
 - **CANONICAL:** cost efficiency never authorizes silent correctness degradation; detailed evidence remains available by escalation.
 - **CANONICAL:** capability/version discovery, structured progress, cancellation and stable errors are part of the eventual Creator/Agent Protocol contract.
-- **CANONICAL:** Agent Tool Interface and human visual workspace are separate surfaces. Creator Full retains preview, directly editable timeline and visible controls such as captions, headline/style/layout/assets/audio as capabilities mature; ordinary visual adjustments must not require chat-only interaction.
+- **CANONICAL:** Agent Tool Interface and human visual workspace are separate surfaces. CEVRA Studio retains preview, directly editable timeline and visible controls such as captions, headline/style/layout/assets/audio as capabilities mature; ordinary visual adjustments must not require chat-only interaction.
 - **CANONICAL:** AI edits and direct user edits converge on the same Project IR/history/typed command system.
 - **ADR:** docs/adr/0024-creator-tool-interface-and-token-efficiency.md.
 
@@ -1696,9 +1696,9 @@ Current dependency blockers/gates:
 - **AUDIT COMPLETED:** the pinned 83-file EDVID baseline was re-decomposed specifically for Creator product/architecture using the existing canonical parity evidence plus direct reinspection of Skill, preview UI, style catalog, shortform/longform references, installer/runtime workflow and helper topology.
 - **EVIDENCE:** `docs/CEVRA_CREATOR_EDVID_DECOMPOSITION.md` maps the complete user journey to HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE / VISUAL WORKSPACE / PROVIDER boundaries.
 - **FINDING:** no observed EDVID user-experience requirement forces a reversal of ADRs 0022–0026. The primary product risk is losing EDVID simplicity through overexposed internal complexity, not inability of CEVRA architecture to reproduce the workflow.
-- **FINDING:** EDVID's direct visual preview/timeline/style chooser is a first-class part of its experience and must remain represented in Creator Full planning; EDVID is not a chat-only product.
+- **FINDING:** EDVID's direct visual preview/timeline/style chooser is a first-class part of its experience and must remain represented in CEVRA Studio planning; EDVID is not a chat-only product.
 - **FINDING:** EDVID's token-economy patterns (packed transcript, bounded visual review, numeric-first QA, cached analysis, selective context) are high-value behaviors to preserve and extend.
-- **PROCESS:** the decision queue in the decomposition document is product input only; it does not pre-approve Lite/Full, host UX, evidence, autonomy, workspace, security, installation or implementation details.
+- **PROCESS:** the decision queue in the decomposition document is product input only; it does not pre-approve CEVRA Creator / CEVRA Studio, host UX, evidence, autonomy, workspace, security, installation or implementation details.
 
 ---
 
@@ -1708,8 +1708,8 @@ Current dependency blockers/gates:
 - **CANONICAL:** CEVRA Creator is a complete conversational-first editing product: it can analyze, edit, preview, refine and export a final local video; it is not a demo or partial editor.
 - **CANONICAL:** CEVRA Studio includes the entire CEVRA Creator workflow and adds the directly editable visual workspace, timeline, inspector, More Controls and Advanced over the same project/history.
 - **CANONICAL:** CEVRA Creator / CEVRA Studio are not defined by separate intelligence quality or duplicated runtimes. Optional capability entitlement/hardware/provider/commercial limits remain separate decisions.
-- **NAMING — APPROVED:** **CEVRA Creator** = conversational-first complete product; **CEVRA Studio** = Creator + full visual editing workspace. Lite/Full are retired as product names.
-- **ADR:** docs/adr/0027-creator-lite-full-product-boundary.md.
+- **NAMING — APPROVED:** **CEVRA Creator** = conversational-first complete product; **CEVRA Studio** = Creator + full visual editing workspace. CEVRA Creator / CEVRA Studio are retired as product names.
+- **ADR:** docs/adr/0027-creator-studio-product-boundary.md.
 
 ---
 
