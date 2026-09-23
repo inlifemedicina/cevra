@@ -231,13 +231,13 @@ See [ADR 0026](adr/0026-creator-mobile-remote-host-experience.md).
 
 ### 9.5 Creator conversational and visual product boundary
 
-The provisional Lite surface is a complete conversational-first editing product capable of reaching final local export through the shared Creator Core. It does not require the full directly editable visual workspace.
+CEVRA Creator is the complete conversational-first editing product capable of reaching final local export through the shared Creator Core. It does not require the full directly editable visual workspace.
 
-The provisional Full surface includes all Lite capabilities and adds the visual editing workspace, layered timeline, inspector and progressive manual controls over the same canonical project/history.
+CEVRA Studio includes all CEVRA Creator capabilities and adds the visual editing workspace, layered timeline, inspector and progressive manual controls over the same canonical project/history.
 
-Lite/Full do not represent separate editorial brains or audiovisual runtimes. Capability entitlements and commercial packaging remain separate concerns.
+CEVRA Creator / CEVRA Studio do not represent separate editorial brains or audiovisual runtimes. Capability entitlements and commercial packaging remain separate concerns.
 
-`Lite` and `Full` remain internal provisional names. A preferred later naming direction is **CEVRA Creator** for the conversational-first surface and **CEVRA Creator Studio** for the visual-workspace surface.
+The approved surface names are **CEVRA Creator** for the conversational-first product and **CEVRA Studio** for the visual-workspace product.
 
 See [ADR 0027](adr/0027-creator-lite-full-product-boundary.md).
 
