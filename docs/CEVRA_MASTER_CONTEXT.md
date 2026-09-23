@@ -1583,6 +1583,18 @@ Current dependency blockers/gates:
 
 ---
 
+## 2026-09-22 — Creator Skill standalone runtime topology
+
+- **CANONICAL:** Creator Skill is an agent-native standalone product surface; it does not require CEVRA Vids Desktop installed, open or running.
+- **CANONICAL:** Creator and Vids consume the same reusable CEVRA Core foundations rather than maintaining parallel audiovisual stacks. Creator may ship a standalone compatible distribution of those Core/runtime components.
+- **CANONICAL:** reusable Creator-relevant application/domain/runtime capabilities must remain callable without React/Tauri presentation state. “Headless” is a boundary requirement; exact local process/IPC packaging remains undecided.
+- **CANONICAL:** preserve EDVID-level conversational simplicity while keeping CEVRA Project IR/history, typed execution, managed runtimes, QA, provenance and provider neutrality underneath.
+- **CANONICAL:** Claude Code is the first priority Creator host, not a canonical-state owner or architectural dependency. The same provider-neutral Agent Protocol/Core must remain adaptable to Codex, local/self-hosted and future hosts.
+- **CANONICAL:** extract/adapt useful EDVID behavioral intelligence systematically, but place invariants and reusable editorial behavior in the appropriate CEVRA Skill/Core/Creative Intelligence layer rather than cloning EDVID's loose-file/runtime architecture.
+- **ADR:** docs/adr/0021-creator-skill-runtime-topology.md.
+
+---
+
 # 26. Explicitly unresolved decisions
 
 Do not guess these in future chats:
