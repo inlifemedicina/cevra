@@ -139,6 +139,12 @@ Creator usa Tool Interface provider-neutral em duas camadas: uma superfície pri
 
 A Tool Interface do agente não substitui a interface humana. Creator Full mantém preview, timeline diretamente editável, controles visuais de legenda/headline/layout/assets/áudio e inspector progressivo sobre o mesmo Project IR/history. O objetivo é preservar e melhorar a combinação EDVID de conversa + superfície visual, não criar uma caixa de chat obrigatória para toda alteração. Ver ADR 0024.
 
+### Creator local project lifecycle — approved 2026-09-22
+
+Creator cria/abre automaticamente um projeto CEVRA local a partir de pasta de mídia ou arquivos fornecidos diretamente, sem wizard obrigatório. Conversa/sessão do provider nunca é o projeto. Project IR/ProjectHistory permanecem canônicos e permitem retomada por outro host compatível ou pelo workspace visual.
+
+Para edições rápidas one-shot, a robustez local não deve virar custo de contexto: usar resumo compacto, revisão/delta, evidência mínima e nenhum dump completo de Project IR. O mesmo Core/command/history é usado; não existe um segundo engine descartável. Artefatos derivados podem seguir cleanup posterior, enquanto export humano permanece previsível e acessível. Ver ADR 0025.
+
 ## Creation Modes V1
 
 Faceless Explainer e Slideshow são direção V1; Music-to-video é condicional a análise proporcional de ritmo/beat/onset/energy. Todos são workflows sobre as mesmas fundações, não novos produtos/timelines/runtimes. Faceless pode usar roteiro e TTS provider-neutral; TTS genérico não autoriza voice clone. Brand Kit V1 cobre logo, fontes, cores e componentes/presets; Figma é importador opcional. Product Launch Video e WebGPU/TypeGPU ficam pós-V1.
