@@ -16,6 +16,7 @@ import type {
   MediaProjectBinding,
   MediaProjectMutation
 } from "./types.js";
+import { mediaOperationOutputUris } from "./media-operation.js";
 
 export const MAX_MEDIA_EXECUTION_RECORDS = 4_096;
 export const MAX_MEDIA_EXECUTION_INTENTS = 1_024;
@@ -114,14 +115,26 @@ function validateAttempt(value: unknown, operation: MediaOperation): MediaExecut
   const ownedOutputUris = stringArray(value.ownedOutputUris, 32, "owned output URIs");
   const removedPartialOutputUris = stringArray(value.removedPartialOutputUris, 32, "removed output URIs");
   const cleanupFailedOutputUris = stringArray(value.cleanupFailedOutputUris, 32, "cleanup-failed output URIs");
+  const expectedOutputUris = mediaOperationOutputUris(operation);
+  if (!sameStrings(outputUris, expectedOutputUris)) throw new Error("Media execution output URIs do not match the operation.");
+  for (const [name, values] of [
+    ["preexisting", preexistingOutputUris],
+    ["owned", ownedOutputUris],
+    ["removed", removedPartialOutputUris],
+    ["cleanup-failed", cleanupFailedOutputUris]
+  ] as const) {
+    assertOutputSubset(values, expectedOutputUris, `${name} output URIs`);
+  }
   let ownedOutputPublications: MediaExecutionAttempt["ownedOutputPublications"];
   if (value.ownedOutputPublications !== undefined) {
     if (!Array.isArray(value.ownedOutputPublications) || value.ownedOutputPublications.length > 32) throw new Error("Invalid publication evidence list.");
     ownedOutputPublications = value.ownedOutputPublications.map((item) => {
       object(item, ["uri", "evidence"], "owned publication");
       if (!boundedString(item.uri, 4096)) throw new Error("Invalid owned publication URI.");
+      if (!expectedOutputUris.includes(item.uri)) throw new Error("Owned publication URI is not an operation output.");
       return { uri: item.uri, evidence: validatePublication(item.evidence) };
     });
+    unique(ownedOutputPublications.map(({ uri }) => uri), "owned publication URI");
   }
   const result = value.result === undefined ? undefined : validateResult(value.result, operation, value.jobId);
   const provenance = value.provenance === undefined ? undefined : validateProvenance(value.provenance);
@@ -157,6 +170,15 @@ function validateAttempt(value: unknown, operation: MediaOperation): MediaExecut
     ...(value.errorCode !== undefined ? { errorCode: value.errorCode as NonNullable<MediaExecutionAttempt["errorCode"]> } : {}),
     ...(value.technicalError !== undefined ? { technicalError: value.technicalError } : {})
   };
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function assertOutputSubset(values: readonly string[], expected: readonly string[], label: string): void {
+  unique(values, label);
+  if (values.some((value) => !expected.includes(value))) throw new Error(`${label} contain a URI outside the operation outputs.`);
 }
 
 function validateIntent(value: unknown): MediaExecutionIntentV1 {

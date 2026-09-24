@@ -1,6 +1,7 @@
 export * from "./errors.js";
 export * from "./local-source-ingest.js";
 export * from "./media-service.js";
+export * from "./media-operation.js";
 export * from "./repository.js";
 export * from "./transcription-service.js";
 export * from "./alignment-service.js";

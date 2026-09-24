@@ -7,7 +7,7 @@ import {
 } from "@cevra/contracts";
 import type { JournalActor, ProjectHistory, ProjectIR, TimelineClip } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
-import type { MediaApplicationService } from "./media-service.js";
+import { mediaExecutionMutationApplied, type MediaApplicationService } from "./media-service.js";
 import {
   InMemoryMediaExecutionRepository,
   MediaExecutionAlreadyExistsError,
@@ -101,7 +101,7 @@ export interface ExecuteResolvedAudioPlanOutcome {
 
 export interface ResolvedAudioPlanApplicationServiceOptions {
   history: ProjectHistory;
-  media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs">;
+  media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs" | "getExecutionRecord">;
   intents?: MediaExecutionIntentRepository;
   clock?: () => string;
   idGenerator?: () => string;
@@ -109,7 +109,7 @@ export interface ResolvedAudioPlanApplicationServiceOptions {
 
 export class ResolvedAudioPlanApplicationService {
   private readonly history: ProjectHistory;
-  private readonly media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs">;
+  private readonly media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs" | "getExecutionRecord">;
   private readonly idGenerator: () => string;
   private readonly intents: MediaExecutionIntentRepository;
   private readonly clock: () => string;
@@ -258,37 +258,64 @@ export class ResolvedAudioPlanApplicationService {
     const pending = await this.intents.listIntentsByStatus(this.history.current.project.id, statuses);
     const results: MediaRecoveryResult[] = [];
     for (const intent of pending) {
-      if (canonicalExportMatches(this.history.current, intent)) {
-        try {
-          const cleanup = await this.media.cleanupOwnedOutputs(intent.childExecutionIds.audio);
-          intent.cleanupUncertainUris = cleanup.failed;
-        } catch {
-          intent.cleanupUncertainUris = [intent.childExecutionIds.audio];
-        }
+      if (await this.canonicalMuxChildApplied(intent)) {
+        const audioCleanup = await this.cleanupChild(intent.childExecutionIds.audio);
+        intent.cleanupUncertainUris = audioCleanup.cleanup.failed;
         intent.reconciledAt = this.clock();
-        await this.transitionIntent(intent, "durable-succeeded");
-        results.push({ executionId: intent.id, status: "succeeded" });
+        await this.transitionIntent(intent, audioCleanup.recoveryFailed ? "recovery-incomplete" : "durable-succeeded");
+        results.push({
+          executionId: intent.id,
+          status: audioCleanup.recoveryFailed ? "failed" : "succeeded",
+          ...(audioCleanup.recoveryFailed ? { errorCode: "MEDIA_RECOVERY_FAILED" as const } : {})
+        });
         continue;
       }
       const failed = new Set<string>();
+      let recoveryFailed = false;
       for (const executionId of [intent.childExecutionIds.audio, intent.childExecutionIds.mux]) {
-        try {
-          const cleanup = await this.media.cleanupOwnedOutputs(executionId);
-          for (const uri of cleanup.failed) failed.add(uri);
-        } catch {
-          failed.add(executionId);
-        }
+        const childCleanup = await this.cleanupChild(executionId);
+        for (const uri of childCleanup.cleanup.failed) failed.add(uri);
+        recoveryFailed ||= childCleanup.recoveryFailed;
       }
       intent.reconciledAt = this.clock();
       intent.cleanupUncertainUris = [...failed];
-      await this.transitionIntent(intent, failed.size ? "recovery-incomplete" : "interrupted");
+      const incomplete = failed.size > 0 || recoveryFailed;
+      await this.transitionIntent(intent, incomplete ? "recovery-incomplete" : "interrupted");
       results.push({
         executionId: intent.id,
-        status: failed.size ? "failed" : "interrupted",
-        errorCode: failed.size ? "MEDIA_RECOVERY_FAILED" : "MEDIA_OPERATION_INTERRUPTED"
+        status: incomplete ? "failed" : "interrupted",
+        errorCode: incomplete ? "MEDIA_RECOVERY_FAILED" : "MEDIA_OPERATION_INTERRUPTED"
       });
     }
     return results;
+  }
+
+  private async cleanupChild(executionId: string): Promise<{
+    cleanup: { removed: string[]; failed: string[] };
+    recoveryFailed: boolean;
+  }> {
+    try {
+      return { cleanup: await this.media.cleanupOwnedOutputs(executionId), recoveryFailed: false };
+    } catch (cause) {
+      if (cause instanceof MediaApplicationError && cause.code === "MEDIA_OPERATION_NOT_FOUND") {
+        return { cleanup: { removed: [], failed: [] }, recoveryFailed: false };
+      }
+      return { cleanup: { removed: [], failed: [] }, recoveryFailed: true };
+    }
+  }
+
+  private async canonicalMuxChildApplied(intent: MediaExecutionIntentV1): Promise<boolean> {
+    if (!canonicalExportMatches(this.history.current, intent)) return false;
+    const mux = await this.media.getExecutionRecord(intent.childExecutionIds.mux);
+    if (!mux || mux.projectId !== intent.projectId || !["committing", "succeeded"].includes(mux.status)
+      || mux.operation.type !== "mux-audio"
+      || mux.operation.outputUri !== intent.exportIntent.expectedOutputUri
+      || mux.mutation.type !== "export.add"
+      || mux.mutation.exportId !== intent.exportIntent.exportId
+      || mux.mutation.presetId !== intent.exportIntent.presetId) {
+      return false;
+    }
+    return mediaExecutionMutationApplied(mux, this.history.current);
   }
 
   private async transitionIntent(

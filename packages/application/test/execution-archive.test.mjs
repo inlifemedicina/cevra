@@ -57,6 +57,44 @@ test("persisted archive rejects malformed nested results and publication evidenc
   assert.throws(() => validatePersistedMediaExecutionArchive({ version: 1, projectId, records: [malformed], intents: [] }), /sampleRate/u);
 });
 
+test("persisted attempt tracking is exactly bound to canonical operation outputs", () => {
+  const outputUri = "/tmp/output.mp4";
+  const base = {
+    ...record("bound-output"), status: "running",
+    operation: { type: "trim", inputUri: "/tmp/input.mp4", outputUri, startMs: 0, endMs: 1000 },
+    attempts: [{
+      number: 1, jobId: "bound-output:1", status: "running", requestedAt: now,
+      outputUris: [outputUri], preexistingOutputUris: [], ownedOutputUris: [],
+      ownedOutputPublications: [], removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0
+    }]
+  };
+  const parse = (candidate) => validatePersistedMediaExecutionArchive({
+    version: 1, projectId, records: [candidate], intents: []
+  });
+  assert.doesNotThrow(() => parse(base));
+  for (const field of [
+    "outputUris", "preexistingOutputUris", "ownedOutputUris", "removedPartialOutputUris", "cleanupFailedOutputUris"
+  ]) {
+    const candidate = structuredClone(base);
+    candidate.attempts[0][field] = ["/tmp/foreign"];
+    assert.throws(() => parse(candidate), /operation|outside the operation outputs/u, field);
+  }
+  const publication = structuredClone(base);
+  publication.attempts[0].ownedOutputPublications = [{
+    uri: "/tmp/foreign",
+    evidence: { version: 1, scheme: "posix-dev-inode", device: "1", inode: "2" }
+  }];
+  assert.throws(() => parse(publication), /not an operation output/u);
+
+  const outputless = record("outputless");
+  outputless.attempts = [{
+    number: 1, jobId: "outputless:1", status: "running", requestedAt: now,
+    outputUris: [], preexistingOutputUris: ["/tmp/foreign"], ownedOutputUris: [],
+    removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0
+  }];
+  assert.throws(() => parse(outputless), /outside the operation outputs/u);
+});
+
 test("persisted archive enforces defensive record and intent count bounds", () => {
   assert.throws(() => validatePersistedMediaExecutionArchive({
     version: 1, projectId, records: Array(MAX_MEDIA_EXECUTION_RECORDS + 1).fill(null), intents: []

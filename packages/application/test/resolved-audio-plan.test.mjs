@@ -473,11 +473,127 @@ test("composite startup reconciliation never executes children and is idempotent
   let executeCalls = 0;
   const media = {
     async execute() { executeCalls += 1; assert.fail("startup reconciliation must not execute media"); },
-    async cleanupOwnedOutputs() { return { removed: [], failed: [] }; }
+    async cleanupOwnedOutputs() { return { removed: [], failed: [] }; },
+    async getExecutionRecord() { return undefined; }
   };
   const service = new ResolvedAudioPlanApplicationService({ history, media, intents: repository, clock: () => now });
   assert.deepEqual((await service.reconcilePendingWithoutReplay()).map(({ status }) => status), ["interrupted"]);
   assert.deepEqual(await service.reconcilePendingWithoutReplay(), []);
   assert.equal(executeCalls, 0);
   assert.equal((await repository.getIntent("pending-intent")).status, "interrupted");
+  assert.deepEqual((await repository.getIntent("pending-intent")).cleanupUncertainUris, []);
+});
+
+test("audio-running recovery cleans a proven audio child while a missing mux child is empty cleanup", async () => {
+  const history = historyFixture();
+  const plan = compileResolvedAudioPlan(history.current, {
+    id: "missing-mux-plan", audioOutputUri: "/render/missing-mux.wav", outputChannelLayout: "stereo",
+    normalization: { type: "none" }, projectJournalEntryCount: history.entries.length
+  });
+  const audioResult = sequenceResult(plan.operation);
+  const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [{
+    id: "missing-mux:audio", projectId: history.current.project.id, locale: "pt-BR",
+    operation: plan.operation, mutation: { type: "none" }, actor: { type: "system" },
+    status: "succeeded", createdAt: now, attempts: [{
+      number: 1, jobId: "missing-mux:audio:1", status: "succeeded", requestedAt: now, completedAt: now,
+      outputUris: [plan.operation.outputUri], preexistingOutputUris: [], ownedOutputUris: [plan.operation.outputUri],
+      ownedOutputPublications: [{ uri: plan.operation.outputUri, evidence: publication }],
+      removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: history.current.history.revision,
+      result: audioResult
+    }]
+  }], intents: [{
+    version: 1, id: "missing-mux", kind: "resolved-audio-plan", projectId: history.current.project.id,
+    projectBinding: plan.projectBinding, status: "audio-running",
+    childExecutionIds: { audio: "missing-mux:audio", mux: "missing-mux:mux" },
+    exportIntent: { exportId: "missing-mux-export", presetId: "fixture", expectedOutputUri: "/render/missing-mux.mp4" },
+    createdAt: now, updatedAt: now
+  }] });
+  const artifacts = new MemoryArtifacts();
+  artifacts.files.set(plan.operation.outputUri, Buffer.from("pcm"));
+  const media = new MediaApplicationService({
+    history, executions: repository, artifacts, clock: () => now,
+    engine: new FakeEngine(async () => assert.fail("restart must not execute media"))
+  });
+  const service = new ResolvedAudioPlanApplicationService({ history, media, intents: repository, clock: () => now });
+  assert.deepEqual((await service.reconcilePendingWithoutReplay()).map(({ status }) => status), ["interrupted"]);
+  assert.equal(artifacts.files.has(plan.operation.outputUri), false);
+  assert.deepEqual(artifacts.removed, [plan.operation.outputUri]);
+  assert.deepEqual((await repository.getIntent("missing-mux")).cleanupUncertainUris, []);
+});
+
+test("pre-existing canonical export cannot satisfy a pending intent without its applied mux child", async () => {
+  for (const status of ["requested", "audio-running", "mux-running", "application-committed"]) {
+    const history = historyFixture();
+    history.commit({ type: "export.add", export: {
+      id: "collision-export", presetId: "fixture", status: "completed", outputUri: "/render/collision.mp4",
+      createdAt: now, completedAt: now
+    } });
+    const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [], intents: [{
+      version: 1, id: `collision-${status}`, kind: "resolved-audio-plan", projectId: history.current.project.id,
+      projectBinding: { projectId: history.current.project.id, projectRevision: history.current.history.revision,
+        projectSnapshotId: history.current.history.headSnapshotId, projectJournalEntryCount: history.entries.length },
+      status, childExecutionIds: { audio: `collision-${status}:audio`, mux: `collision-${status}:mux` },
+      exportIntent: { exportId: "collision-export", presetId: "fixture", expectedOutputUri: "/render/collision.mp4" },
+      createdAt: now, updatedAt: now
+    }] });
+    const media = new MediaApplicationService({
+      history, executions: repository, artifacts: new MemoryArtifacts(), clock: () => now,
+      engine: new FakeEngine(async () => assert.fail("restart must not execute media"))
+    });
+    const service = new ResolvedAudioPlanApplicationService({ history, media, intents: repository, clock: () => now });
+    assert.deepEqual((await service.reconcilePendingWithoutReplay()).map(({ status: value }) => value), ["interrupted"]);
+    assert.equal((await repository.getIntent(`collision-${status}`)).status, "interrupted");
+    assert.deepEqual((await repository.getIntent(`collision-${status}`)).cleanupUncertainUris, []);
+  }
+});
+
+test("restart durable promotion requires the exact mux child and an applied canonical mutation", async () => {
+  const variants = ["missing-result", "wrong-operation", "wrong-output", "wrong-export", "wrong-preset", "wrong-mutation", "correct"];
+  for (const variant of variants) {
+    const history = historyFixture();
+    history.commit({ type: "export.add", export: {
+      id: "proof-export", presetId: "fixture", status: "completed", outputUri: "/render/proof.mp4",
+      createdAt: now, completedAt: now
+    } });
+    const muxId = `proof-${variant}:mux`;
+    const baseRecord = {
+      id: muxId, projectId: history.current.project.id, locale: "pt-BR",
+      operation: { type: "mux-audio", videoUri: "/render/visual.mp4", audioUri: "/render/audio.wav",
+        outputUri: variant === "wrong-output" ? "/render/wrong.mp4" : "/render/proof.mp4", replaceExisting: true },
+      mutation: variant === "wrong-mutation"
+        ? { type: "none" }
+        : { type: "export.add", exportId: variant === "wrong-export" ? "other-export" : "proof-export",
+          presetId: variant === "wrong-preset" ? "other-preset" : "fixture" },
+      actor: { type: "system" }, status: "succeeded", createdAt: now,
+      attempts: [{ number: 1, jobId: `${muxId}:1`, status: "succeeded", requestedAt: now,
+        outputUris: [variant === "wrong-output" ? "/render/wrong.mp4" : "/render/proof.mp4"],
+        preexistingOutputUris: [], ownedOutputUris: [], removedPartialOutputUris: [], cleanupFailedOutputUris: [],
+        projectRevisionBefore: 0,
+        ...(variant === "missing-result" ? {} : { result: muxResult({
+          type: "mux-audio", videoUri: "/render/visual.mp4", audioUri: "/render/audio.wav",
+          outputUri: variant === "wrong-output" ? "/render/wrong.mp4" : "/render/proof.mp4", replaceExisting: true
+        }) }) }]
+    };
+    if (variant === "wrong-operation") {
+      baseRecord.operation = { type: "probe", inputUri: "/render/visual.mp4" };
+      baseRecord.attempts[0].outputUris = [];
+    }
+    const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [baseRecord], intents: [{
+      version: 1, id: `proof-${variant}`, kind: "resolved-audio-plan", projectId: history.current.project.id,
+      projectBinding: { projectId: history.current.project.id, projectRevision: history.current.history.revision,
+        projectSnapshotId: history.current.history.headSnapshotId, projectJournalEntryCount: history.entries.length },
+      status: "application-committed", childExecutionIds: { audio: `proof-${variant}:audio`, mux: muxId },
+      exportIntent: { exportId: "proof-export", presetId: "fixture", expectedOutputUri: "/render/proof.mp4" },
+      createdAt: now, updatedAt: now
+    }] });
+    const media = new MediaApplicationService({
+      history, executions: repository, artifacts: new MemoryArtifacts(), clock: () => now,
+      engine: new FakeEngine(async () => assert.fail("restart must not execute media"))
+    });
+    const service = new ResolvedAudioPlanApplicationService({ history, media, intents: repository, clock: () => now });
+    const [result] = await service.reconcilePendingWithoutReplay();
+    assert.equal(result.status, variant === "correct" ? "succeeded" : "interrupted", variant);
+    assert.equal((await repository.getIntent(`proof-${variant}`)).status,
+      variant === "correct" ? "durable-succeeded" : "interrupted", variant);
+  }
 });
