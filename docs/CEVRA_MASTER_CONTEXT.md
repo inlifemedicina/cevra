@@ -1450,6 +1450,7 @@ runtime run `35805137702` passed on macOS arm64.
 | Audio Sequence Runtime V1 | #36 | `a18f19a06b33669c149c58f57bc74f385c0a02f2` | IMPLEMENTED / CLOSED |
 | Audio Measurement V1 | #38 | `282d29ec2252f5f488050b3b4efba4ec2cfcfe76` | IMPLEMENTED / CLOSED |
 | Application Resolved Audio Plan V1 | #42 | `ff744592e7cf14b40018e3781440fb74b343f7a0` | IMPLEMENTED / CLOSED |
+| Durable Media Execution Archive V1 | #44 | `f5518102ace30d54659334d995712b36d0a4f6b7` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1573,18 +1574,12 @@ provided visual result with the same binding, performs an exclusive staged
 than being ignored; Composition, UI, mastering and the full editable J-cut
 workflow remain outside this slice.
 
-The Desktop Host still wires an in-memory Media execution repository. Full
-process-crash recovery of the composite sequence → mux → promotion intent is
-therefore not claimed. **Durable Media Execution Recovery V1 is a canonical,
-Product Owner-approved direction with implementation pending:** a small,
-versioned operational archive lives under the trusted Desktop project root,
-separate from Project IR and the canonical Project Store package, stores no
-media, and reconciles without automatic render/edit/mux replay. Cleanup requires
-ownership proof; ambiguous artifacts and proven persisted canonical exports are
-preserved. ADR 0027 records the boundary and future integration with
-DesktopProjectPersistence. Runtime identity advances to 0.3.1 with protocol
-and third-party pins unchanged. Audio Sequence/Measurement, Alignment and
-`extract-audio` semantics remain preserved. Product progress remains **48%**.
+Durable recovery of the bounded composite sequence → mux → promotion intent is
+now provided by the operational archive closed in ADR 0028. This does not claim
+full CEVRA product crash recovery or automatic adoption by future workflows.
+Runtime identity remains 0.3.1 with protocol and third-party pins unchanged.
+Audio Sequence/Measurement, Alignment and `extract-audio` semantics remain
+preserved. Product progress remains **48%**.
 
 The adversarial remediation on the same feature branch closes the confirmed
 pre-review gaps: final state is rechecked after the `committing` archive save
@@ -1606,12 +1601,19 @@ NOTES**, with no reproduced BLOCKER, HIGH or MEDIUM finding. This closes only
 the bounded vertical; Slice 3 in full and the coordinated Media Runtime gate
 remain active. Product progress remains **48%**.
 
-**Durable Media Execution Archive V1 — IN DEVELOPMENT / independent adversarial
-re-review pending after focused remediation.** Branch
-`feat/durable-media-execution-archive-v1`, remediation code head
-`498cc0ef2320d43098b58bbd32d8a99a0bf05b8b`, evolves the
-existing Application execution repository into a small versioned operational
-archive under the trusted Desktop root and the same active-project writer lease.
+**Durable Media Execution Archive V1 — IMPLEMENTED / CLOSED.** PR #44 merged
+reviewed feature head `16bf0cb347b9738b9ca84194e67a2cba5056127b`
+by normal merge commit `f5518102ace30d54659334d995712b36d0a4f6b7`
+on 2026-09-24. Pull-request CI run `36024597615` passed 5/5 and exact managed
+macOS arm64 runtime run `36024597609` passed; post-merge main CI run
+`36026252042` passed 5/5 and exact managed runtime run `36026251971` passed on
+the merge SHA. Independent adversarial review, focused verification of F-1
+through F-4 and the N-1 protected-root micro-review concluded **APPROVE FOR PR
+WITH NON-BLOCKING NOTES**, with no reproduced BLOCKER, HIGH or MEDIUM finding.
+
+The existing Application execution repository is now a small versioned
+operational archive under the trusted Desktop root and the same active-project
+writer lease.
 [ADR 0028](adr/0028-durable-media-execution-archive-v1.md) records the approved
 no-auto-replay architecture: ProjectHistory is restored first; closed/integrity-
 checked records and minimal resolved-audio intents are then reconciled; cleanup
@@ -1630,8 +1632,24 @@ canonical project remains available. SHA-256 detects accidental corruption but
 does not authenticate against an actor able to rewrite the trusted root; URI
 text never authorizes deletion. Project IR and Project
 Store formats, Tauri/WebView permissions, third-party dependencies and media
-runtimes are unchanged. Product progress remains **48%** until review/merge and
-user-visible capability evidence justify a separate change.
+runtimes are unchanged. The configured Media Runtime root also remains a
+protected Transcription root when archive recovery degrades Media. **Durable
+Media Execution Recovery V1 is IMPLEMENTED / CLOSED for this bounded ADR 0028
+archive and restart-reconciliation scope only.** Strong Windows publication
+identity, removal of the residual POSIX `lstat`→`unlink` interval, hostile-writer
+authentication, a complete abrupt process-kill matrix and permanent audit
+retention remain unclaimed. Application Resolved Audio Plan V1 remains closed,
+but the full Slice 3 editable J-cut product experience and the coordinated Media
+Runtime gate remain active. Product progress remains **48%**.
+
+**NEXT PLANNED ENGINEERING SLICE — NOT STARTED:** Slice 4, Durable Source
+Technical Descriptor / MR-V01. It must preserve trusted normalized probe
+evidence through ingest → open → planning → export with source-byte invalidation
+and V1 compatibility. Before production implementation, an execution-feasibility
+and authority decision must determine where that durable technical metadata can
+live without becoming a hidden secondary render authority. Any required Project
+IR or Project Package evolution needs explicit Product Owner approval; this
+closeout makes no such choice and implements no descriptor, field or migration.
 
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
@@ -1753,11 +1771,12 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Implement Durable Media Execution Archive V1 as the next recommended slice within Slice 3, preserving the approved no-auto-replay and ownership-proof recovery boundary.
-2. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
-3. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
-4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
-5. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
+1. Prepare the authority/execution-feasibility decision for Slice 4 — Durable Source Technical Descriptor / MR-V01; do not evolve Project IR or Project Package without Product Owner approval.
+2. Implement Slice 4 only after that authority is explicit, preserving source-byte invalidation, V1 compatibility and ingest/open/planning/export continuity without hidden render authority.
+3. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
+4. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
+5. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
+6. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
 
 ---
 
