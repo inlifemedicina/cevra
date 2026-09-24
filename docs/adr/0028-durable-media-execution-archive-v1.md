@@ -41,15 +41,28 @@ implementation remains in Desktop Host.
 
 The canonical file is a private regular file named
 `media-executions.v1.cevra.json`. It contains a closed envelope, SHA-256 of the
-complete operational payload, and a closed runtime-validated archive. Unknown
+complete operational payload, and a closed runtime-validated archive. SHA-256
+detects accidental corruption and inconsistent writes; it is not authentication
+against an actor able to rewrite the trusted root and recompute the digest.
+The trusted Desktop root remains the threat boundary, and even a valid digest
+never makes a URI cleanup authority. Unknown
 versions/keys, malformed records, digest mismatch, project mismatch, symlinks
 and oversized content fail closed before paths or publication evidence are
 trusted.
 
 V1 permits at most 4,096 execution records, 1,024 composite intents and an
-8 MiB encoded archive. It does not prune active/interrupted ownership evidence.
-A safe terminal-record pruning policy is deferred; reaching a bound is an
-observable failure, never silent deletion.
+8 MiB encoded archive. Compaction is pressure-triggered and deterministic. It
+may remove the oldest unreferenced terminal record only when its latest attempt
+has no cleanup uncertainty, or the oldest terminal intent only when it is
+`durable-succeeded`/`interrupted` with no cleanup uncertainty. Active,
+nonterminal, referenced and recovery-incomplete evidence is never pruned.
+Operational evidence is bounded state, not a permanent audit log.
+
+If no safe candidate can make a proposed mutation fit, the repository throws
+`MEDIA_EXECUTION_ARCHIVE_FULL` before filesystem persistence. The current
+archive remains readable and is not quarantined or write-blocked. By contrast,
+a fault during an attempted write, including post-rename/directory-sync
+uncertainty, blocks reads and writes on that live instance until reopen.
 
 Each write is serialized and follows:
 
@@ -102,6 +115,12 @@ Archive status, attempt result or a URI never overrides restored ProjectHistory.
 Known publication evidence is re-proved through `ArtifactStore.matchesPublication`
 before deletion. Missing evidence, identity mismatch, symlink, foreign inode or
 unsupported Windows identity causes preservation and observable uncertainty.
+Persisted attempt tracking is schema-bound to the exact output URI set derived
+from its typed operation; pre-existing/owned/removed/failed/publication lists
+cannot introduce an unrelated URI. Restart cleanup for operations without
+strong exclusive publication evidence preserves any existing destination and
+records uncertainty instead of deleting by path alone. Same-session cleanup
+retains its established behavior because it has current execution knowledge.
 The residual POSIX `lstat`→`unlink` interval remains; V1 does not claim TOCTOU
 elimination.
 
@@ -120,16 +139,26 @@ canonical in-memory commit, not durable success. Only a successful
 `markCheckpointSucceeded()` to write `durable-succeeded`. Checkpoint failure is
 not rolled back; restart lets restored ProjectHistory decide authority.
 
+Restart promotion of a composite intent additionally requires its exact mux
+child record: matching project, child ID, mux output URI, `export.add` mutation,
+export/preset IDs, committing-or-succeeded state and the shared canonical
+mutation proof. A pre-existing canonical export with the same identifiers is
+not sufficient. A child not yet created is normal empty cleanup, not a URI or
+recovery uncertainty.
+
 ## Consequences and exclusions
 
 - No Project IR/Project Store format or migration changes.
 - No DB, new dependency, worker, Tauri/WebView permission or filesystem API.
 - No automatic replay, render, mux, retry or editorial mutation after restart.
 - Ambiguous artifacts and proven canonical/undo/redo-retained media are preserved.
+- A classified archive failure degrades Media capability while keeping a
+  healthy canonical project open; unexpected programming errors still fail
+  closed instead of being swallowed.
 - Director gains no memory or filesystem authority; this is a compatible typed
   execution/recovery extension only.
-- Terminal pruning, strong Windows publication identity and removal of the
-  residual POSIX unlink race remain deferred.
+- Strong Windows publication identity and removal of the residual POSIX unlink
+  race remain deferred.
 
 Technical objective evidence is sufficient for this bounded backend slice;
 there is no new subjective Product Owner acceptance surface. The implementation
