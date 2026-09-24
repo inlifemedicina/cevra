@@ -898,3 +898,85 @@ test("historical exclusive records without publication identity preserve ambiguo
   assert.deepEqual(await service.cleanupOwnedOutputs("legacy-owned"), { removed: [], failed: [audioSequence.outputUri] });
   assert.equal(artifacts.files.has(audioSequence.outputUri), true);
 });
+
+test("atomic execution create permits at most one engine call for a duplicate id", async () => {
+  const engine = new FakeEngine(async (operation) => ({
+    type: "probe",
+    probe: { uri: operation.inputUri, hasVideo: true, hasAudio: true, videoCodec: "h264", audioCodec: "aac" }
+  }));
+  const { service, repository } = fixture(engine);
+  const request = { id: "atomic-duplicate", operation: { type: "probe", inputUri: "/media/in.mp4" }, mutation: { type: "none" } };
+  const outcomes = await Promise.allSettled([service.execute(request), service.execute(request)]);
+  assert.equal(outcomes.filter(({ status }) => status === "fulfilled").length, 1);
+  assert.equal(outcomes.filter(({ status }) => status === "rejected").length, 1);
+  assert.equal(engine.calls.length, 1);
+  assert.equal((await repository.get("atomic-duplicate")).status, "succeeded");
+});
+
+test("restart reconciliation interrupts noncanonical work without retry, cleans proven derived output, and is idempotent", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.files.add(audioSequence.outputUri);
+  const runningOperation = { ...audioSequence, outputUri: "/media/staging/running.wav" };
+  const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [
+    {
+      id: "restart-requested", projectId: "project-1", locale: "pt-BR",
+      operation: { type: "probe", inputUri: "/media/in.mp4" }, mutation: { type: "none" }, actor: { type: "system" },
+      status: "requested", createdAt: now, attempts: []
+    },
+    {
+      id: "restart-running", projectId: "project-1", locale: "pt-BR",
+      operation: runningOperation, mutation: { type: "none" }, actor: { type: "system" },
+      status: "running", createdAt: now, attempts: [{
+        number: 1, jobId: "restart-running:1", status: "running", requestedAt: now, startedAt: now,
+        outputUris: [runningOperation.outputUri], preexistingOutputUris: [], ownedOutputUris: [],
+        removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0
+      }]
+    },
+    {
+      id: "restart-committing-derived", projectId: "project-1", locale: "pt-BR",
+      operation: audioSequence, mutation: { type: "none" }, actor: { type: "system" },
+      status: "committing", createdAt: now, attempts: [{
+        number: 1, jobId: "restart-committing-derived:1", status: "committing", requestedAt: now, startedAt: now,
+        outputUris: [audioSequence.outputUri], preexistingOutputUris: [], ownedOutputUris: [audioSequence.outputUri],
+        ownedOutputPublications: [{ uri: audioSequence.outputUri, evidence: publication }],
+        removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0,
+        result: completedAudioSequence()
+      }]
+    }
+  ] });
+  const engine = new FakeEngine(async () => assert.fail("restart reconciliation must not execute the engine"));
+  const { service } = fixture(engine, artifacts, repository);
+  const first = await service.reconcilePendingWithoutReplay();
+  const second = await service.reconcilePendingWithoutReplay();
+  assert.deepEqual(first.map(({ status }) => status), ["interrupted", "interrupted", "interrupted"]);
+  assert.deepEqual(second, []);
+  assert.equal(engine.calls.length, 0);
+  assert.equal(artifacts.files.has(audioSequence.outputUri), false);
+  assert.equal((await repository.get("restart-requested")).attempts.length, 0);
+  assert.equal((await repository.get("restart-running")).attempts.length, 1);
+  assert.deepEqual((await repository.get("restart-committing-derived")).attempts[0].removedPartialOutputUris,
+    [audioSequence.outputUri]);
+});
+
+test("restart reconciliation preserves non-exclusive foreign output without current ownership proof", async () => {
+  const artifacts = new MemoryArtifacts();
+  artifacts.files.add(trim.outputUri);
+  const repository = new InMemoryMediaExecutionRepository({ version: 1, records: [{
+    id: "restart-foreign-trim", projectId: "project-1", locale: "pt-BR",
+    operation: trim, mutation: { type: "none" }, actor: { type: "system" },
+    status: "running", createdAt: now, attempts: [{
+      number: 1, jobId: "restart-foreign-trim:1", status: "running", requestedAt: now, startedAt: now,
+      outputUris: [trim.outputUri], preexistingOutputUris: [], ownedOutputUris: [trim.outputUri],
+      removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0
+    }]
+  }] });
+  const engine = new FakeEngine(async () => assert.fail("restart must not execute or retry"));
+  const { service } = fixture(engine, artifacts, repository);
+  const [recovery] = await service.reconcilePendingWithoutReplay();
+  assert.equal(recovery.status, "failed");
+  assert.equal(recovery.errorCode, "MEDIA_RECOVERY_FAILED");
+  assert.equal(artifacts.files.has(trim.outputUri), true);
+  assert.deepEqual(artifacts.removed, []);
+  assert.deepEqual((await repository.get("restart-foreign-trim")).attempts[0].cleanupFailedOutputUris, [trim.outputUri]);
+  assert.equal(engine.calls.length, 0);
+});

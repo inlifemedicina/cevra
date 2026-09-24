@@ -93,6 +93,38 @@ export interface MediaExecutionRecord {
   attempts: MediaExecutionAttempt[];
 }
 
+export type MediaExecutionIntentStatus =
+  | "requested"
+  | "audio-running"
+  | "audio-succeeded"
+  | "mux-running"
+  | "application-committed"
+  | "durable-succeeded"
+  | "interrupted"
+  | "recovery-incomplete";
+
+export interface MediaExecutionIntentV1 {
+  version: 1;
+  id: string;
+  kind: "resolved-audio-plan";
+  projectId: string;
+  projectBinding: MediaProjectBinding;
+  status: MediaExecutionIntentStatus;
+  childExecutionIds: {
+    audio: string;
+    mux: string;
+  };
+  exportIntent: {
+    exportId: string;
+    presetId: string;
+    expectedOutputUri: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  reconciledAt?: string;
+  cleanupUncertainUris?: string[];
+}
+
 export interface MediaExecutionRequest {
   id?: string;
   locale?: "pt-BR" | "en-US";

@@ -1606,6 +1606,33 @@ NOTES**, with no reproduced BLOCKER, HIGH or MEDIUM finding. This closes only
 the bounded vertical; Slice 3 in full and the coordinated Media Runtime gate
 remain active. Product progress remains **48%**.
 
+**Durable Media Execution Archive V1 — IN DEVELOPMENT / independent adversarial
+re-review pending after focused remediation.** Branch
+`feat/durable-media-execution-archive-v1`, remediation code head
+`498cc0ef2320d43098b58bbd32d8a99a0bf05b8b`, evolves the
+existing Application execution repository into a small versioned operational
+archive under the trusted Desktop root and the same active-project writer lease.
+[ADR 0028](adr/0028-durable-media-execution-archive-v1.md) records the approved
+no-auto-replay architecture: ProjectHistory is restored first; closed/integrity-
+checked records and minimal resolved-audio intents are then reconciled; cleanup
+requires current publication-identity proof; ambiguity, foreign replacements,
+canonical exports and undo/redo-retained media are preserved. Atomic duplicate-ID
+creation, serialized fsync+rename writes, bounded corruption quarantine,
+checkpoint-aware durable-success finalization and idempotent zero-engine startup
+reconciliation are implemented on the feature branch. Focused remediation now
+binds every persisted attempt URI to its typed operation, preserves non-exclusive
+restart outputs without strong current ownership evidence, requires the exact
+applied mux child before promoting a composite intent, treats not-yet-created
+children as empty cleanup, and adds deterministic pressure compaction plus a
+distinct `MEDIA_EXECUTION_ARCHIVE_FULL` path that does not permanently block
+the repository. Classified archive failures degrade Media while a healthy
+canonical project remains available. SHA-256 detects accidental corruption but
+does not authenticate against an actor able to rewrite the trusted root; URI
+text never authorizes deletion. Project IR and Project
+Store formats, Tauri/WebView permissions, third-party dependencies and media
+runtimes are unchanged. Product progress remains **48%** until review/merge and
+user-visible capability evidence justify a separate change.
+
 **Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
 
 GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.

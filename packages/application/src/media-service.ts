@@ -18,7 +18,8 @@ import {
 } from "@cevra/contracts";
 import { applyCommand, type EditCommand, type JournalActor, type ProjectHistory, type ProjectIR } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
-import type { MediaExecutionRepository } from "./repository.js";
+import { MediaExecutionAlreadyExistsError, type MediaExecutionRepository } from "./repository.js";
+import { mediaOperationOutputUris } from "./media-operation.js";
 import {
   provenanceFrom,
   type MediaApplicationErrorCode,
@@ -86,9 +87,6 @@ export class MediaApplicationService {
     }
     const executionId = stableRequest.id;
     const locale = stableRequest.locale;
-    if (await this.executions.get(executionId)) {
-      throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId);
-    }
     const record: MediaExecutionRecord = {
       id: executionId,
       projectId: this.history.current.project.id,
@@ -102,8 +100,63 @@ export class MediaApplicationService {
       createdAt: this.clock(),
       attempts: []
     };
-    await this.executions.save(record);
+    try {
+      await this.executions.create(record);
+    } catch (cause) {
+      if (cause instanceof MediaExecutionAlreadyExistsError) {
+        throw new MediaApplicationError("MEDIA_INVALID_REQUEST", locale, executionId, {}, cause);
+      }
+      throw cause;
+    }
     return this.runAttempt(record, signal);
+  }
+
+  /**
+   * Desktop restart reconciliation. Unlike recoverPending(), this method never
+   * invokes retry or the Media Engine.
+   */
+  async reconcilePendingWithoutReplay(): Promise<MediaRecoveryResult[]> {
+    const projectId = this.history.current.project.id;
+    const pending = await this.executions.listByStatus(projectId, ["requested", "running", "committing"]);
+    const reconciled: MediaRecoveryResult[] = [];
+    for (const record of pending) {
+      const attempt = record.attempts.at(-1);
+      if (record.status === "committing" && record.mutation.type !== "none"
+        && attempt?.result && mediaExecutionMutationApplied(record, this.history.current)) {
+        const project = this.history.current;
+        const entry = committedEntry(record, this.history.entries);
+        attempt.status = "succeeded";
+        attempt.completedAt = this.clock();
+        attempt.projectRevisionAfter = project.history.revision;
+        if (project.history.headSnapshotId) attempt.projectSnapshotAfter = project.history.headSnapshotId;
+        if (entry) attempt.projectJournalEntryId = entry.id;
+        record.status = "succeeded";
+        await this.executions.save(record);
+        reconciled.push({ executionId: record.id, status: "succeeded" });
+        continue;
+      }
+      if (!attempt) {
+        record.status = "interrupted";
+        await this.executions.save(record);
+        reconciled.push({ executionId: record.id, status: "interrupted", errorCode: "MEDIA_OPERATION_INTERRUPTED" });
+        continue;
+      }
+      const cleanup = await this.reconcileCleanupAfterRestart(record, attempt);
+      attempt.removedPartialOutputUris.push(...cleanup.removed.filter((uri) => !attempt.removedPartialOutputUris.includes(uri)));
+      attempt.cleanupFailedOutputUris.push(...cleanup.failed.filter((uri) => !attempt.cleanupFailedOutputUris.includes(uri)));
+      attempt.status = "interrupted";
+      attempt.completedAt = this.clock();
+      attempt.errorCode = cleanup.failed.length ? "MEDIA_RECOVERY_FAILED" : "MEDIA_OPERATION_INTERRUPTED";
+      attempt.technicalError = "Desktop restarted before the media operation completed; execution was not replayed.";
+      record.status = cleanup.failed.length ? "failed" : "interrupted";
+      await this.executions.save(record);
+      reconciled.push({
+        executionId: record.id,
+        status: record.status,
+        errorCode: attempt.errorCode
+      });
+    }
+    return reconciled;
   }
 
   async retry(executionId: string, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
@@ -135,7 +188,7 @@ export class MediaApplicationService {
     const recovered: MediaRecoveryResult[] = [];
     for (const record of pending) {
       const attempt = record.attempts.at(-1);
-      if (record.status === "committing" && attempt?.result && mutationApplied(record, this.history.current)) {
+      if (record.status === "committing" && attempt?.result && mediaExecutionMutationApplied(record, this.history.current)) {
         const project = this.history.current;
         const entry = committedEntry(record, this.history.entries);
         attempt.status = "succeeded";
@@ -150,7 +203,7 @@ export class MediaApplicationService {
       }
       if (attempt) {
         const cleanup = hasExclusivePublication(record.operation)
-          ? await this.cleanupPublished(attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
+          ? await this.cleanupPublished(record.operation, attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
           : await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);
         attempt.removedPartialOutputUris.push(...cleanup.removed);
         attempt.cleanupFailedOutputUris.push(...cleanup.failed);
@@ -188,15 +241,19 @@ export class MediaApplicationService {
     if (!record) throw new MediaApplicationError("MEDIA_OPERATION_NOT_FOUND", this.history.current.project.defaultLocale, executionId);
     const attempt = record.attempts.at(-1);
     if (!attempt) return { removed: [], failed: [] };
-    const cleanup = await this.cleanupPublished(attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris);
+    const cleanup = await this.cleanupPublished(record.operation, attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris);
     attempt.removedPartialOutputUris.push(...cleanup.removed.filter((uri) => !attempt.removedPartialOutputUris.includes(uri)));
     attempt.cleanupFailedOutputUris.push(...cleanup.failed.filter((uri) => !attempt.cleanupFailedOutputUris.includes(uri)));
     await this.executions.save(record);
     return cleanup;
   }
 
+  async getExecutionRecord(executionId: string): Promise<MediaExecutionRecord | undefined> {
+    return this.executions.get(executionId);
+  }
+
   private async runAttempt(record: MediaExecutionRecord, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
-    const outputUris = operationOutputUris(record.operation);
+    const outputUris = mediaOperationOutputUris(record.operation);
     const current = this.history.current;
     const attempt: MediaExecutionAttempt = {
       number: record.attempts.length + 1,
@@ -296,7 +353,7 @@ export class MediaApplicationService {
       const failure = cause instanceof AttemptFailure ? cause : undefined;
       const code: MediaApplicationErrorCode = cancelled ? "MEDIA_OPERATION_CANCELLED" : failure?.code ?? "MEDIA_OPERATION_FAILED";
       const cleanup = hasExclusivePublication(record.operation)
-        ? await this.cleanupPublished(attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
+        ? await this.cleanupPublished(record.operation, attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
         : await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);
       attempt.removedPartialOutputUris.push(...cleanup.removed);
       attempt.cleanupFailedOutputUris.push(...cleanup.failed);
@@ -368,16 +425,20 @@ export class MediaApplicationService {
   }
 
   private async cleanupPublished(
+    operation: MediaOperation,
     claimedUris: readonly string[],
     publications: readonly { uri: string; evidence: MediaPublicationEvidenceV1 }[],
     preexisting: readonly string[]
   ): Promise<{ removed: string[]; failed: string[] }> {
+    const allowedUris = mediaOperationOutputUris(operation);
+    const allowed = new Set(allowedUris);
+    const evidenceIsBound = publications.every(({ uri }) => allowed.has(uri));
     const protectedUris = new Set(preexisting);
     for (const uri of this.history.retainedMediaUris()) protectedUris.add(uri);
     const removed: string[] = [];
     const failed: string[] = [];
-    const evidencedUris = new Set(publications.map(({ uri }) => uri));
-    for (const uri of claimedUris) {
+    const evidencedUris = new Set(publications.filter(({ uri }) => allowed.has(uri)).map(({ uri }) => uri));
+    for (const uri of allowedUris) {
       if (protectedUris.has(uri) || evidencedUris.has(uri)) continue;
       try {
         if (await this.artifacts.kind(uri) !== "missing") failed.push(uri);
@@ -385,9 +446,22 @@ export class MediaApplicationService {
         failed.push(uri);
       }
     }
+    if (!evidenceIsBound || claimedUris.length !== allowedUris.length
+      || claimedUris.some((uri, index) => uri !== allowedUris[index])) {
+      for (const uri of allowedUris) {
+        if (protectedUris.has(uri) || failed.includes(uri)) continue;
+        try {
+          if (await this.artifacts.kind(uri) !== "missing") failed.push(uri);
+        } catch {
+          failed.push(uri);
+        }
+      }
+      return { removed, failed };
+    }
     for (const publication of publications) {
       if (protectedUris.has(publication.uri)) continue;
       try {
+        if (await this.artifacts.kind(publication.uri) === "missing") continue;
         if (!this.artifacts.matchesPublication
           || !await this.artifacts.matchesPublication(publication.uri, publication.evidence)) {
           failed.push(publication.uri);
@@ -401,6 +475,32 @@ export class MediaApplicationService {
       }
     }
     return { removed, failed };
+  }
+
+  private async reconcileCleanupAfterRestart(
+    record: MediaExecutionRecord,
+    attempt: MediaExecutionAttempt
+  ): Promise<{ removed: string[]; failed: string[] }> {
+    if (hasExclusivePublication(record.operation)) {
+      return this.cleanupPublished(
+        record.operation,
+        attempt.outputUris,
+        attempt.ownedOutputPublications ?? [],
+        attempt.preexistingOutputUris
+      );
+    }
+    const protectedUris = new Set(attempt.preexistingOutputUris);
+    for (const uri of this.history.retainedMediaUris()) protectedUris.add(uri);
+    const failed: string[] = [];
+    for (const uri of mediaOperationOutputUris(record.operation)) {
+      if (protectedUris.has(uri)) continue;
+      try {
+        if (await this.artifacts.kind(uri) !== "missing") failed.push(uri);
+      } catch {
+        failed.push(uri);
+      }
+    }
+    return { removed: [], failed };
   }
 }
 
@@ -446,7 +546,7 @@ function validateProjectBinding(binding: MediaProjectBinding | undefined): void 
 function validateOutputExpectation(expectation: MediaOutputExpectation | undefined, operation: MediaOperation): void {
   if (!expectation) return;
   rejectUnexpectedKeys(expectation, ["durationMs", "durationToleranceMs"], "media output expectation");
-  if (operationOutputUris(operation).length !== 1
+  if (mediaOperationOutputUris(operation).length !== 1
     || !Number.isSafeInteger(expectation.durationMs) || expectation.durationMs <= 0
     || !Number.isSafeInteger(expectation.durationToleranceMs) || expectation.durationToleranceMs < 0) {
     throw new Error("Invalid media output expectation.");
@@ -472,7 +572,7 @@ function validateMutation(operation: MediaOperation, mutation: MediaProjectMutat
     if (mutation.type !== "none") throw new Error("Audio sequence PCM is a derived intermediate and must not mutate Project IR.");
     return;
   }
-  const producesFile = operationOutputUris(operation).length > 0;
+  const producesFile = mediaOperationOutputUris(operation).length > 0;
   if (producesFile === (mutation.type === "none")) throw new Error("File-producing media operations require a typed Project IR mutation.");
 }
 
@@ -576,31 +676,7 @@ function mutationCommand(
   };
 }
 
-function operationOutputUris(operation: MediaOperation): string[] {
-  switch (operation.type) {
-    case "probe":
-    case "measure-audio":
-    case "detect-silence":
-      return [];
-    case "mux-audio":
-    case "concat":
-    case "trim":
-    case "transcode":
-    case "fit":
-    case "crop":
-    case "speed":
-    case "volume":
-    case "loudness-normalize":
-    case "audio-fade":
-    case "extract-audio":
-    case "extract-frame":
-    case "overlay-media":
-    case "render-audio-sequence":
-      return [operation.outputUri];
-  }
-}
-
-function mutationApplied(record: MediaExecutionRecord, project: ProjectIR): boolean {
+export function mediaExecutionMutationApplied(record: MediaExecutionRecord, project: ProjectIR): boolean {
   const result = record.attempts.at(-1)?.result;
   const mutation = record.mutation;
   if (!result) return false;

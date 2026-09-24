@@ -1,9 +1,16 @@
 import {
-  InMemoryMediaExecutionRepository,
   LocalSourceIngestService,
   MediaApplicationService,
+  ResolvedAudioPlanApplicationService,
   TranscriptionApplicationService
 } from "@cevra/application";
+import type {
+  ExecuteResolvedAudioPlanOutcome,
+  ExecuteResolvedAudioPlanRequest,
+  MediaExecutionRepository,
+  MediaExecutionIntentRepository
+} from "@cevra/application";
+import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
   FfmpegMediaEngine,
   NodeMediaArtifactStore,
@@ -12,13 +19,19 @@ import {
 } from "@cevra/media-ffmpeg";
 import { ProjectHistory } from "@cevra/project-ir";
 import {
+  assertModelCacheIsolated,
   FasterWhisperTranscriptionAdapter,
+  resolveRuntimePaths as resolveTranscriptionRuntimePaths,
   type LocalTranscriptionAdapterOptions,
   type SupportedTranscriptionModelId
 } from "@cevra/transcription-faster-whisper";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { DesktopPersistenceError, DesktopProjectPersistence } from "./persistence.js";
+import {
+  DesktopMediaExecutionArchiveFullError,
+  isDesktopMediaExecutionArchiveOperationalError
+} from "./media-execution-archive.js";
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
 
 type Locale = "pt-BR" | "en-US";
@@ -30,6 +43,7 @@ export interface DesktopSessionServices {
   mediaCapability: CapabilityState;
   transcriptionCapability: CapabilityState;
   persistence?: DesktopProjectPersistence;
+  resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
 }
 
@@ -102,6 +116,22 @@ export class DesktopSession {
     });
   }
 
+  /** Internal Desktop composition boundary; intentionally not exposed by Tauri/WebView. */
+  async executeResolvedAudioPlan(
+    request: ExecuteResolvedAudioPlanRequest,
+    signal?: AbortSignal
+  ): Promise<ExecuteResolvedAudioPlanOutcome> {
+    if (!this.services.resolvedAudioPlan) throw safeError("MEDIA_UNAVAILABLE");
+    const stableRequest = structuredClone(request);
+    const intentId = stableRequest.id;
+    return this.runMutation(async () => {
+      const outcome = await this.services.resolvedAudioPlan!.execute(stableRequest, signal);
+      await this.persistMutation();
+      await this.services.resolvedAudioPlan!.markCheckpointSucceeded(intentId);
+      return outcome;
+    });
+  }
+
   async close(): Promise<void> {
     for (const controller of this.operations.values()) controller.abort();
     await Promise.allSettled([
@@ -156,32 +186,73 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
   const opened = await DesktopProjectPersistence.open(persistenceRoot, {
     recoveredSession: environment.CEVRA_HOST_RECOVERY === "1"
   });
-  const history = opened.history;
-  const media = await createMediaServices(history, environment);
-  const transcription = await createTranscriptionServices(history, environment, media.runtimeRoot);
-  return new DesktopSession({
-    history,
-    ...(media.ingest ? { ingest: media.ingest } : {}),
-    ...(transcription.service ? { transcription: transcription.service } : {}),
-    mediaCapability: media.capability,
-    transcriptionCapability: transcription.capability,
-    persistence: opened.persistence,
-    close: async () => {
-      await media.close?.();
+  const configuredMediaRuntime = configuredMediaRuntimePaths(environment);
+  let media: Awaited<ReturnType<typeof createMediaServices>> | undefined;
+  let mediaArchiveFailure: "archive-full" | "archive-unavailable" | undefined;
+  try {
+    const history = opened.history;
+    const executions = await opened.persistence.openMediaExecutionRepository(history.current.project.id);
+    const recovery = composeMediaApplicationServices(history, executions, unavailableMediaEngine());
+    await recovery.application.reconcilePendingWithoutReplay();
+    await recovery.resolvedAudioPlan.reconcilePendingWithoutReplay();
+    media = await createMediaServices(history, environment, executions, configuredMediaRuntime);
+  } catch (cause) {
+    if (!isDesktopMediaExecutionArchiveOperationalError(cause)) {
+      await media?.close?.().catch(() => undefined);
+      await opened.persistence.close();
+      throw cause;
     }
-  });
+    await media?.close?.().catch(() => undefined);
+    media = undefined;
+    mediaArchiveFailure = cause instanceof DesktopMediaExecutionArchiveFullError
+      ? "archive-full"
+      : "archive-unavailable";
+  }
+  try {
+    const history = opened.history;
+    const transcription = configuredMediaRuntime.invalid
+      ? { capability: unavailable("runtime-invalid") }
+      : await createTranscriptionServices(history, environment, configuredMediaRuntime.paths?.root);
+    return new DesktopSession({
+      history,
+      ...(media?.ingest ? { ingest: media.ingest } : {}),
+      ...(transcription.service ? { transcription: transcription.service } : {}),
+      mediaCapability: media?.capability ?? unavailable(mediaArchiveFailure ?? "archive-unavailable"),
+      transcriptionCapability: transcription.capability,
+      persistence: opened.persistence,
+      ...(media?.resolvedAudioPlan ? { resolvedAudioPlan: media.resolvedAudioPlan } : {}),
+      close: async () => {
+        await media?.close?.();
+      }
+    });
+  } catch (cause) {
+    await media?.close?.().catch(() => undefined);
+    await opened.persistence.close();
+    throw cause;
+  }
 }
 
-async function createMediaServices(history: ProjectHistory, environment: NodeJS.ProcessEnv): Promise<{
+async function createMediaServices(
+  history: ProjectHistory,
+  environment: NodeJS.ProcessEnv,
+  executions: MediaExecutionRepository & MediaExecutionIntentRepository,
+  configuredRuntime: ConfiguredMediaRuntime
+): Promise<{
   capability: CapabilityState;
   ingest?: LocalSourceIngestService;
+  application: MediaApplicationService;
+  resolvedAudioPlan: ResolvedAudioPlanApplicationService;
   close?: () => Promise<void>;
   runtimeRoot?: string;
 }> {
-  const configuredRoot = environment.CEVRA_MEDIA_RUNTIME_ROOT;
-  if (!configuredRoot) return { capability: unavailable("runtime-not-configured") };
+  if (configuredRuntime.invalid) {
+    return { capability: unavailable("runtime-invalid"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
+  }
+  if (!configuredRuntime.paths) {
+    return { capability: unavailable("runtime-not-configured"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
+  }
   try {
-    const runtime = resolveMediaRuntimePaths(configuredRoot);
+    const runtime = configuredRuntime.paths;
     const root = runtime.root;
     const mode = environment.CEVRA_MEDIA_RUNTIME_MODE === "development" ? "development" : "release";
     const transport = new ProcessMediaWorkerTransport({
@@ -195,23 +266,58 @@ async function createMediaServices(history: ProjectHistory, environment: NodeJS.
     const health = await engine.healthcheck();
     if (health.status === "unavailable") {
       await worker.close();
-      return { capability: unavailable("runtime-invalid"), runtimeRoot: root };
+      return { capability: unavailable("runtime-invalid"), runtimeRoot: root, ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
     }
-    const application = new MediaApplicationService({
-      engine,
-      history,
-      executions: new InMemoryMediaExecutionRepository(),
-      artifacts: new NodeMediaArtifactStore()
-    });
+    const services = composeMediaApplicationServices(history, executions, engine);
     return {
       capability: available(),
-      ingest: new LocalSourceIngestService({ media: application, history }),
+      ingest: new LocalSourceIngestService({ media: services.application, history }),
+      ...services,
       close: () => worker.close(),
       runtimeRoot: root
     };
   } catch {
-    return { capability: unavailable("runtime-invalid") };
+    return { capability: unavailable("runtime-invalid"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
   }
+}
+
+interface ConfiguredMediaRuntime {
+  paths?: ReturnType<typeof resolveMediaRuntimePaths>;
+  invalid: boolean;
+}
+
+function configuredMediaRuntimePaths(environment: NodeJS.ProcessEnv): ConfiguredMediaRuntime {
+  const configuredRoot = environment.CEVRA_MEDIA_RUNTIME_ROOT;
+  if (!configuredRoot) return { invalid: false };
+  try {
+    return { paths: resolveMediaRuntimePaths(configuredRoot), invalid: false };
+  } catch {
+    return { invalid: true };
+  }
+}
+
+function composeMediaApplicationServices(
+  history: ProjectHistory,
+  executions: MediaExecutionRepository & MediaExecutionIntentRepository,
+  engine: MediaEngineAdapter
+): {
+  application: MediaApplicationService;
+  resolvedAudioPlan: ResolvedAudioPlanApplicationService;
+} {
+  const application = new MediaApplicationService({ engine, history, executions, artifacts: new NodeMediaArtifactStore() });
+  return {
+    application,
+    resolvedAudioPlan: new ResolvedAudioPlanApplicationService({ history, media: application, intents: executions })
+  };
+}
+
+function unavailableMediaEngine(): MediaEngineAdapter {
+  return {
+    async identity() { return { id: "cevra.media.unavailable", kind: "media", displayName: "Unavailable Media Runtime", version: "0.0.0", apiVersion: 1 }; },
+    async healthcheck() { return { status: "unavailable", checkedAt: new Date().toISOString(), checks: [] }; },
+    async capabilities() { return []; },
+    async execute() { throw new Error("Media Runtime is unavailable."); }
+  };
 }
 
 async function createTranscriptionServices(history: ProjectHistory, environment: NodeJS.ProcessEnv, mediaRuntimeRoot?: string): Promise<{
@@ -242,6 +348,8 @@ async function createTranscriptionServices(history: ProjectHistory, environment:
           privatePythonRoot: requiredEnvironment(environment, "CEVRA_PRIVATE_PYTHON_ROOT"),
           ...(mediaRuntimeRoot ? { protectedRoots: [mediaRuntimeRoot] } : {})
         };
+    const resolvedRuntime = resolveTranscriptionRuntimePaths(runtime);
+    if (mode === "managed") assertModelCacheIsolated(modelCacheDir, resolvedRuntime.protectedRoots);
     const adapter = new FasterWhisperTranscriptionAdapter({
       runtime,
       profile: {

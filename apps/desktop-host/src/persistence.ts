@@ -4,6 +4,11 @@ import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { link, lstat, mkdir, open, readFile, readdir, rename, rm } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
+import {
+  DesktopMediaExecutionRepository,
+  type DesktopMediaExecutionRepositoryOptions,
+  type MediaExecutionArchiveFaultPoint
+} from "./media-execution-archive.js";
 
 const CURRENT_FILE = "active-project.current.cevra.json";
 const PREVIOUS_FILE = "active-project.previous.cevra.json";
@@ -116,6 +121,19 @@ export class DesktopProjectPersistence {
       await Promise.allSettled([rm(nextTemp, { force: true }), rm(previousTemp, { force: true })]);
       throw new DesktopPersistenceError("PROJECT_PERSISTENCE_FAILED");
     }
+  }
+
+  async openMediaExecutionRepository(
+    projectId: string,
+    injectFault?: (point: MediaExecutionArchiveFaultPoint) => void
+  ): Promise<DesktopMediaExecutionRepository> {
+    const options: DesktopMediaExecutionRepositoryOptions = {
+      root: this.root,
+      projectId,
+      assertOwned: () => this.ownership.assertOwned(),
+      ...(injectFault ? { injectFault } : {})
+    };
+    return DesktopMediaExecutionRepository.open(options);
   }
 
   async close(): Promise<void> {
