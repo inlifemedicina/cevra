@@ -1,7 +1,7 @@
 # ADR 0028 — Durable Media Execution Archive V1
 
-**Status:** ACCEPTED DIRECTION / IN DEVELOPMENT — independent adversarial review pending
-**Date:** 2026-09-23
+**Status:** IMPLEMENTED / CLOSED
+**Date:** 2026-09-24
 
 ## Context and authority
 
@@ -161,5 +161,29 @@ recovery uncertainty.
   race remain deferred.
 
 Technical objective evidence is sufficient for this bounded backend slice;
-there is no new subjective Product Owner acceptance surface. The implementation
-remains open for independent adversarial review and is not CLOSED on this branch.
+there is no new subjective Product Owner acceptance surface.
+
+## Implementation closeout
+
+PR [#44](https://github.com/inlifemedicina/cevra/pull/44) merged reviewed feature
+head `16bf0cb347b9738b9ca84194e67a2cba5056127b` by normal merge commit
+`f5518102ace30d54659334d995712b36d0a4f6b7` on 2026-09-24. Pull-request CI
+run `36024597615` passed all five normal jobs and pull-request exact managed
+macOS arm64 runtime run `36024597609` passed. On the merge commit, normal CI
+run `36026252042` passed all five jobs and exact managed runtime run
+`36026251971` passed.
+
+Independent adversarial review first identified unsafe restart cleanup,
+capacity lockout, missing-child recovery semantics and an old-export intent
+collision. The focused remediation for F-1 through F-4 was independently
+verified. The final N-1 micro-fix preserved the configured Media Runtime root as
+a protected Transcription root when archive recovery degrades Media, and its
+focused review concluded **APPROVE FOR PR WITH NON-BLOCKING NOTES**. No
+reproduced BLOCKER, HIGH or MEDIUM finding remained at merge.
+
+Durable Media Execution Recovery V1 is therefore **IMPLEMENTED / CLOSED for the
+bounded operational archive and restart-reconciliation scope defined by this
+ADR**. This closeout does not claim hostile-writer authentication, absolute
+POSIX race elimination, strong Windows publication identity, a complete abrupt
+process-kill matrix, permanent audit retention, automatic replay/resume or
+recovery for future workflows that have not adopted this infrastructure.

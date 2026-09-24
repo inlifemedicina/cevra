@@ -1,10 +1,34 @@
 # Durable Media Execution Archive V1 — implementation evidence
 
-**Status:** IN DEVELOPMENT / remediation complete / focused independent re-review pending
+**Status:** IMPLEMENTED / CLOSED
 **Base:** `9025151f714de08cf9a77c9492df768400b887f5`
-**Branch:** `feat/durable-media-execution-archive-v1`
+**Feature PR:** [#44](https://github.com/inlifemedicina/cevra/pull/44)
+**Feature head:** `16bf0cb347b9738b9ca84194e67a2cba5056127b`
+**Feature merge:** `f5518102ace30d54659334d995712b36d0a4f6b7`
 **Reviewed pre-remediation head:** `dcd346f7b9c7a29ed0ef8fd61dcc9d84827bbeb1`
-**Remediation code head:** `498cc0ef2320d43098b58bbd32d8a99a0bf05b8b`
+**Remediation head:** `45d380073b7dcd26ffa3fcf7d7ea70ed4de55c51`
+**Final N-1 head:** `16bf0cb347b9738b9ca84194e67a2cba5056127b`
+
+## Closeout evidence
+
+- Initial implementation head `dcd346f7b9c7a29ed0ef8fd61dcc9d84827bbeb1`
+  entered adversarial review with **CHANGES REQUIRED BEFORE PR**.
+- F-1 through F-4 remediation culminated at
+  `45d380073b7dcd26ffa3fcf7d7ea70ed4de55c51`; focused independent re-review
+  verified those findings fixed and concluded **APPROVE FOR PR WITH
+  NON-BLOCKING NOTES**.
+- N-1 was fixed at `16bf0cb347b9738b9ca84194e67a2cba5056127b`;
+  its focused micro-review also concluded **APPROVE FOR PR WITH NON-BLOCKING
+  NOTES**.
+- PR #44 pull-request CI run `36024597615` passed 5/5, and exact managed
+  macOS arm64 runtime run `36024597609` passed on the final feature head.
+- PR #44 merged normally as `f5518102ace30d54659334d995712b36d0a4f6b7`.
+  Post-merge main CI run `36026252042` passed 5/5 and exact managed runtime
+  run `36026251971` passed on that merge commit.
+
+The accepted recovery direction is closed only for the bounded operational
+archive and restart-reconciliation scope in ADR 0028. The limitations below
+remain explicit and the coordinated Media Runtime gate remains active.
 
 ## Implemented evidence
 
@@ -99,10 +123,12 @@ The tests construct equivalent persisted crash states; they are labeled
   required Tauri evidence.
 - Pre-remediation normal CI run `35930005886`, attempt 2, passed 5/5 on
   `dcd346f7b9c7a29ed0ef8fd61dcc9d84827bbeb1`. Attempt 1's EPIPE was transient
-  evidence, not a code change request. A new final-head run is required and the
-  old run is not proof of this remediation.
-- Exact FFmpeg runtime is not required because this remediation changes no
-  Media Runtime path and is not being triggered through an unrelated edit.
+  evidence, not a code change request. That old run is not proof of the final
+  implementation; final feature-head and post-merge runs are recorded in the
+  closeout evidence above.
+- Exact FFmpeg runtime was not manually forced for the remediation. It later
+  triggered naturally for both PR #44 and the feature merge and passed on each
+  corresponding SHA.
 
 ## Bounded resource characterization
 
