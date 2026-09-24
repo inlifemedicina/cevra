@@ -19,7 +19,9 @@ import {
 } from "@cevra/media-ffmpeg";
 import { ProjectHistory } from "@cevra/project-ir";
 import {
+  assertModelCacheIsolated,
   FasterWhisperTranscriptionAdapter,
+  resolveRuntimePaths as resolveTranscriptionRuntimePaths,
   type LocalTranscriptionAdapterOptions,
   type SupportedTranscriptionModelId
 } from "@cevra/transcription-faster-whisper";
@@ -184,6 +186,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
   const opened = await DesktopProjectPersistence.open(persistenceRoot, {
     recoveredSession: environment.CEVRA_HOST_RECOVERY === "1"
   });
+  const configuredMediaRuntime = configuredMediaRuntimePaths(environment);
   let media: Awaited<ReturnType<typeof createMediaServices>> | undefined;
   let mediaArchiveFailure: "archive-full" | "archive-unavailable" | undefined;
   try {
@@ -192,7 +195,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
     const recovery = composeMediaApplicationServices(history, executions, unavailableMediaEngine());
     await recovery.application.reconcilePendingWithoutReplay();
     await recovery.resolvedAudioPlan.reconcilePendingWithoutReplay();
-    media = await createMediaServices(history, environment, executions);
+    media = await createMediaServices(history, environment, executions, configuredMediaRuntime);
   } catch (cause) {
     if (!isDesktopMediaExecutionArchiveOperationalError(cause)) {
       await media?.close?.().catch(() => undefined);
@@ -207,7 +210,9 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
   }
   try {
     const history = opened.history;
-    const transcription = await createTranscriptionServices(history, environment, media?.runtimeRoot);
+    const transcription = configuredMediaRuntime.invalid
+      ? { capability: unavailable("runtime-invalid") }
+      : await createTranscriptionServices(history, environment, configuredMediaRuntime.paths?.root);
     return new DesktopSession({
       history,
       ...(media?.ingest ? { ingest: media.ingest } : {}),
@@ -230,7 +235,8 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
 async function createMediaServices(
   history: ProjectHistory,
   environment: NodeJS.ProcessEnv,
-  executions: MediaExecutionRepository & MediaExecutionIntentRepository
+  executions: MediaExecutionRepository & MediaExecutionIntentRepository,
+  configuredRuntime: ConfiguredMediaRuntime
 ): Promise<{
   capability: CapabilityState;
   ingest?: LocalSourceIngestService;
@@ -239,12 +245,14 @@ async function createMediaServices(
   close?: () => Promise<void>;
   runtimeRoot?: string;
 }> {
-  const configuredRoot = environment.CEVRA_MEDIA_RUNTIME_ROOT;
-  if (!configuredRoot) {
+  if (configuredRuntime.invalid) {
+    return { capability: unavailable("runtime-invalid"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
+  }
+  if (!configuredRuntime.paths) {
     return { capability: unavailable("runtime-not-configured"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
   }
   try {
-    const runtime = resolveMediaRuntimePaths(configuredRoot);
+    const runtime = configuredRuntime.paths;
     const root = runtime.root;
     const mode = environment.CEVRA_MEDIA_RUNTIME_MODE === "development" ? "development" : "release";
     const transport = new ProcessMediaWorkerTransport({
@@ -270,6 +278,21 @@ async function createMediaServices(
     };
   } catch {
     return { capability: unavailable("runtime-invalid"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
+  }
+}
+
+interface ConfiguredMediaRuntime {
+  paths?: ReturnType<typeof resolveMediaRuntimePaths>;
+  invalid: boolean;
+}
+
+function configuredMediaRuntimePaths(environment: NodeJS.ProcessEnv): ConfiguredMediaRuntime {
+  const configuredRoot = environment.CEVRA_MEDIA_RUNTIME_ROOT;
+  if (!configuredRoot) return { invalid: false };
+  try {
+    return { paths: resolveMediaRuntimePaths(configuredRoot), invalid: false };
+  } catch {
+    return { invalid: true };
   }
 }
 
@@ -325,6 +348,8 @@ async function createTranscriptionServices(history: ProjectHistory, environment:
           privatePythonRoot: requiredEnvironment(environment, "CEVRA_PRIVATE_PYTHON_ROOT"),
           ...(mediaRuntimeRoot ? { protectedRoots: [mediaRuntimeRoot] } : {})
         };
+    const resolvedRuntime = resolveTranscriptionRuntimePaths(runtime);
+    if (mode === "managed") assertModelCacheIsolated(modelCacheDir, resolvedRuntime.protectedRoots);
     const adapter = new FasterWhisperTranscriptionAdapter({
       runtime,
       profile: {

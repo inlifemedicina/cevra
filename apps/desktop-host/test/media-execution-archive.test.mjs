@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -121,6 +122,46 @@ function fullPendingArchive(projectId, outputUri) {
   assert.equal(remaining, 0);
   assert.equal(Buffer.byteLength(envelope(archive), "utf8"), MAX_MEDIA_EXECUTION_ARCHIVE_BYTES);
   return archive;
+}
+
+async function installConfiguredMediaRuntime(root) {
+  const runtimeRoot = resolve(root, "configured-media-runtime");
+  const pythonExecutable = resolve(runtimeRoot, "python", "bin", "python3.12");
+  const workerScript = resolve(runtimeRoot, "worker", "cevra_media_worker.py");
+  await mkdir(resolve(runtimeRoot, "python", "bin"), { recursive: true });
+  await mkdir(resolve(runtimeRoot, "worker"), { recursive: true });
+  await writeFile(pythonExecutable, "fixture private Python", "utf8");
+  await writeFile(workerScript, "# fixture worker\n", "utf8");
+  await writeFile(resolve(runtimeRoot, "manifest.json"), JSON.stringify({
+    format: "cevra-media-runtime",
+    formatVersion: 1,
+    python: { root: "python", executable: "python/bin/python3.12" },
+    worker: { root: "worker", entrypoint: "worker/cevra_media_worker.py" }
+  }), "utf8");
+  return runtimeRoot;
+}
+
+async function managedTranscriptionEnvironment(root, modelCacheDir) {
+  const sourcePython = process.env.CEVRA_TEST_PYTHON ?? (process.platform === "win32" ? "python" : "python3");
+  const environmentRoot = resolve(root, `transcription-env-${createHash("sha256").update(modelCacheDir).digest("hex").slice(0, 8)}`);
+  const venv = spawnSync(sourcePython, ["-m", "venv", "--without-pip", environmentRoot], { encoding: "utf8" });
+  assert.equal(venv.status, 0, `controlled transcription environment failed: ${venv.stderr}`);
+  const pythonExecutable = resolve(environmentRoot, process.platform === "win32" ? "Scripts/python.exe" : "bin/python3");
+  const details = spawnSync(pythonExecutable, ["-I", "-c", "import site,sys; print(sys.base_prefix); print(site.getsitepackages()[0])"], { encoding: "utf8" });
+  assert.equal(details.status, 0, `controlled transcription probe failed: ${details.stderr}`);
+  const [privatePythonRoot, sitePackages] = details.stdout.trim().split(/\r?\n/u);
+  const packageRoot = resolve(sitePackages, "faster_whisper");
+  await mkdir(packageRoot, { recursive: true });
+  await writeFile(resolve(packageRoot, "__init__.py"), "__version__ = \"1.2.1\"\n", "utf8");
+  await mkdir(resolve(modelCacheDir, "hub", "models--Systran--faster-whisper-base", "snapshots", "fixture"), { recursive: true });
+  return {
+    CEVRA_TRANSCRIPTION_MODE: "managed",
+    CEVRA_TRANSCRIPTION_PYTHON: pythonExecutable,
+    CEVRA_TRANSCRIPTION_ENV_ROOT: environmentRoot,
+    CEVRA_TRANSCRIPTION_MODEL_CACHE: modelCacheDir,
+    CEVRA_TRANSCRIPTION_MODEL_ID: "base",
+    CEVRA_PRIVATE_PYTHON_ROOT: privatePythonRoot
+  };
 }
 
 async function open(t, suppliedRoot) {
@@ -609,6 +650,77 @@ test("production startup keeps canonical project open when a classified archive 
   assert.deepEqual(state.capabilities.mediaImport, { available: false, reason: "archive-unavailable" });
   assert.equal(state.capabilities.transcription.reason, "runtime-not-configured");
   assert.equal(await readFile(foreign, "utf8"), "archive unavailable sentinel");
+  await session.close();
+});
+
+test("degraded Media startup still protects its configured runtime from the Transcription model cache", async (t) => {
+  const fixture = await open(t);
+  const mediaRuntimeRoot = await installConfiguredMediaRuntime(fixture.root);
+  const transcription = await managedTranscriptionEnvironment(
+    fixture.root,
+    resolve(mediaRuntimeRoot, "overlapping-model-cache")
+  );
+  const foreign = resolve(fixture.root, "protected-root-overlap-sentinel");
+  await writeFile(foreign, "protected root overlap sentinel", "utf8");
+  await fixture.project.persistence.close();
+  await symlink(foreign, resolve(fixture.root, ".media-execution-archive-hostile.tmp"));
+
+  const session = await createProductionDesktopSession({
+    ...transcription,
+    CEVRA_PROJECT_PERSISTENCE_ROOT: fixture.root,
+    CEVRA_HOST_RECOVERY: "1",
+    CEVRA_MEDIA_RUNTIME_ROOT: mediaRuntimeRoot
+  });
+  const state = session.state();
+  assert.equal(state.project.project.id, fixture.projectId);
+  assert.deepEqual(state.capabilities.mediaImport, { available: false, reason: "archive-unavailable" });
+  assert.deepEqual(state.capabilities.transcription, { available: false, reason: "runtime-invalid" });
+  assert.equal(await readFile(foreign, "utf8"), "protected root overlap sentinel");
+  await session.close();
+});
+
+test("degraded Media startup keeps Transcription available with an isolated model cache", async (t) => {
+  const fixture = await open(t);
+  const mediaRuntimeRoot = await installConfiguredMediaRuntime(fixture.root);
+  const transcription = await managedTranscriptionEnvironment(fixture.root, resolve(fixture.root, "isolated-model-cache"));
+  const foreign = resolve(fixture.root, "protected-root-isolated-sentinel");
+  await writeFile(foreign, "protected root isolated sentinel", "utf8");
+  await fixture.project.persistence.close();
+  await symlink(foreign, resolve(fixture.root, ".media-execution-archive-hostile.tmp"));
+
+  const session = await createProductionDesktopSession({
+    ...transcription,
+    CEVRA_PROJECT_PERSISTENCE_ROOT: fixture.root,
+    CEVRA_HOST_RECOVERY: "1",
+    CEVRA_MEDIA_RUNTIME_ROOT: mediaRuntimeRoot
+  });
+  const state = session.state();
+  assert.equal(state.project.project.id, fixture.projectId);
+  assert.deepEqual(state.capabilities.mediaImport, { available: false, reason: "archive-unavailable" });
+  assert.deepEqual(state.capabilities.transcription, { available: true, reason: "available" });
+  assert.equal(await readFile(foreign, "utf8"), "protected root isolated sentinel");
+  await session.close();
+});
+
+test("invalid configured Media root cannot silently remove Transcription isolation during degraded startup", async (t) => {
+  const fixture = await open(t);
+  const transcription = await managedTranscriptionEnvironment(fixture.root, resolve(fixture.root, "invalid-root-model-cache"));
+  const foreign = resolve(fixture.root, "invalid-root-sentinel");
+  await writeFile(foreign, "invalid root sentinel", "utf8");
+  await fixture.project.persistence.close();
+  await symlink(foreign, resolve(fixture.root, ".media-execution-archive-hostile.tmp"));
+
+  const session = await createProductionDesktopSession({
+    ...transcription,
+    CEVRA_PROJECT_PERSISTENCE_ROOT: fixture.root,
+    CEVRA_HOST_RECOVERY: "1",
+    CEVRA_MEDIA_RUNTIME_ROOT: resolve(fixture.root, "missing-media-runtime")
+  });
+  const state = session.state();
+  assert.equal(state.project.project.id, fixture.projectId);
+  assert.deepEqual(state.capabilities.mediaImport, { available: false, reason: "archive-unavailable" });
+  assert.deepEqual(state.capabilities.transcription, { available: false, reason: "runtime-invalid" });
+  assert.equal(await readFile(foreign, "utf8"), "invalid root sentinel");
   await session.close();
 });
 

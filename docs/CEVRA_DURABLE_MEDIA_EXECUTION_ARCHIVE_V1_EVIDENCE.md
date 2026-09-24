@@ -53,6 +53,11 @@
   proof of this intent. Durable reconciliation requires the exact mux child,
   expected output, matching export mutation/preset, valid terminal boundary
   and the shared canonical mutation proof.
+- **N-1 — degraded startup isolation:** the configured Media Runtime root is
+  resolved independently from Media capability/archive recovery and remains a
+  protected Transcription root. An overlapping model cache fails closed, an
+  isolated cache remains available, and an invalid configured Media root cannot
+  silently remove the protection while the canonical project still opens.
 
 SHA-256 detects accidental corruption and inconsistent payloads. It does not
 authenticate the archive against an actor who can rewrite the trusted root and
