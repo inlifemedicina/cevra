@@ -40,6 +40,20 @@ export class DesktopMediaExecutionArchiveError extends Error {
   }
 }
 
+export class DesktopMediaExecutionArchiveFullError extends Error {
+  readonly code = "MEDIA_EXECUTION_ARCHIVE_FULL" as const;
+  constructor() {
+    super("MEDIA_EXECUTION_ARCHIVE_FULL");
+    this.name = "DesktopMediaExecutionArchiveFullError";
+  }
+}
+
+export function isDesktopMediaExecutionArchiveOperationalError(
+  value: unknown
+): value is DesktopMediaExecutionArchiveError | DesktopMediaExecutionArchiveFullError {
+  return value instanceof DesktopMediaExecutionArchiveError || value instanceof DesktopMediaExecutionArchiveFullError;
+}
+
 interface IntegrityEnvelopeV1 {
   format: typeof FORMAT;
   version: 1;
@@ -52,6 +66,7 @@ export interface DesktopMediaExecutionRepositoryOptions {
   projectId: string;
   assertOwned: () => Promise<void>;
   injectFault?: (point: MediaExecutionArchiveFaultPoint) => void;
+  limits?: { records?: number; intents?: number; bytes?: number };
 }
 
 export class DesktopMediaExecutionRepository implements MediaExecutionRepository, MediaExecutionIntentRepository {
@@ -109,7 +124,6 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
       const validated = validateMediaExecutionRecord(record);
       this.assertProject(validated.projectId);
       if (state.records.some(({ id }) => id === validated.id)) throw new MediaExecutionAlreadyExistsError(validated.id);
-      if (state.records.length >= MAX_MEDIA_EXECUTION_RECORDS) throw invalid();
       state.records.push(validated);
     });
   }
@@ -145,7 +159,6 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
       const validated = validateMediaExecutionIntent(intent);
       this.assertProject(validated.projectId);
       if (state.intents.some(({ id }) => id === validated.id)) throw new MediaExecutionAlreadyExistsError(validated.id);
-      if (state.intents.length >= MAX_MEDIA_EXECUTION_INTENTS) throw invalid();
       state.intents.push(validated);
     });
   }
@@ -185,14 +198,14 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
       await this.options.assertOwned();
       const next = clone(this.state);
       change(next);
-      validatePersistedMediaExecutionArchive(next);
+      const prepared = prepareArchive(next, archiveLimits(this.options));
       try {
-        await this.persist(next);
+        await this.persistPayload(prepared.payload);
       } catch (cause) {
         this.writeBlocked = true;
         throw cause;
       }
-      this.state = next;
+      this.state = prepared.state;
     });
     this.queue = operation.then(() => undefined, () => undefined);
     return operation;
@@ -200,9 +213,13 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
 
   private async persist(state: PersistedMediaExecutionArchiveV1): Promise<void> {
     await this.options.assertOwned();
-    const envelope = encodeEnvelope(validatePersistedMediaExecutionArchive(state));
-    const payload = `${JSON.stringify(envelope)}\n`;
-    if (Buffer.byteLength(payload, "utf8") > MAX_MEDIA_EXECUTION_ARCHIVE_BYTES) throw invalid();
+    const prepared = prepareArchive(state, archiveLimits(this.options));
+    await this.persistPayload(prepared.payload);
+    this.state = prepared.state;
+  }
+
+  private async persistPayload(payload: string): Promise<void> {
+    await this.options.assertOwned();
     const canonical = resolve(this.options.root, MEDIA_EXECUTION_ARCHIVE_FILE);
     const temporary = resolve(this.options.root, `${TEMP_PREFIX}${process.pid}-${randomUUID()}.tmp`);
     let file: Awaited<ReturnType<typeof open>> | undefined;
@@ -226,6 +243,99 @@ export class DesktopMediaExecutionRepository implements MediaExecutionRepository
       throw unavailable();
     }
   }
+}
+
+interface ArchiveLimits {
+  records: number;
+  intents: number;
+  bytes: number;
+}
+
+function archiveLimits(options: DesktopMediaExecutionRepositoryOptions): ArchiveLimits {
+  return {
+    records: options.limits?.records ?? MAX_MEDIA_EXECUTION_RECORDS,
+    intents: options.limits?.intents ?? MAX_MEDIA_EXECUTION_INTENTS,
+    bytes: options.limits?.bytes ?? MAX_MEDIA_EXECUTION_ARCHIVE_BYTES
+  };
+}
+
+function prepareArchive(
+  candidate: PersistedMediaExecutionArchiveV1,
+  limits: ArchiveLimits
+): { state: PersistedMediaExecutionArchiveV1; payload: string } {
+  const state = clone(candidate);
+  while (true) {
+    const payload = encodePayload(state);
+    const pressure = state.intents.length > limits.intents
+      ? "intents"
+      : state.records.length > limits.records
+        ? "records"
+        : Buffer.byteLength(payload, "utf8") > limits.bytes
+          ? "bytes"
+          : undefined;
+    if (!pressure) {
+      const validated = validatePersistedMediaExecutionArchive(state);
+      return { state: validated, payload: encodePayload(validated) };
+    }
+    if (!pruneOne(state, pressure)) throw new DesktopMediaExecutionArchiveFullError();
+  }
+}
+
+function encodePayload(state: PersistedMediaExecutionArchiveV1): string {
+  return `${JSON.stringify(encodeEnvelope(state))}\n`;
+}
+
+function pruneOne(
+  state: PersistedMediaExecutionArchiveV1,
+  pressure: "records" | "intents" | "bytes"
+): boolean {
+  const referenced = new Set(state.intents.flatMap((intent) => [intent.childExecutionIds.audio, intent.childExecutionIds.mux]));
+  const recordCandidates = state.records.filter((record) => isSafelyPrunableRecord(record) && !referenced.has(record.id));
+  const intentCandidates = state.intents.filter(isSafelyPrunableIntent);
+  const oldestRecord = oldest(recordCandidates);
+  const oldestIntent = oldest(intentCandidates);
+
+  if (pressure === "intents") return removeIntent(state, oldestIntent);
+  if (pressure === "records") {
+    if (oldestRecord) return removeRecord(state, oldestRecord);
+    return removeIntent(state, oldestIntent);
+  }
+  const candidate = [
+    ...(oldestRecord ? [{ kind: "record" as const, value: oldestRecord }] : []),
+    ...(oldestIntent ? [{ kind: "intent" as const, value: oldestIntent }] : [])
+  ].sort((left, right) => compareOldest(left.value, right.value) || left.kind.localeCompare(right.kind))[0];
+  if (!candidate) return false;
+  return candidate.kind === "record" ? removeRecord(state, candidate.value) : removeIntent(state, candidate.value);
+}
+
+function isSafelyPrunableRecord(record: MediaExecutionRecord): boolean {
+  if (!["succeeded", "failed", "cancelled", "interrupted"].includes(record.status)) return false;
+  return (record.attempts.at(-1)?.cleanupFailedOutputUris.length ?? 0) === 0;
+}
+
+function isSafelyPrunableIntent(intent: MediaExecutionIntentV1): boolean {
+  return (intent.status === "durable-succeeded" || intent.status === "interrupted")
+    && (intent.cleanupUncertainUris?.length ?? 0) === 0;
+}
+
+function oldest<T extends { id: string; createdAt: string }>(values: readonly T[]): T | undefined {
+  return [...values].sort(compareOldest)[0];
+}
+
+function compareOldest(left: { id: string; createdAt: string }, right: { id: string; createdAt: string }): number {
+  return left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id);
+}
+
+function removeRecord(state: PersistedMediaExecutionArchiveV1, record: MediaExecutionRecord | undefined): boolean {
+  if (!record) return false;
+  state.records = state.records.filter(({ id }) => id !== record.id);
+  return true;
+}
+
+function removeIntent(state: PersistedMediaExecutionArchiveV1, intent: MediaExecutionIntentV1 | undefined): boolean {
+  if (!intent) return false;
+  state.intents = state.intents.filter(({ id }) => id !== intent.id);
+  return true;
 }
 
 function emptyArchive(projectId: string): PersistedMediaExecutionArchiveV1 {

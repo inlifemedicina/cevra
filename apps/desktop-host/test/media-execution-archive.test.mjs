@@ -6,13 +6,21 @@ import { resolve } from "node:path";
 import test from "node:test";
 import {
   DesktopMediaExecutionArchiveError,
+  DesktopMediaExecutionArchiveFullError,
+  DesktopMediaExecutionRepository,
   DesktopProjectPersistence,
   DesktopSession,
   MEDIA_EXECUTION_ARCHIVE_FILE,
   createProductionDesktopSession
 } from "../dist/index.js";
 import { __openDesktopProjectForTest } from "../dist/persistence.js";
-import { MediaApplicationService, ResolvedAudioPlanApplicationService } from "@cevra/application";
+import {
+  MAX_MEDIA_EXECUTION_INTENTS,
+  MAX_MEDIA_EXECUTION_ARCHIVE_BYTES,
+  MAX_MEDIA_EXECUTION_RECORDS,
+  MediaApplicationService,
+  ResolvedAudioPlanApplicationService
+} from "@cevra/application";
 import { NodeMediaArtifactStore } from "@cevra/media-ffmpeg";
 import { createEmptyProject, ProjectHistory } from "@cevra/project-ir";
 
@@ -51,6 +59,68 @@ function intent(projectId, id) {
     createdAt: now,
     updatedAt: now
   };
+}
+
+function envelope(archive) {
+  return `${JSON.stringify({
+    format: "cevra-media-execution-archive",
+    version: 1,
+    integrity: { algorithm: "sha256", value: createHash("sha256").update(JSON.stringify(archive)).digest("hex") },
+    archive
+  })}\n`;
+}
+
+async function installArchive(root, archive) {
+  await writeFile(resolve(root, MEDIA_EXECUTION_ARCHIVE_FILE), envelope(archive), { mode: 0o600 });
+}
+
+async function openLimited(t, limits) {
+  const value = await root(t);
+  const project = await DesktopProjectPersistence.open(value, { clock: () => now });
+  const projectId = project.history.current.project.id;
+  const repository = await DesktopMediaExecutionRepository.open({
+    root: value, projectId, assertOwned: async () => {}, limits
+  });
+  return { root: value, project, projectId, repository };
+}
+
+function fullPendingArchive(projectId, outputUri) {
+  const records = Array.from({ length: MAX_MEDIA_EXECUTION_RECORDS - 1 }, (_, index) => {
+    const id = `capacity-uncertain-${String(index).padStart(4, "0")}`;
+    const output = `/tmp/${id}.mp4`;
+    return {
+      ...record(projectId, id, "failed"),
+      operation: { type: "trim", inputUri: `/tmp/${"x".repeat(900)}`, outputUri: output, startMs: 0, endMs: 1000 },
+      attempts: [{
+        number: 1, jobId: `${id}:1`, status: "failed", requestedAt: now, completedAt: now,
+        outputUris: [output], preexistingOutputUris: [], ownedOutputUris: [], removedPartialOutputUris: [],
+        cleanupFailedOutputUris: [output], projectRevisionBefore: 0, errorCode: "MEDIA_RECOVERY_FAILED"
+      }]
+    };
+  });
+  records.push({
+    ...record(projectId, "capacity-pending", "running"),
+    operation: { type: "trim", inputUri: "/tmp/input.mp4", outputUri, startMs: 0, endMs: 1000 },
+    attempts: [{
+      number: 1, jobId: "capacity-pending:1", status: "running", requestedAt: now, startedAt: now,
+      outputUris: [outputUri], preexistingOutputUris: [], ownedOutputUris: [outputUri],
+      removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0
+    }]
+  });
+  const archive = { version: 1, projectId, records, intents: [] };
+  let remaining = MAX_MEDIA_EXECUTION_ARCHIVE_BYTES - Buffer.byteLength(envelope(archive), "utf8");
+  assert.ok(remaining > 0);
+  for (const candidate of records) {
+    if (remaining === 0) break;
+    if (candidate.id === "capacity-pending") continue;
+    const capacity = 4090 - candidate.operation.inputUri.length;
+    const added = Math.min(capacity, remaining);
+    candidate.operation.inputUri += "y".repeat(added);
+    remaining -= added;
+  }
+  assert.equal(remaining, 0);
+  assert.equal(Buffer.byteLength(envelope(archive), "utf8"), MAX_MEDIA_EXECUTION_ARCHIVE_BYTES);
+  return archive;
 }
 
 async function open(t, suppliedRoot) {
@@ -108,6 +178,92 @@ test("serialized concurrent creates retain every distinct record without temp ar
   assert.equal(fixture.repository.snapshot().records.length, 25);
   assert.deepEqual((await readdir(fixture.root)).filter((name) => name.startsWith(".media-execution-archive-")), []);
   await fixture.project.persistence.close();
+});
+
+test("record-count pressure compacts only oldest safe terminals at the real V1 bound", async (t) => {
+  const fixture = await open(t);
+  await fixture.project.persistence.close();
+  const records = Array.from({ length: MAX_MEDIA_EXECUTION_RECORDS }, (_, index) =>
+    record(fixture.projectId, `terminal-${String(index).padStart(4, "0")}`, "succeeded"));
+  await installArchive(fixture.root, { version: 1, projectId: fixture.projectId, records, intents: [] });
+  const project = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  const repository = await project.persistence.openMediaExecutionRepository(fixture.projectId);
+  await repository.create(record(fixture.projectId, "new-active"));
+  const snapshot = repository.snapshot();
+  assert.equal(snapshot.records.length, MAX_MEDIA_EXECUTION_RECORDS);
+  assert.equal(snapshot.records.some(({ id }) => id === "terminal-0000"), false);
+  assert.equal(snapshot.records.some(({ id }) => id === "new-active"), true);
+  await project.persistence.close();
+});
+
+test("record-count FULL with only active state is deterministic and never write-blocks the repository", async (t) => {
+  const fixture = await open(t);
+  await fixture.project.persistence.close();
+  const records = Array.from({ length: MAX_MEDIA_EXECUTION_RECORDS }, (_, index) =>
+    record(fixture.projectId, `active-${String(index).padStart(4, "0")}`));
+  await installArchive(fixture.root, { version: 1, projectId: fixture.projectId, records, intents: [] });
+  const project = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  const repository = await project.persistence.openMediaExecutionRepository(fixture.projectId);
+  await assert.rejects(() => repository.create(record(fixture.projectId, "does-not-fit")), DesktopMediaExecutionArchiveFullError);
+  assert.ok(await repository.get("active-0000"));
+  assert.equal((await repository.listByStatus(fixture.projectId, ["requested"])).length, MAX_MEDIA_EXECUTION_RECORDS);
+  assert.equal(repository.snapshot().records.length, MAX_MEDIA_EXECUTION_RECORDS);
+  assert.deepEqual((await readdir(fixture.root)).filter((name) => name.startsWith(".media-execution-archive-")), []);
+  await project.persistence.close();
+});
+
+test("intent-count pressure compacts safe terminals without touching pending intents", async (t) => {
+  const fixture = await open(t);
+  await fixture.project.persistence.close();
+  const intents = Array.from({ length: MAX_MEDIA_EXECUTION_INTENTS }, (_, index) => ({
+    ...intent(fixture.projectId, `terminal-intent-${String(index).padStart(4, "0")}`), status: "interrupted"
+  }));
+  await installArchive(fixture.root, { version: 1, projectId: fixture.projectId, records: [], intents });
+  const project = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  const repository = await project.persistence.openMediaExecutionRepository(fixture.projectId);
+  await repository.createIntent(intent(fixture.projectId, "new-pending-intent"));
+  const snapshot = repository.snapshot();
+  assert.equal(snapshot.intents.length, MAX_MEDIA_EXECUTION_INTENTS);
+  assert.equal(snapshot.intents.some(({ id }) => id === "terminal-intent-0000"), false);
+  assert.equal(snapshot.intents.some(({ id }) => id === "new-pending-intent"), true);
+  await project.persistence.close();
+});
+
+test("byte pressure compacts safe terminals and exact/over-limit rejection never blocks reads", async (t) => {
+  const fixture = await openLimited(t, { bytes: 64 * 1024 });
+  await fixture.repository.create({ ...record(fixture.projectId, "byte-terminal", "succeeded"),
+    operation: { type: "probe", inputUri: `/tmp/${"x".repeat(3000)}` } });
+  await fixture.repository.create(record(fixture.projectId, "byte-active"));
+  const before = (await lstat(resolve(fixture.root, MEDIA_EXECUTION_ARCHIVE_FILE))).size;
+  await fixture.project.persistence.close();
+
+  let project = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  let repository = await DesktopMediaExecutionRepository.open({
+    root: fixture.root, projectId: fixture.projectId, assertOwned: async () => {}, limits: { bytes: before - 1 }
+  });
+  await repository.save(record(fixture.projectId, "byte-active"));
+  assert.equal(repository.snapshot().records.some(({ id }) => id === "byte-terminal"), false);
+  assert.ok(await repository.get("byte-active"));
+  await project.persistence.close();
+
+  const exactSize = (await lstat(resolve(fixture.root, MEDIA_EXECUTION_ARCHIVE_FILE))).size;
+  project = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  repository = await DesktopMediaExecutionRepository.open({
+    root: fixture.root, projectId: fixture.projectId, assertOwned: async () => {}, limits: { bytes: exactSize }
+  });
+  await repository.save(record(fixture.projectId, "byte-active"));
+  assert.ok(await repository.get("byte-active"));
+  await project.persistence.close();
+
+  project = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  repository = await DesktopMediaExecutionRepository.open({
+    root: fixture.root, projectId: fixture.projectId, assertOwned: async () => {}, limits: { bytes: exactSize - 1 }
+  });
+  await assert.rejects(() => repository.save(record(fixture.projectId, "byte-active")), DesktopMediaExecutionArchiveFullError);
+  assert.ok(await repository.get("byte-active"));
+  assert.equal(repository.snapshot().records.length, 1);
+  assert.deepEqual((await readdir(fixture.root)).filter((name) => name.startsWith(".media-execution-archive-")), []);
+  await project.persistence.close();
 });
 
 test("closed schema rejects an extra key without changing the durable archive", async (t) => {
@@ -171,6 +327,32 @@ test("oversized archive is quarantined without becoming cleanup authority", asyn
   await reopenedProject.persistence.close();
 });
 
+test("schema-valid digest with an output URI outside its operation is quarantined before any delete", async (t) => {
+  const fixture = await open(t);
+  const foreign = resolve(fixture.root, "schema-foreign.mp4");
+  await writeFile(foreign, "schema sentinel", "utf8");
+  await fixture.project.persistence.close();
+  const expected = resolve(fixture.root, "expected.mp4");
+  const invalidRecord = {
+    ...record(fixture.projectId, "invalid-output-binding", "running"),
+    operation: { type: "trim", inputUri: "/tmp/input.mp4", outputUri: expected, startMs: 0, endMs: 1000 },
+    attempts: [{
+      number: 1, jobId: "invalid-output-binding:1", status: "running", requestedAt: now,
+      outputUris: [foreign], preexistingOutputUris: [], ownedOutputUris: [foreign],
+      removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: 0
+    }]
+  };
+  await installArchive(fixture.root, {
+    version: 1, projectId: fixture.projectId, records: [invalidRecord], intents: []
+  });
+  const reopened = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  const repository = await reopened.persistence.openMediaExecutionRepository(fixture.projectId);
+  assert.equal(repository.health, "recovered-corrupt");
+  assert.equal(await readFile(foreign, "utf8"), "schema sentinel");
+  assert.deepEqual(repository.snapshot().records, []);
+  await reopened.persistence.close();
+});
+
 test("write faults preserve the old authority or leave a valid new authority for reopen", async (t) => {
   for (const point of ["before-temp-write", "during-temp-write", "before-rename", "after-rename", "directory-sync"]) {
     await t.test(point, async (t) => {
@@ -180,6 +362,7 @@ test("write faults preserve the old authority or leave a valid new authority for
       });
       await assert.rejects(() => faulty.create(record(fixture.projectId, `fault-${point}`)), DesktopMediaExecutionArchiveError);
       await assert.rejects(() => faulty.create(record(fixture.projectId, `blocked-${point}`)), DesktopMediaExecutionArchiveError);
+      await assert.rejects(() => faulty.get(`fault-${point}`), DesktopMediaExecutionArchiveError);
       await fixture.project.persistence.close();
       const reopenedProject = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
       const reopened = await reopenedProject.persistence.openMediaExecutionRepository(fixture.projectId);
@@ -375,5 +558,96 @@ test("production startup restores ProjectHistory before archive reconciliation a
   const repository = await reopened.persistence.openMediaExecutionRepository(fixture.projectId);
   assert.equal((await repository.get("startup-pending")).status, "interrupted");
   assert.equal((await repository.get("startup-pending")).attempts.length, 0);
+  await reopened.persistence.close();
+});
+
+test("production restart preserves a non-exclusive foreign output and records cleanup uncertainty", async (t) => {
+  const fixture = await open(t);
+  const foreign = resolve(fixture.root, "foreign-trim.mp4");
+  await writeFile(foreign, "foreign sentinel", "utf8");
+  await fixture.repository.create({
+    ...record(fixture.projectId, "foreign-trim", "running"),
+    operation: { type: "trim", inputUri: resolve(fixture.root, "input.mp4"), outputUri: foreign, startMs: 0, endMs: 1000 },
+    attempts: [{
+      number: 1, jobId: "foreign-trim:1", status: "running", requestedAt: now, startedAt: now,
+      outputUris: [foreign], preexistingOutputUris: [], ownedOutputUris: [foreign],
+      removedPartialOutputUris: [], cleanupFailedOutputUris: [], projectRevisionBefore: fixture.project.history.current.history.revision
+    }]
+  });
+  await fixture.project.persistence.close();
+
+  const session = await createProductionDesktopSession({
+    CEVRA_PROJECT_PERSISTENCE_ROOT: fixture.root,
+    CEVRA_HOST_RECOVERY: "1"
+  });
+  assert.equal(session.state().project.project.id, fixture.projectId);
+  assert.equal(await readFile(foreign, "utf8"), "foreign sentinel");
+  await session.close();
+
+  const reopened = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  const repository = await reopened.persistence.openMediaExecutionRepository(fixture.projectId);
+  const recovered = await repository.get("foreign-trim");
+  assert.equal(recovered.status, "failed");
+  assert.deepEqual(recovered.attempts[0].removedPartialOutputUris, []);
+  assert.deepEqual(recovered.attempts[0].cleanupFailedOutputUris, [foreign]);
+  await reopened.persistence.close();
+});
+
+test("production startup keeps canonical project open when a classified archive failure makes media unavailable", async (t) => {
+  const fixture = await open(t);
+  const foreign = resolve(fixture.root, "archive-unavailable-foreign");
+  await writeFile(foreign, "archive unavailable sentinel", "utf8");
+  await fixture.project.persistence.close();
+  await symlink(foreign, resolve(fixture.root, ".media-execution-archive-hostile.tmp"));
+
+  const session = await createProductionDesktopSession({
+    CEVRA_PROJECT_PERSISTENCE_ROOT: fixture.root,
+    CEVRA_HOST_RECOVERY: "1"
+  });
+  const state = session.state();
+  assert.equal(state.project.project.id, fixture.projectId);
+  assert.deepEqual(state.capabilities.mediaImport, { available: false, reason: "archive-unavailable" });
+  assert.equal(state.capabilities.transcription.reason, "runtime-not-configured");
+  assert.equal(await readFile(foreign, "utf8"), "archive unavailable sentinel");
+  await session.close();
+});
+
+test("production startup keeps canonical project open and degrades media when recovery hits deterministic FULL", async (t) => {
+  const fixture = await open(t);
+  const foreign = resolve(fixture.root, "capacity-foreign.mp4");
+  await writeFile(foreign, "capacity sentinel", "utf8");
+  await fixture.project.persistence.close();
+  const archive = fullPendingArchive(fixture.projectId, foreign);
+  const archivePath = resolve(fixture.root, MEDIA_EXECUTION_ARCHIVE_FILE);
+  await installArchive(fixture.root, archive);
+  const before = createHash("sha256").update(await readFile(archivePath)).digest("hex");
+
+  const session = await createProductionDesktopSession({
+    CEVRA_PROJECT_PERSISTENCE_ROOT: fixture.root,
+    CEVRA_HOST_RECOVERY: "1"
+  });
+  const state = session.state();
+  assert.equal(state.project.project.id, fixture.projectId);
+  assert.deepEqual(state.capabilities.mediaImport, { available: false, reason: "archive-full" });
+  assert.equal(await readFile(foreign, "utf8"), "capacity sentinel");
+  assert.equal(createHash("sha256").update(await readFile(archivePath)).digest("hex"), before);
+  assert.equal((await readdir(fixture.root)).some((entry) => entry.startsWith("media-executions.invalid-")), false);
+  await session.close();
+
+  const secondSession = await createProductionDesktopSession({
+    CEVRA_PROJECT_PERSISTENCE_ROOT: fixture.root,
+    CEVRA_HOST_RECOVERY: "1"
+  });
+  const secondState = secondSession.state();
+  assert.equal(secondState.project.project.id, fixture.projectId);
+  assert.deepEqual(secondState.capabilities.mediaImport, { available: false, reason: "archive-full" });
+  assert.equal(await readFile(foreign, "utf8"), "capacity sentinel");
+  assert.equal(createHash("sha256").update(await readFile(archivePath)).digest("hex"), before);
+  await secondSession.close();
+
+  const reopened = await DesktopProjectPersistence.open(fixture.root, { clock: () => now });
+  const repository = await reopened.persistence.openMediaExecutionRepository(fixture.projectId);
+  assert.equal((await repository.get("capacity-pending")).status, "running");
+  assert.equal(reopened.history.current.project.id, fixture.projectId);
   await reopened.persistence.close();
 });

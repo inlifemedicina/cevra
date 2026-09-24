@@ -3,7 +3,9 @@ export { DesktopPersistenceError, DesktopProjectPersistence } from "./persistenc
 export type { DesktopProjectPersistenceOptions, OpenDesktopProjectResult, PersistenceState } from "./persistence.js";
 export {
   DesktopMediaExecutionArchiveError,
+  DesktopMediaExecutionArchiveFullError,
   DesktopMediaExecutionRepository,
+  isDesktopMediaExecutionArchiveOperationalError,
   MEDIA_EXECUTION_ARCHIVE_FILE
 } from "./media-execution-archive.js";
 export type { MediaExecutionArchiveFaultPoint, MediaExecutionArchiveHealth } from "./media-execution-archive.js";
