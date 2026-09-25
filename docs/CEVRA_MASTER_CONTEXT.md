@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-25, MR-V01 post-review remediation checkpoint on canonical base `b00ad159bc0080c31355c8b59d1d5ba22524b2ff`
+**Last decision reconciliation:** 2026-09-25, MR-V01 merged and closed by PR #46 at `0c8a09c185d1496faa4783f8b9495cd90dff9a21`
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1641,13 +1641,14 @@ retention remain unclaimed. Application Resolved Audio Plan V1 remains closed,
 but the full Slice 3 editable J-cut product experience and the coordinated Media
 Runtime gate remain active. Product progress remains **48%**.
 
-**Durable Source Technical Descriptor V1 / MR-V01 — IN DEVELOPMENT / focused
-independent re-review pending.** The Product Owner approved the bounded authority decision in
+**Durable Source Technical Descriptor V1 / MR-V01 — IMPLEMENTED / CLOSED.**
+The Product Owner approved the bounded authority decision in
 [ADR 0029](adr/0029-durable-source-technical-descriptor-v1.md): an optional,
 own-versioned descriptor extends `SourceAsset` while Project IR, History Archive
-and Project Package remain version 2 with no migration. Branch
-`feat/durable-source-technical-descriptor-v1`, based exactly on
-`b00ad159bc0080c31355c8b59d1d5ba22524b2ff`, implements adopted SHA-256/byte-size
+and Project Package remain version 2 with no migration. PR #46 merged feature
+head `f6df275d0bb30cede04ceaf13223933d4b8e4194` normally as
+`0c8a09c185d1496faa4783f8b9495cd90dff9a21`. The closed scope implements
+adopted SHA-256/byte-size
 identity, supported normalized selected-stream evidence, one bounded streaming
 hash coordinated with probe, guarded post-ingest adoption and operation-scoped
 verification for the resolved-audio export vertical. Reopen performs no media
@@ -1662,12 +1663,14 @@ re-proves the original Audio Sequence PCM publication before mux consumption and
 export promotion. A controlled comparison confirmed that the former P-PCM gap
 could promote replacement bytes; the protected path now fails before mux and
 preserves the foreign file. The managed-runtime catalog includes real descriptor
-acquisition plus positive and changed-source cases, pending exact-runtime
-execution on the updated code. The
+acquisition plus positive and changed-source cases. PR CI `36153512241` and PR
+Exact Runtime `36153512395` passed on the feature head; post-merge CI
+`36161031848` and Exact Runtime `36161031859` passed on the merge commit. The
 [evidence record](CEVRA_DURABLE_SOURCE_TECHNICAL_DESCRIPTOR_V1_EVIDENCE.md)
 separates data preservation from semantic compatibility and records the
-required pre-Cut-Compiler/history scalability gate. Independent review, PR,
-merge and closeout remain pending; no CLOSED claim is made. Product progress
+required pre-Cut-Compiler/history scalability gate. Same-inode PCM in-place
+mutation, strong Windows publication identity, residual probe/hash TOCTOU and
+optimized composite recovery remain explicit bounded limits. Product progress
 remains **48%**.
 
 **Product-owner technical delegation:** within an explicitly approved slice,
@@ -1801,9 +1804,9 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete independent review, PR, merge and closeout for Durable Source Technical Descriptor V1 / MR-V01 without widening its bounded authority.
-2. Reconcile and close Transcript Cache V1/PR #24 only after the dependency relationship is revalidated; retain draft/unmerged status until focused review and remote CI complete.
-3. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
+1. Reconcile and close Transcript Cache V1/PR #24 now that MR-V01 is closed; retain draft/unmerged status until its focused dependency review and current remote CI complete.
+2. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
+3. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
 4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
 5. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
 

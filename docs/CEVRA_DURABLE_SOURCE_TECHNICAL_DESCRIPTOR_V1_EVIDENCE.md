@@ -1,12 +1,18 @@
 # CEVRA Durable Source Technical Descriptor V1 — Evidence
 
-Status: **IN DEVELOPMENT / focused independent re-review pending**
+Status: **IMPLEMENTED / CLOSED**
 
 Date: 2026-09-25
 
 Base: `b00ad159bc0080c31355c8b59d1d5ba22524b2ff`
 
 Branch: `feat/durable-source-technical-descriptor-v1`
+
+Feature PR: [#46](https://github.com/inlifemedicina/cevra/pull/46)
+
+Feature head: `f6df275d0bb30cede04ceaf13223933d4b8e4194`
+
+Feature merge: `0c8a09c185d1496faa4783f8b9495cd90dff9a21`
 
 Initial code checkpoint: `1a24b1b53a52b5f50aede13db40be2c3415c7e45`
 
@@ -15,6 +21,28 @@ Post-review remediation code checkpoint: `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358
 Final guard-error checkpoint: `9cbb1d0a9f3cddcdc3ea525e6d44396fb5fbd748`
 
 Architecture: [ADR 0029](adr/0029-durable-source-technical-descriptor-v1.md)
+
+## Closeout evidence
+
+- Pull-request CI run `36153512241` passed 5/5 on feature head
+  `f6df275d0bb30cede04ceaf13223933d4b8e4194`.
+- Pull-request Audio Sequence Exact Runtime run `36153512395`, job
+  `108132378246`, passed on the same head. It executed managed FFmpeg 9.0.1 and
+  the Application resolved-audio/final-mux catalog, including successful real
+  descriptor acquisition/export and changed-source rejection.
+- PR #46 merged normally as
+  `0c8a09c185d1496faa4783f8b9495cd90dff9a21` with parents
+  `b00ad159bc0080c31355c8b59d1d5ba22524b2ff` and
+  `f6df275d0bb30cede04ceaf13223933d4b8e4194`.
+- Post-merge CI run `36161031848` passed 5/5 on the merge commit.
+- Post-merge Audio Sequence Exact Runtime run `36161031859` passed on the
+  merge commit and reran the descriptor-bearing managed-runtime catalog.
+- Independent adversarial re-review concluded **APPROVE FOR PR WITH
+  NON-BLOCKING NOTES** after the F-1/F-2/F-3 and P-PCM remediations.
+
+This closes MR-V01 at the bounded ADR 0029 scope. It does not remove the limits
+recorded below, close the coordinated Media Runtime gate, or claim full visual
+Composition attestation.
 
 ## Implemented scope
 
@@ -95,7 +123,8 @@ probe + Node identity descriptor acquisition, positive sequence/mux/export and
 changed-source rejection using separate synthetic sources. The script builds
 and parses locally; the exact managed FFmpeg runtime was not available in this
 local workspace, so native execution is **NOT RUN** here and remains required
-before merge.
+before merge. The required managed-native execution subsequently passed in PR
+and post-merge runs recorded above.
 
 ## Compatibility characterization
 
@@ -142,6 +171,12 @@ characterization values, not platform performance guarantees.
 
 - Probe still opens the file by path; path/handle/final-state checks reduce but
   do not eliminate the residual probe-versus-hash TOCTOU premise.
+- Same-inode in-place mutation of the ephemeral, execution-private sequence PCM
+  is not cryptographically detected. A second full-content hash is deferred as
+  disproportionate I/O for V1; revisit an expanded operational stamp or a
+  demonstrably superior equivalent before cross-execution reuse, shared or
+  user-visible staging, Windows publication identity, or after a real
+  corrupted-export report.
 - No Windows-native filesystem characterization has been run locally.
 - The memo is per operation/execution, not session-wide or persistent.
 - Legacy sources continue without a verified-content claim.
@@ -183,17 +218,18 @@ with Python 3.12.14 passed **70/70**. Local Rust/Tauri remains NOT RUN because
 `cargo` is unavailable. At that local-validation checkpoint, remote normal CI
 had not yet completed. The feature push allowlist
 does not naturally run the exact workflow; the future pull-request path filter
-does include the changed Application/Media files and must execute the updated
-descriptor-bearing catalog before merge. ADR 0029 remains **ACCEPTED
-DIRECTION / IN DEVELOPMENT** and the product progress baseline remains **48%**
-until independent review, PR, merge and closeout.
+does include the changed Application/Media files. That gate passed in PR run
+`36153512395` and again post-merge in run `36161031859`. ADR 0029 is
+**IMPLEMENTED / CLOSED** at the bounded V1 scope and product progress remains
+**48%**.
 
 Remote normal CI run `36090798711` (`push`) completed **5/5 SUCCESS** on
 implementation/documentation head `2cf0e1afaddd991562f17f60de9cec0b0f5c9cda`:
 Monorepo, Tauri, Media Runtime reproducibility, Transcription and Alignment.
 The exact managed runtime workflow was not triggered by the feature-push branch
 allowlist; this is **NOT RUN**, not a pass, and the pull-request path gate remains
-required for the new descriptor-bearing functional catalog.
+required for the new descriptor-bearing functional catalog. That later gate is
+recorded in the closeout evidence above.
 
 Implementation environment recorded for traceability: Codex Desktop. The task
 requested GPT-5.6 Sol with High reasoning; repository evidence cannot
