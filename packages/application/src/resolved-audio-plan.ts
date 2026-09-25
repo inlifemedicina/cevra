@@ -7,12 +7,21 @@ import {
 } from "@cevra/contracts";
 import type { JournalActor, ProjectHistory, ProjectIR, TimelineClip } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
-import { mediaExecutionMutationApplied, type MediaApplicationService } from "./media-service.js";
+import {
+  MediaExecutionPreCommitError,
+  mediaExecutionMutationApplied,
+  type MediaApplicationService
+} from "./media-service.js";
 import {
   InMemoryMediaExecutionRepository,
   MediaExecutionAlreadyExistsError,
   type MediaExecutionIntentRepository
 } from "./repository.js";
+import {
+  SourceTechnicalDescriptorResolver,
+  createSourceContentVerificationMemo,
+  type SourceContentVerificationMemo
+} from "./source-technical-descriptor.js";
 import type {
   MediaExecutionIntentV1,
   MediaExecutionOutcome,
@@ -35,6 +44,9 @@ export type ResolvedAudioPlanErrorCode =
   | "AUDIO_PLAN_UNSUPPORTED_TIMING"
   | "AUDIO_PLAN_UNSUPPORTED_SOURCE"
   | "AUDIO_PLAN_DUCKING_UNSUPPORTED"
+  | "AUDIO_PLAN_SOURCE_OFFLINE"
+  | "AUDIO_PLAN_SOURCE_CONTENT_CHANGED"
+  | "AUDIO_PLAN_SOURCE_VERIFICATION_UNAVAILABLE"
   | "AUDIO_PLAN_GAIN_UNSUPPORTED"
   | "AUDIO_PLAN_NORMALIZATION_UNSUPPORTED"
   | "AUDIO_PLAN_VISUAL_BINDING_INVALID";
@@ -103,6 +115,7 @@ export interface ResolvedAudioPlanApplicationServiceOptions {
   history: ProjectHistory;
   media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs" | "getExecutionRecord">;
   intents?: MediaExecutionIntentRepository;
+  sourceVerifier?: SourceTechnicalDescriptorResolver;
   clock?: () => string;
   idGenerator?: () => string;
 }
@@ -113,6 +126,7 @@ export class ResolvedAudioPlanApplicationService {
   private readonly idGenerator: () => string;
   private readonly intents: MediaExecutionIntentRepository;
   private readonly clock: () => string;
+  private readonly sourceVerifier: SourceTechnicalDescriptorResolver | undefined;
 
   constructor(options: ResolvedAudioPlanApplicationServiceOptions) {
     this.history = options.history;
@@ -120,6 +134,7 @@ export class ResolvedAudioPlanApplicationService {
     this.idGenerator = options.idGenerator ?? defaultId;
     this.intents = options.intents ?? new InMemoryMediaExecutionRepository();
     this.clock = options.clock ?? (() => new Date().toISOString());
+    this.sourceVerifier = options.sourceVerifier;
   }
 
   compile(request: Omit<CompileResolvedAudioPlanRequest, "id" | "projectJournalEntryCount"> & { id?: string }): ResolvedAudioPlanV1 {
@@ -185,8 +200,10 @@ export class ResolvedAudioPlanApplicationService {
       throw cause;
     }
     let audioOutcome: MediaExecutionOutcome | undefined;
+    const sourceMemo = createSourceContentVerificationMemo();
     try {
       await this.transitionIntent(intent, "audio-running");
+      await this.verifyPlanSources(plan, sourceMemo, signal);
       audioOutcome = await this.media.execute({
         id: audioExecutionId,
         locale,
@@ -195,6 +212,7 @@ export class ResolvedAudioPlanApplicationService {
         projectBinding: plan.projectBinding,
         actor: stableRequest.actor ?? { type: "user" }
       }, signal);
+      await this.revalidatePlanSources(sourceMemo, signal);
       await this.transitionIntent(intent, "audio-succeeded");
       assertCurrentBinding(this.history, plan.projectBinding);
       const muxDurationValidation = durationValidation(plan, audioOutcome.record);
@@ -218,7 +236,9 @@ export class ResolvedAudioPlanApplicationService {
           durationToleranceMs: FINAL_MUX_DURATION_TOLERANCE_MS
         },
         actor: stableRequest.actor ?? { type: "user" }
-      }, signal);
+      }, signal, {
+        verify: async (guardSignal) => this.preCommitSourceGuard(sourceMemo, guardSignal)
+      });
 
       await this.transitionIntent(intent, "application-committed");
 
@@ -240,6 +260,42 @@ export class ResolvedAudioPlanApplicationService {
       await this.transitionIntent(intent, "interrupted", true);
       throw mapApplicationError(cause, locale, stableRequest.id);
     }
+  }
+
+  private async verifyPlanSources(
+    plan: ResolvedAudioPlanV1,
+    memo: SourceContentVerificationMemo,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const sourceById = new Map(this.history.current.sources.map((source) => [source.id, source]));
+    for (const binding of plan.sourceBindings) {
+      const source = sourceById.get(binding.sourceId);
+      if (!source?.technicalDescriptor) continue;
+      if (!this.sourceVerifier) {
+        throw new ResolvedAudioPlanError("AUDIO_PLAN_SOURCE_VERIFICATION_UNAVAILABLE", "Source content verification is unavailable for descriptor-bearing media.");
+      }
+      const resolution = await this.sourceVerifier.verify(source, memo, signal);
+      if (resolution.status !== "verified") throw sourceResolutionError(resolution.status);
+    }
+  }
+
+  private async revalidatePlanSources(memo: SourceContentVerificationMemo, signal?: AbortSignal): Promise<void> {
+    if (memo.entries.size === 0) return;
+    if (!this.sourceVerifier) {
+      throw new ResolvedAudioPlanError("AUDIO_PLAN_SOURCE_VERIFICATION_UNAVAILABLE", "Source content verification became unavailable.");
+    }
+    const status = await this.sourceVerifier.revalidate(memo, signal);
+    if (status !== "verified") throw sourceResolutionError(status);
+  }
+
+  private async preCommitSourceGuard(memo: SourceContentVerificationMemo, signal?: AbortSignal): Promise<void> {
+    if (memo.entries.size === 0) return;
+    if (!this.sourceVerifier) throw new MediaExecutionPreCommitError("SOURCE_VERIFICATION_UNAVAILABLE");
+    const status = await this.sourceVerifier.revalidate(memo, signal);
+    if (status === "verified") return;
+    if (status === "offline") throw new MediaExecutionPreCommitError("SOURCE_OFFLINE");
+    if (status === "content-changed") throw new MediaExecutionPreCommitError("SOURCE_CONTENT_CHANGED");
+    throw new MediaExecutionPreCommitError("SOURCE_VERIFICATION_UNAVAILABLE");
   }
 
   async markCheckpointSucceeded(intentId: string): Promise<void> {
@@ -338,6 +394,19 @@ function canonicalExportMatches(project: ProjectIR, intent: MediaExecutionIntent
     && item.presetId === intent.exportIntent.presetId
     && item.outputUri === intent.exportIntent.expectedOutputUri
     && item.status === "completed");
+}
+
+function sourceResolutionError(status: string): ResolvedAudioPlanError {
+  if (status === "offline") {
+    return new ResolvedAudioPlanError("AUDIO_PLAN_SOURCE_OFFLINE", "A source file is offline during verified audio execution.");
+  }
+  if (status === "content-changed") {
+    return new ResolvedAudioPlanError("AUDIO_PLAN_SOURCE_CONTENT_CHANGED", "A source file changed during verified audio execution.");
+  }
+  return new ResolvedAudioPlanError(
+    "AUDIO_PLAN_SOURCE_VERIFICATION_UNAVAILABLE",
+    "The current source content cannot be verified with the adopted method."
+  );
 }
 
 export function compileResolvedAudioPlan(project: ProjectIR, request: CompileResolvedAudioPlanRequest): ResolvedAudioPlanV1 {
@@ -647,6 +716,11 @@ function rejectUnexpectedKeys(value: unknown, allowed: readonly string[], label:
 
 function mapApplicationError(cause: unknown, locale: "pt-BR" | "en-US", executionId: string): Error {
   if (cause instanceof MediaApplicationError) return cause;
+  if (cause instanceof ResolvedAudioPlanError && [
+    "AUDIO_PLAN_SOURCE_OFFLINE",
+    "AUDIO_PLAN_SOURCE_CONTENT_CHANGED",
+    "AUDIO_PLAN_SOURCE_VERIFICATION_UNAVAILABLE"
+  ].includes(cause.code)) return cause;
   if (cause instanceof ResolvedAudioPlanError && cause.code === "AUDIO_PLAN_PROJECT_CONFLICT") {
     return new MediaApplicationError("MEDIA_PROJECT_CONFLICT", locale, executionId, {}, cause);
   }

@@ -1,9 +1,15 @@
 import type { MediaProbeResult } from "@cevra/contracts";
 import { translate, type CevraLocale, type TranslationKey } from "@cevra/i18n";
 import type { ExtensionMap, JournalActor, ProjectHistory, ProjectIR, SourceAsset } from "@cevra/project-ir";
-import { fileURLToPath } from "node:url";
 import { MediaApplicationError } from "./errors.js";
+import { localSourceProbeInput } from "./local-source-uri.js";
 import type { MediaApplicationService } from "./media-service.js";
+import {
+  normalizeSourceTechnicalDescriptor,
+  type SourceContentIdentityPort,
+  type SourceFileOperationalStampV1,
+  type VerifiedSourceContentIdentityV1
+} from "./source-technical-descriptor.js";
 import type { MediaExecutionOutcome, MediaExecutionRecord } from "./types.js";
 
 export type LocalSourceIngestErrorCode =
@@ -12,6 +18,9 @@ export type LocalSourceIngestErrorCode =
   | "LOCAL_SOURCE_KIND_MISMATCH"
   | "LOCAL_SOURCE_PROJECT_CONFLICT"
   | "LOCAL_SOURCE_PROBE_FAILED"
+  | "LOCAL_SOURCE_IDENTITY_UNAVAILABLE"
+  | "LOCAL_SOURCE_OFFLINE"
+  | "LOCAL_SOURCE_CONTENT_CHANGED"
   | "LOCAL_SOURCE_COMMIT_FAILED";
 
 // Local Source Ingest V1 supports video and audio. Still-image ingest requires a
@@ -38,6 +47,9 @@ const ERROR_KEYS: Readonly<Record<LocalSourceIngestErrorCode, TranslationKey>> =
   LOCAL_SOURCE_KIND_MISMATCH: "ingest.error.kindMismatch",
   LOCAL_SOURCE_PROJECT_CONFLICT: "ingest.error.projectConflict",
   LOCAL_SOURCE_PROBE_FAILED: "ingest.error.probeFailed",
+  LOCAL_SOURCE_IDENTITY_UNAVAILABLE: "ingest.error.identityUnavailable",
+  LOCAL_SOURCE_OFFLINE: "ingest.error.sourceOffline",
+  LOCAL_SOURCE_CONTENT_CHANGED: "ingest.error.contentChanged",
   LOCAL_SOURCE_COMMIT_FAILED: "ingest.error.commitFailed"
 };
 
@@ -76,34 +88,46 @@ export interface LocalSourceIngestResult {
 export interface LocalSourceIngestServiceOptions {
   media: Pick<MediaApplicationService, "execute">;
   history: ProjectHistory;
+  identity?: SourceContentIdentityPort;
   idGenerator?: () => string;
 }
 
 export class LocalSourceIngestService {
   private readonly media: Pick<MediaApplicationService, "execute">;
   private readonly history: ProjectHistory;
+  private readonly identity: SourceContentIdentityPort | undefined;
   private readonly idGenerator: () => string;
 
   constructor(options: LocalSourceIngestServiceOptions) {
     this.media = options.media;
     this.history = options.history;
+    this.identity = options.identity;
     this.idGenerator = options.idGenerator ?? defaultId;
   }
 
   async ingest(request: LocalSourceIngestRequest, signal?: AbortSignal): Promise<LocalSourceIngestResult> {
-    const before = this.history.current;
-    const locale = request.locale ?? before.project.defaultLocale;
-    const sourceId = request.sourceId ?? this.idGenerator();
-    const probeExecutionId = this.idGenerator();
-    const probeInputUri = validateRequest(request, sourceId, locale, probeExecutionId);
     let stableRequest: LocalSourceIngestRequest;
     try {
       stableRequest = clone(request);
     } catch (cause) {
-      throw new LocalSourceIngestError("LOCAL_SOURCE_INVALID_REQUEST", locale, probeExecutionId, cause);
+      throw new LocalSourceIngestError("LOCAL_SOURCE_INVALID_REQUEST", this.history.current.project.defaultLocale, "invalid-ingest", cause);
     }
+    const before = this.history.current;
+    const locale = stableRequest.locale ?? before.project.defaultLocale;
+    const sourceId = stableRequest.sourceId ?? this.idGenerator();
+    const probeExecutionId = this.idGenerator();
+    const probeInputUri = validateRequest(stableRequest, sourceId, locale, probeExecutionId);
     if (before.sources.some((source) => source.id === sourceId)) {
       throw new LocalSourceIngestError("LOCAL_SOURCE_INVALID_REQUEST", locale, probeExecutionId);
+    }
+    const journalEntryCount = this.history.entries.length;
+    let initialIdentity: SourceFileOperationalStampV1 | undefined;
+    if (this.identity) {
+      try {
+        initialIdentity = await this.identity.captureSource(stableRequest.uri, signal);
+      } catch (cause) {
+        throw mapIdentityError(cause, locale, probeExecutionId);
+      }
     }
 
     let probeOutcome: MediaExecutionOutcome;
@@ -136,16 +160,29 @@ export class LocalSourceIngestService {
       throw new LocalSourceIngestError("LOCAL_SOURCE_KIND_MISMATCH", locale, probeExecutionId);
     }
 
+    let contentIdentity: VerifiedSourceContentIdentityV1 | undefined;
+    if (this.identity && initialIdentity) {
+      try {
+        contentIdentity = await this.identity.identifySource(stableRequest.uri, initialIdentity, signal);
+      } catch (cause) {
+        throw mapIdentityError(cause, locale, probeExecutionId);
+      }
+    }
+    if (signal?.aborted) {
+      throw new MediaApplicationError("MEDIA_OPERATION_CANCELLED", locale, probeExecutionId);
+    }
+
     const latest = this.history.current;
     if (
       latest.project.id !== before.project.id
       || latest.history.revision !== before.history.revision
       || latest.history.headSnapshotId !== before.history.headSnapshotId
+      || this.history.entries.length !== journalEntryCount
     ) {
       throw new LocalSourceIngestError("LOCAL_SOURCE_PROJECT_CONFLICT", locale, probeExecutionId);
     }
 
-    const source = sourceFromProbe(stableRequest, sourceId, kind, probeOutcome.record, probe, locale, probeExecutionId);
+    const source = sourceFromProbe(stableRequest, sourceId, kind, probeOutcome.record, probe, contentIdentity, locale, probeExecutionId);
     let project: ProjectIR;
     try {
       project = this.history.commit({ type: "source.add", source }, stableRequest.actor ?? { type: "user" });
@@ -166,7 +203,7 @@ function validateRequest(
   probeExecutionId: string
 ): string {
   const expectedKinds: readonly LocalSourceKind[] = ["video", "audio"];
-  const probeInputUri = typeof request.uri === "string" ? localProbeInput(request.uri) : undefined;
+  const probeInputUri = typeof request.uri === "string" ? localSourceProbeInput(request.uri) : undefined;
   const valid = typeof request.uri === "string"
     && request.uri.trim().length > 0
     && probeInputUri !== undefined
@@ -179,31 +216,6 @@ function validateRequest(
     && (request.extensions === undefined || isRecord(request.extensions));
   if (!valid) throw new LocalSourceIngestError("LOCAL_SOURCE_INVALID_REQUEST", locale, probeExecutionId);
   return probeInputUri;
-}
-
-// Local Source Ingest V1 accepts local file URLs and absolute filesystem paths
-// already understood by the media runtime. Network/provider URIs and UNC paths
-// belong to future source-specific ingest services.
-function localProbeInput(uri: string): string | undefined {
-  if (uri !== uri.trim() || /[\0\r\n]/u.test(uri)) return undefined;
-  if (/^[A-Za-z]:[\\/]/u.test(uri)) return uri;
-  if (uri.startsWith("/") && !uri.startsWith("//")) return uri;
-  if (!uri.startsWith("file://")) return undefined;
-  try {
-    const parsed = new URL(uri);
-    const local = parsed.protocol === "file:"
-      && (parsed.hostname === "" || parsed.hostname === "localhost")
-      && parsed.username === ""
-      && parsed.password === ""
-      && parsed.port === ""
-      && parsed.search === ""
-      && parsed.hash === ""
-      && parsed.pathname.startsWith("/")
-      && !parsed.pathname.startsWith("//");
-    return local ? fileURLToPath(parsed) : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 function completedProbe(
@@ -247,12 +259,28 @@ function sourceFromProbe(
   kind: "video" | "audio",
   record: MediaExecutionRecord,
   probe: MediaProbeResult,
+  identity: VerifiedSourceContentIdentityV1 | undefined,
   locale: CevraLocale,
   probeExecutionId: string
 ): SourceAsset {
   const attempt = record.attempts.at(-1);
   if (!attempt) throw new LocalSourceIngestError("LOCAL_SOURCE_PROBE_FAILED", locale, probeExecutionId);
   const callerExtensions = clone(request.extensions ?? {});
+  let technicalDescriptor: SourceAsset["technicalDescriptor"];
+  if (identity) {
+    try {
+      technicalDescriptor = normalizeSourceTechnicalDescriptor({
+        basis: "ingest",
+        sourceKind: kind,
+        probe,
+        identity,
+        provenance: attempt.provenance ?? (() => { throw invalidProbe(locale, probeExecutionId); })()
+      });
+    } catch (cause) {
+      if (cause instanceof LocalSourceIngestError) throw cause;
+      throw new LocalSourceIngestError("LOCAL_SOURCE_PROBE_FAILED", locale, probeExecutionId, cause);
+    }
+  }
   return {
     id: sourceId,
     kind,
@@ -260,6 +288,7 @@ function sourceFromProbe(
     displayName: request.displayName,
     ...optionalMetadata(probe, locale, probeExecutionId),
     ...(request.checksum !== undefined ? { checksum: request.checksum } : {}),
+    ...(technicalDescriptor ? { technicalDescriptor } : {}),
     extensions: {
       ...callerExtensions,
       "cevra.ingest": {
@@ -318,4 +347,14 @@ function defaultId(): string {
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function mapIdentityError(cause: unknown, locale: CevraLocale, probeExecutionId: string): Error {
+  const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
+  if (code === "SOURCE_IDENTITY_CANCELLED" || (cause instanceof Error && cause.name === "AbortError")) {
+    return new MediaApplicationError("MEDIA_OPERATION_CANCELLED", locale, probeExecutionId, {}, cause);
+  }
+  if (code === "SOURCE_IDENTITY_OFFLINE") return new LocalSourceIngestError("LOCAL_SOURCE_OFFLINE", locale, probeExecutionId, cause);
+  if (code === "SOURCE_IDENTITY_CHANGED") return new LocalSourceIngestError("LOCAL_SOURCE_CONTENT_CHANGED", locale, probeExecutionId, cause);
+  return new LocalSourceIngestError("LOCAL_SOURCE_IDENTITY_UNAVAILABLE", locale, probeExecutionId, cause);
 }

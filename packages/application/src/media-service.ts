@@ -49,6 +49,19 @@ export interface MediaApplicationServiceOptions {
   idGenerator?: () => string;
 }
 
+/** Trusted Application-only guard. It is never serialized or accepted from a product request. */
+export interface MediaExecutionPreCommitGuard {
+  verify(signal?: AbortSignal): Promise<void>;
+}
+
+export class MediaExecutionPreCommitError extends Error {
+  constructor(readonly code: Extract<MediaApplicationErrorCode,
+    "SOURCE_CONTENT_CHANGED" | "SOURCE_OFFLINE" | "SOURCE_VERIFICATION_UNAVAILABLE">) {
+    super(code);
+    this.name = "MediaExecutionPreCommitError";
+  }
+}
+
 class AttemptFailure extends Error {
   constructor(readonly code: MediaApplicationErrorCode, message: string, readonly parameter?: string) {
     super(message);
@@ -72,7 +85,11 @@ export class MediaApplicationService {
     this.idGenerator = options.idGenerator ?? defaultId;
   }
 
-  async execute(request: MediaExecutionRequest, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
+  async execute(
+    request: MediaExecutionRequest,
+    signal?: AbortSignal,
+    preCommitGuard?: MediaExecutionPreCommitGuard
+  ): Promise<MediaExecutionOutcome> {
     const defaultLocale = this.history.current.project.defaultLocale;
     let candidate: MediaExecutionRequest | undefined;
     let stableRequest: Required<Pick<MediaExecutionRequest, "id" | "locale" | "operation" | "mutation" | "actor">>
@@ -108,7 +125,7 @@ export class MediaApplicationService {
       }
       throw cause;
     }
-    return this.runAttempt(record, signal);
+    return this.runAttempt(record, signal, preCommitGuard);
   }
 
   /**
@@ -252,7 +269,11 @@ export class MediaApplicationService {
     return this.executions.get(executionId);
   }
 
-  private async runAttempt(record: MediaExecutionRecord, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
+  private async runAttempt(
+    record: MediaExecutionRecord,
+    signal?: AbortSignal,
+    preCommitGuard?: MediaExecutionPreCommitGuard
+  ): Promise<MediaExecutionOutcome> {
     const outputUris = mediaOperationOutputUris(record.operation);
     const current = this.history.current;
     const attempt: MediaExecutionAttempt = {
@@ -318,6 +339,7 @@ export class MediaApplicationService {
       attempt.result = clone(result);
       record.status = "committing";
       await this.executions.save(record);
+      await preCommitGuard?.verify(signal);
       if (signal?.aborted) throw abortMarker();
       const commitProject = this.history.current;
       if ((record.projectBinding || record.mutation.type !== "none")
@@ -351,7 +373,10 @@ export class MediaApplicationService {
       }
       const cancelled = isAbort(cause, signal);
       const failure = cause instanceof AttemptFailure ? cause : undefined;
-      const code: MediaApplicationErrorCode = cancelled ? "MEDIA_OPERATION_CANCELLED" : failure?.code ?? "MEDIA_OPERATION_FAILED";
+      const commitFailure = cause instanceof MediaExecutionPreCommitError ? cause : undefined;
+      const code: MediaApplicationErrorCode = cancelled
+        ? "MEDIA_OPERATION_CANCELLED"
+        : commitFailure?.code ?? failure?.code ?? "MEDIA_OPERATION_FAILED";
       const cleanup = hasExclusivePublication(record.operation)
         ? await this.cleanupPublished(record.operation, attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
         : await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);

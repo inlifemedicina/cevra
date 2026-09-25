@@ -2,9 +2,13 @@ import {
   LocalSourceIngestService,
   MediaApplicationService,
   ResolvedAudioPlanApplicationService,
+  SourceTechnicalDescriptorApplicationService,
+  SourceTechnicalDescriptorResolver,
   TranscriptionApplicationService
 } from "@cevra/application";
 import type {
+  AdoptSourceTechnicalDescriptorOutcome,
+  AdoptSourceTechnicalDescriptorRequest,
   ExecuteResolvedAudioPlanOutcome,
   ExecuteResolvedAudioPlanRequest,
   MediaExecutionRepository,
@@ -39,6 +43,7 @@ type Locale = "pt-BR" | "en-US";
 export interface DesktopSessionServices {
   history: ProjectHistory;
   ingest?: Pick<LocalSourceIngestService, "ingest">;
+  sourceTechnicalDescriptor?: Pick<SourceTechnicalDescriptorApplicationService, "adopt">;
   transcription?: Pick<TranscriptionApplicationService, "transcribeSource">;
   mediaCapability: CapabilityState;
   transcriptionCapability: CapabilityState;
@@ -89,6 +94,19 @@ export class DesktopSession {
       await this.persistMutation();
       return this.state();
     }));
+  }
+
+  /** Internal Desktop boundary; no WebView/Tauri command is exposed by MR-V01. */
+  async adoptSourceTechnicalDescriptor(
+    request: AdoptSourceTechnicalDescriptorRequest,
+    signal?: AbortSignal
+  ): Promise<AdoptSourceTechnicalDescriptorOutcome> {
+    if (!this.services.mediaCapability.available || !this.services.sourceTechnicalDescriptor) throw safeError("MEDIA_UNAVAILABLE");
+    return this.runMutation(async () => {
+      const outcome = await this.services.sourceTechnicalDescriptor!.adopt(structuredClone(request), signal);
+      await this.persistMutation();
+      return outcome;
+    });
   }
 
   cancel(operationId: string): { operationId: string; cancelled: boolean } {
@@ -216,6 +234,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
     return new DesktopSession({
       history,
       ...(media?.ingest ? { ingest: media.ingest } : {}),
+      ...(media?.sourceTechnicalDescriptor ? { sourceTechnicalDescriptor: media.sourceTechnicalDescriptor } : {}),
       ...(transcription.service ? { transcription: transcription.service } : {}),
       mediaCapability: media?.capability ?? unavailable(mediaArchiveFailure ?? "archive-unavailable"),
       transcriptionCapability: transcription.capability,
@@ -240,6 +259,7 @@ async function createMediaServices(
 ): Promise<{
   capability: CapabilityState;
   ingest?: LocalSourceIngestService;
+  sourceTechnicalDescriptor?: SourceTechnicalDescriptorApplicationService;
   application: MediaApplicationService;
   resolvedAudioPlan: ResolvedAudioPlanApplicationService;
   close?: () => Promise<void>;
@@ -271,7 +291,12 @@ async function createMediaServices(
     const services = composeMediaApplicationServices(history, executions, engine);
     return {
       capability: available(),
-      ingest: new LocalSourceIngestService({ media: services.application, history }),
+      ingest: new LocalSourceIngestService({ media: services.application, history, identity: services.artifacts }),
+      sourceTechnicalDescriptor: new SourceTechnicalDescriptorApplicationService({
+        media: services.application,
+        history,
+        identity: services.artifacts
+      }),
       ...services,
       close: () => worker.close(),
       runtimeRoot: root
@@ -303,11 +328,19 @@ function composeMediaApplicationServices(
 ): {
   application: MediaApplicationService;
   resolvedAudioPlan: ResolvedAudioPlanApplicationService;
+  artifacts: NodeMediaArtifactStore;
 } {
-  const application = new MediaApplicationService({ engine, history, executions, artifacts: new NodeMediaArtifactStore() });
+  const artifacts = new NodeMediaArtifactStore();
+  const application = new MediaApplicationService({ engine, history, executions, artifacts });
   return {
     application,
-    resolvedAudioPlan: new ResolvedAudioPlanApplicationService({ history, media: application, intents: executions })
+    resolvedAudioPlan: new ResolvedAudioPlanApplicationService({
+      history,
+      media: application,
+      intents: executions,
+      sourceVerifier: new SourceTechnicalDescriptorResolver(artifacts)
+    }),
+    artifacts
   };
 }
 

@@ -14,7 +14,10 @@ export type MediaApplicationErrorCode =
   | "MEDIA_PROJECT_CONFLICT"
   | "MEDIA_INVALID_REQUEST"
   | "MEDIA_PROJECT_COMMIT_FAILED"
-  | "MEDIA_RECOVERY_FAILED";
+  | "MEDIA_RECOVERY_FAILED"
+  | "SOURCE_CONTENT_CHANGED"
+  | "SOURCE_OFFLINE"
+  | "SOURCE_VERIFICATION_UNAVAILABLE";
 
 export type MediaProjectMutation =
   | { type: "none" }

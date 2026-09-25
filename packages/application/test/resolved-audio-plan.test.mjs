@@ -9,6 +9,7 @@ import {
   MediaApplicationService,
   ResolvedAudioPlanApplicationService,
   ResolvedAudioPlanError,
+  SourceTechnicalDescriptorResolver,
   compileResolvedAudioPlan
 } from "../dist/index.js";
 
@@ -128,7 +129,7 @@ function muxResult(operation, durationMs = 4_000) {
   };
 }
 
-function services(executeImpl, project = projectFixture()) {
+function services(executeImpl, project = projectFixture(), sourceVerifier) {
   const history = historyFixture(project);
   const artifacts = new MemoryArtifacts();
   const repository = new InMemoryMediaExecutionRepository();
@@ -137,8 +138,52 @@ function services(executeImpl, project = projectFixture()) {
     return operation.type === "render-audio-sequence" ? sequenceResult(operation) : muxResult(operation);
   }));
   const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
-  const service = new ResolvedAudioPlanApplicationService({ history, media, intents: repository, idGenerator: () => "plan-generated", clock: () => now });
+  const service = new ResolvedAudioPlanApplicationService({
+    history,
+    media,
+    intents: repository,
+    idGenerator: () => "plan-generated",
+    clock: () => now,
+    ...(sourceVerifier ? { sourceVerifier } : {})
+  });
   return { history, artifacts, repository, engine, media, service };
+}
+
+function sourceDescriptor(digest) {
+  return {
+    version: 1,
+    basis: "ingest",
+    content: { sha256: digest.repeat(64), sizeBytes: 1 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra.media.ffmpeg",
+      engineVersion: "0.3.0",
+      engineApiVersion: 1
+    },
+    video: { codec: "h264" },
+    audio: { codec: "aac" }
+  };
+}
+
+function verificationPort(history, state = { changed: false }) {
+  return {
+    captureCalls: [],
+    identifyCalls: [],
+    checkCalls: [],
+    async captureSource(uri) {
+      this.captureCalls.push(uri);
+      return { version: 1, uri, canonicalPath: uri, device: "1", inode: uri, sizeBytes: 1, mtimeNs: "1", ctimeNs: "1" };
+    },
+    async identifySource(uri, stamp) {
+      this.identifyCalls.push(uri);
+      const source = history.current.sources.find((item) => item.uri === uri);
+      return { version: 1, content: structuredClone(source.technicalDescriptor.content), stamp, bytesRead: 1 };
+    },
+    async checkSource(uri) {
+      this.checkCalls.push({ uri, exportCount: history.current.exports.length });
+      return state.changed ? "changed" : "match";
+    }
+  };
 }
 
 function visual(plan) {
@@ -228,6 +273,80 @@ test("Application executes sequence then exclusive mux, promotes one export, and
   assert.equal(artifacts.files.has("/render/audio.wav"), false);
   assert.equal(artifacts.files.has("/render/final.mp4"), true);
   assert.deepEqual(history.entries.at(-1).command.type, "export.add");
+});
+
+test("descriptor-bearing resolved audio verifies each unique source once and rechecks before export promotion", async () => {
+  const project = projectFixture();
+  project.sources.find((item) => item.id === "a").technicalDescriptor = sourceDescriptor("a");
+  project.sources.find((item) => item.id === "b").technicalDescriptor = sourceDescriptor("b");
+  const history = historyFixture(project);
+  const port = verificationPort(history);
+  const artifacts = new MemoryArtifacts();
+  const repository = new InMemoryMediaExecutionRepository();
+  const engine = new FakeEngine(async (operation) => {
+    artifacts.files.set(operation.outputUri, Buffer.from(operation.type));
+    return operation.type === "render-audio-sequence" ? sequenceResult(operation) : muxResult(operation);
+  });
+  const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
+  const service = new ResolvedAudioPlanApplicationService({
+    history,
+    media,
+    intents: repository,
+    sourceVerifier: new SourceTechnicalDescriptorResolver(port),
+    clock: () => now
+  });
+  const plan = service.compile({ id: "verified", audioOutputUri: "/render/verified.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  await service.execute({ id: "verified", plan, visual: visual(plan), outputUri: "/render/verified.mp4", exportId: "verified", presetId: "fixture" });
+  assert.deepEqual(port.captureCalls.sort(), ["/media/a.mov", "/media/b.mov"]);
+  assert.deepEqual(port.identifyCalls.sort(), ["/media/a.mov", "/media/b.mov"]);
+  assert.equal(port.checkCalls.length, 4, "two sources are rechecked after sequence and immediately before export.add");
+  assert.equal(port.checkCalls.every((call) => call.exportCount === 0), true, "decisive checks must occur before export.add");
+  assert.equal(history.current.exports.length, 1);
+});
+
+test("source change during resolved-audio consumption prevents export promotion and cleans owned outputs", async () => {
+  const project = projectFixture();
+  project.sources.find((item) => item.id === "a").technicalDescriptor = sourceDescriptor("a");
+  const history = historyFixture(project);
+  const state = { changed: false };
+  const port = verificationPort(history, state);
+  const artifacts = new MemoryArtifacts();
+  const repository = new InMemoryMediaExecutionRepository();
+  const engine = new FakeEngine(async (operation) => {
+    artifacts.files.set(operation.outputUri, Buffer.from(operation.type));
+    if (operation.type === "mux-audio") state.changed = true;
+    return operation.type === "render-audio-sequence" ? sequenceResult(operation) : muxResult(operation);
+  });
+  const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
+  const service = new ResolvedAudioPlanApplicationService({
+    history,
+    media,
+    intents: repository,
+    sourceVerifier: new SourceTechnicalDescriptorResolver(port),
+    clock: () => now
+  });
+  const plan = service.compile({ id: "changed", audioOutputUri: "/render/changed.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  await assert.rejects(
+    service.execute({ id: "changed", plan, visual: visual(plan), outputUri: "/render/changed.mp4", exportId: "changed", presetId: "fixture" }),
+    (error) => error instanceof MediaApplicationError && error.code === "SOURCE_CONTENT_CHANGED"
+  );
+  assert.equal(history.current.exports.length, 0);
+  assert.equal(artifacts.files.has("/render/changed.wav"), false);
+  assert.equal(artifacts.files.has("/render/changed.mp4"), false);
+  assert.equal(port.checkCalls.at(-1).exportCount, 0);
+});
+
+test("descriptor-bearing resolved audio fails closed when source verification capability is absent", async () => {
+  const project = projectFixture();
+  project.sources.find((item) => item.id === "a").technicalDescriptor = sourceDescriptor("a");
+  const fixture = services(undefined, project);
+  const plan = fixture.service.compile({ id: "no-verifier", audioOutputUri: "/render/no-verifier.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  await assert.rejects(
+    fixture.service.execute({ id: "no-verifier", plan, visual: visual(plan), outputUri: "/render/no-verifier.mp4", exportId: "no-verifier", presetId: "fixture" }),
+    (error) => error instanceof ResolvedAudioPlanError && error.code === "AUDIO_PLAN_SOURCE_VERIFICATION_UNAVAILABLE"
+  );
+  assert.equal(fixture.engine.calls.length, 0);
+  assert.equal(fixture.history.current.exports.length, 0);
 });
 
 test("commit followed by undo during rendering cannot restore authority to the old plan", async () => {
