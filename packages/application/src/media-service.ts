@@ -55,11 +55,11 @@ export interface MediaExecutionGuards {
   beforeCommit?: { verify(signal?: AbortSignal): Promise<void> };
 }
 
-export class MediaExecutionPreCommitError extends Error {
+export class MediaExecutionGuardError extends Error {
   constructor(readonly code: Extract<MediaApplicationErrorCode,
     "MEDIA_INPUT_ARTIFACT_CHANGED" | "SOURCE_CONTENT_CHANGED" | "SOURCE_OFFLINE" | "SOURCE_VERIFICATION_UNAVAILABLE">) {
     super(code);
-    this.name = "MediaExecutionPreCommitError";
+    this.name = "MediaExecutionGuardError";
   }
 }
 
@@ -295,7 +295,7 @@ export class MediaApplicationService {
       && samePublicationEvidence(result.publication, publication.evidence);
     if (!bound || !this.artifacts.matchesPublication
       || !await this.artifacts.matchesPublication(expectedOutputUri, publication.evidence)) {
-      throw new MediaApplicationError("MEDIA_INPUT_ARTIFACT_CHANGED", locale, executionId);
+      throw new MediaExecutionGuardError("MEDIA_INPUT_ARTIFACT_CHANGED");
     }
   }
 
@@ -405,10 +405,10 @@ export class MediaApplicationService {
       }
       const cancelled = isAbort(cause, signal);
       const failure = cause instanceof AttemptFailure ? cause : undefined;
-      const commitFailure = cause instanceof MediaExecutionPreCommitError ? cause : undefined;
+      const guardFailure = cause instanceof MediaExecutionGuardError ? cause : undefined;
       const code: MediaApplicationErrorCode = cancelled
         ? "MEDIA_OPERATION_CANCELLED"
-        : commitFailure?.code ?? failure?.code ?? "MEDIA_OPERATION_FAILED";
+        : guardFailure?.code ?? failure?.code ?? "MEDIA_OPERATION_FAILED";
       const cleanup = hasExclusivePublication(record.operation)
         ? await this.cleanupPublished(record.operation, attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
         : await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);

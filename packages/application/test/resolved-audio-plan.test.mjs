@@ -495,7 +495,7 @@ test("PCM publication replacement is reproduced without the guard and rejected b
     const service = new ResolvedAudioPlanApplicationService({ history, media: resolvedMedia, intents: repository, clock: () => now });
     const plan = service.compile({ id: "pcm-boundary", audioOutputUri: uris.pcm, outputChannelLayout: "stereo", normalization: { type: "none" } });
     const request = { id: "pcm-boundary", plan, visual: { ...visual(plan), uri: uris.visual }, outputUri: uris.output, exportId: "pcm-boundary", presetId: "fixture" };
-    return { root, uris, history, artifacts, service, request, getMuxCalls: () => muxCalls };
+    return { root, uris, history, artifacts, repository, service, request, getMuxCalls: () => muxCalls };
   }
 
   const control = await runCase(false);
@@ -514,6 +514,7 @@ test("PCM publication replacement is reproduced without the guard and rejected b
       (error) => error instanceof MediaApplicationError && error.code === "MEDIA_RECOVERY_FAILED");
     assert.equal(guarded.getMuxCalls(), 0, "publication mismatch must fail before mux engine execution");
     assert.equal(guarded.history.current.exports.length, 0);
+    assert.equal((await guarded.repository.get("pcm-boundary:mux")).attempts.at(-1).errorCode, "MEDIA_INPUT_ARTIFACT_CHANGED");
     assert.equal(await readFile(guarded.uris.pcm, "utf8"), "foreign-pcm", "foreign replacement must survive cleanup");
     assert.equal(await readFile(guarded.uris.visual, "utf8"), "visual");
     assert.equal(await guarded.artifacts.kind(guarded.uris.output), "missing");

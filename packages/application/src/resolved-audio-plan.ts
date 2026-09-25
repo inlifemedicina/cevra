@@ -8,7 +8,7 @@ import {
 import type { JournalActor, ProjectHistory, ProjectIR, TimelineClip } from "@cevra/project-ir";
 import { MediaApplicationError } from "./errors.js";
 import {
-  MediaExecutionPreCommitError,
+  MediaExecutionGuardError,
   mediaExecutionMutationApplied,
   type MediaApplicationService
 } from "./media-service.js";
@@ -298,12 +298,12 @@ export class ResolvedAudioPlanApplicationService {
 
   private async preCommitSourceGuard(memo: SourceContentVerificationMemo, signal?: AbortSignal): Promise<void> {
     if (memo.entries.size === 0) return;
-    if (!this.sourceVerifier) throw new MediaExecutionPreCommitError("SOURCE_VERIFICATION_UNAVAILABLE");
+    if (!this.sourceVerifier) throw new MediaExecutionGuardError("SOURCE_VERIFICATION_UNAVAILABLE");
     const status = await this.sourceVerifier.revalidate(memo, signal);
     if (status === "verified") return;
-    if (status === "offline") throw new MediaExecutionPreCommitError("SOURCE_OFFLINE");
-    if (status === "content-changed") throw new MediaExecutionPreCommitError("SOURCE_CONTENT_CHANGED");
-    throw new MediaExecutionPreCommitError("SOURCE_VERIFICATION_UNAVAILABLE");
+    if (status === "offline") throw new MediaExecutionGuardError("SOURCE_OFFLINE");
+    if (status === "content-changed") throw new MediaExecutionGuardError("SOURCE_CONTENT_CHANGED");
+    throw new MediaExecutionGuardError("SOURCE_VERIFICATION_UNAVAILABLE");
   }
 
   async markCheckpointSucceeded(intentId: string): Promise<void> {
