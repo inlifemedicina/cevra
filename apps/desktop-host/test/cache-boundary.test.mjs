@@ -6,7 +6,8 @@ import test from "node:test";
 import { CEVRA_ENGINE_API_VERSION } from "@cevra/contracts";
 import { TranscriptionApplicationService } from "@cevra/application";
 import { createEmptyProject, ProjectHistory } from "@cevra/project-ir";
-import { FileTranscriptCache, NodeSourceContentIdentityProvider } from "@cevra/transcript-cache";
+import { FileTranscriptCache } from "@cevra/transcript-cache";
+import { NodeMediaArtifactStore } from "@cevra/media-ffmpeg";
 import { DesktopProjectPersistence, DesktopSession } from "../dist/index.js";
 
 const now = "2026-09-15T12:00:00.000Z";
@@ -30,7 +31,7 @@ test("cache-derived transcript promotion is checkpointed while cache deletion ca
   };
   const engineResult = { transcript: { language: "pt", words: [], segments: [] }, modelId: "model", wordTiming: "none" };
   const engineIdentity = { id: "engine", kind: "transcription", displayName: "Cache fixture", version: "1", apiVersion: CEVRA_ENGINE_API_VERSION };
-  const sourceIdentity = new NodeSourceContentIdentityProvider();
+  const sourceIdentity = new NodeMediaArtifactStore();
   const seedProject = createEmptyProject({ id: "seed", name: "Seed", locale: "pt-BR", now });
   seedProject.sources.push({ id: "seed-source", kind: "video", uri: mediaPath, displayName: "copy.mov", durationMs: 1000 });
   const seedHistory = new ProjectHistory(seedProject, { clock: () => now, idGenerator: () => "seed-history" });

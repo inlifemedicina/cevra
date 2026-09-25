@@ -8,6 +8,10 @@ import type {
   TranscriptionResult
 } from "@cevra/contracts";
 import type { TranscriptDigest } from "@cevra/project-ir";
+import type {
+  SourceContentIdentityPort,
+  VerifiedSourceContentIdentityV1
+} from "./source-technical-descriptor.js";
 
 export const TRANSCRIPT_CACHE_KEY_VERSION = 1 as const;
 export const TRANSCRIPTION_CACHE_NORMALIZATION_VERSION = "transcription-result-v1" as const;
@@ -16,20 +20,15 @@ export const ALIGNMENT_CACHE_VALIDATION_VERSION = "alignment-result-v1" as const
 export type TranscriptCachePolicy = "prefer" | "refresh" | "bypass";
 export type TranscriptCacheStatus = "hit" | "miss" | "bypass" | "refresh";
 
-export interface SourceContentIdentity {
-  algorithm: "sha256";
-  digest: `sha256:${string}`;
-  byteLength: number;
-}
-
-export interface SourceContentIdentityProvider {
-  identify(inputUri: string, signal?: AbortSignal): Promise<SourceContentIdentity | undefined>;
+export interface TranscriptSourceContentIdentityV1 {
+  sha256: string;
+  sizeBytes: number;
 }
 
 export interface TranscriptionCacheKey {
   schemaVersion: typeof TRANSCRIPT_CACHE_KEY_VERSION;
   kind: "transcription";
-  source: SourceContentIdentity;
+  source: TranscriptSourceContentIdentityV1;
   execution: TranscriptionExecutionIdentity;
   requestedLanguage: "auto" | "pt" | "en";
   wordTimestamps: boolean;
@@ -47,7 +46,7 @@ export interface AlignmentMediaPreparationIdentity {
 export interface AlignmentCacheKey {
   schemaVersion: typeof TRANSCRIPT_CACHE_KEY_VERSION;
   kind: "alignment";
-  source: SourceContentIdentity;
+  source: TranscriptSourceContentIdentityV1;
   inputTranscriptDigest: TranscriptDigest;
   language: "pt" | "en";
   execution: AlignmentExecutionIdentity;
@@ -70,6 +69,27 @@ export interface TranscriptResultCache {
     signal?: AbortSignal
   ): Promise<boolean>;
   invalidate(key: TranscriptCacheKey): Promise<void>;
+}
+
+export interface TranscriptSourceVerificationV1 {
+  cacheIdentity: TranscriptSourceContentIdentityV1;
+  verified: VerifiedSourceContentIdentityV1;
+}
+
+export async function verifyTranscriptSource(
+  port: SourceContentIdentityPort,
+  uri: string,
+  signal?: AbortSignal
+): Promise<TranscriptSourceVerificationV1> {
+  const captured = await port.captureSource(uri, signal);
+  const verified = await port.identifySource(uri, captured, signal);
+  return {
+    cacheIdentity: {
+      sha256: verified.content.sha256,
+      sizeBytes: verified.content.sizeBytes
+    },
+    verified
+  };
 }
 
 export function isTranscriptionIdentityProvider(

@@ -282,9 +282,11 @@ function validateCacheKey(key: TranscriptCacheKey): void {
       || key.mediaPreparation.operation !== "extract-audio" || key.mediaPreparation.audioCodec !== "pcm" || key.mediaPreparation.profileVersion !== "alignment-pcm-v1") throw new Error("Alignment cache key is invalid.");
   } else throw new Error("Cache key kind is invalid.");
   if (key.schemaVersion !== 1 || !isRecord(key.source)) throw new Error("Cache key version or source is invalid.");
-  exactKeys(key.source, ["algorithm", "digest", "byteLength"]);
-  if (key.source.algorithm !== "sha256" || !Number.isSafeInteger(key.source.byteLength) || key.source.byteLength < 0) throw new Error("Source identity is invalid.");
-  sha256Value(key.source.digest);
+  exactKeys(key.source, ["sha256", "sizeBytes"]);
+  if (!Number.isSafeInteger(key.source.sizeBytes) || key.source.sizeBytes < 0
+    || !/^[0-9a-f]{64}$/u.test(key.source.sha256)) {
+    throw new Error("Source identity is invalid.");
+  }
 }
 
 function parseEnvelope(text: string): CacheEnvelope {

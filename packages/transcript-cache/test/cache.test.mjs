@@ -1,18 +1,17 @@
 import assert from "node:assert/strict";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import {
   FileTranscriptCache,
-  NodeSourceContentIdentityProvider,
   cacheKeyDigest,
   canonicalJson,
   sha256Digest
 } from "../dist/index.js";
 
-const source = { algorithm: "sha256", digest: `sha256:${"a".repeat(64)}`, byteLength: 12 };
+const source = { sha256: "a".repeat(64), sizeBytes: 12 };
 const execution = {
   engineId: "engine", engineVersion: "1", engineApiVersion: 1, workerProtocolVersion: 1,
   modelId: "model", resultModelId: "model", modelRevision: "revision", modelArtifactDigest: `sha256:${"b".repeat(64)}`,
@@ -44,7 +43,7 @@ test("canonical JSON and SHA-256 are deterministic and closed", () => {
 
 test("every material transcription and alignment identity field changes its key digest", () => {
   const transcriptionChanges = [
-    { source: { ...source, digest: `sha256:${"e".repeat(64)}` } }, { source: { ...source, byteLength: 13 } },
+    { source: { ...source, sha256: "e".repeat(64) } }, { source: { ...source, sizeBytes: 13 } },
     ...["engineId", "engineVersion", "modelId", "resultModelId", "modelRevision", "modelArtifactDigest", "languageDetectionPolicyVersion", "devicePolicy", "effectiveDevice", "computeType", "resultNormalizationVersion", "runtimePipelineVersion"].map((field) => ({ execution: { ...execution, [field]: field === "modelArtifactDigest" ? `sha256:${"f".repeat(64)}` : `${execution[field]}-changed` } })),
     { execution: { ...execution, engineApiVersion: 2 } }, { execution: { ...execution, workerProtocolVersion: 2 } },
     { requestedLanguage: "en" }, { wordTimestamps: false }, { schemaVersion: 2 }
@@ -56,7 +55,7 @@ test("every material transcription and alignment identity field changes its key 
   }
   const alignmentChanges = [
     { inputTranscriptDigest: `sha256-v1:${"e".repeat(64)}` }, { language: "en" },
-    { source: { ...source, digest: `sha256:${"f".repeat(64)}` } },
+    { source: { ...source, sha256: "f".repeat(64) } },
     { execution: { ...alignmentKey.execution, engineVersion: "2" } },
     { execution: { ...alignmentKey.execution, modelRevision: "new" } },
     { execution: { ...alignmentKey.execution, modelDigest: `sha256:${"e".repeat(64)}` } },
@@ -70,59 +69,6 @@ test("every material transcription and alignment identity field changes its key 
     else assert.notEqual(cacheKeyDigest(changed), cacheKeyDigest(alignmentKey));
   }
 });
-
-test("source identity hashes actual bytes with bounded streaming and ignores path/mtime", async () => withTemp(async (root) => {
-  const one = join(root, "one.bin");
-  const two = join(root, "renamed.bin");
-  const bytes = Buffer.alloc(8 * 1024 * 1024, 0x5a);
-  await writeFile(one, bytes); await writeFile(two, bytes);
-  let maximumChunk = 0;
-  const provider = new NodeSourceContentIdentityProvider({ onChunk: (size) => { maximumChunk = Math.max(maximumChunk, size); } });
-  const first = await provider.identify(one);
-  const copied = await provider.identify(two);
-  assert.deepEqual(first, copied);
-  assert.equal(first.digest, `sha256:${createHash("sha256").update(bytes).digest("hex")}`);
-  assert.equal(first.byteLength, bytes.length);
-  assert.ok(maximumChunk <= 1024 * 1024, "hashing must remain chunk-bounded");
-  await utimes(two, new Date(), new Date(Date.now() + 5000));
-  assert.deepEqual(await provider.identify(two), first);
-  await writeFile(two, Buffer.from("different"));
-  assert.notDeepEqual(await provider.identify(two), first);
-  const sameNameA = join(root, "a", "same.mov"); const sameNameB = join(root, "b", "same.mov");
-  await mkdir(dirname(sameNameA)); await mkdir(dirname(sameNameB));
-  await writeFile(sameNameA, "alpha"); await writeFile(sameNameB, "beta");
-  assert.notDeepEqual(await provider.identify(sameNameA), await provider.identify(sameNameB));
-  const known = join(root, "known.bin"); await writeFile(known, "abc");
-  assert.deepEqual(await provider.identify(known), {
-    algorithm: "sha256",
-    digest: "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-    byteLength: 3
-  });
-}));
-
-test("source identity bypasses symlinks and remote paths and supports cancellation", async () => withTemp(async (root) => {
-  const file = join(root, "media.bin"); const link = join(root, "link.bin");
-  await writeFile(file, "media"); await symlink(file, link);
-  const provider = new NodeSourceContentIdentityProvider();
-  assert.equal(await provider.identify(link), undefined);
-  assert.equal(await provider.identify("https://example.test/media"), undefined);
-  const controller = new AbortController(); controller.abort();
-  await assert.rejects(() => provider.identify(file, controller.signal), { name: "AbortError" });
-}));
-
-test("source deletion during streaming hash safely bypasses identity", async () => withTemp(async (root) => {
-  const file = join(root, "volatile.bin"); await writeFile(file, Buffer.alloc(3 * 1024 * 1024, 1));
-  let removed = false;
-  const provider = new NodeSourceContentIdentityProvider({ onChunk: async () => { if (!removed) { removed = true; await rm(file); } } });
-  assert.equal(await provider.identify(file), undefined);
-}));
-
-test("source hashing cancellation during streaming aborts bounded work", async () => withTemp(async (root) => {
-  const file = join(root, "cancel.bin"); await writeFile(file, Buffer.alloc(3 * 1024 * 1024, 1));
-  const controller = new AbortController();
-  const provider = new NodeSourceContentIdentityProvider({ onChunk: () => controller.abort("stop") });
-  await assert.rejects(() => provider.identify(file, controller.signal), { name: "AbortError" });
-}));
 
 test("cache round trip uses opaque content addressing and contains no source path", async () => withTemp(async (root) => {
   const cache = new FileTranscriptCache(root);
@@ -151,6 +97,25 @@ test("corrupt, bad-integrity and wrong-key entries degrade to MISS", async () =>
   wrong.key.requestedLanguage = "en";
   wrong.payloadDigest = sha256Digest(canonicalJson(wrong.payload));
   await writeFile(path, JSON.stringify(wrong));
+  assert.equal(await cache.read(key), undefined);
+}));
+
+test("unknown envelope fields, cancellation, and cache deletion remain disposable MISS boundaries", async () => withTemp(async (root) => {
+  const cache = new FileTranscriptCache(root);
+  await cache.write(key, producer);
+  const path = entryPath(root, key);
+  const envelope = JSON.parse(await readFile(path, "utf8"));
+  envelope.untrustedExtra = true;
+  await writeFile(path, JSON.stringify(envelope));
+  assert.equal(await cache.read(key), undefined);
+
+  const controller = new AbortController();
+  controller.abort("stop");
+  await assert.rejects(cache.read(key, controller.signal), { name: "AbortError" });
+  await assert.rejects(cache.write(key, producer, controller.signal), { name: "AbortError" });
+
+  assert.equal(await cache.write(key, producer), true);
+  await rm(root, { recursive: true, force: true });
   assert.equal(await cache.read(key), undefined);
 }));
 

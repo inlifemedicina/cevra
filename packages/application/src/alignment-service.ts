@@ -20,6 +20,7 @@ import {
   type JournalActor,
   type ProjectHistory,
   type ProjectIR,
+  type SourceAsset,
   type SourceTranscript,
   type TranscriptProvenanceStage,
   type TranscriptState
@@ -27,14 +28,15 @@ import {
 import {
   isAlignmentIdentityProvider,
   mediaPreparationIdentity,
+  verifyTranscriptSource,
   type AlignmentCacheKey,
   type AlignmentMediaPreparationIdentity,
-  type SourceContentIdentity,
-  type SourceContentIdentityProvider,
   type TranscriptCachePolicy,
   type TranscriptCacheStatus,
-  type TranscriptResultCache
+  type TranscriptResultCache,
+  type TranscriptSourceVerificationV1
 } from "./transcript-cache.js";
+import type { SourceContentIdentityPort } from "./source-technical-descriptor.js";
 
 export type AlignmentApplicationErrorCode =
   | "ALIGNMENT_APP_INVALID_REQUEST"
@@ -106,7 +108,7 @@ export interface AlignmentApplicationServiceOptions {
   audioWorkspace: AlignmentAudioWorkspace;
   history: ProjectHistory;
   cache?: TranscriptResultCache;
-  sourceIdentity?: SourceContentIdentityProvider;
+  sourceIdentity?: SourceContentIdentityPort;
   clock?: () => string;
   idGenerator?: () => string;
 }
@@ -117,7 +119,7 @@ export class AlignmentApplicationService {
   private readonly audioWorkspace: AlignmentAudioWorkspace;
   private readonly history: ProjectHistory;
   private readonly cache: TranscriptResultCache | undefined;
-  private readonly sourceIdentity: SourceContentIdentityProvider | undefined;
+  private readonly sourceIdentity: SourceContentIdentityPort | undefined;
   private readonly clock: () => string;
   private readonly idGenerator: () => string;
 
@@ -134,7 +136,7 @@ export class AlignmentApplicationService {
 
   async alignSource(request: AlignSourceRequest, signal?: AbortSignal): Promise<AlignSourceOutcome> {
     const before = this.history.current;
-    const requestRecord = isRecord(request) ? request : undefined;
+    const requestRecord = snapshotRequest(request);
     const locale = isLocale(requestRecord?.locale) ? requestRecord.locale : before.project.defaultLocale;
     const executionId = this.executionId(requestRecord, locale);
     const normalized = validateRequest(requestRecord, locale, executionId);
@@ -153,6 +155,9 @@ export class AlignmentApplicationService {
     const projectIdBefore = before.project.id;
     const revisionBefore = before.history.revision;
     const snapshotBefore = before.history.headSnapshotId;
+    const journalEntryCountBefore = this.history.entries.length;
+    const sourceUriBefore = source.uri;
+    const descriptorBefore = source.technicalDescriptor ? clone(source.technicalDescriptor) : undefined;
     assertNotCancelled(signal, locale, executionId);
 
     let identity: EngineIdentity;
@@ -171,12 +176,12 @@ export class AlignmentApplicationService {
     let mediaPreparation: AlignmentMediaPreparationIdentity | undefined;
     let cacheStatus: TranscriptCacheStatus = "bypass";
     let cacheKey: AlignmentCacheKey | undefined;
-    let sourceBefore: SourceContentIdentity | undefined;
+    let sourceBefore: TranscriptSourceVerificationV1 | undefined;
     let executionBefore: AlignmentExecutionIdentity | undefined;
     if (normalized.cachePolicy !== "bypass" && this.cache && this.sourceIdentity && identityProvider && typeof this.media.identity === "function") {
       try {
         const [sourceIdentity, executionIdentity, mediaIdentity] = await Promise.all([
-          this.sourceIdentity.identify(source.uri, signal),
+          verifyTranscriptSource(this.sourceIdentity, source.uri, signal),
           identityProvider.describeAlignmentExecution(identityRequest, signal),
           this.media.identity()
         ]);
@@ -186,8 +191,9 @@ export class AlignmentApplicationService {
       } catch (cause) {
         if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
       }
+      if (sourceBefore) assertDescriptorMatches(source, sourceBefore, locale, executionId);
       if (sourceBefore && executionBefore && mediaPreparation && alignmentExecutionMatches(executionBefore, identity)) {
-        cacheKey = { schemaVersion: 1, kind: "alignment", source: sourceBefore, inputTranscriptDigest, language, execution: executionBefore, mediaPreparation };
+        cacheKey = { schemaVersion: 1, kind: "alignment", source: sourceBefore.cacheIdentity, inputTranscriptDigest, language, execution: executionBefore, mediaPreparation };
         cacheStatus = normalized.cachePolicy === "refresh" ? "refresh" : "miss";
       }
     }
@@ -235,42 +241,51 @@ export class AlignmentApplicationService {
       assertNotCancelled(signal, locale, executionId);
 
       if (!result) {
-      let rawResult: AlignmentResult;
-      try {
-        rawResult = await this.engine.align({
-          inputUri: lease!.outputUri,
-          language,
-          transcript: clone(current.transcript)
-        }, { jobId: executionId, locale, ...(signal ? { signal } : {}) });
-      } catch (cause) {
-        if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
-        throw appError("ALIGNMENT_APP_ENGINE_FAILED", locale, executionId, cause);
-      }
-      assertNotCancelled(signal, locale, executionId);
-
-      const completedLease = lease!;
-      lease = undefined;
-      try {
-        await releaseAudioLease(completedLease);
-      } catch (cause) {
-        throw appError("ALIGNMENT_APP_AUDIO_CLEANUP_FAILED", locale, executionId, cause);
-      }
-
-      try {
-        result = validateAlignmentResult(rawResult, current.transcript, language, source.durationMs);
-        assertAlignmentResultIdentity(result, executionBefore);
-        producedAt = this.clock();
-        candidate = buildAlignedCandidate(source.id, current, result, identity, inputTranscriptDigest, executionId, producedAt);
-      } catch (cause) {
-        throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId, cause);
-      }
-      if (cacheKey && sourceBefore && executionBefore && this.cache && identityProvider) {
-        if (!await alignmentIdentityStable(this.sourceIdentity!, source.uri, identityProvider, identityRequest, sourceBefore, executionBefore, identity, this.media, mediaPreparation!, signal)) {
-          throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+        let rawResult: AlignmentResult;
+        try {
+          rawResult = await this.engine.align({
+            inputUri: lease!.outputUri,
+            language,
+            transcript: clone(current.transcript)
+          }, { jobId: executionId, locale, ...(signal ? { signal } : {}) });
+        } catch (cause) {
+          if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
+          throw appError("ALIGNMENT_APP_ENGINE_FAILED", locale, executionId, cause);
         }
-        try { await this.cache.write(cacheKey, { producerExecutionId: executionId, producedAt, payload: result }, signal); }
-        catch (cause) { if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause); }
-      }
+        assertNotCancelled(signal, locale, executionId);
+
+        const completedLease = lease!;
+        lease = undefined;
+        try {
+          await releaseAudioLease(completedLease);
+        } catch (cause) {
+          throw appError("ALIGNMENT_APP_AUDIO_CLEANUP_FAILED", locale, executionId, cause);
+        }
+
+        try {
+          result = validateAlignmentResult(rawResult, current.transcript, language, source.durationMs);
+          assertAlignmentResultIdentity(result, executionBefore);
+          producedAt = this.clock();
+          candidate = buildAlignedCandidate(source.id, current, result, identity, inputTranscriptDigest, executionId, producedAt);
+        } catch (cause) {
+          throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId, cause);
+        }
+        if (cacheKey && sourceBefore && executionBefore && this.cache && identityProvider) {
+          if (!await alignmentIdentityStable(this.sourceIdentity!, source, identityProvider, identityRequest, sourceBefore, executionBefore, identity, this.media, mediaPreparation!, locale, executionId, signal)) {
+            throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+          }
+          try { await this.cache.write(cacheKey, { producerExecutionId: executionId, producedAt, payload: result }, signal); }
+          catch (cause) { if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause); }
+        }
+      } else if (cacheStatus === "hit" && sourceBefore && this.sourceIdentity) {
+        let sourceState: Awaited<ReturnType<SourceContentIdentityPort["checkSource"]>>;
+        try {
+          sourceState = await this.sourceIdentity.checkSource(source.uri, sourceBefore.verified.stamp, signal);
+        } catch (cause) {
+          if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
+          sourceState = "changed";
+        }
+        if (sourceState !== "match") throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
       }
 
       if (!result) throw appError("ALIGNMENT_APP_ENGINE_FAILED", locale, executionId);
@@ -282,7 +297,10 @@ export class AlignmentApplicationService {
       if (latest.project.id !== projectIdBefore
         || latest.history.revision !== revisionBefore
         || latest.history.headSnapshotId !== snapshotBefore
+        || this.history.entries.length !== journalEntryCountBefore
         || latestSource?.kind !== source.kind
+        || latestSource.uri !== sourceUriBefore
+        || JSON.stringify(latestSource.technicalDescriptor) !== JSON.stringify(descriptorBefore)
         || latestTranscript?.transcriptDigest !== inputTranscriptDigest) {
         throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
       }
@@ -340,28 +358,58 @@ function validateRequest(request: Record<string, unknown> | undefined, locale: C
 }
 
 async function alignmentIdentityStable(
-  sourceIdentity: SourceContentIdentityProvider,
-  uri: string,
+  sourceIdentity: SourceContentIdentityPort,
+  source: SourceAsset,
   provider: AlignmentExecutionIdentityProvider,
   request: AlignmentRequest,
-  sourceBefore: SourceContentIdentity,
+  sourceBefore: TranscriptSourceVerificationV1,
   executionBefore: AlignmentExecutionIdentity,
   engine: EngineIdentity,
   media: MediaEngineAdapter,
   mediaBefore: AlignmentMediaPreparationIdentity,
+  locale: CevraLocale,
+  executionId: string,
   signal?: AbortSignal
 ): Promise<boolean> {
   try {
     const [sourceAfter, executionAfter, mediaAfter] = await Promise.all([
-      sourceIdentity.identify(uri, signal), provider.describeAlignmentExecution(request, signal), media.identity()
+      verifyTranscriptSource(sourceIdentity, source.uri, signal),
+      provider.describeAlignmentExecution(request, signal),
+      media.identity()
     ]);
-    return !!sourceAfter && !!executionAfter && alignmentExecutionMatches(executionAfter, engine)
-      && JSON.stringify(sourceBefore) === JSON.stringify(sourceAfter)
+    assertDescriptorMatches(source, sourceAfter, locale, executionId);
+    return !!executionAfter && alignmentExecutionMatches(executionAfter, engine)
+      && sourceBefore.cacheIdentity.sha256 === sourceAfter.cacheIdentity.sha256
+      && sourceBefore.cacheIdentity.sizeBytes === sourceAfter.cacheIdentity.sizeBytes
       && JSON.stringify(executionBefore) === JSON.stringify(executionAfter)
       && JSON.stringify(mediaBefore) === JSON.stringify(mediaPreparationIdentity(mediaAfter));
   } catch (cause) {
     if (isAbort(cause, signal)) throw cause;
     return false;
+  }
+}
+
+function assertDescriptorMatches(
+  source: SourceAsset,
+  verification: TranscriptSourceVerificationV1,
+  locale: CevraLocale,
+  executionId: string
+): void {
+  const expected = source.technicalDescriptor?.content;
+  if (expected && (expected.sha256 !== verification.cacheIdentity.sha256
+    || expected.sizeBytes !== verification.cacheIdentity.sizeBytes)) {
+    throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+  }
+}
+
+function snapshotRequest(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  try {
+    const snapshot: Record<string, unknown> = {};
+    for (const key of Object.keys(value)) snapshot[key] = clone(value[key]);
+    return snapshot;
+  } catch {
+    return undefined;
   }
 }
 
