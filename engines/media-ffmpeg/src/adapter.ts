@@ -1,5 +1,12 @@
 import {
   CEVRA_ENGINE_API_VERSION,
+  AUDIO_SEQUENCE_SAMPLE_FORMAT,
+  AUDIO_SEQUENCE_SAMPLE_RATE,
+  AUDIO_SEQUENCE_VERSION,
+  MAX_AUDIO_SEQUENCE_GRAPH_BYTES,
+  MAX_AUDIO_SEQUENCE_ITEMS,
+  MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES,
+  MAX_MEDIA_INPUTS,
   MEDIA_DELIVERY_MATRIX,
   resolveAudioDelivery,
   resolveAudioMutationDelivery,
@@ -8,6 +15,9 @@ import {
   resolveTranscodeDelivery,
   validateCopyCompatibility,
   validateMediaOperation,
+  validateAudioMeasurementReport,
+  AUDIO_MEASUREMENT_ERROR_CODES,
+  AudioMeasurementError,
   type CapabilityDescriptor,
   type EngineHealth,
   type EngineIdentity,
@@ -69,6 +79,10 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     if (plannedDelivery) await this.assertDeliveryAvailable(plannedDelivery);
     const call = (name: string, args: Record<string, unknown>) => this.call(name, args, context.jobId, signal);
     switch (operation.type) {
+      case "measure-audio": {
+        const report = await call("cevra-measure-audio", { version: operation.version, input: operation.inputUri, stream_index: operation.streamIndex, start_ms: operation.startMs, end_ms: operation.endMs });
+        return { type: "measure-audio", report: validateAudioMeasurementReport(report, operation, context.jobId) };
+      }
       case "probe":
         return { type: "probe", probe: parseProbe(await call("probe", { inputs: [operation.inputUri] }), operation.inputUri) };
       case "trim":
@@ -124,9 +138,33 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
           output: operation.outputUri,
           container,
           audio_codec: rule.defaultAudioCodec,
-          replace_existing: operation.replaceExisting ?? true
+          replace_existing: operation.replaceExisting ?? true,
+          ...(operation.durationValidation ? { duration_validation: {
+            version: operation.durationValidation.version,
+            video_duration_ms: operation.durationValidation.videoDurationMs,
+            audio_duration_ms: operation.durationValidation.audioDurationMs,
+            input_tolerance_ms: operation.durationValidation.inputToleranceMs,
+            output_audio_tolerance_ms: operation.durationValidation.outputAudioToleranceMs
+          } } : {})
         }), operation.outputUri);
       }
+      case "render-audio-sequence":
+        return fileResult(await call("cevra-render-audio-sequence", {
+          version: operation.version,
+          sources: operation.sources.map((source) => ({ id: source.id, uri: source.uri })),
+          items: operation.items.map((item) => ({
+            source_id: item.sourceId,
+            source_start_ms: item.sourceStartMs,
+            source_end_ms: item.sourceEndMs,
+            timeline_start_ms: item.timelineStartMs,
+            ...(item.gainDb !== undefined ? { gain_db: item.gainDb } : {}),
+            ...(item.fadeInMs !== undefined ? { fade_in_ms: item.fadeInMs } : {}),
+            ...(item.fadeOutMs !== undefined ? { fade_out_ms: item.fadeOutMs } : {})
+          })),
+          output: operation.outputUri,
+          output_duration_ms: operation.outputDurationMs,
+          output_channel_layout: operation.outputChannelLayout
+        }), operation.outputUri);
       case "speed":
         return fileResult(await call("cevra-speed", { input: operation.inputUri, output: operation.outputUri, factor: operation.factor }), operation.outputUri);
       case "transcode": {
@@ -185,7 +223,14 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
   private async call(name: string, args: Record<string, unknown>, jobId: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (signal?.aborted) throw abortError();
     const result = await this.worker.callTool(name, args, jobId, signal);
-    if (result.isError) throw new Error(readText(result) || `Media worker tool ${name} failed.`);
+    if (result.isError) {
+      if (name === "cevra-measure-audio") {
+        const error = result.structuredContent?.measurementError;
+        const code = AUDIO_MEASUREMENT_ERROR_CODES.find(code => error === `AUDIO_MEASUREMENT_${code}`);
+        if (code) throw new AudioMeasurementError(code);
+      }
+      throw new Error(readText(result) || `Media worker tool ${name} failed.`);
+    }
     const payload = result.structuredContent ?? parseTextJson(result);
     if (!isRecord(payload) || Object.keys(payload).length === 0) {
       throw new Error(`Media worker tool ${name} returned an invalid result.`);
@@ -202,10 +247,23 @@ function parseProbe(payload: Record<string, unknown>, fallbackUri: string): Medi
   }
   return {
     uri: typeof payload.file === "string" ? payload.file : fallbackUri,
+    ...(finite(payload.size_bytes) ? { sizeBytes: payload.size_bytes } : {}),
     ...(finite(payload.duration) ? { durationMs: Math.round(payload.duration * 1000) } : {}),
     ...(video && finite(video.width) ? { width: video.width } : {}),
     ...(video && finite(video.height) ? { height: video.height } : {}),
     ...(video && finite(video.fps) ? { frameRate: video.fps } : {}),
+    ...(video ? optionalRational(video, "avg_frame_rate", "avgFrameRate") : {}),
+    ...(video ? optionalRational(video, "r_frame_rate", "rFrameRate") : {}),
+    ...(video ? optionalBoolean(video, "variable_frame_rate_suspected", "variableFrameRateSuspected") : {}),
+    ...(video ? optionalInteger(video, "rotation", "rotationDegrees", -360, 360) : {}),
+    ...(video ? optionalString(video, "pix_fmt", "pixelFormat", 64) : {}),
+    ...(video ? optionalInteger(video, "bit_depth", "bitDepth", 1, 64) : {}),
+    ...(video ? optionalString(video, "color_space", "colorSpace", 64) : {}),
+    ...(video ? optionalString(video, "color_primaries", "colorPrimaries", 64) : {}),
+    ...(video ? optionalString(video, "color_transfer", "colorTransfer", 64) : {}),
+    ...(video ? optionalString(video, "color_range", "colorRange", 64) : {}),
+    ...(video ? optionalBoolean(video, "hdr", "hdr") : {}),
+    ...(video ? optionalString(video, "hdr_format", "hdrFormat", 128) : {}),
     hasVideo: Boolean(video),
     hasAudio: Boolean(audio),
     ...(video && typeof video.codec === "string" ? { videoCodec: video.codec } : {}),
@@ -213,6 +271,59 @@ function parseProbe(payload: Record<string, unknown>, fallbackUri: string): Medi
     ...(audio && finite(audio.sample_rate) ? { sampleRate: audio.sample_rate } : {}),
     ...(audio && finite(audio.channels) ? { channels: audio.channels } : {})
   };
+}
+
+function optionalString(
+  source: Record<string, unknown>,
+  sourceKey: string,
+  outputKey: string,
+  maximumLength: number
+): Record<string, string> {
+  const value = source[sourceKey];
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "string" || value.length === 0 || value.length > maximumLength || value !== value.trim() || /[\0\r\n]/u.test(value)) {
+    throw new Error(`Media worker probe ${sourceKey} is invalid.`);
+  }
+  return { [outputKey]: value };
+}
+
+function optionalRational(
+  source: Record<string, unknown>,
+  sourceKey: string,
+  outputKey: string
+): Record<string, string> {
+  const result = optionalString(source, sourceKey, outputKey, 64);
+  const value = result[outputKey];
+  if (value === undefined) return result;
+  const match = /^(\d+)\/(\d+)$/u.exec(value);
+  if (!match || (match[2] === "0" && match[1] !== "0")) throw new Error(`Media worker probe ${sourceKey} is invalid.`);
+  return result;
+}
+
+function optionalBoolean(
+  source: Record<string, unknown>,
+  sourceKey: string,
+  outputKey: string
+): Record<string, boolean> {
+  const value = source[sourceKey];
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "boolean") throw new Error(`Media worker probe ${sourceKey} is invalid.`);
+  return { [outputKey]: value };
+}
+
+function optionalInteger(
+  source: Record<string, unknown>,
+  sourceKey: string,
+  outputKey: string,
+  minimum: number,
+  maximum: number
+): Record<string, number> {
+  const value = source[sourceKey];
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "number" || !Number.isInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`Media worker probe ${sourceKey} is invalid.`);
+  }
+  return { [outputKey]: value };
 }
 
 function fileResult(payload: Record<string, unknown>, fallbackUri: string): MediaOperationResult {
@@ -226,13 +337,72 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
   const parsedProbe = parseProbe(probe, fallbackUri);
   if (!parsedProbe.hasVideo && !parsedProbe.hasAudio) throw new Error("Media worker output probe contains no audio or video stream.");
   const effectiveProfile = parseEffectiveProfile(payload.effectiveProfile);
+  const audioSequence = parseAudioSequenceEvidence(payload.audioSequence);
+  const publication = parsePublicationEvidence(payload.publication);
+  const muxDuration = parseMuxDurationEvidence(payload.muxDuration);
   return {
     type: "file",
     outputUri: typeof payload.output === "string" ? payload.output : fallbackUri,
     ...(probe && finite(probe.duration) ? { durationMs: Math.round(probe.duration * 1000) } : {}),
     probe: parsedProbe,
-    effectiveProfile
+    effectiveProfile,
+    ...(audioSequence ? { audioSequence } : {}),
+    ...(publication ? { publication } : {}),
+    ...(muxDuration ? { muxDuration } : {})
   };
+}
+
+function parsePublicationEvidence(value: unknown) {
+  if (value === undefined) return undefined;
+  const allowed = new Set(["version", "scheme", "device", "inode"]);
+  if (!isRecord(value) || Object.keys(value).some((key) => !allowed.has(key))
+    || value.version !== 1 || value.scheme !== "posix-dev-inode"
+    || typeof value.device !== "string" || !/^\d+$/.test(value.device)
+    || typeof value.inode !== "string" || !/^[1-9]\d*$/.test(value.inode)) {
+    throw new Error("Media worker publication evidence is invalid.");
+  }
+  return value as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["publication"]>;
+}
+
+function parseMuxDurationEvidence(value: unknown) {
+  if (value === undefined) return undefined;
+  const allowed = new Set(["version", "inputVideoDurationMs", "inputAudioDurationMs", "outputVideoDurationMs", "outputAudioDurationMs"]);
+  if (!isRecord(value) || Object.keys(value).some((key) => !allowed.has(key)) || value.version !== 1) {
+    throw new Error("Media worker mux duration evidence is invalid.");
+  }
+  for (const field of ["inputVideoDurationMs", "inputAudioDurationMs", "outputVideoDurationMs", "outputAudioDurationMs"] as const) {
+    if (!Number.isSafeInteger(value[field]) || (value[field] as number) < 1) {
+      throw new Error("Media worker mux duration evidence is invalid.");
+    }
+  }
+  return value as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["muxDuration"]>;
+}
+
+function parseAudioSequenceEvidence(value: unknown) {
+  if (value === undefined) return undefined;
+  const allowedFields = new Set(["version", "sampleRate", "sampleFormat", "channelLayout", "distinctSourceCount", "itemCount", "maximumSimultaneousItemCount", "outputSampleCount", "estimatedDataBytes", "measuredDataBytes", "graphBytes"]);
+  if (!isRecord(value)
+    || Object.keys(value).some((key) => !allowedFields.has(key))
+    || value.version !== AUDIO_SEQUENCE_VERSION
+    || value.sampleRate !== AUDIO_SEQUENCE_SAMPLE_RATE
+    || value.sampleFormat !== AUDIO_SEQUENCE_SAMPLE_FORMAT
+    || !["mono", "stereo"].includes(String(value.channelLayout))) {
+    throw new Error("Media worker audio sequence evidence is invalid.");
+  }
+  const integerFields = ["distinctSourceCount", "itemCount", "maximumSimultaneousItemCount", "outputSampleCount", "estimatedDataBytes", "measuredDataBytes", "graphBytes"] as const;
+  if (integerFields.some((field) => !Number.isSafeInteger(value[field]) || (value[field] as number) < 0)) {
+    throw new Error("Media worker audio sequence evidence is invalid.");
+  }
+  if ((value.distinctSourceCount as number) < 1 || (value.distinctSourceCount as number) > MAX_MEDIA_INPUTS
+    || (value.itemCount as number) < 1 || (value.itemCount as number) > MAX_AUDIO_SEQUENCE_ITEMS
+    || (value.maximumSimultaneousItemCount as number) < 1 || (value.maximumSimultaneousItemCount as number) > (value.itemCount as number)
+    || (value.outputSampleCount as number) < 1
+    || (value.estimatedDataBytes as number) < 1 || (value.estimatedDataBytes as number) > MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES
+    || (value.measuredDataBytes as number) < 1 || (value.measuredDataBytes as number) > MAX_AUDIO_SEQUENCE_WAV_DATA_BYTES
+    || (value.graphBytes as number) < 1 || (value.graphBytes as number) > MAX_AUDIO_SEQUENCE_GRAPH_BYTES) {
+    throw new Error("Media worker audio sequence evidence is outside its bounded contract.");
+  }
+  return value as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["audioSequence"]>;
 }
 
 function parseEffectiveProfile(value: unknown): EffectiveMediaProfile {
@@ -246,7 +416,7 @@ function parseEffectiveProfile(value: unknown): EffectiveMediaProfile {
 
 function operationDelivery(operation: MediaOperation): ResolvedMediaDelivery | undefined {
   switch (operation.type) {
-    case "probe": case "detect-silence": case "extract-frame": return undefined;
+    case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
     case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
     case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
     case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);

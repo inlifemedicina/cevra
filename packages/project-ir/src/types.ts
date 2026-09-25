@@ -24,6 +24,39 @@ export interface ProjectMetadata {
 
 export type SourceKind = "video" | "audio" | "image";
 
+export const SOURCE_TECHNICAL_DESCRIPTOR_VERSION = 1 as const;
+export const SOURCE_TECHNICAL_DESCRIPTOR_PROFILE = "cevra.source-technical.v1" as const;
+export const MAX_SOURCE_TECHNICAL_DESCRIPTOR_BYTES = 2048 as const;
+
+export interface SourceTechnicalDescriptorV1 {
+  version: typeof SOURCE_TECHNICAL_DESCRIPTOR_VERSION;
+  basis: "ingest" | "post-ingest";
+  content: {
+    sha256: string;
+    sizeBytes: number;
+  };
+  method: {
+    profile: typeof SOURCE_TECHNICAL_DESCRIPTOR_PROFILE;
+    engineId: string;
+    engineVersion: string;
+    engineApiVersion: number;
+  };
+  video?: {
+    codec?: string;
+    pixelFormat?: string;
+    avgFrameRate?: string;
+    rFrameRate?: string;
+    rotationDegrees?: number;
+    colorPrimaries?: string;
+    colorTransfer?: string;
+    colorSpace?: string;
+    colorRange?: string;
+  };
+  audio?: {
+    codec?: string;
+  };
+}
+
 export interface SourceAsset {
   id: Id;
   kind: SourceKind;
@@ -36,6 +69,7 @@ export interface SourceAsset {
   sampleRate?: number;
   channels?: number;
   checksum?: string;
+  technicalDescriptor?: SourceTechnicalDescriptorV1;
   extensions?: ExtensionMap;
 }
 
@@ -300,6 +334,15 @@ export type EditCommand =
   | { type: "project.rename"; name: string }
   | { type: "source.add"; source: SourceAsset }
   | { type: "source.remove"; sourceId: Id }
+  | {
+      type: "source.technicalDescriptor.set";
+      sourceId: Id;
+      expectedSourceUri: string;
+      expectedTechnicalDescriptor:
+        | { state: "absent" }
+        | { state: "value"; value: SourceTechnicalDescriptorV1 };
+      technicalDescriptor: SourceTechnicalDescriptorV1;
+    }
   | { type: "transcript.set"; transcript: SourceTranscript; expectedCurrentTranscriptDigest?: TranscriptDigest }
   | { type: "transcript.remove"; sourceId: Id; expectedTranscriptDigest: TranscriptDigest }
   | { type: "track.add"; track: TimelineTrack }

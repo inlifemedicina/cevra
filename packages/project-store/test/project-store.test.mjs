@@ -1,12 +1,43 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ProjectHistory, createEmptyProject } from "@cevra/project-ir";
+import {
+  ProjectHistory,
+  computeHistoryTranscriptBlobDigest,
+  createEmptyProject,
+  createSourceTranscript
+} from "@cevra/project-ir";
 import { deserializeProjectPackage, serializeProjectPackage } from "../dist/index.js";
 
 const fixedTime = "2026-09-11T18:00:00.000Z";
 
 function legacySource(id) {
   return { id, kind: "video", uri: `file:///${id}.mp4`, displayName: id, durationMs: 1_000 };
+}
+
+function technicalDescriptor(basis = "post-ingest") {
+  return {
+    version: 1,
+    basis,
+    content: { sha256: "a".repeat(64), sizeBytes: 1234 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra-media-ffmpeg",
+      engineVersion: "0.2.1",
+      engineApiVersion: 1
+    },
+    video: {
+      codec: "h264",
+      pixelFormat: "yuv420p",
+      avgFrameRate: "30000/1001",
+      rFrameRate: "30000/1001",
+      rotationDegrees: 0,
+      colorPrimaries: "bt709",
+      colorTransfer: "bt709",
+      colorSpace: "bt709",
+      colorRange: "tv"
+    },
+    audio: { codec: "aac" }
+  };
 }
 
 function legacyProject({ name, revision, sources, transcript, headEntryId, headSnapshotId }) {
@@ -20,6 +51,38 @@ function legacyProject({ name, revision, sources, transcript, headEntryId, headS
     history: { revision, ...(headEntryId ? { headEntryId } : {}), ...(headSnapshotId ? { headSnapshotId } : {}) },
     qa: [], exports: [], extensions: {}
   };
+}
+
+function transcriptFor(sourceId = "source-1", overrides = {}) {
+  return createSourceTranscript({
+    sourceId,
+    wordTiming: "model",
+    speakerState: "none",
+    transcript: {
+      language: "pt-BR",
+      words: [{ id: "w1", text: "olá", startMs: 0, endMs: 500, confidence: 0.91 }],
+      segments: [{ id: "s1", text: "olá", startMs: 0, endMs: 500, wordIds: ["w1"] }]
+    },
+    provenance: {
+      stages: [{ kind: "transcription", executionId: "exec-1", engineId: "engine", engineVersion: "1", engineApiVersion: "1", modelId: "model", createdAt: fixedTime }]
+    },
+    extensions: { review: "exact" },
+    ...overrides
+  });
+}
+
+function historyWithTranscript() {
+  let sequence = 0;
+  const project = createEmptyProject({ id: "p-transcript", name: "Transcript", now: fixedTime });
+  project.sources.push({ id: "source-1", kind: "video", uri: "file:///source-1.mp4", displayName: "source-1", durationMs: 1_000 });
+  project.sourceTranscripts.push(transcriptFor());
+  const history = new ProjectHistory(project, { idGenerator: () => `package-${++sequence}`, clock: () => fixedTime });
+  history.commit({ type: "project.rename", name: "After" });
+  return history;
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 test("project package round-trips history and redo state", () => {
@@ -44,6 +107,41 @@ test("project package round-trips history and redo state", () => {
   assert.ok(serialized.files["history/journal.jsonl"] !== undefined);
 });
 
+test("V2 package and history preserve the optional source technical descriptor through undo and redo", () => {
+  let seq = 0;
+  const project = createEmptyProject({ id: "p-descriptor", name: "Descriptor", now: fixedTime });
+  project.sources.push({
+    id: "source-descriptor",
+    kind: "video",
+    uri: "/media/source.mov",
+    displayName: "source.mov",
+    durationMs: 1000,
+    checksum: "legacy:unchanged",
+    technicalDescriptor: technicalDescriptor("ingest")
+  });
+  const history = new ProjectHistory(project, {
+    idGenerator: () => `descriptor-${++seq}`,
+    clock: () => fixedTime
+  });
+  history.commit({ type: "project.rename", name: "After descriptor" });
+  history.undo();
+
+  const serialized = serializeProjectPackage(history, fixedTime);
+  const manifest = JSON.parse(serialized.files["manifest.json"]);
+  const restored = deserializeProjectPackage(serialized, {
+    idGenerator: () => `restored-descriptor-${++seq}`,
+    clock: () => fixedTime
+  });
+
+  assert.equal(manifest.projectSchemaVersion, 2);
+  assert.equal(manifest.formatVersion, 2);
+  assert.deepEqual(restored.current.sources[0].technicalDescriptor, technicalDescriptor("ingest"));
+  assert.equal(restored.current.sources[0].checksum, "legacy:unchanged");
+  assert.equal(restored.canRedo, true);
+  assert.deepEqual(restored.redo().sources[0].technicalDescriptor, technicalDescriptor("ingest"));
+  assert.deepEqual(restored.undo().sources[0].technicalDescriptor, technicalDescriptor("ingest"));
+});
+
 test("tampered current project is rejected", () => {
   let seq = 0;
   const history = new ProjectHistory(createEmptyProject({ id: "p1", name: "A", now: fixedTime }), {
@@ -57,7 +155,130 @@ test("tampered current project is rejected", () => {
   assert.throws(() => deserializeProjectPackage(serialized), /does not match/);
 });
 
-test("v1 package migrates active project and every snapshot independently without changing package format", () => {
+test("V2 package stores compact snapshots and exact per-source transcript blobs", () => {
+  const history = historyWithTranscript();
+  history.undo();
+  const serialized = serializeProjectPackage(history, fixedTime);
+  const manifest = JSON.parse(serialized.files["manifest.json"]);
+  const snapshotFiles = Object.keys(serialized.files).filter((path) => path.startsWith("history/snapshots/"));
+  const blobFiles = Object.keys(serialized.files).filter((path) => path.startsWith("history/transcript-blobs/"));
+
+  assert.equal(manifest.formatVersion, 2);
+  assert.equal(snapshotFiles.length, 2);
+  assert.equal(blobFiles.length, 1);
+  for (const path of snapshotFiles) {
+    const snapshot = JSON.parse(serialized.files[path]);
+    assert.equal(Object.hasOwn(snapshot.project, "sourceTranscripts"), false);
+    assert.equal(snapshot.sourceTranscriptRefs.length, 1);
+  }
+
+  const restored = deserializeProjectPackage(serialized);
+  assert.deepEqual(restored.current, history.current);
+  assert.equal(restored.canRedo, true);
+  assert.equal(restored.redo().project.name, "After");
+  assert.deepEqual(restored.current.sourceTranscripts[0], transcriptFor());
+});
+
+test("same editorial digest but different exact transcript state survives V2 save, undo, and redo", () => {
+  const history = historyWithTranscript();
+  const initial = history.current.sourceTranscripts[0];
+  const changed = clone(initial);
+  changed.transcript.words[0].confidence = 0.33;
+  changed.provenance.stages[0].executionId = "exec-2";
+  changed.extensions = { review: "different exact state" };
+  assert.equal(initial.transcriptDigest, changed.transcriptDigest);
+  assert.notEqual(computeHistoryTranscriptBlobDigest(initial), computeHistoryTranscriptBlobDigest(changed));
+
+  history.commit({ type: "transcript.set", transcript: changed, expectedCurrentTranscriptDigest: initial.transcriptDigest });
+  const serialized = serializeProjectPackage(history, fixedTime);
+  assert.equal(Object.keys(serialized.files).filter((path) => path.startsWith("history/transcript-blobs/")).length, 2);
+  const restored = deserializeProjectPackage(serialized);
+  assert.deepEqual(restored.current.sourceTranscripts[0], changed);
+  assert.deepEqual(restored.undo().sourceTranscripts[0], initial);
+  assert.deepEqual(restored.redo().sourceTranscripts[0], changed);
+});
+
+test("V2 package corruption cases fail closed", () => {
+  const valid = serializeProjectPackage(historyWithTranscript(), fixedTime);
+  const blobPath = Object.keys(valid.files).find((path) => path.startsWith("history/transcript-blobs/"));
+  const snapshotPaths = Object.keys(valid.files).filter((path) => path.startsWith("history/snapshots/"));
+  const activeId = JSON.parse(valid.files["manifest.json"]).activeSnapshotId;
+  const activeSnapshotPath = snapshotPaths.find((path) => JSON.parse(valid.files[path]).id === activeId);
+  assert.ok(blobPath);
+  assert.ok(activeSnapshotPath);
+
+  const missingBlob = clone(valid);
+  delete missingBlob.files[blobPath];
+  assert.throws(() => deserializeProjectPackage(missingBlob), /missing transcript blob/);
+
+  const wrongDigest = clone(valid);
+  const wrongDigestBlob = JSON.parse(wrongDigest.files[blobPath]);
+  wrongDigestBlob.transcript.extensions.review = "tampered";
+  wrongDigest.files[blobPath] = JSON.stringify(wrongDigestBlob);
+  assert.throws(() => deserializeProjectPackage(wrongDigest), /digest mismatch/);
+
+  const filenameMismatch = clone(valid);
+  const filenameMismatchBlob = JSON.parse(filenameMismatch.files[blobPath]);
+  filenameMismatchBlob.digest = `sha256-history-transcript-v1-${"0".repeat(64)}`;
+  filenameMismatch.files[blobPath] = JSON.stringify(filenameMismatchBlob);
+  assert.throws(() => deserializeProjectPackage(filenameMismatch), /Invalid history transcript blob/);
+
+  const malformedBlob = clone(valid);
+  malformedBlob.files[blobPath] = "{";
+  assert.throws(() => deserializeProjectPackage(malformedBlob), /invalid JSON/);
+
+  const invalidTranscript = clone(valid);
+  const invalidBlob = JSON.parse(invalidTranscript.files[blobPath]);
+  invalidBlob.transcript.transcript.words[0].confidence = 2;
+  const invalidDigest = computeHistoryTranscriptBlobDigest(invalidBlob.transcript);
+  invalidBlob.digest = invalidDigest;
+  delete invalidTranscript.files[blobPath];
+  const invalidPath = `history/transcript-blobs/${invalidDigest}.json`;
+  invalidTranscript.files[invalidPath] = JSON.stringify(invalidBlob);
+  for (const path of snapshotPaths) {
+    const snapshot = JSON.parse(invalidTranscript.files[path]);
+    snapshot.sourceTranscriptRefs[0].digest = invalidDigest;
+    invalidTranscript.files[path] = JSON.stringify(snapshot);
+  }
+  assert.throws(() => deserializeProjectPackage(invalidTranscript), /confidence must be between/);
+
+  const unknownRef = clone(valid);
+  const unknownSnapshot = JSON.parse(unknownRef.files[activeSnapshotPath]);
+  unknownSnapshot.sourceTranscriptRefs[0].digest = `sha256-history-transcript-v1-${"1".repeat(64)}`;
+  unknownRef.files[activeSnapshotPath] = JSON.stringify(unknownSnapshot);
+  assert.throws(() => deserializeProjectPackage(unknownRef), /missing transcript blob/);
+
+  const sourceMismatch = clone(valid);
+  const mismatchSnapshot = JSON.parse(sourceMismatch.files[activeSnapshotPath]);
+  mismatchSnapshot.sourceTranscriptRefs[0].sourceId = "another-source";
+  sourceMismatch.files[activeSnapshotPath] = JSON.stringify(mismatchSnapshot);
+  assert.throws(() => deserializeProjectPackage(sourceMismatch), /ref\/source mismatch/);
+
+  const activeMismatch = clone(valid);
+  const project = JSON.parse(activeMismatch.files["project.json"]);
+  project.project.name = "tampered current";
+  activeMismatch.files["project.json"] = JSON.stringify(project);
+  assert.throws(() => deserializeProjectPackage(activeMismatch), /does not match/);
+
+  const partial = clone(valid);
+  delete partial.files[activeSnapshotPath];
+  assert.throws(() => deserializeProjectPackage(partial), /cursor references unknown snapshot/);
+
+  const unsafeBlobPath = clone(valid);
+  unsafeBlobPath.files["history/transcript-blobs/../outside.json"] = unsafeBlobPath.files[blobPath];
+  assert.throws(() => deserializeProjectPackage(unsafeBlobPath), /Invalid history transcript blob path/);
+});
+
+test("V2 package serializes 500 unrelated commits with one transcript blob", () => {
+  const history = historyWithTranscript();
+  for (let index = 0; index < 500; index += 1) history.commit({ type: "project.rename", name: `Scale ${index}` });
+  const serialized = serializeProjectPackage(history, fixedTime);
+  assert.equal(Object.keys(serialized.files).filter((path) => path.startsWith("history/transcript-blobs/")).length, 1);
+  assert.equal(Object.keys(serialized.files).filter((path) => path.startsWith("history/snapshots/")).length, 502);
+  assert.equal(deserializeProjectPackage(serialized).current.project.name, "Scale 499");
+});
+
+test("v1 package migrates every snapshot and writes V2 on the next save", () => {
   const rawLegacy = {
     language: "pt",
     words: [{ id: "w1", text: "olá", startMs: 0, endMs: 100, extraWord: { keep: true } }],
@@ -121,13 +342,57 @@ test("v1 package migrates active project and every snapshot independently withou
 
   const roundTrip = serializeProjectPackage(restored, fixedTime);
   const roundTripManifest = JSON.parse(roundTrip.files["manifest.json"]);
-  assert.equal(roundTripManifest.formatVersion, 1);
+  assert.equal(roundTripManifest.formatVersion, 2);
   assert.equal(roundTripManifest.projectSchemaVersion, 2);
   const reopened = deserializeProjectPackage(roundTrip);
   assert.equal(reopened.canRedo, true);
   assert.equal(reopened.entries[0].id, "entry-1");
   assert.deepEqual(reopened.redo().extensions["cevra.migration.v1UnassignedTranscript"].payload, rawLegacy);
   assert.equal(reopened.undo().sourceTranscripts.length, 1);
+});
+
+test("V1 package with Project IR V2 preserves exact transcript metadata, IDs, and redo cursor through V2 rewrite", () => {
+  const original = historyWithTranscript();
+  original.commit({ type: "project.rename", name: "Newest" });
+  original.undo();
+  const fullSnapshots = original.snapshots;
+  const active = original.current;
+  const activeSnapshotId = active.history.headSnapshotId;
+  const v1Package = { files: {
+    "manifest.json": JSON.stringify({
+      format: "cevra-project",
+      formatVersion: 1,
+      projectId: active.project.id,
+      projectSchemaVersion: active.schemaVersion,
+      activeSnapshotId,
+      createdAt: active.project.createdAt,
+      savedAt: fixedTime,
+      defaultLocale: active.project.defaultLocale
+    }),
+    "project.json": JSON.stringify(active),
+    "history/journal.jsonl": original.entries.map((entry) => JSON.stringify(entry)).join("\n"),
+    ...Object.fromEntries(fullSnapshots.map((snapshot) => [
+      `history/snapshots/${snapshot.id}.json`,
+      JSON.stringify(snapshot)
+    ]))
+  }};
+
+  const restoredV1 = deserializeProjectPackage(v1Package);
+  assert.deepEqual(restoredV1.current, active);
+  assert.deepEqual(restoredV1.current.sourceTranscripts[0].transcript.words[0].confidence, 0.91);
+  assert.deepEqual(restoredV1.current.sourceTranscripts[0].provenance, transcriptFor().provenance);
+  assert.deepEqual(restoredV1.current.sourceTranscripts[0].extensions, { review: "exact" });
+  assert.deepEqual(restoredV1.entries.map(({ id, revision }) => ({ id, revision })), original.entries.map(({ id, revision }) => ({ id, revision })));
+  assert.deepEqual(restoredV1.snapshots.map(({ id, revision }) => ({ id, revision })), fullSnapshots.map(({ id, revision }) => ({ id, revision })));
+  assert.equal(restoredV1.canRedo, true);
+
+  const v2Package = serializeProjectPackage(restoredV1, fixedTime);
+  assert.equal(JSON.parse(v2Package.files["manifest.json"]).formatVersion, 2);
+  const reopenedV2 = deserializeProjectPackage(v2Package);
+  assert.deepEqual(reopenedV2.current, active);
+  assert.equal(reopenedV2.canRedo, true);
+  assert.equal(reopenedV2.redo().project.name, "Newest");
+  assert.deepEqual(reopenedV2.undo().sourceTranscripts[0], transcriptFor());
 });
 
 test("v1 quarantine evidence survives a v2 source mutation and package round-trip", () => {

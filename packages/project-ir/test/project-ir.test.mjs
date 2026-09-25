@@ -8,6 +8,7 @@ import {
   ProjectCommandError,
   ProjectHistory,
   V1_UNASSIGNED_TRANSCRIPT_EXTENSION,
+  computeHistoryTranscriptBlobDigest,
   computeTranscriptDigest,
   createEmptyProject,
   createSourceTranscript,
@@ -35,6 +36,33 @@ function v1Project(overrides = {}) {
 
 function source(id = "source-1", kind = "video", overrides = {}) {
   return { id, kind, uri: `file:///${id}.mp4`, displayName: id, durationMs: 10_000, ...overrides };
+}
+
+function technicalDescriptor(overrides = {}) {
+  return {
+    version: 1,
+    basis: "post-ingest",
+    content: { sha256: "a".repeat(64), sizeBytes: 1234 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra.media.ffmpeg",
+      engineVersion: "0.3.0",
+      engineApiVersion: 1
+    },
+    video: {
+      codec: "h264",
+      pixelFormat: "yuv420p",
+      avgFrameRate: "30000/1001",
+      rFrameRate: "30/1",
+      rotationDegrees: 0,
+      colorPrimaries: "bt709",
+      colorTransfer: "bt709",
+      colorSpace: "bt709",
+      colorRange: "tv"
+    },
+    audio: { codec: "aac" },
+    ...overrides
+  };
 }
 
 function transcriptionStage(overrides = {}) {
@@ -169,6 +197,137 @@ test("factory creates schema v2 with source-scoped transcripts and no legacy tra
   assert.deepEqual(project.sourceTranscripts, []);
   assert.equal(Object.hasOwn(project, "transcript"), false);
   assert.equal(validateProjectIR(project).ok, true);
+});
+
+test("schema v2 validates the closed optional source technical descriptor without changing v1 acceptance", () => {
+  const valid = createEmptyProject({ id: "descriptor-project", now: fixedTime });
+  valid.sources.push(source("descriptor-source", "video", { technicalDescriptor: technicalDescriptor() }));
+  assert.equal(validateProjectIR(valid).ok, true);
+
+  const absent = createEmptyProject({ id: "descriptor-absent", now: fixedTime });
+  absent.sources.push(source());
+  assert.equal(validateProjectIR(absent).ok, true);
+
+  const legacyHomonym = v1Project({
+    sources: [source("legacy", "video", { technicalDescriptor: { historical: true } })]
+  });
+  assert.equal(validateProjectIRv1(legacyHomonym).ok, true);
+
+  const invalidCases = [
+    ["top-level extra", { ...technicalDescriptor(), extra: true }],
+    ["unknown version", { ...technicalDescriptor(), version: 2 }],
+    ["unknown profile", { ...technicalDescriptor(), method: { ...technicalDescriptor().method, profile: "other" } }],
+    ["uppercase digest", { ...technicalDescriptor(), content: { sha256: "A".repeat(64), sizeBytes: 1 } }],
+    ["unsafe size", { ...technicalDescriptor(), content: { sha256: "a".repeat(64), sizeBytes: Number.MAX_SAFE_INTEGER + 1 } }],
+    ["unreduced rational", { ...technicalDescriptor(), video: { codec: "h264", avgFrameRate: "60000/2002" } }],
+    ["zero sentinel", { ...technicalDescriptor(), video: { codec: "h264", avgFrameRate: "0/0" } }],
+    ["control string", { ...technicalDescriptor(), audio: { codec: "aac\n" } }],
+    ["nested extra", { ...technicalDescriptor(), video: { codec: "h264", hdr: true } }]
+  ];
+  for (const [label, descriptor] of invalidCases) {
+    const project = createEmptyProject({ id: `invalid-${label}`, now: fixedTime });
+    project.sources.push(source("source-1", "video", { technicalDescriptor: descriptor }));
+    assert.equal(validateProjectIR(project).ok, false, label);
+  }
+
+  const oversized = technicalDescriptor({
+    method: { ...technicalDescriptor().method, engineId: "🧪".repeat(64), engineVersion: "🧪".repeat(64) },
+    video: Object.fromEntries([
+      "codec", "pixelFormat", "colorPrimaries", "colorTransfer", "colorSpace", "colorRange"
+    ].map((key) => [key, "🧪".repeat(64)])),
+    audio: { codec: "🧪".repeat(64) }
+  });
+  const oversizedProject = createEmptyProject({ id: "oversized", now: fixedTime });
+  oversizedProject.sources.push(source("source-1", "video", { technicalDescriptor: oversized }));
+  const oversizedResult = validateProjectIR(oversizedProject);
+  assert.equal(oversizedResult.ok, false);
+  assert.equal(oversizedResult.issues.some((issue) => issue.code === "size"), true);
+
+  const audioWithVideo = createEmptyProject({ id: "kind", now: fixedTime });
+  audioWithVideo.sources.push(source("audio", "audio", { technicalDescriptor: technicalDescriptor() }));
+  assert.equal(validateProjectIR(audioWithVideo).ok, false);
+});
+
+test("source technical descriptor command adopts once, preserves guards, and treats equality as a no-op", () => {
+  let sequence = 0;
+  const project = createEmptyProject({ id: "descriptor-command", now: fixedTime });
+  project.sources.push(source());
+  project.sourceTranscripts.push(sourceTranscript());
+  const history = new ProjectHistory(project, {
+    idGenerator: () => `descriptor-${++sequence}`,
+    clock: () => fixedTime
+  });
+  const beforeTranscript = clone(history.current.sourceTranscripts[0]);
+  const beforeChecksum = history.current.sources[0].checksum;
+  const descriptor = technicalDescriptor();
+  const adopted = history.commit({
+    type: "source.technicalDescriptor.set",
+    sourceId: "source-1",
+    expectedSourceUri: "file:///source-1.mp4",
+    expectedTechnicalDescriptor: { state: "absent" },
+    technicalDescriptor: descriptor
+  });
+  assert.deepEqual(adopted.sources[0].technicalDescriptor, descriptor);
+  assert.deepEqual(adopted.sourceTranscripts[0], beforeTranscript);
+  assert.equal(adopted.sources[0].checksum, beforeChecksum);
+  assert.equal(history.entries.at(-1).command.type, "source.technicalDescriptor.set");
+
+  history.commit({ type: "project.rename", name: "redo target" });
+  history.undo();
+  const beforeNoOp = historyState(history);
+  assertProjectCommandError(() => history.commit({
+    type: "source.technicalDescriptor.set",
+    sourceId: "source-1",
+    expectedSourceUri: "file:///source-1.mp4",
+    expectedTechnicalDescriptor: { state: "value", value: clone(descriptor) },
+    technicalDescriptor: clone(descriptor)
+  }), "PROJECT_SOURCE_DESCRIPTOR_NO_OP");
+  assert.deepStrictEqual(historyState(history), beforeNoOp);
+  assert.equal(history.redo().project.name, "redo target");
+});
+
+test("source technical descriptor command rejects stale identity, replacement, and basis rewrite without history mutation", () => {
+  const current = technicalDescriptor();
+  const makeProject = () => {
+    const project = createEmptyProject({ id: "descriptor-guards", now: fixedTime });
+    project.sources.push(source("source-1", "video", { checksum: "legacy", technicalDescriptor: current }));
+    return project;
+  };
+  const changedMethod = { ...technicalDescriptor(), method: { ...technicalDescriptor().method, engineVersion: "0.3.1" } };
+  const cases = [
+    ["uri", { expectedSourceUri: "file:///other.mp4", technicalDescriptor: changedMethod }, "PROJECT_SOURCE_DESCRIPTOR_URI_MISMATCH"],
+    ["expected absent", { expectedTechnicalDescriptor: { state: "absent" }, technicalDescriptor: changedMethod }, "PROJECT_SOURCE_DESCRIPTOR_STALE"],
+    ["stale expected", { expectedTechnicalDescriptor: { state: "value", value: { ...current, method: { ...current.method, engineVersion: "old" } } }, technicalDescriptor: changedMethod }, "PROJECT_SOURCE_DESCRIPTOR_STALE"],
+    ["content", { technicalDescriptor: { ...changedMethod, content: { sha256: "b".repeat(64), sizeBytes: 1234 } } }, "PROJECT_SOURCE_DESCRIPTOR_CONTENT_MISMATCH"],
+    ["basis", { technicalDescriptor: { ...changedMethod, basis: "ingest" } }, "PROJECT_SOURCE_DESCRIPTOR_BASIS_MISMATCH"]
+  ];
+  for (const [label, overrides, code] of cases) {
+    const history = historyWithRedo(makeProject(), `descriptor-${label}`);
+    const before = historyState(history);
+    assertProjectCommandError(() => history.commit({
+      type: "source.technicalDescriptor.set",
+      sourceId: "source-1",
+      expectedSourceUri: "file:///source-1.mp4",
+      expectedTechnicalDescriptor: { state: "value", value: clone(current) },
+      technicalDescriptor: changedMethod,
+      ...overrides
+    }), code);
+    assert.deepStrictEqual(historyState(history), before, label);
+    assert.equal(history.redo().project.name, "C", label);
+  }
+
+  const absentHistory = new ProjectHistory(createEmptyProject({ id: "absent", now: fixedTime }), { clock: () => fixedTime });
+  absentHistory.current.sources;
+  const imageProject = createEmptyProject({ id: "image", now: fixedTime });
+  imageProject.sources.push(source("image", "image", { uri: "file:///image.png" }));
+  const imageHistory = new ProjectHistory(imageProject, { clock: () => fixedTime });
+  assertProjectCommandError(() => imageHistory.commit({
+    type: "source.technicalDescriptor.set",
+    sourceId: "image",
+    expectedSourceUri: "file:///image.png",
+    expectedTechnicalDescriptor: { state: "absent" },
+    technicalDescriptor: { ...technicalDescriptor(), basis: "post-ingest", video: undefined, audio: undefined }
+  }), "PROJECT_SOURCE_DESCRIPTOR_SOURCE_INELIGIBLE");
 });
 
 test("TranscriptState public shape remains usable as the nested payload", () => {
@@ -570,6 +729,225 @@ test("history archive round-trips v2 snapshots and an active redo cursor", () =>
   assert.equal(restored.canRedo, true);
   assert.equal(restored.redo().project.name, "C");
   assert.equal(restored.restoreSnapshot(restored.snapshots[0].id).project.name, "A");
+});
+
+test("history blob identity preserves exact transcript state beyond editorial transcriptDigest", () => {
+  let sequence = 0;
+  const initial = sourceTranscript();
+  const confidenceUpdate = clone(initial);
+  confidenceUpdate.transcript.words[0].confidence = 0.42;
+  confidenceUpdate.provenance.stages[0].executionId = "confidence-refresh";
+  confidenceUpdate.extensions = { review: { exact: true } };
+
+  assert.equal(initial.transcriptDigest, confidenceUpdate.transcriptDigest);
+  assert.notEqual(computeHistoryTranscriptBlobDigest(initial), computeHistoryTranscriptBlobDigest(confidenceUpdate));
+
+  const history = new ProjectHistory(v2ProjectWith(initial), {
+    idGenerator: () => `exact-${++sequence}`,
+    clock: () => fixedTime
+  });
+  history.commit({
+    type: "transcript.set",
+    transcript: confidenceUpdate,
+    expectedCurrentTranscriptDigest: initial.transcriptDigest
+  });
+
+  const archive = history.toArchive();
+  assert.equal(archive.version, 2);
+  assert.equal(archive.transcriptBlobs.length, 2);
+  assert.deepEqual(history.undo().sourceTranscripts[0], initial);
+  assert.deepEqual(history.redo().sourceTranscripts[0], confidenceUpdate);
+
+  const restored = ProjectHistory.fromArchive(archive);
+  assert.deepEqual(restored.current.sourceTranscripts[0], confidenceUpdate);
+  assert.deepEqual(restored.undo().sourceTranscripts[0], initial);
+  assert.deepEqual(restored.redo().sourceTranscripts[0], confidenceUpdate);
+});
+
+test("compact history structurally reuses transcript blobs across 500 unrelated commits", () => {
+  let sequence = 0;
+  const transcript = sourceTranscript();
+  const history = new ProjectHistory(v2ProjectWith(transcript), {
+    idGenerator: () => `scale-${++sequence}`,
+    clock: () => fixedTime
+  });
+
+  for (let index = 0; index < 500; index += 1) {
+    history.commit({ type: "project.rename", name: `Rename ${index}` });
+  }
+  const archive = history.toArchive();
+  assert.equal(archive.snapshots.length, 501);
+  assert.equal(archive.transcriptBlobs.length, 1);
+  assert.equal(archive.snapshots.every((snapshot) => !Object.hasOwn(snapshot.project, "sourceTranscripts")), true);
+  assert.equal(new Set(archive.snapshots.map((snapshot) => snapshot.sourceTranscriptRefs[0].digest)).size, 1);
+  assert.deepEqual(history.restoreSnapshot(archive.snapshots[0].id).sourceTranscripts, [transcript]);
+  assert.equal(history.redo().project.name, "Rename 0");
+});
+
+test("compact history refreshes only transcript-affecting source refs", () => {
+  let sequence = 0;
+  const initial = sourceTranscript();
+  const history = new ProjectHistory(v2ProjectWith(initial), {
+    idGenerator: () => `classification-${++sequence}`,
+    clock: () => fixedTime
+  });
+  const initialRef = history.toArchive().snapshots[0].sourceTranscriptRefs[0];
+
+  history.commit({ type: "project.rename", name: "Unrelated" });
+  assert.deepEqual(history.toArchive().snapshots.at(-1).sourceTranscriptRefs[0], initialRef);
+
+  const exactUpdate = clone(initial);
+  exactUpdate.transcript.words[0].confidence = 0.57;
+  exactUpdate.provenance.stages[0].executionId = "classification-update";
+  exactUpdate.extensions = { classification: "exact-version" };
+  history.commit({
+    type: "transcript.set",
+    transcript: exactUpdate,
+    expectedCurrentTranscriptDigest: initial.transcriptDigest
+  });
+  const updatedArchive = history.toArchive();
+  const updatedRef = updatedArchive.snapshots.at(-1).sourceTranscriptRefs[0];
+  assert.notEqual(updatedRef.digest, initialRef.digest);
+  assert.equal(updatedArchive.transcriptBlobs.length, 2);
+
+  history.commit({
+    type: "transcript.remove",
+    sourceId: "source-1",
+    expectedTranscriptDigest: exactUpdate.transcriptDigest
+  });
+  assert.deepEqual(history.toArchive().snapshots.at(-1).sourceTranscriptRefs, []);
+
+  const sourceRemoval = new ProjectHistory(v2ProjectWith(initial), {
+    idGenerator: () => `source-classification-${++sequence}`,
+    clock: () => fixedTime
+  });
+  sourceRemoval.commit({ type: "source.remove", sourceId: "source-1" });
+  assert.deepEqual(sourceRemoval.toArchive().snapshots.at(-1).sourceTranscriptRefs, []);
+});
+
+test("retained media URIs cover undo and redo history without retaining a truncated branch", () => {
+  let sequence = 0;
+  const project = createEmptyProject({ id: "retained-media-project", now: fixedTime });
+  project.sources.push(source("undo-source", "video", { uri: "file:///history/undo.mp4" }));
+  project.exports.push({
+    id: "historical-export",
+    presetId: "delivery",
+    status: "completed",
+    outputUri: "file:///history/export.mp4",
+    createdAt: fixedTime,
+    completedAt: fixedTime
+  });
+  const history = new ProjectHistory(project, {
+    idGenerator: () => `retained-media-${++sequence}`,
+    clock: () => fixedTime
+  });
+
+  history.commit({ type: "source.remove", sourceId: "undo-source" });
+  history.commit({
+    type: "source.add",
+    source: source("redo-source", "video", { uri: "file:///history/redo.mp4" })
+  });
+  history.undo();
+
+  const retained = history.retainedMediaUris();
+  assert.deepEqual(retained, [
+    "file:///history/undo.mp4",
+    "file:///history/export.mp4",
+    "file:///history/redo.mp4"
+  ]);
+  retained.push("file:///external-mutation.mp4");
+  assert.equal(history.retainedMediaUris().includes("file:///external-mutation.mp4"), false);
+
+  history.commit({ type: "project.rename", name: "Branched" });
+  assert.equal(history.canRedo, false);
+  assert.deepEqual(history.retainedMediaUris(), [
+    "file:///history/undo.mp4",
+    "file:///history/export.mp4"
+  ]);
+});
+
+test("commit return remains detached from compact snapshot and transcript storage", () => {
+  let sequence = 0;
+  const history = new ProjectHistory(v2ProjectWith(sourceTranscript()), {
+    idGenerator: () => `detached-return-${++sequence}`,
+    clock: () => fixedTime
+  });
+
+  const returned = history.commit({ type: "project.rename", name: "Committed" });
+  returned.project.name = "Externally mutated";
+  returned.sourceTranscripts[0].transcript.words[0].text = "mutated";
+
+  const current = history.current;
+  assert.equal(current.project.name, "Committed");
+  assert.equal(current.sourceTranscripts[0].transcript.words[0].text, "ação");
+  assert.equal(history.toArchive().transcriptBlobs[0].transcript.transcript.words[0].text, "ação");
+});
+
+test("branching after undo excludes abandoned transcript blobs from the V2 archive", () => {
+  let sequence = 0;
+  const initial = sourceTranscript();
+  const replacement = sourceTranscript({
+    transcript: wordTranscript({
+      words: [{ id: "w1", text: "replacement", startMs: 0, endMs: 500 }],
+      segments: [{ id: "s1", text: "replacement", startMs: 0, endMs: 500, wordIds: ["w1"] }]
+    })
+  });
+  const history = new ProjectHistory(v2ProjectWith(initial), {
+    idGenerator: () => `branch-${++sequence}`,
+    clock: () => fixedTime
+  });
+  history.commit({ type: "transcript.set", transcript: replacement, expectedCurrentTranscriptDigest: initial.transcriptDigest });
+  history.undo();
+  history.commit({ type: "project.rename", name: "Replacement branch" });
+
+  const archive = history.toArchive();
+  assert.equal(history.canRedo, false);
+  assert.equal(archive.transcriptBlobs.length, 1);
+  assert.equal(archive.transcriptBlobs[0].digest, computeHistoryTranscriptBlobDigest(initial));
+  assert.deepEqual(history.current.sourceTranscripts, [initial]);
+});
+
+test("V1 full history archives remain readable and invalid archive versions fail closed", () => {
+  let sequence = 0;
+  const history = new ProjectHistory(v2ProjectWith(sourceTranscript()), {
+    idGenerator: () => `legacy-archive-${++sequence}`,
+    clock: () => fixedTime
+  });
+  history.commit({ type: "project.rename", name: "Changed" });
+  history.undo();
+  const fullSnapshots = history.snapshots;
+  const legacyArchive = {
+    version: 1,
+    entries: history.entries,
+    snapshots: fullSnapshots,
+    cursorSnapshotId: fullSnapshots[0].id
+  };
+  const restored = ProjectHistory.fromArchive(legacyArchive);
+  assert.deepEqual(restored.current, history.current);
+  assert.equal(restored.canRedo, true);
+  assert.equal(restored.redo().project.name, "Changed");
+  assert.throws(() => ProjectHistory.fromArchive({ ...legacyArchive, version: 99 }), /Unsupported history archive version 99/);
+});
+
+test("history transcript digest rejects unsupported non-JSON state instead of normalizing it", () => {
+  const undefinedExtension = sourceTranscript({ extensions: { unsupported: undefined } });
+  assert.throws(() => computeHistoryTranscriptBlobDigest(undefinedExtension), /unsupported non-JSON state/);
+
+  const circular = sourceTranscript({ extensions: {} });
+  circular.extensions.self = circular.extensions;
+  assert.throws(() => computeHistoryTranscriptBlobDigest(circular), /circular reference/);
+});
+
+test("V2 history archive rejects duplicate and tampered transcript blobs", () => {
+  const history = new ProjectHistory(v2ProjectWith(sourceTranscript()), { clock: () => fixedTime });
+  const duplicate = clone(history.toArchive());
+  duplicate.transcriptBlobs.push(clone(duplicate.transcriptBlobs[0]));
+  duplicate.transcriptBlobs[1].transcript.extensions = { conflict: true };
+  assert.throws(() => ProjectHistory.fromArchive(duplicate), /Duplicate transcript blob digest/);
+
+  const tampered = clone(history.toArchive());
+  tampered.transcriptBlobs[0].transcript.provenance.stages[0].executionId = "tampered";
+  assert.throws(() => ProjectHistory.fromArchive(tampered), /digest mismatch/);
 });
 
 test("transcript.set creates, replaces semantics, updates same-digest metadata, and accepts a current consumer", () => {

@@ -14,6 +14,22 @@ const now = "2026-09-15T12:00:00.000Z";
 const unavailable = { available: false, reason: "runtime-not-configured" };
 const hostRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
+function technicalDescriptor() {
+  return {
+    version: 1,
+    basis: "ingest",
+    content: { sha256: "b".repeat(64), sizeBytes: 1234 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra-media-ffmpeg",
+      engineVersion: "0.2.1",
+      engineApiVersion: 1
+    },
+    video: { codec: "h264", avgFrameRate: "30000/1001" },
+    audio: { codec: "aac" }
+  };
+}
+
 async function temporaryRoot(t) {
   const root = await mkdtemp(resolve(tmpdir(), "cevra-persistence-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -86,6 +102,24 @@ test("save close reopen preserves exact history, IDs, source URI, transcript pro
   await reopened.persistence.close();
 });
 
+test("checkpoint and simple reopen preserve the source descriptor without reading source media", async (t) => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options());
+  opened.history.commit({ type: "source.add", source: {
+    id: "source-descriptor", kind: "video", uri: "/definitely/offline/source.mov", displayName: "source.mov",
+    durationMs: 1234, width: 1920, height: 1080, frameRate: 29.97, checksum: "legacy:kept",
+    technicalDescriptor: technicalDescriptor()
+  } });
+  await opened.persistence.checkpoint(opened.history);
+  await opened.persistence.close();
+
+  const reopened = await DesktopProjectPersistence.open(root, options());
+  assert.deepEqual(reopened.history.current.sources[0].technicalDescriptor, technicalDescriptor());
+  assert.equal(reopened.history.current.sources[0].uri, "/definitely/offline/source.mov");
+  assert.equal(reopened.history.current.sources[0].checksum, "legacy:kept");
+  await reopened.persistence.close();
+});
+
 test("every session mutation checkpoints before returning success", async (t) => {
   const root = await temporaryRoot(t);
   const opened = await DesktopProjectPersistence.open(root, options());
@@ -131,6 +165,39 @@ test("every session mutation checkpoints before returning success", async (t) =>
   await session.close();
 });
 
+test("internal descriptor adoption checkpoints the exact ProjectHistory mutation before returning", async (t) => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options());
+  opened.history.commit({ type: "source.add", source: {
+    id: "source-adopt", kind: "video", uri: "/media/adopt.mov", displayName: "adopt.mov", durationMs: 1234
+  } });
+  await opened.persistence.checkpoint(opened.history);
+  const descriptor = { ...technicalDescriptor(), basis: "post-ingest" };
+  const session = new DesktopSession({
+    history: opened.history,
+    persistence: opened.persistence,
+    mediaCapability: { available: true, reason: "available" },
+    transcriptionCapability: unavailable,
+    sourceTechnicalDescriptor: {
+      async adopt() {
+        const project = opened.history.commit({
+          type: "source.technicalDescriptor.set",
+          sourceId: "source-adopt",
+          expectedSourceUri: "/media/adopt.mov",
+          expectedTechnicalDescriptor: { state: "absent" },
+          technicalDescriptor: descriptor
+        });
+        return { source: project.sources[0], project, probeExecution: {}, bytesRead: 1234 };
+      }
+    }
+  });
+
+  await session.adoptSourceTechnicalDescriptor({ sourceId: "source-adopt", id: "adopt" });
+  const durable = await readDurableHistory(root);
+  assert.deepEqual(durable.current.sources[0].technicalDescriptor, descriptor);
+  await session.close();
+});
+
 test("invalid current recovers previous, quarantines evidence, and surfaces recovery", async (t) => {
   const root = await temporaryRoot(t);
   const opened = await DesktopProjectPersistence.open(root, options());
@@ -146,6 +213,43 @@ test("invalid current recovers previous, quarantines evidence, and surfaces reco
   await recovered.persistence.close();
   const verified = await DesktopProjectPersistence.open(root, options());
   await verified.persistence.close();
+});
+
+test("tampered V2 transcript blob is classified as corruption and recovers previous-known-good", async (t) => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options());
+  opened.history.commit({ type: "source.add", source: {
+    id: "blob-source", kind: "video", uri: "/media/blob.mov", displayName: "blob.mov", durationMs: 1_000
+  } });
+  const transcript = {
+    sourceId: "blob-source", wordTiming: "model", speakerState: "none",
+    transcript: {
+      words: [{ id: "word", text: "exact", startMs: 0, endMs: 500, confidence: 0.95 }],
+      segments: [{ id: "segment", text: "exact", startMs: 0, endMs: 500, wordIds: ["word"] }]
+    },
+    provenance: { stages: [{ kind: "transcription", executionId: "blob-exec", engineId: "test", engineVersion: "1", engineApiVersion: "1", modelId: "test", createdAt: now }] },
+    transcriptDigest: ""
+  };
+  transcript.transcriptDigest = computeTranscriptDigest(transcript);
+  opened.history.commit({ type: "transcript.set", transcript });
+  await opened.persistence.checkpoint(opened.history);
+  await opened.persistence.close();
+
+  const currentPath = resolve(root, "active-project.current.cevra.json");
+  const wrapper = JSON.parse(await readFile(currentPath, "utf8"));
+  const blobPath = Object.keys(wrapper.files).find((path) => path.startsWith("history/transcript-blobs/"));
+  assert.ok(blobPath);
+  const blob = JSON.parse(wrapper.files[blobPath]);
+  blob.transcript.transcript.words[0].confidence = 0.1;
+  wrapper.files[blobPath] = JSON.stringify(blob);
+  await writeFile(currentPath, `${JSON.stringify(wrapper)}\n`, "utf8");
+
+  const recovered = await DesktopProjectPersistence.open(root, options());
+  assert.equal(recovered.persistence.state, "local-recovered");
+  assert.equal(recovered.history.current.sources.length, 0);
+  assert.equal(recovered.history.current.sourceTranscripts.length, 0);
+  await readFile(resolve(root, "active-project.invalid-current.cevra.json"), "utf8");
+  await recovered.persistence.close();
 });
 
 test("a supervisor-declared host restart surfaces recovery even when current is valid", async (t) => {

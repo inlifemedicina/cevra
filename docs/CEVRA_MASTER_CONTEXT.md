@@ -2,6 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
+**Last decision reconciliation:** 2026-09-25, MR-V01 merged and closed by PR #46 at `0c8a09c185d1496faa4783f8b9495cd90dff9a21`
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -86,7 +87,7 @@ import raw media
 → export
 ```
 
-Manual editing remains available for refinement, correction, fallback and advanced control, but routine production work should not be shifted back to the user.
+Direct manual editing is first-class and remains available in the Normal surface for adjustment, refinement, correction and creative control. AI editing and direct manipulation operate on the same project/timeline; routine production work should not be shifted back to the user.
 
 ## 1.3 CANONICAL — independence requirements
 
@@ -240,6 +241,69 @@ A1 — voice / original audio
 ```
 
 Generated/found/imported assets become normal Project IR sources/items with provenance.
+
+## 3.3 CANONICAL — Normal / More Controls / Advanced
+
+CEVRA Vids uses **one editor, one Project IR, one project and one timeline** with progressive disclosure of controls. There are not separate Normal and Advanced project states.
+
+### Normal — default editing surface
+
+The Normal surface must be approximately as direct and easy to understand as the observed EDVID editing surface while retaining original CEVRA visual identity and avoiding EDVID branding/trade dress.
+
+Normal keeps the timeline visible and directly editable. The user may freely touch and edit it from the start.
+
+Default Normal characteristics:
+
+- large preview;
+- clear compact timeline;
+- direct trim, move, delete, duplicate and drag/drop interactions;
+- simple visible categories such as media, captions, text, images/B-roll, audio and effects;
+- contextual inspector exposing only relevant controls for the selected item;
+- presets and visual choices;
+- natural-language CEVRA command field available in the same editing experience;
+- immediate visible result in the same preview/timeline;
+- no requirement to understand Project IR, Director internals, provider choice, engine choice, QA internals or technical track structures.
+
+### More Controls
+
+Contextual progressive disclosure may expose additional controls for the selected element without forcing the full Advanced surface.
+
+### Advanced — optional full exposure
+
+Advanced exposes the deeper editing complexity available for the same project/timeline, including as capabilities mature:
+
+- expanded/separated tracks;
+- precise timing;
+- keyframes;
+- transform/crop/position/opacity;
+- detailed caption properties;
+- layered audio controls;
+- transitions/effect parameters;
+- B-roll/overlay details;
+- animation/composition controls;
+- deeper technical project/render controls where appropriate.
+
+Advanced capability must never force Advanced complexity onto the Normal surface.
+
+## 3.4 CANONICAL — unified AI + direct editing interaction
+
+CEVRA must not force a choice between “automatic” and “manual” editing.
+
+Target interaction:
+
+```text
+CEVRA edits
+→ user directly adjusts
+→ user asks by natural language
+→ CEVRA changes the same project
+→ user refines again
+```
+
+All paths mutate the same validated Project IR through the same typed command/history system.
+
+Product constraint:
+
+> Internal sophistication must not leak into default UX complexity. A new feature should either improve the resulting video or direct user control; if it mainly adds visible complexity, keep it behind contextual/progressive disclosure or defer it.
 
 ---
 
@@ -1130,6 +1194,25 @@ The following files were present in the working context during the 2026-09-12 to
 
 Where exact product/file mapping has not yet been written into the canonical record, **do not guess**. Re-open/analyze the media or recover the associated chat before assigning a product name.
 
+## 17.6 2026-09-19 EDVID usability recording
+
+Reference: `ScreenRecording_09-19-2026 18-54-47_1.mp4`
+
+Status: **CANONICAL usability reference / observed behavior**.
+
+Observed product lesson:
+
+- EDVID presents a direct editing surface where preview, timeline and simple action categories coexist;
+- AI interaction and direct visual editing coexist instead of being separate workflows;
+- substantial internal complexity is hidden from the default user.
+
+Decision derived from this reference:
+
+- EDVID remains the functional/usability floor, not a visual identity to copy;
+- CEVRA Normal must meet or improve this level of directness;
+- CEVRA may be substantially more sophisticated internally without becoming more confusing externally;
+- the full editing depth remains available through progressive disclosure / Advanced over the same Project IR and timeline.
+
 ---
 
 # 18. Public skills / repositories to evaluate
@@ -1275,6 +1358,8 @@ This schedule is directional, not a promise. Architecture correctness and a work
 
 # 23. Roadmap
 
+Compact sequencing reference: `docs/CEVRA_ORGANOGRAMA.md`.
+
 ## Track A — CEVRA Vids
 
 ```text
@@ -1289,13 +1374,18 @@ Foundation / Media Runtime       [CLOSED]
 → Desktop Runtime Integration V1 [CLOSED]
 → Project Persistence V1         [CLOSED]
 → Local Forced Alignment V1      [CLOSED]
-→ Transcript Cache V1          [IN DEVELOPMENT]
+→ decision/document reconciliation [CLOSED]
+→ ProjectHistory Scalability V2  [CLOSED]
+→ small cross-platform/runtime correctness prerequisites [CLOSED]
+→ coordinated Media Runtime adjustment gate
+→ Transcript Cache V1 reconciliation/final closeout
 → editorial transcript / analysis
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
 → numeric QA
-→ native preview + layered timeline
+→ UX Surface Contract: Normal / More Controls / Advanced
+→ native preview + one shared layered timeline
 → captions
 → composition benchmark
 → shortform/longform composition
@@ -1304,6 +1394,13 @@ Foundation / Media Runtime       [CLOSED]
 → agent integration / AI-first orchestration
 → Vids 1.0 hardening
 ```
+
+ADR 0019 and PR #30 closed the measured ProjectHistory failure with exact
+per-`SourceTranscript` content-addressed deduplication and compact snapshots.
+The history blob digest covers complete stored state and remains explicitly
+distinct from the editorial `transcriptDigest`; journal, undo/redo, recovery,
+version identity and V1 compatibility are preserved. Transcript Cache remains a
+separate disposable derived-data system and is not history storage.
 
 ## Track B — Orbit Platform
 
@@ -1319,15 +1416,42 @@ Mobile → additional CEVRA apps → sync/publishing/analytics → broader Orbit
 
 ---
 
+## 23.1 Canonical decision records and technical evidence
+
+Detailed approved product direction lives in dedicated records rather than being copied into this ledger:
+
+- [CEVRA Director decisions](CEVRA_DIRECTOR_DECISIONS.md) — coordination, context, providers, permissions, plan validation, bidirectional impact and early round-trip proof.
+- [Editorial decisions](CEVRA_EDITORIAL_DECISIONS.md) — D1–D13: ingest/editorial-start, evidence, takes, meaning, duration, pacing, junctions, strategy, color, audio, QA and version-linked review.
+- [Visual decisions](CEVRA_VISUAL_DECISIONS.md) — D14–D18: presets, captions, placement/QA, EDVID styles and post-V1 personalization boundary.
+- [Composition decisions](CEVRA_COMPOSITION_DECISIONS.md) — D19–D23: split, supporting media, external assets, B-roll and registered first-party components.
+- [Integration decisions](CEVRA_INTEGRATION_DECISIONS.md) — I1–I19, Creation Modes, provider-neutral boundaries, assets, distribution/update/account and Bridge versus Creator Skill.
+- [Update Strategy v3](UPDATE_STRATEGY.md) — canonical managed-update authority: controller, component classes/manifests, compatibility, promotion/rollback, distribution, diagnostics and resilience.
+- [Product Owner acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md) — stable behavioral cases, future status and division between automation and human review.
+- [Fable adversarial audit](CEVRA_FABLE_AUDIT_REVIEW_2026-09-18.md) and [targeted audit](CEVRA_FABLE_TARGETED_AUDIT_MEDIA_HISTORY_PREVIEW_EXPORT_2026-09-18.md) — technical evidence, blocker wording and approved K1–K5 directions.
+- [PR #25/#26 reconciliation inventory](CEVRA_RECONCILIATION_INVENTORY_2026-09.md) — first and final residual audits, including closure criteria for the superseded evidence branches.
+
+Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The records above do not claim implementation merely because a direction is approved.
+
+### Current cross-cutting decisions
+
+- **Product simplicity:** POWER INSIDE → SIMPLE BY DEFAULT → DIRECT MANUAL CONTROL AVAILABLE → FULL COMPLEXITY WHEN THE USER ASKS. Normal, More Controls and Advanced use the same project, Project IR, timeline, selection/playhead, history and command system.
+- **Multi-source:** source-scoped evidence/transcripts support semantic comparison, narrative organization and best-take selection into one final project/timeline; this is approved direction, not completed behavior.
+- **Provider boundary:** consumer subscription, official embedded mechanism, coding agent, SDK and API are distinct until verified. No provider-native schema becomes core domain state.
+- **Fix-now/defer:** minimize total rework using impact, current bounded risk and future migration/compatibility/test/integration cost; do not justify speculative optimization.
+- **Fable K1–K5:** first Windows H.264 candidate `h264_mf`; validated automatic HDR→SDR for SDR targets; V1 render ownership split between Composition visual output and Media Runtime audio/mux; two added composition benchmark criteria; official V1 targets macOS arm64 and Windows x64.
+
+---
+
 # 24. Current repository state
 
 ## 24.1 `main`
 
-Canonical `main` at the start of Transcript Cache V1:
+Canonical remote `main` after the Durable Media Execution Archive V1 closeout:
 
-`099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`
+`b00ad159bc0080c31355c8b59d1d5ba22524b2ff`
 
-This is the documentation closeout merge following Local Forced Alignment V1.
+PR #45 merged the docs-only closeout after PR #44 implemented Durable Media
+Execution Archive V1. The feature and closeout used normal merge commits.
 
 ## 24.2 Important merged milestones
 
@@ -1348,18 +1472,253 @@ This is the documentation closeout merge following Local Forced Alignment V1.
 | Desktop Runtime Integration V1 | #19 | `1c6e512e54e49bbec18b8b1afee6f96afc544d7c` | CLOSED |
 | Project Persistence V1 | #20 | `a36c5c56d5b0791cf4732550aac7f6adffed2bfa` | CLOSED |
 | Local Forced Alignment V1 | #22 | `45913175b30c42a2758820a2937fe9a0126ab739` | CLOSED |
+| ProjectHistory Scalability V2 | #30 | `b6f201afa73aae0aa85f8a3d4187a568ab749e72` | IMPLEMENTED / CLOSED |
+| Audio Sequence Runtime V1 | #36 | `a18f19a06b33669c149c58f57bc74f385c0a02f2` | IMPLEMENTED / CLOSED |
+| Audio Measurement V1 | #38 | `282d29ec2252f5f488050b3b4efba4ec2cfcfe76` | IMPLEMENTED / CLOSED |
+| Application Resolved Audio Plan V1 | #42 | `ff744592e7cf14b40018e3781440fb74b343f7a0` | IMPLEMENTED / CLOSED |
+| Durable Media Execution Archive V1 | #44 | `f5518102ace30d54659334d995712b36d0a4f6b7` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
-Transcript Cache V1 is active on `feat/transcript-cache-v1`, based exactly on
-`099a88ceed9a274254d0ffc7e9fd457f7d63d5ae`. It remains IN DEVELOPMENT until
-review, PR and merge.
+**ProjectHistory Scalability V2 — IMPLEMENTED / CLOSED.** PR #30 merged at
+`b6f201afa73aae0aa85f8a3d4187a568ab749e72`. Compact snapshots plus exact
+per-source transcript blobs removed the measured O(commits × transcript
+payload) failure: the representative package fell from approximately 294.98
+MiB to 3.15 MiB and no longer produced the observed `RangeError`. Retained-media
+cleanup uses the metadata-only path, and the corrected commit hot path avoids
+redundant rematerialization. Project IR schema is unchanged; V1 read → V2 write
+compatibility, journal, undo/redo and recovery are preserved.
 
-The proposal, both Project IR v2 Slice A/B, Application Transcript Persistence
-and Desktop UI Shell branches were removed after their merges. Desktop Runtime
-Integration V1 was removed after merge. Project Persistence V1 was also removed
-after merge. Local Forced Alignment V1 was removed after PR #22 merged and its
-post-merge CI passed 5/5 jobs.
+**Cross-platform/runtime correctness prerequisites — CLOSED.** PR #32 merged by
+normal merge commit `13dc11a869fdb103be609a66d312ea49966cc0df`.
+Post-merge CI run `35679529464` passed all five required jobs. Platform-aware
+runtime path contracts are implemented from pinned runtime metadata, including
+the Windows x64 private-root `python.exe` and Windows venv
+`Scripts/python.exe` layouts, while preserving private-root confinement,
+venv-provenance and isolation controls. The media probe contract now preserves
+bounded rotation, pixel-depth, color/HDR and exact average/nominal frame-rate
+evidence already emitted by the pinned worker; Project IR remains unchanged.
+The render watchdog prerequisite was audited with no production code change:
+the existing configurable timeout, liveness, cancellation, settlement,
+worker-exit and artifact-cleanup mechanisms satisfy this bounded prerequisite.
+Real Windows runtime/export execution remains a later validation gate. Windows
+H.264/export, HDR-to-SDR and the coordinated Media Runtime gate are not closed.
+
+**Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
+merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
+`35762551155` passed all five required jobs, and exact managed macOS arm64
+runtime run `35762551203` passed the functional catalog on the merge SHA. The
+general typed `render-audio-sequence` executor produces explicit-duration,
+48 kHz interleaved float32 mono/stereo WAV with independent source/timeline
+timing, supplied gain/fades and linear overlap. Runtime identity is `0.2.1`.
+
+This is not a two-video project limitation. One request is bounded to 128
+distinct sources and 2,048 items; exact-runtime execution covered 3, 8, 16 and
+32 distinct sources, 64 and 256 items, and 2, 4 and 8 simultaneous items. Source
+audio coverage fails closed from selected-stream timing evidence rather than
+being replaced by the global silence base. Output sample/data counts are
+measured from actual RIFF/WAV chunks. Owner-scoped staging, exclusive
+publication and Application ownership evidence preserve race-winning or
+crash-ambiguous foreign destinations. [ADR 0020](adr/0020-audio-sequence-runtime-v1.md)
+records the closed scope and the research lineage at
+`4cf2e3d6fd74d8a1111b0d8c6ba9e559170f48ef`.
+
+Resource-sampler no-measurement fail-closed hardening, conservative
+negative-start/codec-priming tail behavior and stricter
+`WAVE_FORMAT_EXTENSIBLE` GUID validation remain non-blocking LOW/NOTE work.
+No current correctness failure is reproduced, dependent work is not blocked,
+and later correction needs no Project IR or runtime-semantic migration. The
+complete editable J-cut workflow, mastering, Composition, Windows
+H.264, HDR and other coordinated Media Runtime slices remain open; the
+coordinated Media Runtime adjustment gate is not closed.
+
+**Audio Measurement V1 (MR-A02) — IMPLEMENTED / CLOSED.** PR #38 merged the
+independently reviewed feature head `6ca81b3709c703884e4ff4104b52ae5bb9487c2d`
+by normal merge commit `282d29ec2252f5f488050b3b4efba4ec2cfcfe76`.
+Post-merge normal CI run `35805137771` passed all five required jobs, and exact
+managed macOS arm64 runtime run `35805137702` passed the pinned FFmpeg 9.0.1
+build, Audio Sequence catalog, measurement characterization and final Audio
+Measurement catalog. The delivered read-only typed Media execution path has one
+explicitly selected stream/interval, native-rate
+RMS/sample peak, eligible loudness, drained true-peak estimate and unrounded
+full-scale evidence. No mastering, QA verdict, editorial mutation or cache.
+[ADR 0021](adr/0021-audio-measurement-v1.md) records the method/coverage/lifecycle
+contract; the [evidence record](CEVRA_AUDIO_MEASUREMENT_V1_EVIDENCE.md) separates
+local characterization from exact managed runtime CI. CEVRA worker identity is
+0.3.0; third-party pins and Alignment's existing PCM profile remain
+unchanged. Director receives compatible evidence, not worker editorial authority.
+
+Initial implementation checkpoint `bca975e6690c14d560a0881d2fbe1dc7548f5692`:
+normal CI `35777894595` passed 5/5 and exact managed macOS arm64 run
+`35777894541` passed both catalogs. Independent review then reproduced bounded
+R128 signal→silence, MPEG-TS seek, Matroska/WebM duration-tag, true-peak excerpt
+edge and report-invariant defects. The same feature branch applied the
+bounded remediations with no dependency, Project IR, runtime-identity or method-
+identity change. Remediation code `45a89c76e3f78bcaf79bbdb06e60d2edbe0fa29f`
+passed normal CI `35786488724` 5/5 and exact managed macOS arm64 run
+`35786488665`; the latter rebuilt the signed/pinned FFmpeg 9.0.1 runtime once
+and passed the preserved Audio Sequence, feasibility and expanded Audio
+Measurement catalogs. Final focused re-review then found that a digitally silent
+requested core with real neighboring signal could be rejected because its core
+silence flag was incorrectly reused while parsing the contextual SWR4 true peak.
+The bounded correction separates native sample-silence evidence from continuous
+reconstruction evidence; exact/inner Audio Sequence gaps and a non-stationary
+MPEG-TS temporal oracle now cover the distinction. Final bounded hardening also
+requires per-channel NaN/Infinity evidence from the consumed SWR4 true-peak
+center, so non-finite guard context cannot hide behind a finite maximum. Semantic
+ADTS/TS codec priming and Matroska/WebM seek granularity remain explicitly
+deferred despite internally coherent decoded PTS/counts. The approximately
+eight-sample shift independently observed in one 48 kHz fixture is not a bound:
+at nominal 1 ms granularity, ±0.5 ms corresponds to ±24 samples at 48 kHz and
+±96 at 192 kHz, as scale rather than a guaranteed maximum. Revisit before
+sample-exact transient/boundary policy. These limitations remain
+**DEFERRED / non-blocking** together with tiny-interval error classification,
+periodic WAV/M2TS autodetection, stdout/stderr separation, residual ultra-low
+short-term windows, timeout/cancel refinements, relative-gate quantization,
+native Windows process-tree validation and complete EBU/ITU certification.
+
+**Permanent progress-prompt rule:** CEVRA Vids progress toward a fully usable
+functional version has Product Owner baseline **48%**. Carry that baseline in
+progress prompts/status handoffs; do not increase it for test counts, commits
+or an implementation awaiting independent review. Any future change must be
+explicitly grounded in accepted user-visible capability/acceptance evidence,
+not inferred from engineering activity. Closing MR-A02 alone leaves it at 48%
+until the Product Owner evaluates the user-visible capability evidence.
+
+**Application Resolved Audio Plan V1 (bounded MR-A05/MR-A06 vertical) —
+IMPLEMENTED / CLOSED.** PR #42 merged reviewed feature head
+`b12304af046f36c86a4ee43aa06f19584cb1d550` by normal merge commit
+`ff744592e7cf14b40018e3781440fb74b343f7a0` on 2026-09-23. Post-merge main CI
+run `35918380631` passed 5/5 and exact managed macOS arm64 runtime run
+`35918380640` passed on that merge SHA. [ADR 0027](adr/0027-application-resolved-audio-plan-v1.md)
+defines a reconstructible Application plan compiled from canonical audio tracks,
+bound to project revision/snapshot/journal state and resolved through closed
+Audio Sequence V1. The bounded `normalization=NONE` vertical accepts a caller-
+provided visual result with the same binding, performs an exclusive staged
+`mux-audio`, validates duration/packet-copy evidence, promotes only through
+`export.add` and cleans only known-owned PCM. Explicit LUFS targets reject rather
+than being ignored; Composition, UI, mastering and the full editable J-cut
+workflow remain outside this slice.
+
+Durable recovery of the bounded composite sequence → mux → promotion intent is
+now provided by the operational archive closed in ADR 0028. This does not claim
+full CEVRA product crash recovery or automatic adoption by future workflows.
+Runtime identity remains 0.3.1 with protocol and third-party pins unchanged.
+Audio Sequence/Measurement, Alignment and `extract-audio` semantics remain
+preserved. Product progress remains **48%**.
+
+The adversarial remediation on the same feature branch closes the confirmed
+pre-review gaps: final state is rechecked after the `committing` archive save
+with no suspension before ProjectHistory commit; requests and schemas are
+snapshotted/closed; `musicDuckDb` fails closed; plan comparison is structural;
+publication cleanup requires POSIX dev/inode identity evidence; and managed
+FFprobe proves selected input/output stream durations instead of container
+duration. The caller visual remains an assertion, not independent pixel proof.
+Pre-remediation runs `35818228308` and `35818228318` apply only to head
+`038fdc19bde7fa518a3e5609da1a2bc79ebe797c`. Remediation head
+`37036a0f31d0f69547facee97f0aed6a0581918f` passed normal CI run `35889604895`
+(5/5) and exact managed runtime run `35889604818`. Final pre-PR micro-remediation
+now derives publication identity from owned staging before confirming the linked
+destination and snapshots getter-backed requests before validating them. Code
+head `ddee31c84caedc52e60d2db1d36c5e4575360792` passed normal CI run
+`35907517116` (5/5) and exact managed macOS arm64 runtime run `35907517082`.
+Final Pre-PR Adversarial Review concluded **APPROVE FOR PR WITH NON-BLOCKING
+NOTES**, with no reproduced BLOCKER, HIGH or MEDIUM finding. This closes only
+the bounded vertical; Slice 3 in full and the coordinated Media Runtime gate
+remain active. Product progress remains **48%**.
+
+**Durable Media Execution Archive V1 — IMPLEMENTED / CLOSED.** PR #44 merged
+reviewed feature head `16bf0cb347b9738b9ca84194e67a2cba5056127b`
+by normal merge commit `f5518102ace30d54659334d995712b36d0a4f6b7`
+on 2026-09-24. Pull-request CI run `36024597615` passed 5/5 and exact managed
+macOS arm64 runtime run `36024597609` passed; post-merge main CI run
+`36026252042` passed 5/5 and exact managed runtime run `36026251971` passed on
+the merge SHA. Independent adversarial review, focused verification of F-1
+through F-4 and the N-1 protected-root micro-review concluded **APPROVE FOR PR
+WITH NON-BLOCKING NOTES**, with no reproduced BLOCKER, HIGH or MEDIUM finding.
+
+The existing Application execution repository is now a small versioned
+operational archive under the trusted Desktop root and the same active-project
+writer lease.
+[ADR 0028](adr/0028-durable-media-execution-archive-v1.md) records the approved
+no-auto-replay architecture: ProjectHistory is restored first; closed/integrity-
+checked records and minimal resolved-audio intents are then reconciled; cleanup
+requires current publication-identity proof; ambiguity, foreign replacements,
+canonical exports and undo/redo-retained media are preserved. Atomic duplicate-ID
+creation, serialized fsync+rename writes, bounded corruption quarantine,
+checkpoint-aware durable-success finalization and idempotent zero-engine startup
+reconciliation are implemented on the feature branch. Focused remediation now
+binds every persisted attempt URI to its typed operation, preserves non-exclusive
+restart outputs without strong current ownership evidence, requires the exact
+applied mux child before promoting a composite intent, treats not-yet-created
+children as empty cleanup, and adds deterministic pressure compaction plus a
+distinct `MEDIA_EXECUTION_ARCHIVE_FULL` path that does not permanently block
+the repository. Classified archive failures degrade Media while a healthy
+canonical project remains available. SHA-256 detects accidental corruption but
+does not authenticate against an actor able to rewrite the trusted root; URI
+text never authorizes deletion. Project IR and Project
+Store formats, Tauri/WebView permissions, third-party dependencies and media
+runtimes are unchanged. The configured Media Runtime root also remains a
+protected Transcription root when archive recovery degrades Media. **Durable
+Media Execution Recovery V1 is IMPLEMENTED / CLOSED for this bounded ADR 0028
+archive and restart-reconciliation scope only.** Strong Windows publication
+identity, removal of the residual POSIX `lstat`→`unlink` interval, hostile-writer
+authentication, a complete abrupt process-kill matrix and permanent audit
+retention remain unclaimed. Application Resolved Audio Plan V1 remains closed,
+but the full Slice 3 editable J-cut product experience and the coordinated Media
+Runtime gate remain active. Product progress remains **48%**.
+
+**Durable Source Technical Descriptor V1 / MR-V01 — IMPLEMENTED / CLOSED.**
+The Product Owner approved the bounded authority decision in
+[ADR 0029](adr/0029-durable-source-technical-descriptor-v1.md): an optional,
+own-versioned descriptor extends `SourceAsset` while Project IR, History Archive
+and Project Package remain version 2 with no migration. PR #46 merged feature
+head `f6df275d0bb30cede04ceaf13223933d4b8e4194` normally as
+`0c8a09c185d1496faa4783f8b9495cd90dff9a21`. The closed scope implements
+adopted SHA-256/byte-size
+identity, supported normalized selected-stream evidence, one bounded streaming
+hash coordinated with probe, guarded post-ingest adoption and operation-scoped
+verification for the resolved-audio export vertical. Reopen performs no media
+read; legacy sources remain valid without a verified-content claim. The
+[code checkpoint](../packages/application/src/source-technical-descriptor.ts)
+initially landed at `1a24b1b53a52b5f50aede13db40be2c3415c7e45`. Post-review
+remediation checkpoints `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358fa` and
+`9cbb1d0a9f3cddcdc3ea525e6d44396fb5fbd748`
+refuses unsafe isolated retries of validated mux operations, validates descriptor
+adoption inputs before deriving locale/IDs, observes final-chunk cancellation and
+re-proves the original Audio Sequence PCM publication before mux consumption and
+export promotion. A controlled comparison confirmed that the former P-PCM gap
+could promote replacement bytes; the protected path now fails before mux and
+preserves the foreign file. The managed-runtime catalog includes real descriptor
+acquisition plus positive and changed-source cases. PR CI `36153512241` and PR
+Exact Runtime `36153512395` passed on the feature head; post-merge CI
+`36161031848` and Exact Runtime `36161031859` passed on the merge commit. The
+[evidence record](CEVRA_DURABLE_SOURCE_TECHNICAL_DESCRIPTOR_V1_EVIDENCE.md)
+separates data preservation from semantic compatibility and records the
+required pre-Cut-Compiler/history scalability gate. Same-inode PCM in-place
+mutation, strong Windows publication identity, residual probe/hash TOCTOU and
+optimized composite recovery remain explicit bounded limits. Product progress
+remains **48%**.
+
+**Product-owner technical delegation:** within an explicitly approved slice,
+the technical lead may choose and implement the solution with the best total
+quality/cost benefit without per-detail ratification. Final audiovisual
+correctness, file safety, user time, performance, compatibility, maintenance and
+future rework are weighed together; simplicity is preferred when guarantees and
+results are equivalent. Concrete evidence may justify revisiting an earlier
+choice, while out-of-scope corrections are reported rather than silently added.
+New material cost, privacy exposure, destructive behavior or objective/architecture
+change still requires explicit treatment. Independent review and merge gates
+remain mandatory; this clarification narrows no prior safety policy.
+
+**Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
+
+GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.
+
+Current dependency blockers/gates:
+
+1. complete the approved coordinated Media Runtime adjustment gate;
+2. reconcile and close Transcript Cache V1, revalidating its relationship to history/storage.
 
 ---
 
@@ -1405,6 +1764,29 @@ post-merge CI passed 5/5 jobs.
 - **IMPLEMENTED/CLOSED:** Local Forced Alignment V1 merged in PR #22 at `45913175b30c42a2758820a2937fe9a0126ab739`; post-merge CI run `35005561921` passed 5/5 jobs and the feature branch was removed. ADR 0017 adds a provider-neutral `AlignmentEngineAdapter`, isolated per-canonical-segment CTC runtime and application-owned stale-digest promotion through existing `transcript.set`/`ProjectHistory`. Alignment is bounded to 30-second/1,024-token windows, preserves unknown characters through wildcard emissions, appends provenance without rewriting history, verifies a closed exact model-file allow-list and surfaces disposable-audio cleanup failures before promotion. It adapts only forced-alignment behavior from BSD-2-Clause WhisperX v3.8.6 commit `3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0`, pins Apache-2.0 PT/EN model revisions and hashes, keeps downloads disabled, and adds no cache, diarization, Project IR migration, Media Runtime operation or UI/Tauri permission. Runtime/model packaging, full PT-weight smoke, safe crash-leftover temp reclamation and the non-blocking cleanup-retry behavior remain later gates.
 - **PROCESS:** this master document was created specifically because the previous ChatGPT conversation reached maximum length; future decisions must be recorded here.
 
+## 2026-09-19 — editing-surface simplification
+
+- **CANONICAL:** Normal is the default CEVRA Vids editing surface and should be approximately as direct/simple as the observed EDVID editor behavior.
+- **CANONICAL:** the timeline remains visible and directly editable in Normal; it is not hidden behind an expert-only mode.
+- **CANONICAL:** “More Controls” and Advanced use progressive disclosure over the same project, Project IR, timeline, history and typed command system; no duplicate editor state.
+- **CANONICAL:** Advanced exposes the full available editing complexity when requested by the user.
+- **CANONICAL:** natural-language AI editing and direct timeline manipulation coexist and mutate the same project.
+- **CANONICAL:** internal sophistication must not leak into default UX complexity.
+- **CANONICAL:** this decision does not require an architecture reset or restart of the dependency roadmap; it adds an explicit UX Surface Contract before Native Preview + Timeline is considered complete.
+- **RESEARCH:** `ScreenRecording_09-19-2026 18-54-47_1.mp4` is retained as an EDVID usability reference for this decision.
+
+## 2026-09-21 — decision/governance reconciliation
+
+- **CANONICAL:** PR #25 Director direction is incorporated in the dedicated Director record without its stale branch handoff.
+- **CANONICAL:** PR #26 decision families D1–D23 and I1–I19 are reconciled into dedicated editorial, visual, composition and integration records; provider-specific claims remain implementation-time verification gates.
+- **CANONICAL:** Bridge Skill supports Vids through the typed Agent Protocol; Creator Skill is a standalone agent-native product surface. Lite/Full share one editorial core, and Creator Full must deliver final output without Desktop.
+- **CANONICAL:** the fix-now/defer, execution-feasibility, Product Owner pause, coordinated Media Runtime, acceptance-catalog and Director-impact rules are permanent agent policy in `AGENTS.md`.
+- **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
+- **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
+- **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
+- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, paused for dependency reconciliation. GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS; focused independent review and reconciliation against the changed history baseline remain required.
+- **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
+
 ---
 
 # 26. Explicitly unresolved decisions
@@ -1414,10 +1796,7 @@ Do not guess these in future chats:
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
 2. **SUPERSEDED / RESOLVED by PR #14:** the finalized bounded Project IR v2 implementation plan merged before Slice A began;
 3. **RESOLVED by ADR 0017 and PR #22:** provider-neutral local CTC forced-alignment adapter, PT/EN model pins and stale-digest application integration; packaging/model-manager distribution remains unresolved;
-4. **PROPOSED by ADR 0018 / IN DEVELOPMENT:** derived Transcript Cache V1 uses
-   actual-byte source SHA-256, exact execution/model identity, versioned
-   integrity envelopes and invalidation-by-miss; final acceptance awaits review
-   and merge;
+4. final Transcript Cache V1 closeout after dependency reconciliation and focused review; PR #24 remains draft/unmerged;
 5. final transcription model default for production quality;
 6. production transcription-runtime assembly/update mechanism;
 7. production model-asset identity, update and distribution mechanism;
@@ -1427,6 +1806,11 @@ Do not guess these in future chats:
 11. final embedded Codex/Claude commercial integration mechanisms;
 12. final Marketplace package/runtime security model implementation;
 13. mobile implementation timing.
+14. **RESOLVED by ADR 0019 and PR #30:** ProjectHistory Scalability V2 is implemented and closed;
+15. exact Windows fallback if validated `h264_mf` is materially inadequate;
+16. exact HDR→SDR dependency/build and quality/performance profile;
+17. Preview V1 ADR and final resolved composition-plan boundary;
+18. final provider mechanisms, entitlements and commercial terms for every external integration.
 
 ---
 
@@ -1447,15 +1831,11 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete and independently review Transcript Cache V1 on
-   `feat/transcript-cache-v1`; do not start editorial transcript/analysis before
-   this cache slice is merged and canonically closed.
-2. Do not reopen the closed Application Transcript Persistence, Local Transcription Engine V1 or Project IR v2 Slices A/B.
-3. Preserve the provider-neutral flow from authorized source through `TranscriptionEngineAdapter` and guarded Project History promotion.
-4. Validate the ADR 0015 supervised private-host path from native picker through existing application services, canonical ProjectHistory and source-scoped transcript presentation.
-5. Preserve the EDVID baseline and dependency-driven implementation order.
-6. Apply the quality/performance policy to future preview, render, composition and export work.
-7. Keep this document updated after every material decision, merge or completed research finding.
+1. Reconcile and close Transcript Cache V1/PR #24 now that MR-V01 is closed; retain draft/unmerged status until its focused dependency review and current remote CI complete.
+2. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
+3. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
+4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
+5. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
 
 ---
 

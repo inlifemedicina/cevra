@@ -98,6 +98,8 @@ jobs:
           engines/media-ffmpeg/worker/cevra_job_control.py
           engines/media-ffmpeg/worker/cevra_media_worker.py
           engines/media-ffmpeg/worker/cevra_native_tools.py
+          engines/media-ffmpeg/worker/cevra_audio_measurement.py
+          engines/media-ffmpeg/worker/cevra_streaming_process.py
           engines/media-ffmpeg/worker/runtime_integrity.py
           engines/media-ffmpeg/worker/runtime_profile.py
       - name: Parse pinned versions and manifest schema

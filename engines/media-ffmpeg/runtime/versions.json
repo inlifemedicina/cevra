@@ -1,5 +1,5 @@
 {
-  "mediaRuntime": "0.1.0",
+  "mediaRuntime": "0.3.1",
   "python": {
     "version": "3.12.14",
     "series": "3.12",

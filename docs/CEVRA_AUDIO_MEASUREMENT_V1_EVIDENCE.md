@@ -1,0 +1,298 @@
+# Audio Measurement V1 — execution evidence
+
+Base: `8aea564b7cdfd7d235fa72964f07eeed961c1bbc`.
+Branch: `feat/typed-audio-measurement-v1`.
+Status: IMPLEMENTED / CLOSED.
+Contract/method authority: [ADR 0021](adr/0021-audio-measurement-v1.md).
+
+## Independent adversarial findings and remediation
+
+The independent review of initial HEAD `772b5d84611064b3e23bc7e41a45afbae83967cd`
+validated five bounded correctness findings. All production fixes preserve the
+typed read-only operation, `mutation: none`, zero media artifacts, runtime
+identity 0.3.0 and method identity `cevra.audio-measurement.native-swr4.v1`;
+this method has not yet been published or merged.
+
+| Finding | Before | Bounded correction / current evidence |
+|---|---|---|
+| FFmpeg 9.0.1 R128 M/S NaN after signal → exact zero | A valid speech-like/sine clip followed by ≥500 ms zero aborted as `AUDIO_MEASUREMENT_INVALID_METADATA` | Only NaN M/S windows are skipped for their respective gated/short-term update. Prior valid integrated evidence survives. Infinity and decoded NaN/Inf remain fail-closed. Signal→zero, fade→zero, clip→1 s gap→clip and Audio Sequence with a real 500 ms gap all pass locally. |
+| MPEG-TS input seek | `-copyts -seek_timestamp 1 -ss` permitted FFmpeg accurate-seek to apply container start time again | `-noaccurate_seek` is an input option before `-i`; exact selection remains typed `atrim` plus PTS/frame coverage validation. Three windows in a generated non-zero-start, amplitude-stepped MPEG-TS each produced 24,000 frames and segment-specific RMS locally; existing MP4/AAC cases remain passing. |
+| Matroska/WebM duration fallback | `_audio_coverage_ms` understood `duration_tag`, but the closed ffprobe request never requested it | Probe requests only `stream_tags=DURATION`, validates the bounded tag object and maps that field to `duration_tag`. MKV/AAC, MKV/FLAC and WebM/Vorbis fixtures prove 182,400 frames over 100..3,900 ms locally. Missing/malformed evidence remains fail-closed. |
+| True-peak excerpt edge | Cutting before SWR made an internal boundary look like a physical source edge | The SWR branch receives up to 50 ms of proven real context on both sides, drains, then selects only the requested center at 4×. Guard samples are not requested sample evidence, but their contribution to the band-limited reconstruction may influence intersample values inside the requested boundary. Other metrics remain core-only. At real source boundaries the available guard is clipped, never padded. |
+| Acoustically contradictory reports | Structurally valid but impossible peak/full-scale combinations passed contract validation | `truePeakLinear`, sample peaks and exact full-scale predicates now obey cross-field invariants with an explicit `2e-6` linear tolerance. This is rounding tolerance, not clipping inference. |
+| Non-finite true-peak context | A NaN/Infinity in real guard context could propagate through SWR while peak-maximum reduction still emitted a finite value | The true-peak `astats` branch now emits per-channel `Number_of_NaNs` and `Number_of_Infs`; each must exist and equal zero. Positive evidence rejects as `AUDIO_MEASUREMENT_NON_FINITE_SAMPLES`, while absent/malformed metadata remains `INVALID_METADATA`. Core checks are unchanged. |
+
+The final focused re-review found one additional coupling defect: the reduction
+used the core's digital-silence classification while parsing the independent
+SWR4 branch. A core of all-zero native samples with adjacent real signal could
+therefore reject a finite contextual true peak as `AUDIO_MEASUREMENT_NUMERICAL_RANGE`.
+The parser now keeps those authorities separate. `-inf` in the true-peak branch
+maps to zero; a finite peak is converted normally regardless of core silence;
+NaN/Infinity remain invalid. The contract likewise allows zero or positive true
+peak for a silent core while continuing to require zero core RMS/sample peak,
+false full-scale predicates and digital-silence loudness.
+
+Final bounded hardening adds the complementary non-finite authority without
+changing that semantics. Deterministic float fixtures place NaN, +Infinity and
+-Infinity one native sample before the core and immediately after it, within the
+real 50 ms guard. All six executions reject specifically as
+`AUDIO_MEASUREMENT_NON_FINITE_SAMPLES`; the existing three inside-core fixtures
+continue to reject with the same code. A finite neighboring impulse still
+produces the valid contextual true peak below. Missing/malformed true-peak
+counters are unit-tested as `INVALID_METADATA`.
+
+Bounded local development evidence on FFmpeg 9.0.2 (not release proof):
+
+- a unit impulse one native sample before a silent 1,000..1,500 ms core produced
+  24,000 core frames, RMS/sample peak **0**, all full-scale predicates false,
+  digital-silence loudness and contextual true peak **0.204424573**;
+- a real Audio Sequence gap measured at 1,000..1,500 ms produced 24,000 frames,
+  core RMS/sample peak **0**, digital-silence loudness and true peak
+  **0.004726129**; the inner 1,001..1,499 ms interval produced 23,904 frames and
+  true peak **0**, both valid under the same semantics;
+- the MPEG-TS oracle now uses three non-stationary amplitude steps. Its 500 ms
+  after-start/active-seek/late windows measured RMS **0.070678968**,
+  **0.176731474** and **0.353546303**, identifying the intended 0.1/0.25/0.5
+  amplitude regions rather than merely accepting a stationary sine.
+
+The worst deterministic local edge reproduction used a 48 kHz stable sine at
+0.45×Nyquist, amplitude 0.8, phase π/4, measured over the internal 1..2 s
+excerpt. Before correction true peak was **1.571228869** (**+5.863 dB** versus
+the analytic amplitude). With real context it is **0.790150738**, equal to the
+sample peak and **-0.108 dB** versus the continuous amplitude. Across the bounded
+44.1/48/96 kHz frequency/phase matrix, the estimate stayed at or above sample
+peak within `2e-6` and within `0.011` linear (about 0.12 dB) of the analytic
+stable-sine amplitude. First-sample, last-sample/tail, impulse and near-real-edge
+fixtures retain the deterministic no-padding boundary behavior. These results
+characterize this native SWR4 method; they are not complete EBU/ITU certification.
+
+Codec/container priming is deliberately narrower than decoded timeline
+coverage. PTS, sample counts and selected-stream duration can prove that the
+requested decoded interval was fully analyzed, but ADTS/TS AAC priming can
+still present a coherent yet semantically shifted source timeline. Generic
+priming resolution is **DEFERRED / non-blocking for MR-A02**; the prior broader
+claim that every ambiguity is necessarily rejected conservatively is withdrawn.
+
+Matroska/WebM seek granularity is also **DEFERRED / non-blocking for MR-A02**.
+Independent evidence observed approximately eight samples of decoded-content
+shift in one 48 kHz fixture even though the reported PTS and sample count
+remained internally coherent. **Eight samples is a fixture observation, not a
+bound.** Container/packet timestamp granularity may permit larger shifts. At a
+nominal 1 ms granularity, half a unit is approximately ±0.5 ms, or ±24 samples
+at 48 kHz and ±96 samples at 192 kHz; these values express scale, not a universal
+maximum or guarantee. Current RMS/loudness impact is low, but MR-A02 does not
+claim sample-exact Matroska/WebM seeking. Re-evaluate before any transient/
+boundary QA or policy consumer requires sample-exact excerpts. No report-schema
+change is made.
+
+## Feasibility before contract consolidation
+
+Commit `3fa6015128d2cbd41cb6cd41735941f92a0eebb9`, exact managed macOS arm64
+run `35774039722`: signature-verified FFmpeg **9.0.1**, private CPython
+**3.12.14**, existing Audio Sequence catalog and native measurement
+characterization executed successfully. This is not final implementation CI.
+
+| Fixed fixture | Observed native evidence | Interpretation |
+|---|---|---|
+| 1 kHz sine, amplitude 2, 4 s | sample peak 6.020600 dBFS; RMS 3.010300 dBFS | float headroom retained |
+| digital zero, 4 s | RMS `-inf`, integrated sentinel -70 | no finite loudness substitution |
+| amplitude 1e-5 | sample peak -100 dBFS; native true-peak text `0.000` | candidate text precision insufficient |
+| 50 ms sine | no R128 metadata | no fabricated integrated/short-term value |
+| final-sample unit impulse, 100 ms | sample peak 0 dBFS; ebur128 peak `0.000` | candidate tail defect reproduced |
+| same impulse through drained SWR | 19,200 frames; peak 2.062211 dBFS | complete native oversampling includes edge ringing |
+
+Failed intermediate checks are retained as causes, not passing evidence:
+
+- An initial video fixture expected AAC to retain amplitude-2 PCM headroom.
+  That assumption was false; stream selection now uses sub-full-scale AAC,
+  while float-headroom acceptance remains on original/derived float WAV.
+- Explicit input `-ss 0` on the 30-minute AAC skipped priming-adjacent samples
+  (first observed PTS 1,024). The new operation now omits zero seeking;
+  continuity validation rejected the incomplete result before that correction.
+- Abrupt worker death left its measurement decoder alive after 3 seconds.
+  The owned POSIX process-group correction and regression test address this
+  reproduced lifecycle issue; no speculative filter topology rewrite occurred.
+- On `d40778379d13144893fbc524fdc2349e81d2d498`, normal CI run `35777311294`
+  exposed a stale five-file manifest-schema cardinality (the new worker has
+  seven files). The Media reproducibility job failed before that run was
+  superseded/cancelled by the corrective push. Commit `bca975e` adjusts the exact
+  cardinality and tests agreement with both build and integrity inventories;
+  hashes/signatures and closed file-set verification remain mandatory.
+
+## Local development evidence (not release proof)
+
+macOS arm64; 10 CPUs; 24 GiB RAM; >100 GiB free scratch space. Safeguards:
+one heavy experiment at a time, one filter/decoder thread, generated fixtures
+only, <512 MiB scratch budget per catalog, 120 s fixture-generation timeout,
+180 s catalog-operation timeout and <768 MiB sampled worker-tree RSS guard.
+Python source loops generate short test fixtures only, never production PCM.
+
+The local actual adapter/worker/Application catalog with Homebrew FFmpeg 9.0.2
+measured (development evidence, separate from exact CI below):
+
+- 44.1/48 kHz sine amplitude 0.5: RMS 0.3535533853; tolerance 2e-6 against
+  `0.5/sqrt(2)`. 4 s yields 176,400 / 192,000 measured frames.
+- 44.1 kHz interval 3,991..3,999 ms: 352 measured frames; 48 kHz: 384.
+- Tapered phase-offset 12 kHz sine: sample peak ~0.565685; true peak
+  ~0.8000378 against continuous amplitude 0.8 (0.01 tolerance for finite native
+  interpolation). It is not a comparison of two instances of the same meter.
+- Mono 1 kHz integrated reference ~-9.03 LUFS with 0.06 LU tolerance for native
+  histogram/filter startup; 11 valid complete short-term windows in 4 s.
+  The catalog also generates [EBU Tech 3341 test 1](https://tech.ebu.ch/docs/tech/tech3341.pdf):
+  20 s in-phase stereo 1 kHz, -23 dBFS per-channel peak, I/S expected -23 ±0.1
+  LUFS. This independently specified reference is not a second call to the same
+  implementation, nor a claim that the entire EBU conformance suite ran.
+- Amplitude 2: RMS ~1.41421357 and peak ~2.00000002; no limiter/normalization.
+- Native exact predicates distinguish `1-2^-24`, `1`, `1+2^-23`, independently
+  of dB rounding. Saturated-signal evidence does not diagnose distortion.
+- Representative 30-minute compressed source late 1 s excerpt: ~74–75 ms per
+  warm repeated call; long 120 s analysis ~1.11 s; reports ~0.7–0.9 KiB;
+  final-hardening local run late excerpts **94.99 / 94.29 / 95.43 ms** and long
+  120 s analysis **1,196.53 ms**; sampled worker-tree RSS ≤57.52 MiB; ≤2
+  processes; largest report 898 bytes; 45,724,710 fixture bytes (43.61 MiB,
+  including bounded TS/MKV/WebM/non-finite-guard fixtures).
+  These are observations, not latency/product guarantees. CPU is sampled
+  percent, not integrated CPU time; I/O traffic is not measured.
+
+## Reproduction and final validation checkpoint
+
+Use the same environment variables as the existing Audio Sequence catalog:
+`CEVRA_AUDIO_SEQUENCE_RELEASE=1`, `CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT` pointing
+to the assembled sealed runtime, and `CEVRA_AUDIO_SEQUENCE_PYTHON` pointing to
+its private interpreter. Then run:
+
+```sh
+node engines/media-ffmpeg/test_functional/audio-sequence-runtime.mjs
+node engines/media-ffmpeg/test_functional/audio-measurement-runtime.mjs
+python3 -I -B -m unittest discover -s engines/media-ffmpeg/test_python
+npm run build
+npm run test:ci
+```
+
+Normal CI and exact-runtime CI are separate gates. The existing exact workflow
+builds FFmpeg once and runs both catalogs. Relevant feature pushes, PRs and
+main changes remain covered; docs-only changes do not rebuild FFmpeg.
+
+## Final merge and post-merge checkpoint
+
+PR #38 merged independently reviewed feature head
+`6ca81b3709c703884e4ff4104b52ae5bb9487c2d` by normal merge commit
+`282d29ec2252f5f488050b3b4efba4ec2cfcfe76`, which is the canonical `main` for
+this closeout. Post-merge normal CI run
+[35805137771](https://github.com/inlifemedicina/cevra/actions/runs/35805137771)
+passed all five required jobs: Monorepo, Tauri desktop shell, Media Runtime
+reproducibility, Transcription and Alignment. Post-merge exact managed runtime
+run [35805137702](https://github.com/inlifemedicina/cevra/actions/runs/35805137702)
+passed on native macOS arm64 with the signature/hash-verified FFmpeg 9.0.1 and
+private CPython 3.12.14. The same build passed the preserved Audio Sequence
+catalog, measurement characterization and final Audio Measurement catalog.
+
+This evidence closes MR-A02 at its typed read-only measurement scope. It does
+not close MR-Q01, mastering, complete D11 workflows, the coordinated Media
+Runtime gate, certified meter conformity or native Windows validation. Semantic
+ADTS/TS priming, Matroska/WebM seek granularity/sample-exact identity,
+tiny-interval error classification, periodic WAV/M2TS autodetection,
+stdout/stderr separation, residual ultra-low short-term windows, timeout/cancel
+refinements, relative-gate quantization, native Windows process-tree validation
+and complete EBU/ITU certification remain **DEFERRED / non-blocking**.
+
+## Independent-remediation validation checkpoint
+
+Remediation code SHA: `45a89c76e3f78bcaf79bbdb06e60d2edbe0fa29f`.
+
+- [Normal CI 35786488724](https://github.com/inlifemedicina/cevra/actions/runs/35786488724):
+  **5/5 SUCCESS** — Monorepo, Tauri desktop shell, Media Runtime reproducibility,
+  Transcription and Alignment.
+- [Exact runtime 35786488665](https://github.com/inlifemedicina/cevra/actions/runs/35786488665):
+  **SUCCESS** on native macOS arm64 with signature/hash-verified FFmpeg 9.0.1,
+  private CPython 3.12.14 and CEVRA Media Runtime 0.3.0 / protocol 1. The same
+  managed build passed the preserved Audio Sequence catalog, measurement
+  feasibility characterization and the expanded Audio Measurement catalog.
+
+The exact catalog produced 46 valid reports plus the existing asserted
+rejection/cancellation/timeout/worker-death cases. Key corrected evidence:
+
+- signal→zero: 240,000 frames, I **-11.309**, S max **-12.723** LUFS;
+- fade→zero: 240,000 frames, I **-15.494**, S max **-17.495** LUFS;
+- clip→1 s gap→clip: 240,000 frames, I **-11.309**, S max **-11.754** LUFS;
+- Audio Sequence real 500 ms gap: 144,000 frames, I **-11.916**, S max
+  **-12.723** LUFS;
+- MPEG-TS non-zero start: both 1 s windows produced 48,000 frames, contiguous
+  requested PTS and RMS ~0.08834;
+- MKV/AAC, MKV/FLAC and WebM/Vorbis duration-tag cases each produced 182,400
+  requested frames; the expected mono/stereo signal levels passed;
+- corrected 48 kHz 0.45×Nyquist edge case: sample/true peak
+  **0.790150738**, replacing the pre-fix false true peak 1.571228869;
+- NaN/±Inf decoded-signal fixtures still reject; the sequence and MP4/AAC
+  regression cases remain passing.
+
+Post-remediation exact resource observations: 30-minute-source late 1 s calls
+**95.45 / 74.52 / 51.75 ms**; 120 s analysis **2,072.24 ms** and 5,760,000
+frames; maximum sampled worker-tree RSS **66,368 KiB = 64.81 MiB**; maximum
+**2 processes**; largest report **898 bytes**; synthetic scratch **41,622,466
+bytes = 39.69 MiB**. The existing conservative regression ceilings remain
+768 MiB, two processes and 4 KiB; these are not product requirements.
+
+## Historical pre-remediation implementation checkpoint
+
+Initial implementation checkpoint: `bca975e6690c14d560a0881d2fbe1dc7548f5692`.
+Independent remediation code requires a fresh exact managed-runtime checkpoint;
+the earlier runs below remain historical pre-remediation evidence and are not
+reused as proof for the corrected code.
+
+- [Normal CI 35777894595](https://github.com/inlifemedicina/cevra/actions/runs/35777894595):
+  **5/5 SUCCESS** — Monorepo, Tauri desktop shell, Media Runtime reproducibility,
+  Transcription, Alignment. The corrected sealed manifest pipeline executed.
+- [Exact runtime 35777894541](https://github.com/inlifemedicina/cevra/actions/runs/35777894541):
+  **SUCCESS**, macOS arm64, signature/hash-verified FFmpeg 9.0.1 and pinned
+  private CPython 3.12.14, CEVRA Media Runtime 0.3.0 / protocol 1. The preserved
+  Audio Sequence catalog, native feasibility checks, and measurement catalog
+  all actually executed in the same managed build. No Homebrew fallback.
+- `npm run ci`: build (including frontend/Desktop Host) and **328 Node + 45
+  frontend tests PASS**. `npm run test:python`: **62 PASS** (Media 41,
+  Transcription 10, Alignment 11). `npm audit --audit-level=low`: zero findings.
+- Tauri CI: **23 Rust supervisor tests PASS**, locked dependency check and
+  release shell compilation PASS. No local Rust/native Windows claim.
+- `git diff --check`: PASS. Local Markdown destination validation: 19 targets
+  PASS. Closed ADR 0020, its functional catalog, Project IR/Store, Alignment,
+  Transcription and dependency lockfile remain byte-unchanged from base.
+
+The exact measurement catalog recorded **25 successful reports** plus asserted
+rejection/cancellation/timeout/worker-death cases. Successful reports do not
+label the acoustic content PASS of quality.
+
+| Exact-runtime check | Measured result / acceptance |
+|---|---|
+| Sine 0.5, 44.1/48 kHz | RMS 0.353553385298; error <2e-6; 176,400 / 192,000 frames in 4 s |
+| Fractional-ms tail 3,991..3,999 | 352 / 384 actual frames, respectively |
+| Independent EBU 3341 test 1 | I -23.000; S max -22.993 LUFS; ±0.1 LU tolerance; 171 valid complete windows |
+| Analytic intersample fixture | sample peak 0.565685439; true peak 0.800037787; expected continuous amplitude 0.8 ±0.01 |
+| Float amplitude 2 | RMS 1.414213569; sample/true peak 2.000000020; unrounded full-scale flags true |
+| Digital zero / below gate / 50 ms | distinct silence / no-eligible-blocks / insufficient-duration evidence; no finite sentinel substitution |
+| Coverage and malformed signal | long-container/short-audio, partial range, absent/video stream, truncated input, unsupported layout and NaN/±Inf rejected |
+| Explicit audio stream / late start | second audio stream and source PTS interval 2,100..2,900 ms passed, without shifting the stream to zero |
+| Lifecycle / non-mutation | abort, timeout and abrupt worker death rejected; observed owned child settled; no report promotion or measurement artifact; Project IR/history unchanged |
+| Compatibility | derived float32 sequence headroom retained by measurement; legacy `extract-audio` remains `pcm_s16le`; existing Alignment suites pass |
+
+Exact-run resource observations (sampled every 20 ms, not OS peak guarantees):
+
+- 30-minute compressed AAC, late 1 s excerpt: **102.1 / 84.5 / 85.7 ms** for
+  three calls in one warmed worker (not a controlled cold-cache benchmark).
+- 120 s analysis: **2,720.3 ms**, 5,760,000 actual sample frames, **775-byte**
+  report; longest analysis tested is 120 s, not a complete 30-minute analysis.
+- Catalog maximum: **70,880 KiB = 69.22 MiB** worker-tree RSS, **2 processes**,
+  **898-byte** report, **119.7%** sampled CPU across the tree. Integrated CPU
+  time, filesystem I/O and unobserved transient peaks are NOT MEASURED.
+- Synthetic fixture storage: **31,536,682 bytes (~30.1 MiB)**. Measurement
+  itself creates **zero output/intermediate files**.
+- Regression guards: <768 MiB sampled RSS, ≤2 observed processes, <4 KiB
+  reports for these fixtures; sampling must actually return observations.
+  Fixed metadata/probe bounds and native fixed-window accumulators provide
+  structural memory bounds. These are not project duration/video limits.
+
+Remaining limitations are explicit in ADR 0021: common mono/stereo rates only,
+unresolved semantic ADTS/TS priming despite proven decoded coverage,
+conservative tiny-drain rejection, no complete EBU/ITU certification, and no
+native Windows process-tree validation. Independent review approved the final
+feature head before PR #38 merged; the broader workflows and certifications
+listed above remain outside this closed slice.

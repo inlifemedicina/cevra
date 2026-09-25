@@ -22,6 +22,8 @@ export type CapabilityReason =
   | "available"
   | "runtime-not-configured"
   | "runtime-invalid"
+  | "archive-unavailable"
+  | "archive-full"
   | "model-not-available"
   | "host-unavailable";
 

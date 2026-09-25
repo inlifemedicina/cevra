@@ -51,6 +51,35 @@ new partial outputs and retries them with a new worker `jobId`. A two-phase
 committed before a process stopped, preventing duplicate execution or deletion of
 the committed output.
 
+Desktop production uses the operational archive defined by
+[ADR 0028](adr/0028-durable-media-execution-archive-v1.md). It adds atomic
+`create()` so duplicate IDs cannot overwrite one another, persists minimal
+composite intents and shares the trusted Project persistence owner lease.
+`recoverPending()` remains the historical explicit cleanup-and-retry API. Desktop
+startup instead calls `reconcilePendingWithoutReplay()` only after canonical
+ProjectHistory restoration. That path may reconcile or safely clean proven-owned
+artifacts, but never calls retry, an engine, a worker or a new job ID.
+
+An isolated retry is deliberately unavailable for a `mux-audio` operation with
+typed `durationValidation`: a persisted media record cannot reconstruct the
+trusted source/intermediate guards of its composite resolved-audio execution.
+The refusal occurs before a new attempt, worker job or engine call. The safe
+path is a new composite execution that revalidates its inputs. Existing retry
+behavior remains available for independent operations and legacy mux records
+outside that conservative class.
+
+Within the live resolved-audio execution, the sequence PCM path is not authority
+by itself. Before mux consumption and again before `export.add`, Application
+binds the succeeded child attempt, canonical operation/result URI and original
+publication evidence, then asks the artifact adapter to re-prove the current
+publication identity. Missing, mismatched or unsupported evidence fails closed;
+a foreign replacement is preserved through ownership-safe cleanup.
+
+An `application-committed` composite intent means only that `history.commit`
+completed in memory. It becomes `durable-succeeded` only after the Desktop
+Project checkpoint succeeds. Archive corruption cannot corrupt the Project Store
+or authorize cleanup; ambiguous publication evidence fails safe by preservation.
+
 ## Internationalization
 
 Application errors expose stable `MEDIA_*` codes separately from localized text.

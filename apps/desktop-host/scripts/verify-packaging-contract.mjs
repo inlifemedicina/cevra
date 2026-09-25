@@ -33,7 +33,7 @@ try {
   const bundleDir = resolve(staged, "desktop-host");
   const pythonDir = resolve(staged, "python");
   const environmentRoot = resolve(staged, "transcription-runtime");
-  const pythonExecutable = resolve(environmentRoot, "bin", "python3");
+  const pythonExecutable = resolve(environmentRoot, process.platform === "win32" ? "Scripts/python.exe" : "bin/python3");
   await mkdir(bundleDir, { recursive: true });
   await mkdir(pythonDir, { recursive: true });
   await mkdir(dirname(pythonExecutable), { recursive: true });

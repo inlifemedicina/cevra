@@ -24,7 +24,7 @@ if str(WORKER_DIRECTORY) not in sys.path:
 
 from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
-WORKER_VERSION = "0.1.0"
+WORKER_VERSION = "0.3.1"
 PROTOCOL_VERSION = 1
 UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
@@ -86,6 +86,9 @@ MAX_MEDIA_FPS = 240
 MAX_MEDIA_DURATION_SECONDS = 7 * 24 * 60 * 60
 MAX_MEDIA_INPUTS = 128
 MAX_MEDIA_PATH_LENGTH = 32_768
+MAX_AUDIO_SEQUENCE_ITEMS = 2_048
+MAX_AUDIO_SEQUENCE_GAIN_DB = 24
+MIN_AUDIO_SEQUENCE_GAIN_DB = -120
 ALLOWED_UPSTREAM_TOOLS = frozenset({
     "audio", "crop", "cut", "fit", "join", "loudness", "probe", "silence",
 })
@@ -225,6 +228,19 @@ def _encoders() -> List[str]:
     return sorted(set(result))
 
 
+def _filters() -> List[str]:
+    ffmpeg = _tool("ffmpeg")
+    if not ffmpeg:
+        return []
+    proc = _run([ffmpeg, "-hide_banner", "-filters"])
+    result: List[str] = []
+    for line in (proc.stdout or "").splitlines():
+        match = re.match(r"^\s*[TSC\.]{3}\s+(\S+)\s", line)
+        if match and match.group(1) != "=":
+            result.append(match.group(1))
+    return sorted(set(result))
+
+
 def _hwaccels() -> List[str]:
     ffmpeg = _tool("ffmpeg")
     if not ffmpeg:
@@ -267,6 +283,7 @@ def runtime_capabilities() -> Dict[str, Any]:
         "ffmpegVersion": build.get("version"),
         "ffmpegLicense": build.get("license"),
         "encoders": _encoders(),
+        "filters": _filters(),
         "hwaccels": _hwaccels(),
     }
     _RUNTIME_CAPABILITIES_CACHE = (signature, result)
@@ -424,6 +441,26 @@ def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ff
     tools["cevra-extract-frame"] = {
         "usable": "yes" if png_available else "no",
         **({} if png_available else {"missing": ["PNG encoder" if ffmpeg_present else "ffmpeg"]}),
+    }
+    required_audio_sequence_filters = {"afade", "aformat", "adelay", "amix", "anullsrc", "aresample", "asetpts", "asplit", "atrim", "pan", "volume"}
+    available_filters = set(_filters()) if ffmpeg_present else set()
+    available_encoders = set(_encoders()) if ffmpeg_present else set()
+    missing_audio_sequence = sorted(required_audio_sequence_filters - available_filters)
+    if "pcm_f32le" not in available_encoders:
+        missing_audio_sequence.append("encoder:pcm_f32le")
+    if not ffmpeg_present:
+        missing_audio_sequence.extend(["ffmpeg", "ffprobe"])
+    tools["cevra-render-audio-sequence"] = {
+        "usable": "no" if missing_audio_sequence else "yes",
+        **({"missing": sorted(set(missing_audio_sequence))} if missing_audio_sequence else {"detail": "pcm_f32le/48000 with fixed bounded audio graph"}),
+    }
+    required_measurement = {"astats", "ebur128", "aeval", "aresample", "aformat", "asplit", "asettb", "atrim", "asetpts", "ametadata", "anullsink"}
+    missing_measurement = sorted(required_measurement - available_filters)
+    if "pcm_f64le" not in available_encoders:
+        missing_measurement.append("encoder:pcm_f64le")
+    tools["cevra-measure-audio"] = {
+        "usable": "no" if missing_measurement else "yes",
+        **({"missing": missing_measurement} if missing_measurement else {"detail": "native-rate read-only astats/ebur128 with drained SWR 4x peak evidence"}),
     }
 
 
@@ -603,7 +640,7 @@ def _attach_effective_profile(result: Dict[str, Any], name: str, arguments: Dict
         profile["audioCodec"] = normalized
         available = set(runtime_capabilities().get("encoders") or [])
         copied_audio = arguments.get("audio_codec") == "copy"
-        profile["audioEncoder"] = "copy" if copied_audio else (_audio_encoder(normalized, available) or "unknown")
+        profile["audioEncoder"] = "copy" if copied_audio else ("pcm_f32le" if name == "cevra-render-audio-sequence" else (_audio_encoder(normalized, available) or "unknown"))
     payload["effectiveProfile"] = profile
     result["structuredContent"] = payload
     return result
@@ -616,7 +653,8 @@ def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any
         _validate_tool_arguments(name, arguments)
     except (PermissionError, ValueError) as exc:
         return {"isError": True, "content": [{"type": "text", "text": str(exc)}]}
-    _ensure_profile()
+    if name != "cevra-measure-audio":
+        _ensure_profile()
     custom = call_custom_tool(name, arguments or {}, VENDOR_ROOT)
     if custom is not None:
         return _attach_effective_profile(custom, name, arguments)
@@ -685,7 +723,47 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
     non_negative = {"type": "number", "minimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS}
     positive_integer = {"type": "integer", "minimum": 1}
     non_negative_integer = {"type": "integer", "minimum": 0}
+    millisecond = {"type": "integer", "minimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS * 1000}
+    positive_millisecond = {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_DURATION_SECONDS * 1000}
+    audio_source = {
+        "type": "object", "additionalProperties": False,
+        "properties": {
+            "id": {"type": "string", "minLength": 1, "maxLength": 128},
+            "uri": path,
+        },
+        "required": ["id", "uri"],
+    }
+    audio_item = {
+        "type": "object", "additionalProperties": False,
+        "properties": {
+            "source_id": {"type": "string", "minLength": 1, "maxLength": 128},
+            "source_start_ms": millisecond,
+            "source_end_ms": positive_millisecond,
+            "timeline_start_ms": millisecond,
+            "gain_db": {"type": "number", "minimum": MIN_AUDIO_SEQUENCE_GAIN_DB, "maximum": MAX_AUDIO_SEQUENCE_GAIN_DB},
+            "fade_in_ms": millisecond,
+            "fade_out_ms": millisecond,
+        },
+        "required": ["source_id", "source_start_ms", "source_end_ms", "timeline_start_ms"],
+    }
+    mux_duration_validation = {
+        "type": "object", "additionalProperties": False,
+        "properties": {
+            "version": {"type": "integer", "enum": [1]},
+            "video_duration_ms": positive_millisecond,
+            "audio_duration_ms": positive_millisecond,
+            "input_tolerance_ms": {"type": "integer", "minimum": 0, "maximum": 1000},
+            "output_audio_tolerance_ms": {"type": "integer", "minimum": 0, "maximum": 1000},
+        },
+        "required": ["version", "video_duration_ms", "audio_duration_ms", "input_tolerance_ms", "output_audio_tolerance_ms"],
+    }
     schemas = {
+        "cevra-measure-audio": {
+            "properties": {"version": {"type": "integer", "enum": [1]}, "input": path,
+                           "stream_index": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+                           "start_ms": millisecond, "end_ms": positive_millisecond},
+            "required": ["version", "input", "stream_index", "start_ms", "end_ms"],
+        },
         "cevra-extract-frame": {
             "properties": {"input": path, "output": path, "at": non_negative},
             "required": ["input", "output", "at"],
@@ -707,8 +785,19 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
             "required": ["input", "output"],
         },
         "cevra-mux-audio": {
-            "properties": {"video": path, "audio": path, "output": path, "container": {"type": "string", "enum": sorted(DELIVERY_CONTAINERS)}, "audio_codec": {"type": "string", "enum": sorted(DELIVERY_AUDIO_CODECS)}, "replace_existing": {"type": "boolean"}},
+            "properties": {"video": path, "audio": path, "output": path, "container": {"type": "string", "enum": sorted(DELIVERY_CONTAINERS)}, "audio_codec": {"type": "string", "enum": sorted(DELIVERY_AUDIO_CODECS)}, "replace_existing": {"type": "boolean"}, "duration_validation": mux_duration_validation},
             "required": ["video", "audio", "output"],
+        },
+        "cevra-render-audio-sequence": {
+            "properties": {
+                "version": {"type": "integer", "enum": [1]},
+                "sources": {"type": "array", "minItems": 1, "maxItems": MAX_MEDIA_INPUTS, "items": audio_source},
+                "items": {"type": "array", "minItems": 1, "maxItems": MAX_AUDIO_SEQUENCE_ITEMS, "items": audio_item},
+                "output": path,
+                "output_duration_ms": positive_millisecond,
+                "output_channel_layout": {"type": "string", "enum": ["mono", "stereo"]},
+            },
+            "required": ["version", "sources", "items", "output", "output_duration_ms", "output_channel_layout"],
         },
     }
     return [

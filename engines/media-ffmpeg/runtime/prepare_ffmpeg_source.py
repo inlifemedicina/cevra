@@ -78,6 +78,8 @@ def extract_verified_archive(archive: Path, destination: Path) -> None:
 def prepare(destination: Path) -> Path:
     if shutil.which("gpg") is None:
         raise SystemExit("gpg is required to verify the FFmpeg release signature")
+    if shutil.which("gpgv") is None:
+        raise SystemExit("gpgv is required to verify the FFmpeg release signature")
     destination.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="cevra-ffmpeg-source-") as temp_name:
         temp = Path(temp_name)
@@ -102,8 +104,9 @@ def prepare(destination: Path) -> Path:
         expected = PIN["signingFingerprint"].upper()
         if expected not in fingerprints:
             raise SystemExit(f"FFmpeg signing key fingerprint mismatch: expected {expected}")
-        command(["gpg", "--batch", "--import", str(key)], env=env)
-        verification = command(["gpg", "--batch", "--status-fd", "1", "--verify", str(signature), str(archive)], env=env)
+        keyring = temp / "ffmpeg-signing-key.gpg"
+        command(["gpg", "--batch", "--yes", "--dearmor", "--output", str(keyring), str(key)], env=env)
+        verification = command(["gpgv", "--status-fd", "1", "--keyring", str(keyring), str(signature), str(archive)], env=env)
         if not signature_matches(verification, expected):
             raise SystemExit(f"FFmpeg release signature was not made by pinned fingerprint {expected}")
 

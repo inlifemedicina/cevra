@@ -358,13 +358,13 @@ impl SupervisorCore {
             && self.restart_count.load(Ordering::Relaxed) == 0
         {
             self.process.lock().ok().map(|mut process| process.take());
+            self.set_state(Lifecycle::Recoverable);
             self.pending.lock().ok().map(|mut pending| {
                 pending.reject_all(DesktopCommandError::new(
                     "HOST_PROCESS_EXITED",
                     "Desktop host exited unexpectedly; durable recovery is available.",
                 ))
             });
-            self.set_state(Lifecycle::Recoverable);
         } else if self.state() != Lifecycle::Failed {
             self.fail(DesktopCommandError::new(
                 "HOST_UNAVAILABLE",
@@ -696,7 +696,7 @@ fn trusted_runtime_environment(
             let private_python = resources.join("python-runtime");
             let transcription = resources.join("transcription-runtime");
             let model_cache = resources.join("models");
-            let python = transcription.join("bin/python3");
+            let python = transcription.join(venv_python_relative_path(cfg!(windows)));
             if private_python.is_dir()
                 && transcription.is_dir()
                 && model_cache.is_dir()
@@ -743,6 +743,14 @@ fn trusted_runtime_environment(
     Ok(allowed)
 }
 
+fn venv_python_relative_path(windows: bool) -> &'static str {
+    if windows {
+        "Scripts/python.exe"
+    } else {
+        "bin/python3"
+    }
+}
+
 fn lock_error<T>(_: std::sync::PoisonError<T>) -> DesktopCommandError {
     DesktopCommandError::new(
         "HOST_SUPERVISOR_FAILED",
@@ -754,6 +762,12 @@ fn lock_error<T>(_: std::sync::PoisonError<T>) -> DesktopCommandError {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn private_engine_venv_layout_is_platform_specific() {
+        assert_eq!(venv_python_relative_path(false), "bin/python3");
+        assert_eq!(venv_python_relative_path(true), "Scripts/python.exe");
+    }
 
     #[derive(Clone, Copy)]
     enum HelloMode {
