@@ -257,22 +257,30 @@ export class SourceTechnicalDescriptorApplicationService {
     request: AdoptSourceTechnicalDescriptorRequest,
     signal?: AbortSignal
   ): Promise<AdoptSourceTechnicalDescriptorOutcome> {
-    let stable: AdoptSourceTechnicalDescriptorRequest;
-    try {
-      stable = clone(request);
-    } catch (cause) {
-      throw new SourceTechnicalDescriptorError("SOURCE_DESCRIPTOR_INVALID_REQUEST", this.options.history.current.project.defaultLocale, "invalid-source-descriptor", cause);
-    }
     const before = this.options.history.current;
-    const locale = stable.locale ?? before.project.defaultLocale;
-    const operationId = stable.id ?? this.idGenerator();
-    if (!isRecord(stable) || !hasOnlyKeys(stable, ["id", "sourceId", "locale", "actor"])
-      || typeof stable.sourceId !== "string" || stable.sourceId.trim().length === 0
-      || (stable.id !== undefined && (typeof stable.id !== "string" || stable.id.trim().length === 0))
-      || (stable.locale !== undefined && stable.locale !== "pt-BR" && stable.locale !== "en-US")
-      || !isActor(stable.actor ?? { type: "user" })) {
-      throw new SourceTechnicalDescriptorError("SOURCE_DESCRIPTOR_INVALID_REQUEST", locale, operationId);
+    const defaultLocale = before.project.defaultLocale === "en-US" ? "en-US" : "pt-BR";
+    let candidate: unknown;
+    try {
+      candidate = clone(request);
+    } catch (cause) {
+      throw new SourceTechnicalDescriptorError("SOURCE_DESCRIPTOR_INVALID_REQUEST", defaultLocale, "invalid-source-descriptor", cause);
     }
+    const errorLocale = isRecord(candidate) && (candidate.locale === "pt-BR" || candidate.locale === "en-US")
+      ? candidate.locale
+      : defaultLocale;
+    const errorOperationId = isRecord(candidate) && typeof candidate.id === "string" && candidate.id.trim().length > 0
+      ? candidate.id
+      : "invalid-source-descriptor";
+    if (!isRecord(candidate) || !hasOnlyKeys(candidate, ["id", "sourceId", "locale", "actor"])
+      || typeof candidate.sourceId !== "string" || candidate.sourceId.trim().length === 0
+      || (candidate.id !== undefined && (typeof candidate.id !== "string" || candidate.id.trim().length === 0))
+      || (candidate.locale !== undefined && candidate.locale !== "pt-BR" && candidate.locale !== "en-US")
+      || !isActor(candidate.actor === undefined ? { type: "user" } : candidate.actor)) {
+      throw new SourceTechnicalDescriptorError("SOURCE_DESCRIPTOR_INVALID_REQUEST", errorLocale, errorOperationId);
+    }
+    const stable = candidate as unknown as AdoptSourceTechnicalDescriptorRequest;
+    const locale = stable.locale ?? defaultLocale;
+    const operationId = stable.id ?? this.idGenerator();
     const source = before.sources.find((item) => item.id === stable.sourceId);
     if (!source) throw new SourceTechnicalDescriptorError("SOURCE_DESCRIPTOR_SOURCE_UNKNOWN", locale, operationId);
     if (source.kind !== "video" && source.kind !== "audio") {

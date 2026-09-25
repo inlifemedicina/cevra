@@ -113,7 +113,7 @@ export interface ExecuteResolvedAudioPlanOutcome {
 
 export interface ResolvedAudioPlanApplicationServiceOptions {
   history: ProjectHistory;
-  media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs" | "getExecutionRecord">;
+  media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs" | "getExecutionRecord" | "assertOwnedOutputPublication">;
   intents?: MediaExecutionIntentRepository;
   sourceVerifier?: SourceTechnicalDescriptorResolver;
   clock?: () => string;
@@ -122,7 +122,7 @@ export interface ResolvedAudioPlanApplicationServiceOptions {
 
 export class ResolvedAudioPlanApplicationService {
   private readonly history: ProjectHistory;
-  private readonly media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs" | "getExecutionRecord">;
+  private readonly media: Pick<MediaApplicationService, "execute" | "cleanupOwnedOutputs" | "getExecutionRecord" | "assertOwnedOutputPublication">;
   private readonly idGenerator: () => string;
   private readonly intents: MediaExecutionIntentRepository;
   private readonly clock: () => string;
@@ -237,7 +237,15 @@ export class ResolvedAudioPlanApplicationService {
         },
         actor: stableRequest.actor ?? { type: "user" }
       }, signal, {
-        verify: async (guardSignal) => this.preCommitSourceGuard(sourceMemo, guardSignal)
+        beforeEngine: {
+          verify: async () => this.media.assertOwnedOutputPublication(audioExecutionId, plan.operation.outputUri)
+        },
+        beforeCommit: {
+          verify: async (guardSignal) => {
+            await this.media.assertOwnedOutputPublication(audioExecutionId, plan.operation.outputUri);
+            await this.preCommitSourceGuard(sourceMemo, guardSignal);
+          }
+        }
       });
 
       await this.transitionIntent(intent, "application-committed");

@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { lstat, mkdtemp, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { CEVRA_ENGINE_API_VERSION } from "@cevra/contracts";
@@ -33,6 +36,38 @@ class MemoryArtifacts {
   }
 }
 
+class RealArtifacts {
+  failRemoval = new Set();
+  removed = [];
+  async kind(uri) {
+    try {
+      const metadata = await lstat(uri);
+      return metadata.isSymbolicLink() ? "symlink" : metadata.isFile() ? "file" : "other";
+    } catch (error) {
+      if (error?.code === "ENOENT") return "missing";
+      throw error;
+    }
+  }
+  async exists(uri) { return (await this.kind(uri)) !== "missing"; }
+  async remove(uri) {
+    if (this.failRemoval.has(uri)) throw new Error("simulated cleanup failure");
+    await unlink(uri);
+    this.removed.push(uri);
+  }
+  async matchesPublication(uri, evidence) {
+    try {
+      const metadata = await lstat(uri, { bigint: true });
+      return process.platform !== "win32" && metadata.isFile() && !metadata.isSymbolicLink()
+        && evidence.scheme === "posix-dev-inode"
+        && evidence.device === metadata.dev.toString()
+        && evidence.inode === metadata.ino.toString();
+    } catch (error) {
+      if (error?.code === "ENOENT") return false;
+      throw error;
+    }
+  }
+}
+
 const publication = { version: 1, scheme: "posix-dev-inode", device: "1", inode: "1" };
 
 class FakeEngine {
@@ -44,6 +79,14 @@ class FakeEngine {
   async execute(operation, context) {
     this.calls.push({ operation, context });
     return this.executeImpl(operation, context);
+  }
+}
+
+class HookRepository extends InMemoryMediaExecutionRepository {
+  constructor(hook) { super(); this.hook = hook; }
+  async save(record) {
+    await this.hook?.(record);
+    return super.save(record);
   }
 }
 
@@ -127,6 +170,11 @@ function muxResult(operation, durationMs = 4_000) {
       outputAudioDurationMs: operation.durationValidation.audioDurationMs
     } } : {})
   };
+}
+
+async function realPublication(uri) {
+  const metadata = await lstat(uri, { bigint: true });
+  return { version: 1, scheme: "posix-dev-inode", device: metadata.dev.toString(), inode: metadata.ino.toString() };
 }
 
 function services(executeImpl, project = projectFixture(), sourceVerifier) {
@@ -334,6 +382,144 @@ test("source change during resolved-audio consumption prevents export promotion 
   assert.equal(artifacts.files.has("/render/changed.wav"), false);
   assert.equal(artifacts.files.has("/render/changed.mp4"), false);
   assert.equal(port.checkCalls.at(-1).exportCount, 0);
+});
+
+test("validated mux retry cannot bypass source verification after a retained PCM cleanup failure", async (t) => {
+  if (process.platform === "win32") return t.skip("POSIX publication identity fixture");
+  const root = await mkdtemp(join(tmpdir(), "cevra-validated-mux-retry-"));
+  try {
+    const uris = Object.fromEntries(["a", "b", "music", "visual", "pcm", "output"]
+      .map((name) => [name, join(root, name === "visual" || name === "output" ? `${name}.mp4` : `${name}.wav`)]));
+    await Promise.all([
+      writeFile(uris.a, "source-a"), writeFile(uris.b, "source-b"), writeFile(uris.music, "music"), writeFile(uris.visual, "visual")
+    ]);
+    const project = projectFixture();
+    for (const source of project.sources) source.uri = uris[source.id];
+    project.sources.find((source) => source.id === "a").technicalDescriptor = sourceDescriptor("a");
+    project.sources.find((source) => source.id === "b").technicalDescriptor = sourceDescriptor("b");
+    const history = historyFixture(project);
+    const state = { changed: false };
+    const port = verificationPort(history, state);
+    const artifacts = new RealArtifacts();
+    artifacts.failRemoval.add(uris.pcm);
+    const repository = new InMemoryMediaExecutionRepository();
+    const engine = new FakeEngine(async (operation) => {
+      if (operation.type === "render-audio-sequence") {
+        await Promise.all(operation.sources.map((source) => readFile(source.uri)));
+        await writeFile(operation.outputUri, "original-pcm");
+        return { ...sequenceResult(operation), publication: await realPublication(operation.outputUri) };
+      }
+      await Promise.all([readFile(operation.videoUri), readFile(operation.audioUri)]);
+      await writeFile(operation.outputUri, "muxed");
+      state.changed = true;
+      return { ...muxResult(operation), publication: await realPublication(operation.outputUri) };
+    });
+    const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
+    const service = new ResolvedAudioPlanApplicationService({
+      history, media, intents: repository, sourceVerifier: new SourceTechnicalDescriptorResolver(port), clock: () => now
+    });
+    const plan = service.compile({ id: "retry-guard", audioOutputUri: uris.pcm, outputChannelLayout: "stereo", normalization: { type: "none" } });
+    await assert.rejects(
+      service.execute({ id: "retry-guard", plan, visual: { ...visual(plan), uri: uris.visual }, outputUri: uris.output, exportId: "retry-guard", presetId: "fixture" }),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_RECOVERY_FAILED"
+    );
+    assert.equal(await readFile(uris.pcm, "utf8"), "original-pcm");
+    assert.equal(history.current.exports.length, 0);
+    const before = await repository.get("retry-guard:mux");
+    const revision = history.current.history.revision;
+    const callCount = engine.calls.length;
+    await assert.rejects(media.retry("retry-guard:mux"),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_NOT_RETRYABLE");
+    const after = await repository.get("retry-guard:mux");
+    assert.equal(engine.calls.length, callCount);
+    assert.equal(after.attempts.length, before.attempts.length);
+    assert.equal(history.current.history.revision, revision);
+    assert.equal(history.current.exports.length, 0);
+    assert.equal(await readFile(uris.a, "utf8"), "source-a");
+    assert.equal(await readFile(uris.visual, "utf8"), "visual");
+
+    const nextPlan = service.compile({ id: "new-composite", audioOutputUri: join(root, "new.wav"), outputChannelLayout: "stereo", normalization: { type: "none" } });
+    await assert.rejects(
+      service.execute({ id: "new-composite", plan: nextPlan, visual: { ...visual(nextPlan), uri: uris.visual }, outputUri: join(root, "new.mp4"), exportId: "new", presetId: "fixture" }),
+      (error) => error instanceof ResolvedAudioPlanError && error.code === "AUDIO_PLAN_SOURCE_CONTENT_CHANGED"
+    );
+    assert.equal(engine.calls.length, callCount + 1, "new composite execution rechecks after its new sequence output");
+    assert.equal(engine.calls.at(-1).operation.type, "render-audio-sequence");
+    assert.equal(history.current.exports.length, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("PCM publication replacement is reproduced without the guard and rejected by production consumption guards", async (t) => {
+  if (process.platform === "win32") return t.skip("POSIX publication identity fixture");
+  async function runCase(protectConsumption) {
+    const root = await mkdtemp(join(tmpdir(), `cevra-pcm-consumption-${protectConsumption ? "guarded" : "control"}-`));
+    const uris = Object.fromEntries(["a", "b", "music", "visual", "pcm", "replacement", "output"]
+      .map((name) => [name, join(root, name === "visual" || name === "output" ? `${name}.mp4` : `${name}.wav`)]));
+    await Promise.all([
+      writeFile(uris.a, "source-a"), writeFile(uris.b, "source-b"), writeFile(uris.music, "music"),
+      writeFile(uris.visual, "visual"), writeFile(uris.replacement, "foreign-pcm")
+    ]);
+    const project = projectFixture();
+    for (const source of project.sources) source.uri = uris[source.id];
+    const history = historyFixture(project);
+    const artifacts = new RealArtifacts();
+    let replaced = false;
+    const repository = new HookRepository(async (record) => {
+      if (!replaced && record.id === "pcm-boundary:mux" && record.status === "running") {
+        replaced = true;
+        await rename(uris.replacement, uris.pcm);
+      }
+    });
+    let muxCalls = 0;
+    const engine = new FakeEngine(async (operation) => {
+      if (operation.type === "render-audio-sequence") {
+        await Promise.all(operation.sources.map((source) => readFile(source.uri)));
+        await writeFile(operation.outputUri, "original-pcm");
+        return { ...sequenceResult(operation), publication: await realPublication(operation.outputUri) };
+      }
+      muxCalls += 1;
+      await readFile(operation.videoUri);
+      const consumed = await readFile(operation.audioUri);
+      await writeFile(operation.outputUri, consumed);
+      return { ...muxResult(operation), publication: await realPublication(operation.outputUri) };
+    });
+    const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
+    const resolvedMedia = protectConsumption ? media : {
+      execute: media.execute.bind(media),
+      cleanupOwnedOutputs: media.cleanupOwnedOutputs.bind(media),
+      getExecutionRecord: media.getExecutionRecord.bind(media),
+      assertOwnedOutputPublication: async () => undefined
+    };
+    const service = new ResolvedAudioPlanApplicationService({ history, media: resolvedMedia, intents: repository, clock: () => now });
+    const plan = service.compile({ id: "pcm-boundary", audioOutputUri: uris.pcm, outputChannelLayout: "stereo", normalization: { type: "none" } });
+    const request = { id: "pcm-boundary", plan, visual: { ...visual(plan), uri: uris.visual }, outputUri: uris.output, exportId: "pcm-boundary", presetId: "fixture" };
+    return { root, uris, history, artifacts, service, request, getMuxCalls: () => muxCalls };
+  }
+
+  const control = await runCase(false);
+  try {
+    await control.service.execute(control.request);
+    assert.equal(control.getMuxCalls(), 1);
+    assert.equal(await readFile(control.uris.output, "utf8"), "foreign-pcm", "unguarded control reproduces wrong PCM consumption");
+    assert.equal(control.history.current.exports.length, 1);
+  } finally {
+    await rm(control.root, { recursive: true, force: true });
+  }
+
+  const guarded = await runCase(true);
+  try {
+    await assert.rejects(guarded.service.execute(guarded.request),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_RECOVERY_FAILED");
+    assert.equal(guarded.getMuxCalls(), 0, "publication mismatch must fail before mux engine execution");
+    assert.equal(guarded.history.current.exports.length, 0);
+    assert.equal(await readFile(guarded.uris.pcm, "utf8"), "foreign-pcm", "foreign replacement must survive cleanup");
+    assert.equal(await readFile(guarded.uris.visual, "utf8"), "visual");
+    assert.equal(await guarded.artifacts.kind(guarded.uris.output), "missing");
+  } finally {
+    await rm(guarded.root, { recursive: true, force: true });
+  }
 });
 
 test("descriptor-bearing resolved audio fails closed when source verification capability is absent", async () => {

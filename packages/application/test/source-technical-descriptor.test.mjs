@@ -368,9 +368,22 @@ test("post-ingest captures getter-backed caller input once before any asynchrono
 
 test("post-ingest request and actor schemas are closed", async () => {
   for (const request of [
+    null,
+    undefined,
+    [],
+    "source-1",
+    42,
+    {},
+    { sourceId: null },
+    { sourceId: 42 },
     { sourceId: "source-1", extra: true },
     { sourceId: "source-1", actor: { type: "user", extra: true } },
-    { sourceId: "source-1", id: "" }
+    { sourceId: "source-1", actor: null },
+    { sourceId: "source-1", locale: "fr" },
+    { sourceId: "source-1", locale: null },
+    { sourceId: "source-1", locale: 42 },
+    { sourceId: "source-1", id: "" },
+    { sourceId: "source-1", id: null }
   ]) {
     const context = fixture();
     await assert.rejects(
@@ -380,6 +393,20 @@ test("post-ingest request and actor schemas are closed", async () => {
     assert.equal(context.media.calls.length, 0);
     assert.equal(context.history.entries.length, 0);
   }
+
+  const throwing = fixture();
+  const request = {};
+  Object.defineProperty(request, "sourceId", { enumerable: true, get() { throw new Error("getter failure"); } });
+  await assert.rejects(
+    throwing.service.adopt(request),
+      (error) => error instanceof SourceTechnicalDescriptorError
+      && error.code === "SOURCE_DESCRIPTOR_INVALID_REQUEST"
+      && error.locale === "pt-BR"
+      && error.operationId === "invalid-source-descriptor"
+  );
+  assert.equal(throwing.media.calls.length, 0);
+  assert.equal(throwing.identity.captureCalls, 0);
+  assert.equal(throwing.history.entries.length, 0);
 });
 
 test("resolver distinguishes adopted evidence, verifies once per execution, invalidates memo, and fails closed without capability", async () => {

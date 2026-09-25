@@ -13,6 +13,7 @@ const ERROR_KEYS: Readonly<Record<MediaApplicationErrorCode, TranslationKey>> = 
   MEDIA_INVALID_REQUEST: "media.error.invalidRequest",
   MEDIA_PROJECT_COMMIT_FAILED: "media.error.commitFailed",
   MEDIA_RECOVERY_FAILED: "media.error.recoveryFailed",
+  MEDIA_INPUT_ARTIFACT_CHANGED: "media.error.inputArtifactChanged",
   SOURCE_CONTENT_CHANGED: "sourceDescriptor.error.contentChanged",
   SOURCE_OFFLINE: "sourceDescriptor.error.sourceOffline",
   SOURCE_VERIFICATION_UNAVAILABLE: "sourceDescriptor.error.identityUnavailable"

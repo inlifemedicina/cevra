@@ -212,6 +212,7 @@
   "media.error.invalidRequest": "A solicitação da operação de mídia é inválida.",
   "media.error.commitFailed": "Não foi possível adicionar a saída de mídia ao projeto.",
   "media.error.recoveryFailed": "Não foi possível recuperar com segurança a operação de mídia interrompida.",
+  "media.error.inputArtifactChanged": "Um artefato intermediário de mídia necessário não é mais o arquivo publicado.",
   "ingest.error.invalidRequest": "A solicitação de mídia local é inválida.",
   "ingest.error.unsupportedMedia": "O arquivo selecionado não contém um fluxo de vídeo ou áudio compatível.",
   "ingest.error.kindMismatch": "O arquivo selecionado não corresponde ao tipo de mídia esperado.",

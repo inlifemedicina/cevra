@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { chmod, lstat, mkdtemp, readFile, rename, rm, symlink, unlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -153,6 +154,38 @@ test("Node source identity detects path replacement, symlinks, special files, of
     assert.equal((await lstat(replacement)).isFile(), true);
   } finally {
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Node source identity observes cancellation delivered on the final hash chunk and closes the handle", async () => {
+  for (const bytes of [Buffer.alloc(512 * 1024, 3), Buffer.alloc(3 * 1024 * 1024, 7)]) {
+    const directory = await mkdtemp(join(tmpdir(), "cevra-source-final-abort-"));
+    const path = join(directory, "source.bin");
+    const controller = new AbortController();
+    const store = new NodeMediaArtifactStore({
+      onSourceIdentityChunk(bytesRead) {
+        if (bytesRead === bytes.length) controller.abort();
+      }
+    });
+    try {
+      await writeFile(path, bytes);
+      const initial = await store.captureSource(path);
+      await assert.rejects(
+        store.identifySource(path, initial, controller.signal),
+        (error) => error instanceof NodeSourceContentIdentityError && error.code === "SOURCE_IDENTITY_CANCELLED"
+      );
+      await rename(path, join(directory, "closed.bin"));
+
+      const controlPath = join(directory, "control.bin");
+      await writeFile(controlPath, bytes);
+      const control = new NodeMediaArtifactStore();
+      const controlInitial = await control.captureSource(controlPath);
+      const identity = await control.identifySource(controlPath, controlInitial);
+      assert.equal(identity.bytesRead, bytes.length);
+      assert.equal(identity.content.sha256, createHash("sha256").update(bytes).digest("hex"));
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 });
 

@@ -111,12 +111,15 @@ export class NodeMediaArtifactStore {
         bytesRead += read.bytesRead;
         await this.diagnostics.onSourceIdentityChunk?.(bytesRead);
       }
+      signal?.throwIfAborted();
       const afterHandle = stampFromStats(uri, expected.canonicalPath, await handle.stat({ bigint: true }));
       if (bytesRead !== expected.sizeBytes || !sameStamp(afterHandle, expected)) throw changed();
+      signal?.throwIfAborted();
       await handle.close();
       handle = undefined;
       const afterPath = await captureRegularFile(uri);
       if (!sameStamp(afterPath, expected)) throw changed();
+      signal?.throwIfAborted();
       return {
         version: 1,
         content: { sha256: digest.digest("hex"), sizeBytes: bytesRead },

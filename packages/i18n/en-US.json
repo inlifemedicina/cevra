@@ -212,6 +212,7 @@
   "media.error.invalidRequest": "The media operation request is invalid.",
   "media.error.commitFailed": "The media output could not be added to the project.",
   "media.error.recoveryFailed": "The interrupted media operation could not be recovered safely.",
+  "media.error.inputArtifactChanged": "A required intermediate media artifact is no longer the published file.",
   "ingest.error.invalidRequest": "The local media request is invalid.",
   "ingest.error.unsupportedMedia": "The selected file does not contain a supported video or audio stream.",
   "ingest.error.kindMismatch": "The selected file does not match the expected media type.",
