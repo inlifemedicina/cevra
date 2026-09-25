@@ -164,8 +164,16 @@ the failed portability invocation is not product evidence.
 
 Historical normal CI run `36084236839` on documentation head
 `0750473cc29e8333fa67dd7c7baafad9b9654321` passed 5/5 jobs; it is not evidence
-for the remediation checkpoint. Final broad local regression and remote normal
-CI remain pending at this documentation checkpoint. The feature push allowlist
+for the remediation checkpoint. The final broad local regression over remediation
+code `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358fa` passed all workspace builds and
+**481/481** Node/TypeScript tests when the documented bundled Python 3.12.14 was
+provided to managed Desktop fixtures. The Python suites passed **56/56 Media**,
+**10/10 Transcription** and **11/11 Alignment**; `npm audit` reported zero
+vulnerabilities, `git diff --check` passed and 21 changed-document local links
+resolved. A first broad invocation with the shell's Python 3.9.6 reproduced only
+the known managed-Transcription version gate; the directed Desktop Host rerun
+with Python 3.12.14 passed **70/70**. Local Rust/Tauri remains NOT RUN because
+`cargo` is unavailable. Remote normal CI remains pending. The feature push allowlist
 does not naturally run the exact workflow; the future pull-request path filter
 does include the changed Application/Media files and must execute the updated
 descriptor-bearing catalog before merge. ADR 0029 remains **ACCEPTED
