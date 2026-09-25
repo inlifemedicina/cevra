@@ -1,10 +1,14 @@
 import {
   CURRENT_SCHEMA_VERSION,
+  MAX_SOURCE_TECHNICAL_DESCRIPTOR_BYTES,
   MAX_TRANSCRIPT_PROVENANCE_STAGES,
   PROJECT_IR_SCHEMA_VERSION_V1,
+  SOURCE_TECHNICAL_DESCRIPTOR_PROFILE,
+  SOURCE_TECHNICAL_DESCRIPTOR_VERSION,
   type ProjectIR,
   type ProjectIRv2,
   type SourceAsset,
+  type SourceTechnicalDescriptorV1,
   type SourceTranscript,
   type TranscriptSpeakerState
 } from "./types.js";
@@ -67,6 +71,111 @@ function validateSource(source: unknown, index: number, issues: ValidationIssue[
     if (source[key] !== undefined && (!isFiniteNumber(source[key]) || (source[key] as number) <= 0)) push(issues, `${path}.${key}`, "range", `${key} must be greater than 0.`);
   }
   if (source.frameRate !== undefined && (!isFiniteNumber(source.frameRate) || source.frameRate <= 0)) push(issues, `${path}.frameRate`, "range", "frameRate must be greater than 0.");
+}
+
+const SOURCE_TECHNICAL_STRING_MAX_SCALARS = 64;
+
+function validateSourceTechnicalDescriptor(
+  value: unknown,
+  source: Record<string, unknown>,
+  path: string,
+  issues: ValidationIssue[]
+): void {
+  if (!isRecord(value)) return push(issues, path, "type", "technicalDescriptor must be an object.");
+  rejectUnexpectedKeys(value, ["version", "basis", "content", "method", "video", "audio"], path, issues);
+  if (value.version !== SOURCE_TECHNICAL_DESCRIPTOR_VERSION) push(issues, `${path}.version`, "version", "Unsupported source technical descriptor version.");
+  if (value.basis !== "ingest" && value.basis !== "post-ingest") push(issues, `${path}.basis`, "enum", "Unsupported source technical descriptor basis.");
+
+  if (!isRecord(value.content)) push(issues, `${path}.content`, "type", "content must be an object.");
+  else {
+    rejectUnexpectedKeys(value.content, ["sha256", "sizeBytes"], `${path}.content`, issues);
+    if (typeof value.content.sha256 !== "string" || !/^[0-9a-f]{64}$/u.test(value.content.sha256)) {
+      push(issues, `${path}.content.sha256`, "digest", "sha256 must contain 64 lowercase hexadecimal characters.");
+    }
+    if (!Number.isSafeInteger(value.content.sizeBytes) || (value.content.sizeBytes as number) < 0) {
+      push(issues, `${path}.content.sizeBytes`, "range", "sizeBytes must be a non-negative safe integer.");
+    }
+  }
+
+  if (!isRecord(value.method)) push(issues, `${path}.method`, "type", "method must be an object.");
+  else {
+    rejectUnexpectedKeys(value.method, ["profile", "engineId", "engineVersion", "engineApiVersion"], `${path}.method`, issues);
+    if (value.method.profile !== SOURCE_TECHNICAL_DESCRIPTOR_PROFILE) push(issues, `${path}.method.profile`, "profile", "Unsupported source technical descriptor profile.");
+    for (const key of ["engineId", "engineVersion"] as const) {
+      if (!isTechnicalString(value.method[key])) push(issues, `${path}.method.${key}`, "string", `${key} must be a bounded technical string.`);
+    }
+    if (!Number.isSafeInteger(value.method.engineApiVersion) || (value.method.engineApiVersion as number) <= 0) {
+      push(issues, `${path}.method.engineApiVersion`, "range", "engineApiVersion must be a positive safe integer.");
+    }
+  }
+
+  if (value.video !== undefined) {
+    const videoPath = `${path}.video`;
+    if (!isRecord(value.video)) push(issues, videoPath, "type", "video must be an object.");
+    else {
+      const video = value.video;
+      const keys = ["codec", "pixelFormat", "avgFrameRate", "rFrameRate", "rotationDegrees", "colorPrimaries", "colorTransfer", "colorSpace", "colorRange"] as const;
+      rejectUnexpectedKeys(video, [...keys], videoPath, issues);
+      if (!keys.some((key) => video[key] !== undefined)) push(issues, videoPath, "empty", "video must contain selected-stream evidence.");
+      for (const key of ["codec", "pixelFormat", "colorPrimaries", "colorTransfer", "colorSpace", "colorRange"] as const) {
+        if (video[key] !== undefined && !isTechnicalString(video[key])) push(issues, `${videoPath}.${key}`, "string", `${key} must be a bounded technical string.`);
+      }
+      for (const key of ["avgFrameRate", "rFrameRate"] as const) {
+        if (video[key] !== undefined && !isCanonicalPositiveRational(video[key])) push(issues, `${videoPath}.${key}`, "rational", `${key} must be a reduced positive integer ratio.`);
+      }
+      if (video.rotationDegrees !== undefined
+        && (!Number.isSafeInteger(video.rotationDegrees) || (video.rotationDegrees as number) < -359 || (video.rotationDegrees as number) > 359)) {
+        push(issues, `${videoPath}.rotationDegrees`, "range", "rotationDegrees must be an integer from -359 through 359.");
+      }
+    }
+  }
+
+  if (value.audio !== undefined) {
+    const audioPath = `${path}.audio`;
+    if (!isRecord(value.audio)) push(issues, audioPath, "type", "audio must be an object.");
+    else {
+      rejectUnexpectedKeys(value.audio, ["codec"], audioPath, issues);
+      if (value.audio.codec === undefined) push(issues, audioPath, "empty", "audio must contain selected-stream evidence.");
+      if (value.audio.codec !== undefined && !isTechnicalString(value.audio.codec)) push(issues, `${audioPath}.codec`, "string", "codec must be a bounded technical string.");
+    }
+  }
+
+  if (source.kind === "image") push(issues, path, "source-kind", "Image sources cannot carry the V1 technical descriptor.");
+  if (value.video !== undefined && source.kind !== "video") push(issues, `${path}.video`, "source-kind", "Video evidence requires a video source.");
+  if (value.audio !== undefined && source.kind !== "video" && source.kind !== "audio") push(issues, `${path}.audio`, "source-kind", "Audio evidence requires an audio or video source.");
+
+  try {
+    if (new TextEncoder().encode(JSON.stringify(value)).byteLength > MAX_SOURCE_TECHNICAL_DESCRIPTOR_BYTES) {
+      push(issues, path, "size", `technicalDescriptor exceeds ${MAX_SOURCE_TECHNICAL_DESCRIPTOR_BYTES} UTF-8 bytes.`);
+    }
+  } catch {
+    push(issues, path, "serialization", "technicalDescriptor must be serializable JSON data.");
+  }
+}
+
+function isTechnicalString(value: unknown): value is string {
+  return typeof value === "string"
+    && value.length > 0
+    && value === value.trim()
+    && hasValidUnicodeScalars(value)
+    && [...value].length <= SOURCE_TECHNICAL_STRING_MAX_SCALARS
+    && !/[\u0000-\u001f\u007f-\u009f]/u.test(value);
+}
+
+function isCanonicalPositiveRational(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > SOURCE_TECHNICAL_STRING_MAX_SCALARS) return false;
+  const match = /^([1-9]\d*)\/([1-9]\d*)$/u.exec(value);
+  if (!match) return false;
+  const numerator = BigInt(match[1]!);
+  const denominator = BigInt(match[2]!);
+  return greatestCommonDivisor(numerator, denominator) === BigInt(1);
+}
+
+function greatestCommonDivisor(left: bigint, right: bigint): bigint {
+  let a = left;
+  let b = right;
+  while (b !== BigInt(0)) [a, b] = [b, a % b];
+  return a;
 }
 
 function validateTrack(track: unknown, index: number, issues: ValidationIssue[]): void {
@@ -289,6 +398,12 @@ function validateProjectIRv2(value: unknown): ValidationResult<ProjectIRv2> {
   if (value.schemaVersion !== CURRENT_SCHEMA_VERSION) push(issues, "schemaVersion", "schema", `Expected schemaVersion ${CURRENT_SCHEMA_VERSION}.`);
   if (hasOwn(value, "transcript")) push(issues, "transcript", "legacy", "Legacy top-level transcript is not allowed in schema v2.");
   validateSharedProject(value, issues);
+
+  if (Array.isArray(value.sources)) value.sources.forEach((source, index) => {
+    if (isRecord(source) && source.technicalDescriptor !== undefined) {
+      validateSourceTechnicalDescriptor(source.technicalDescriptor, source, `sources[${index}].technicalDescriptor`, issues);
+    }
+  });
 
   if (!Array.isArray(value.sourceTranscripts)) push(issues, "sourceTranscripts", "type", "sourceTranscripts must be an array.");
   if (issues.length === 0) {
@@ -592,6 +707,16 @@ export function assertValidProjectIR(value: unknown): ProjectIR {
 export function assertValidSourceTranscriptForCreation(value: SourceTranscript): SourceTranscript {
   const issues: ValidationIssue[] = [];
   validateSourceTranscriptValue(value, 0, issues, undefined, false);
+  if (issues.length > 0) throwValidation(issues);
+  return value;
+}
+
+export function assertValidSourceTechnicalDescriptor(
+  value: SourceTechnicalDescriptorV1,
+  sourceKind: SourceAsset["kind"]
+): SourceTechnicalDescriptorV1 {
+  const issues: ValidationIssue[] = [];
+  validateSourceTechnicalDescriptor(value, { kind: sourceKind }, "technicalDescriptor", issues);
   if (issues.length > 0) throwValidation(issues);
   return value;
 }

@@ -1,5 +1,6 @@
 export * from "./errors.js";
 export * from "./local-source-ingest.js";
+export * from "./local-source-uri.js";
 export * from "./media-service.js";
 export * from "./media-operation.js";
 export * from "./repository.js";
@@ -8,3 +9,4 @@ export * from "./alignment-service.js";
 export * from "./resolved-audio-plan.js";
 export * from "./types.js";
 export * from "./execution-archive.js";
+export * from "./source-technical-descriptor.js";

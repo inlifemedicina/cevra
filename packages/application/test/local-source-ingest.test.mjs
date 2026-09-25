@@ -24,7 +24,7 @@ class FakeMediaApplicationService {
   }
 }
 
-function fixture(execute) {
+function fixture(execute, identity) {
   let historyId = 0;
   const history = new ProjectHistory(
     createEmptyProject({ id: "project-1", name: "Project", locale: "pt-BR", now }),
@@ -35,9 +35,41 @@ function fixture(execute) {
   const service = new LocalSourceIngestService({
     media,
     history,
+    ...(identity ? { identity } : {}),
     idGenerator: () => generated.shift() ?? "unexpected-id"
   });
   return { service, history, media };
+}
+
+function verifiedIdentity(uri, sizeBytes = 4096) {
+  const stamp = {
+    version: 1,
+    uri,
+    canonicalPath: "/verified/source.mov",
+    device: "1",
+    inode: "2",
+    sizeBytes,
+    mtimeNs: "3",
+    ctimeNs: "4"
+  };
+  return {
+    calls: [],
+    async captureSource(candidate) {
+      this.calls.push(["capture", candidate]);
+      return stamp;
+    },
+    async identifySource(candidate, expected) {
+      this.calls.push(["identify", candidate]);
+      assert.deepEqual(expected, stamp);
+      return {
+        version: 1,
+        content: { sha256: "c".repeat(64), sizeBytes },
+        stamp,
+        bytesRead: sizeBytes
+      };
+    },
+    async checkSource() { return "match"; }
+  };
 }
 
 function successfulProbe(request, history, probe) {
@@ -129,6 +161,123 @@ test("ingests a local video through the media application probe and commits one 
   assert.deepEqual(context.media.calls[0].request.operation, { type: "probe", inputUri: "/Users/editor/Original Camera File.mov" });
   assert.deepEqual(context.media.calls[0].request.mutation, { type: "none" });
   assert.equal("outputUri" in context.media.calls[0].request.operation, false);
+});
+
+test("verified ingest adopts one normalized descriptor in the same source.add without persisting heuristics", async () => {
+  let history;
+  const identity = verifiedIdentity(videoUri, 4096);
+  const context = fixture(async (request) => successfulProbe(request, history, {
+    uri: request.operation.inputUri,
+    sizeBytes: 4096,
+    durationMs: 12_345,
+    width: 3840,
+    height: 2160,
+    frameRate: 29.97,
+    avgFrameRate: "60000/2002",
+    rFrameRate: "30/1",
+    variableFrameRateSuspected: true,
+    rotationDegrees: 360,
+    pixelFormat: "yuv420p10le",
+    bitDepth: 10,
+    colorSpace: "bt2020nc",
+    colorPrimaries: "bt2020",
+    colorTransfer: "bt709",
+    colorRange: "tv",
+    hdr: true,
+    hdrFormat: "heuristic-hdr",
+    hasVideo: true,
+    hasAudio: true,
+    videoCodec: "h264",
+    audioCodec: "aac"
+  }), identity);
+  history = context.history;
+
+  const outcome = await context.service.ingest({ uri: videoUri, displayName: "Original.mov" });
+  assert.equal(history.entries.length, 1);
+  assert.equal(history.entries[0].command.type, "source.add");
+  assert.deepEqual(identity.calls, [["capture", videoUri], ["identify", videoUri]]);
+  assert.deepEqual(outcome.source.technicalDescriptor, {
+    version: 1,
+    basis: "ingest",
+    content: { sha256: "c".repeat(64), sizeBytes: 4096 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra.media.ffmpeg",
+      engineVersion: "1.0.0",
+      engineApiVersion: 1
+    },
+    video: {
+      codec: "h264",
+      pixelFormat: "yuv420p10le",
+      avgFrameRate: "30000/1001",
+      rFrameRate: "30/1",
+      rotationDegrees: 0,
+      colorPrimaries: "bt2020",
+      colorTransfer: "bt709",
+      colorSpace: "bt2020nc",
+      colorRange: "tv"
+    },
+    audio: { codec: "aac" }
+  });
+  for (const field of ["bitDepth", "hdr", "hdrFormat", "variableFrameRateSuspected", "dolbyVision"]) {
+    assert.equal(JSON.stringify(outcome.source.technicalDescriptor).includes(field), false);
+  }
+  assert.ok(outcome.source.extensions["cevra.ingest"]);
+});
+
+test("verified ingest snapshots caller values before its first await", async () => {
+  let history;
+  let releaseCapture;
+  const captureBarrier = new Promise((resolve) => { releaseCapture = resolve; });
+  const identity = verifiedIdentity(videoUri, 10);
+  identity.captureSource = async (uri) => {
+    await captureBarrier;
+    return { version: 1, uri, canonicalPath: "/verified/source.mov", device: "1", inode: "2", sizeBytes: 10, mtimeNs: "3", ctimeNs: "4" };
+  };
+  const context = fixture(async (request) => successfulProbe(request, history, {
+    uri: request.operation.inputUri,
+    sizeBytes: 10,
+    durationMs: 1_000,
+    frameRate: 25,
+    hasVideo: true,
+    hasAudio: false,
+    videoCodec: "h264"
+  }), identity);
+  history = context.history;
+  const request = { uri: videoUri, displayName: "Before.mov", sourceId: "before" };
+  const pending = context.service.ingest(request);
+  request.uri = "file:///foreign.mov";
+  request.displayName = "After.mov";
+  request.sourceId = "after";
+  releaseCapture();
+  const outcome = await pending;
+  assert.equal(outcome.source.id, "before");
+  assert.equal(outcome.source.uri, videoUri);
+  assert.equal(outcome.source.displayName, "Before.mov");
+});
+
+test("verified ingest rejects identity change without a canonical mutation", async () => {
+  let history;
+  const identity = verifiedIdentity(videoUri, 10);
+  identity.identifySource = async () => {
+    throw Object.assign(new Error("changed"), { code: "SOURCE_IDENTITY_CHANGED" });
+  };
+  const context = fixture(async (request) => successfulProbe(request, history, {
+    uri: request.operation.inputUri,
+    sizeBytes: 10,
+    durationMs: 1_000,
+    frameRate: 25,
+    hasVideo: true,
+    hasAudio: false,
+    videoCodec: "h264"
+  }), identity);
+  history = context.history;
+  await assert.rejects(
+    context.service.ingest({ uri: videoUri, displayName: "Camera.mov" }),
+    (error) => error instanceof LocalSourceIngestError && error.code === "LOCAL_SOURCE_CONTENT_CHANGED"
+  );
+  assert.equal(history.entries.length, 0);
+  assert.equal(history.current.sources.length, 0);
 });
 
 test("ingests audio-only media as an audio source", async () => {

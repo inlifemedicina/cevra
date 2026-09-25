@@ -49,6 +49,20 @@ export interface MediaApplicationServiceOptions {
   idGenerator?: () => string;
 }
 
+/** Trusted Application-only guards. They are never serialized or accepted from a product request. */
+export interface MediaExecutionGuards {
+  beforeEngine?: { verify(signal?: AbortSignal): Promise<void> };
+  beforeCommit?: { verify(signal?: AbortSignal): Promise<void> };
+}
+
+export class MediaExecutionGuardError extends Error {
+  constructor(readonly code: Extract<MediaApplicationErrorCode,
+    "MEDIA_INPUT_ARTIFACT_CHANGED" | "SOURCE_CONTENT_CHANGED" | "SOURCE_OFFLINE" | "SOURCE_VERIFICATION_UNAVAILABLE">) {
+    super(code);
+    this.name = "MediaExecutionGuardError";
+  }
+}
+
 class AttemptFailure extends Error {
   constructor(readonly code: MediaApplicationErrorCode, message: string, readonly parameter?: string) {
     super(message);
@@ -72,7 +86,11 @@ export class MediaApplicationService {
     this.idGenerator = options.idGenerator ?? defaultId;
   }
 
-  async execute(request: MediaExecutionRequest, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
+  async execute(
+    request: MediaExecutionRequest,
+    signal?: AbortSignal,
+    guards?: MediaExecutionGuards
+  ): Promise<MediaExecutionOutcome> {
     const defaultLocale = this.history.current.project.defaultLocale;
     let candidate: MediaExecutionRequest | undefined;
     let stableRequest: Required<Pick<MediaExecutionRequest, "id" | "locale" | "operation" | "mutation" | "actor">>
@@ -108,7 +126,7 @@ export class MediaApplicationService {
       }
       throw cause;
     }
-    return this.runAttempt(record, signal);
+    return this.runAttempt(record, signal, guards);
   }
 
   /**
@@ -164,6 +182,11 @@ export class MediaApplicationService {
     const locale = record?.locale ?? this.history.current.project.defaultLocale;
     if (!record) throw new MediaApplicationError("MEDIA_OPERATION_NOT_FOUND", locale, executionId);
     if (record.projectId !== this.history.current.project.id || !["failed", "cancelled", "interrupted"].includes(record.status)) {
+      throw new MediaApplicationError("MEDIA_OPERATION_NOT_RETRYABLE", locale, executionId);
+    }
+    // A validated mux can depend on transient Application guards that are not
+    // serialized. Isolated retry cannot safely reconstruct those guards.
+    if (record.operation.type === "mux-audio" && record.operation.durationValidation !== undefined) {
       throw new MediaApplicationError("MEDIA_OPERATION_NOT_RETRYABLE", locale, executionId);
     }
     try {
@@ -252,7 +275,35 @@ export class MediaApplicationService {
     return this.executions.get(executionId);
   }
 
-  private async runAttempt(record: MediaExecutionRecord, signal?: AbortSignal): Promise<MediaExecutionOutcome> {
+  async assertOwnedOutputPublication(executionId: string, expectedOutputUri: string): Promise<void> {
+    const record = await this.executions.get(executionId);
+    const locale = record?.locale ?? this.history.current.project.defaultLocale;
+    const attempt = record?.attempts.at(-1);
+    const result = attempt?.result;
+    const allowedOutputs = record ? mediaOperationOutputUris(record.operation) : [];
+    const publication = attempt?.ownedOutputPublications?.find(({ uri }) => uri === expectedOutputUri);
+    const bound = record?.status === "succeeded"
+      && attempt?.status === "succeeded"
+      && allowedOutputs.length === 1
+      && allowedOutputs[0] === expectedOutputUri
+      && attempt.outputUris.length === 1
+      && attempt.outputUris[0] === expectedOutputUri
+      && result?.type === "file"
+      && result.outputUri === expectedOutputUri
+      && result.publication !== undefined
+      && publication !== undefined
+      && samePublicationEvidence(result.publication, publication.evidence);
+    if (!bound || !this.artifacts.matchesPublication
+      || !await this.artifacts.matchesPublication(expectedOutputUri, publication.evidence)) {
+      throw new MediaExecutionGuardError("MEDIA_INPUT_ARTIFACT_CHANGED");
+    }
+  }
+
+  private async runAttempt(
+    record: MediaExecutionRecord,
+    signal?: AbortSignal,
+    guards?: MediaExecutionGuards
+  ): Promise<MediaExecutionOutcome> {
     const outputUris = mediaOperationOutputUris(record.operation);
     const current = this.history.current;
     const attempt: MediaExecutionAttempt = {
@@ -295,6 +346,8 @@ export class MediaApplicationService {
       record.status = "running";
       await this.executions.save(record);
 
+      await guards?.beforeEngine?.verify(signal);
+      if (signal?.aborted) throw abortMarker();
       const result = await this.engine.execute(record.operation, { jobId: attempt.jobId, locale: record.locale, ...(signal ? { signal } : {}) });
       if (hasExclusivePublication(record.operation) && result.type === "file" && result.outputUri === outputUris[0]) {
         attempt.ownedOutputUris.push(result.outputUri);
@@ -318,6 +371,7 @@ export class MediaApplicationService {
       attempt.result = clone(result);
       record.status = "committing";
       await this.executions.save(record);
+      await guards?.beforeCommit?.verify(signal);
       if (signal?.aborted) throw abortMarker();
       const commitProject = this.history.current;
       if ((record.projectBinding || record.mutation.type !== "none")
@@ -351,7 +405,10 @@ export class MediaApplicationService {
       }
       const cancelled = isAbort(cause, signal);
       const failure = cause instanceof AttemptFailure ? cause : undefined;
-      const code: MediaApplicationErrorCode = cancelled ? "MEDIA_OPERATION_CANCELLED" : failure?.code ?? "MEDIA_OPERATION_FAILED";
+      const guardFailure = cause instanceof MediaExecutionGuardError ? cause : undefined;
+      const code: MediaApplicationErrorCode = cancelled
+        ? "MEDIA_OPERATION_CANCELLED"
+        : guardFailure?.code ?? failure?.code ?? "MEDIA_OPERATION_FAILED";
       const cleanup = hasExclusivePublication(record.operation)
         ? await this.cleanupPublished(record.operation, attempt.outputUris, attempt.ownedOutputPublications ?? [], attempt.preexistingOutputUris)
         : await this.cleanup(attempt.outputUris, attempt.preexistingOutputUris);
@@ -718,6 +775,13 @@ function isAbort(error: unknown, signal?: AbortSignal): boolean {
 
 function technicalMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function samePublicationEvidence(left: MediaPublicationEvidenceV1, right: MediaPublicationEvidenceV1): boolean {
+  return left.version === right.version
+    && left.scheme === right.scheme
+    && left.device === right.device
+    && left.inode === right.inode;
 }
 
 function validateDeliveryPostcondition(operation: MediaOperation, result: Extract<MediaOperationResult, { type: "file" }>): void {

@@ -14,6 +14,22 @@ const now = "2026-09-15T12:00:00.000Z";
 const unavailable = { available: false, reason: "runtime-not-configured" };
 const hostRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
+function technicalDescriptor() {
+  return {
+    version: 1,
+    basis: "ingest",
+    content: { sha256: "b".repeat(64), sizeBytes: 1234 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra-media-ffmpeg",
+      engineVersion: "0.2.1",
+      engineApiVersion: 1
+    },
+    video: { codec: "h264", avgFrameRate: "30000/1001" },
+    audio: { codec: "aac" }
+  };
+}
+
 async function temporaryRoot(t) {
   const root = await mkdtemp(resolve(tmpdir(), "cevra-persistence-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -86,6 +102,24 @@ test("save close reopen preserves exact history, IDs, source URI, transcript pro
   await reopened.persistence.close();
 });
 
+test("checkpoint and simple reopen preserve the source descriptor without reading source media", async (t) => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options());
+  opened.history.commit({ type: "source.add", source: {
+    id: "source-descriptor", kind: "video", uri: "/definitely/offline/source.mov", displayName: "source.mov",
+    durationMs: 1234, width: 1920, height: 1080, frameRate: 29.97, checksum: "legacy:kept",
+    technicalDescriptor: technicalDescriptor()
+  } });
+  await opened.persistence.checkpoint(opened.history);
+  await opened.persistence.close();
+
+  const reopened = await DesktopProjectPersistence.open(root, options());
+  assert.deepEqual(reopened.history.current.sources[0].technicalDescriptor, technicalDescriptor());
+  assert.equal(reopened.history.current.sources[0].uri, "/definitely/offline/source.mov");
+  assert.equal(reopened.history.current.sources[0].checksum, "legacy:kept");
+  await reopened.persistence.close();
+});
+
 test("every session mutation checkpoints before returning success", async (t) => {
   const root = await temporaryRoot(t);
   const opened = await DesktopProjectPersistence.open(root, options());
@@ -128,6 +162,39 @@ test("every session mutation checkpoints before returning success", async (t) =>
   durable = await readDurableHistory(root);
   assert.equal(durable.current.sourceTranscripts.length, 1);
   assert.equal(durable.canRedo, false);
+  await session.close();
+});
+
+test("internal descriptor adoption checkpoints the exact ProjectHistory mutation before returning", async (t) => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options());
+  opened.history.commit({ type: "source.add", source: {
+    id: "source-adopt", kind: "video", uri: "/media/adopt.mov", displayName: "adopt.mov", durationMs: 1234
+  } });
+  await opened.persistence.checkpoint(opened.history);
+  const descriptor = { ...technicalDescriptor(), basis: "post-ingest" };
+  const session = new DesktopSession({
+    history: opened.history,
+    persistence: opened.persistence,
+    mediaCapability: { available: true, reason: "available" },
+    transcriptionCapability: unavailable,
+    sourceTechnicalDescriptor: {
+      async adopt() {
+        const project = opened.history.commit({
+          type: "source.technicalDescriptor.set",
+          sourceId: "source-adopt",
+          expectedSourceUri: "/media/adopt.mov",
+          expectedTechnicalDescriptor: { state: "absent" },
+          technicalDescriptor: descriptor
+        });
+        return { source: project.sources[0], project, probeExecution: {}, bytesRead: 1234 };
+      }
+    }
+  });
+
+  await session.adoptSourceTechnicalDescriptor({ sourceId: "source-adopt", id: "adopt" });
+  const durable = await readDurableHistory(root);
+  assert.deepEqual(durable.current.sources[0].technicalDescriptor, descriptor);
   await session.close();
 });
 

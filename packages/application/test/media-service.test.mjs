@@ -246,6 +246,73 @@ test("retry reuses the application record with a new worker job and commits only
   assert.equal((await repository.get("retry-execution")).attempts.length, 2);
 });
 
+test("validated mux retry is refused before a new attempt or engine call while legacy mux remains retryable", async () => {
+  const validatedMux = {
+    ...muxAudio,
+    durationValidation: { version: 1, videoDurationMs: 4000, audioDurationMs: 4000, inputToleranceMs: 1, outputAudioToleranceMs: 23 }
+  };
+  for (const status of ["failed", "cancelled", "interrupted"]) {
+    const artifacts = new MemoryArtifacts();
+    const repository = new InMemoryMediaExecutionRepository();
+    const engine = new FakeEngine(async () => assert.fail("validated mux retry must not execute"));
+    const { service, history } = fixture(engine, artifacts, repository);
+    await repository.save({
+      id: `validated-${status}`, projectId: "project-1", locale: "en-US", operation: validatedMux,
+      mutation: { type: "export.add", exportId: `export-${status}`, presetId: "test" },
+      actor: { type: "system" }, status, createdAt: now, attempts: []
+    });
+    const revision = history.current.history.revision;
+    await assert.rejects(service.retry(`validated-${status}`), (error) => error instanceof MediaApplicationError
+      && error.code === "MEDIA_OPERATION_NOT_RETRYABLE");
+    assert.equal(engine.calls.length, 0);
+    assert.equal((await repository.get(`validated-${status}`)).attempts.length, 0);
+    assert.equal(history.current.history.revision, revision);
+    assert.equal(history.current.exports.length, 0);
+  }
+
+  const legacyArtifacts = new MemoryArtifacts();
+  let legacyCalls = 0;
+  const legacyEngine = new FakeEngine(async (operation) => {
+    legacyCalls += 1;
+    legacyArtifacts.files.add(operation.outputUri);
+    return completedMuxAudio(operation);
+  });
+  const legacyRepository = new InMemoryMediaExecutionRepository();
+  const { service: legacyService } = fixture(legacyEngine, legacyArtifacts, legacyRepository);
+  await legacyRepository.save({
+    id: "legacy-mux", projectId: "project-1", locale: "en-US", operation: muxAudio,
+    mutation: { type: "export.add", exportId: "legacy-export", presetId: "test" },
+    actor: { type: "system" }, status: "failed", createdAt: now, attempts: []
+  });
+  assert.equal((await legacyService.retry("legacy-mux")).record.status, "succeeded");
+  assert.equal(legacyCalls, 1);
+});
+
+test("recoverPending reaches validated mux retry policy without replaying the engine", async () => {
+  const operation = {
+    ...muxAudio,
+    durationValidation: { version: 1, videoDurationMs: 4000, audioDurationMs: 4000, inputToleranceMs: 1, outputAudioToleranceMs: 23 }
+  };
+  const repository = new InMemoryMediaExecutionRepository({
+    version: 1,
+    records: [{
+      id: "pending-validated-mux", projectId: "project-1", locale: "en-US", operation,
+      mutation: { type: "export.add", exportId: "pending-export", presetId: "test" },
+      actor: { type: "system" }, status: "requested", createdAt: now, attempts: []
+    }]
+  });
+  const engine = new FakeEngine(async () => assert.fail("recovery must not replay validated mux"));
+  const { service, history } = fixture(engine, new MemoryArtifacts(), repository);
+
+  assert.deepEqual(await service.recoverPending(), [{
+    executionId: "pending-validated-mux", status: "interrupted", errorCode: "MEDIA_OPERATION_NOT_RETRYABLE"
+  }]);
+  assert.equal(engine.calls.length, 0);
+  assert.equal((await repository.get("pending-validated-mux")).attempts.length, 0);
+  assert.equal(history.current.exports.length, 0);
+  assert.equal(history.current.history.revision, 0);
+});
+
 test("crash recovery removes an uncommitted partial artifact and retries from persisted execution state", async () => {
   const artifacts = new MemoryArtifacts();
   artifacts.files.add(trim.outputUri);

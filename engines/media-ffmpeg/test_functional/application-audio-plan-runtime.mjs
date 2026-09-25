@@ -7,8 +7,10 @@ import path from "node:path";
 import { createEmptyProject, ProjectHistory } from "@cevra/project-ir";
 import {
   InMemoryMediaExecutionRepository,
+  LocalSourceIngestService,
   MediaApplicationService,
-  ResolvedAudioPlanApplicationService
+  ResolvedAudioPlanApplicationService,
+  SourceTechnicalDescriptorResolver
 } from "@cevra/application";
 import {
   FfmpegMediaEngine,
@@ -78,6 +80,26 @@ async function main() {
     assert.ok(Math.abs(correct.muxDuration.outputVideoDurationMs - 4_000) <= 1);
     assert.ok(Math.abs(correct.muxDuration.outputAudioDurationMs - 4_000) <= 23);
 
+    const descriptorSource = path.join(root, "descriptor-source.wav");
+    writeFloatWav(descriptorSource, 48_000, 4_000, [300, 1_300, 2_300, 3_300]);
+    const descriptorPositive = await runDescriptorVertical({ source: descriptorSource, visual, prefix: "descriptor-positive" });
+    assert.equal(descriptorPositive.descriptor.version, 1);
+    assert.equal(descriptorPositive.descriptor.basis, "ingest");
+    assert.equal(descriptorPositive.descriptor.method.profile, "cevra.source-technical.v1");
+    assert.equal(descriptorPositive.project.exports.length, 1);
+    assert.equal(descriptorPositive.pcmExistsAfterPromotion, false);
+
+    const changedDescriptorSource = path.join(root, "descriptor-source-changed.wav");
+    writeFloatWav(changedDescriptorSource, 48_000, 4_000, [400, 1_400, 2_400, 3_400]);
+    const descriptorNegative = await runDescriptorVertical({
+      source: changedDescriptorSource,
+      visual,
+      prefix: "descriptor-negative",
+      mutateAfterAdoption: () => writeFloatWav(changedDescriptorSource, 48_000, 4_000, [600, 1_600, 2_600, 3_600])
+    });
+    assert.equal(descriptorNegative.rejectedCode, "AUDIO_PLAN_SOURCE_CONTENT_CHANGED");
+    assert.equal(descriptorNegative.project.exports.length, 0);
+
     await assert.rejects(
       runVertical({ sourceA, sourceB, visual: shortVisual, wrongPlacement: false, prefix: "short-visual" }),
       (error) => causesContain(error, "mux input video stream duration")
@@ -119,7 +141,9 @@ async function main() {
         packetPayloadAndTimingIdentity: true,
         perStreamDurationEvidence: correct.muxDuration,
         shortVisualRejected: true,
-        shortAudioRejected: true
+        shortAudioRejected: true,
+        descriptorBearingAcquisitionAndExport: true,
+        descriptorBearingChangedSourceRejected: true
       },
       oracle: {
         toleranceMs: TIMING_TOLERANCE_MS,
@@ -136,6 +160,77 @@ async function main() {
     }, null, 2)}\n`);
   } finally {
     await client.close();
+  }
+}
+
+async function runDescriptorVertical({ source, visual, prefix, mutateAfterAdoption }) {
+  const project = createEmptyProject({
+    id: `${prefix}-project`, name: "Descriptor-bearing audio", locale: "en-US", now: "2026-09-25T00:00:00.000Z"
+  });
+  const history = new ProjectHistory(project);
+  const repository = new InMemoryMediaExecutionRepository();
+  const artifacts = new NodeMediaArtifactStore();
+  const media = new MediaApplicationService({ engine, history, executions: repository, artifacts });
+  let generated = 0;
+  const ingest = new LocalSourceIngestService({
+    history,
+    media,
+    identity: artifacts,
+    idGenerator: () => `${prefix}-ingest-${++generated}`
+  });
+  const ingestion = await ingest.ingest({
+    sourceId: `${prefix}-source`, uri: source, displayName: `${prefix} source`, expectedKind: "audio", locale: "en-US"
+  });
+  assert.ok(ingestion.source.technicalDescriptor, "managed probe and Node identity must adopt a real descriptor");
+  history.commit({
+    type: "track.add",
+    track: { id: `${prefix}-track`, kind: "audio", name: "Audio", locked: false, hidden: false, muted: false }
+  });
+  history.commit({
+    type: "clip.add",
+    clip: clip(`${prefix}-clip`, `${prefix}-track`, ingestion.source.id, 0, 4_000, 0, 4_000)
+  });
+
+  const service = new ResolvedAudioPlanApplicationService({
+    history,
+    media,
+    intents: repository,
+    sourceVerifier: new SourceTechnicalDescriptorResolver(artifacts),
+    idGenerator: () => `${prefix}-plan`
+  });
+  const pcm = path.join(root, `${prefix}-mix.wav`);
+  const output = path.join(root, `${prefix}-final.mp4`);
+  const plan = service.compile({ audioOutputUri: pcm, outputChannelLayout: "stereo", normalization: { type: "none" } });
+  mutateAfterAdoption?.();
+  try {
+    const outcome = await service.execute({
+      id: `${prefix}-vertical`,
+      plan,
+      visual: {
+        version: 1,
+        uri: visual,
+        projectBinding: plan.projectBinding,
+        durationMs: 4_000,
+        producerExecutionId: "synthetic-caller-visual-fixture"
+      },
+      outputUri: output,
+      exportId: `${prefix}-export`,
+      presetId: "application-audio-plan-functional"
+    });
+    return {
+      descriptor: ingestion.source.technicalDescriptor,
+      project: outcome.project,
+      pcmExistsAfterPromotion: exists(pcm)
+    };
+  } catch (error) {
+    if (!mutateAfterAdoption) throw error;
+    assert.equal(exists(output), false);
+    assert.equal(exists(pcm), false);
+    return {
+      descriptor: ingestion.source.technicalDescriptor,
+      project: history.current,
+      rejectedCode: error?.code
+    };
   }
 }
 

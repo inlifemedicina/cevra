@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { lstat, mkdtemp, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { CEVRA_ENGINE_API_VERSION } from "@cevra/contracts";
@@ -9,6 +12,7 @@ import {
   MediaApplicationService,
   ResolvedAudioPlanApplicationService,
   ResolvedAudioPlanError,
+  SourceTechnicalDescriptorResolver,
   compileResolvedAudioPlan
 } from "../dist/index.js";
 
@@ -32,6 +36,38 @@ class MemoryArtifacts {
   }
 }
 
+class RealArtifacts {
+  failRemoval = new Set();
+  removed = [];
+  async kind(uri) {
+    try {
+      const metadata = await lstat(uri);
+      return metadata.isSymbolicLink() ? "symlink" : metadata.isFile() ? "file" : "other";
+    } catch (error) {
+      if (error?.code === "ENOENT") return "missing";
+      throw error;
+    }
+  }
+  async exists(uri) { return (await this.kind(uri)) !== "missing"; }
+  async remove(uri) {
+    if (this.failRemoval.has(uri)) throw new Error("simulated cleanup failure");
+    await unlink(uri);
+    this.removed.push(uri);
+  }
+  async matchesPublication(uri, evidence) {
+    try {
+      const metadata = await lstat(uri, { bigint: true });
+      return process.platform !== "win32" && metadata.isFile() && !metadata.isSymbolicLink()
+        && evidence.scheme === "posix-dev-inode"
+        && evidence.device === metadata.dev.toString()
+        && evidence.inode === metadata.ino.toString();
+    } catch (error) {
+      if (error?.code === "ENOENT") return false;
+      throw error;
+    }
+  }
+}
+
 const publication = { version: 1, scheme: "posix-dev-inode", device: "1", inode: "1" };
 
 class FakeEngine {
@@ -43,6 +79,14 @@ class FakeEngine {
   async execute(operation, context) {
     this.calls.push({ operation, context });
     return this.executeImpl(operation, context);
+  }
+}
+
+class HookRepository extends InMemoryMediaExecutionRepository {
+  constructor(hook) { super(); this.hook = hook; }
+  async save(record) {
+    await this.hook?.(record);
+    return super.save(record);
   }
 }
 
@@ -128,7 +172,12 @@ function muxResult(operation, durationMs = 4_000) {
   };
 }
 
-function services(executeImpl, project = projectFixture()) {
+async function realPublication(uri) {
+  const metadata = await lstat(uri, { bigint: true });
+  return { version: 1, scheme: "posix-dev-inode", device: metadata.dev.toString(), inode: metadata.ino.toString() };
+}
+
+function services(executeImpl, project = projectFixture(), sourceVerifier) {
   const history = historyFixture(project);
   const artifacts = new MemoryArtifacts();
   const repository = new InMemoryMediaExecutionRepository();
@@ -137,8 +186,52 @@ function services(executeImpl, project = projectFixture()) {
     return operation.type === "render-audio-sequence" ? sequenceResult(operation) : muxResult(operation);
   }));
   const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
-  const service = new ResolvedAudioPlanApplicationService({ history, media, intents: repository, idGenerator: () => "plan-generated", clock: () => now });
+  const service = new ResolvedAudioPlanApplicationService({
+    history,
+    media,
+    intents: repository,
+    idGenerator: () => "plan-generated",
+    clock: () => now,
+    ...(sourceVerifier ? { sourceVerifier } : {})
+  });
   return { history, artifacts, repository, engine, media, service };
+}
+
+function sourceDescriptor(digest) {
+  return {
+    version: 1,
+    basis: "ingest",
+    content: { sha256: digest.repeat(64), sizeBytes: 1 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra.media.ffmpeg",
+      engineVersion: "0.3.0",
+      engineApiVersion: 1
+    },
+    video: { codec: "h264" },
+    audio: { codec: "aac" }
+  };
+}
+
+function verificationPort(history, state = { changed: false }) {
+  return {
+    captureCalls: [],
+    identifyCalls: [],
+    checkCalls: [],
+    async captureSource(uri) {
+      this.captureCalls.push(uri);
+      return { version: 1, uri, canonicalPath: uri, device: "1", inode: uri, sizeBytes: 1, mtimeNs: "1", ctimeNs: "1" };
+    },
+    async identifySource(uri, stamp) {
+      this.identifyCalls.push(uri);
+      const source = history.current.sources.find((item) => item.uri === uri);
+      return { version: 1, content: structuredClone(source.technicalDescriptor.content), stamp, bytesRead: 1 };
+    },
+    async checkSource(uri) {
+      this.checkCalls.push({ uri, exportCount: history.current.exports.length });
+      return state.changed ? "changed" : "match";
+    }
+  };
 }
 
 function visual(plan) {
@@ -228,6 +321,219 @@ test("Application executes sequence then exclusive mux, promotes one export, and
   assert.equal(artifacts.files.has("/render/audio.wav"), false);
   assert.equal(artifacts.files.has("/render/final.mp4"), true);
   assert.deepEqual(history.entries.at(-1).command.type, "export.add");
+});
+
+test("descriptor-bearing resolved audio verifies each unique source once and rechecks before export promotion", async () => {
+  const project = projectFixture();
+  project.sources.find((item) => item.id === "a").technicalDescriptor = sourceDescriptor("a");
+  project.sources.find((item) => item.id === "b").technicalDescriptor = sourceDescriptor("b");
+  const history = historyFixture(project);
+  const port = verificationPort(history);
+  const artifacts = new MemoryArtifacts();
+  const repository = new InMemoryMediaExecutionRepository();
+  const engine = new FakeEngine(async (operation) => {
+    artifacts.files.set(operation.outputUri, Buffer.from(operation.type));
+    return operation.type === "render-audio-sequence" ? sequenceResult(operation) : muxResult(operation);
+  });
+  const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
+  const service = new ResolvedAudioPlanApplicationService({
+    history,
+    media,
+    intents: repository,
+    sourceVerifier: new SourceTechnicalDescriptorResolver(port),
+    clock: () => now
+  });
+  const plan = service.compile({ id: "verified", audioOutputUri: "/render/verified.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  await service.execute({ id: "verified", plan, visual: visual(plan), outputUri: "/render/verified.mp4", exportId: "verified", presetId: "fixture" });
+  assert.deepEqual(port.captureCalls.sort(), ["/media/a.mov", "/media/b.mov"]);
+  assert.deepEqual(port.identifyCalls.sort(), ["/media/a.mov", "/media/b.mov"]);
+  assert.equal(port.checkCalls.length, 4, "two sources are rechecked after sequence and immediately before export.add");
+  assert.equal(port.checkCalls.every((call) => call.exportCount === 0), true, "decisive checks must occur before export.add");
+  assert.equal(history.current.exports.length, 1);
+});
+
+test("source change during resolved-audio consumption prevents export promotion and cleans owned outputs", async () => {
+  const project = projectFixture();
+  project.sources.find((item) => item.id === "a").technicalDescriptor = sourceDescriptor("a");
+  const history = historyFixture(project);
+  const state = { changed: false };
+  const port = verificationPort(history, state);
+  const artifacts = new MemoryArtifacts();
+  const repository = new InMemoryMediaExecutionRepository();
+  const engine = new FakeEngine(async (operation) => {
+    artifacts.files.set(operation.outputUri, Buffer.from(operation.type));
+    if (operation.type === "mux-audio") state.changed = true;
+    return operation.type === "render-audio-sequence" ? sequenceResult(operation) : muxResult(operation);
+  });
+  const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
+  const service = new ResolvedAudioPlanApplicationService({
+    history,
+    media,
+    intents: repository,
+    sourceVerifier: new SourceTechnicalDescriptorResolver(port),
+    clock: () => now
+  });
+  const plan = service.compile({ id: "changed", audioOutputUri: "/render/changed.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  await assert.rejects(
+    service.execute({ id: "changed", plan, visual: visual(plan), outputUri: "/render/changed.mp4", exportId: "changed", presetId: "fixture" }),
+    (error) => error instanceof MediaApplicationError && error.code === "SOURCE_CONTENT_CHANGED"
+  );
+  assert.equal(history.current.exports.length, 0);
+  assert.equal(artifacts.files.has("/render/changed.wav"), false);
+  assert.equal(artifacts.files.has("/render/changed.mp4"), false);
+  assert.equal(port.checkCalls.at(-1).exportCount, 0);
+});
+
+test("validated mux retry cannot bypass source verification after a retained PCM cleanup failure", async (t) => {
+  if (process.platform === "win32") return t.skip("POSIX publication identity fixture");
+  const root = await mkdtemp(join(tmpdir(), "cevra-validated-mux-retry-"));
+  try {
+    const uris = Object.fromEntries(["a", "b", "music", "visual", "pcm", "output"]
+      .map((name) => [name, join(root, name === "visual" || name === "output" ? `${name}.mp4` : `${name}.wav`)]));
+    await Promise.all([
+      writeFile(uris.a, "source-a"), writeFile(uris.b, "source-b"), writeFile(uris.music, "music"), writeFile(uris.visual, "visual")
+    ]);
+    const project = projectFixture();
+    for (const source of project.sources) source.uri = uris[source.id];
+    project.sources.find((source) => source.id === "a").technicalDescriptor = sourceDescriptor("a");
+    project.sources.find((source) => source.id === "b").technicalDescriptor = sourceDescriptor("b");
+    const history = historyFixture(project);
+    const state = { changed: false };
+    const port = verificationPort(history, state);
+    const artifacts = new RealArtifacts();
+    artifacts.failRemoval.add(uris.pcm);
+    const repository = new InMemoryMediaExecutionRepository();
+    const engine = new FakeEngine(async (operation) => {
+      if (operation.type === "render-audio-sequence") {
+        await Promise.all(operation.sources.map((source) => readFile(source.uri)));
+        await writeFile(operation.outputUri, "original-pcm");
+        return { ...sequenceResult(operation), publication: await realPublication(operation.outputUri) };
+      }
+      await Promise.all([readFile(operation.videoUri), readFile(operation.audioUri)]);
+      await writeFile(operation.outputUri, "muxed");
+      state.changed = true;
+      return { ...muxResult(operation), publication: await realPublication(operation.outputUri) };
+    });
+    const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
+    const service = new ResolvedAudioPlanApplicationService({
+      history, media, intents: repository, sourceVerifier: new SourceTechnicalDescriptorResolver(port), clock: () => now
+    });
+    const plan = service.compile({ id: "retry-guard", audioOutputUri: uris.pcm, outputChannelLayout: "stereo", normalization: { type: "none" } });
+    await assert.rejects(
+      service.execute({ id: "retry-guard", plan, visual: { ...visual(plan), uri: uris.visual }, outputUri: uris.output, exportId: "retry-guard", presetId: "fixture" }),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_RECOVERY_FAILED"
+    );
+    assert.equal(await readFile(uris.pcm, "utf8"), "original-pcm");
+    assert.equal(history.current.exports.length, 0);
+    const before = await repository.get("retry-guard:mux");
+    const revision = history.current.history.revision;
+    const callCount = engine.calls.length;
+    await assert.rejects(media.retry("retry-guard:mux"),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_OPERATION_NOT_RETRYABLE");
+    const after = await repository.get("retry-guard:mux");
+    assert.equal(engine.calls.length, callCount);
+    assert.equal(after.attempts.length, before.attempts.length);
+    assert.equal(history.current.history.revision, revision);
+    assert.equal(history.current.exports.length, 0);
+    assert.equal(await readFile(uris.a, "utf8"), "source-a");
+    assert.equal(await readFile(uris.visual, "utf8"), "visual");
+
+    const nextPlan = service.compile({ id: "new-composite", audioOutputUri: join(root, "new.wav"), outputChannelLayout: "stereo", normalization: { type: "none" } });
+    await assert.rejects(
+      service.execute({ id: "new-composite", plan: nextPlan, visual: { ...visual(nextPlan), uri: uris.visual }, outputUri: join(root, "new.mp4"), exportId: "new", presetId: "fixture" }),
+      (error) => error instanceof ResolvedAudioPlanError && error.code === "AUDIO_PLAN_SOURCE_CONTENT_CHANGED"
+    );
+    assert.equal(engine.calls.length, callCount + 1, "new composite execution rechecks after its new sequence output");
+    assert.equal(engine.calls.at(-1).operation.type, "render-audio-sequence");
+    assert.equal(history.current.exports.length, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("PCM publication replacement is reproduced without the guard and rejected by production consumption guards", async (t) => {
+  if (process.platform === "win32") return t.skip("POSIX publication identity fixture");
+  async function runCase(protectConsumption) {
+    const root = await mkdtemp(join(tmpdir(), `cevra-pcm-consumption-${protectConsumption ? "guarded" : "control"}-`));
+    const uris = Object.fromEntries(["a", "b", "music", "visual", "pcm", "replacement", "output"]
+      .map((name) => [name, join(root, name === "visual" || name === "output" ? `${name}.mp4` : `${name}.wav`)]));
+    await Promise.all([
+      writeFile(uris.a, "source-a"), writeFile(uris.b, "source-b"), writeFile(uris.music, "music"),
+      writeFile(uris.visual, "visual"), writeFile(uris.replacement, "foreign-pcm")
+    ]);
+    const project = projectFixture();
+    for (const source of project.sources) source.uri = uris[source.id];
+    const history = historyFixture(project);
+    const artifacts = new RealArtifacts();
+    let replaced = false;
+    const repository = new HookRepository(async (record) => {
+      if (!replaced && record.id === "pcm-boundary:mux" && record.status === "running") {
+        replaced = true;
+        await rename(uris.replacement, uris.pcm);
+      }
+    });
+    let muxCalls = 0;
+    const engine = new FakeEngine(async (operation) => {
+      if (operation.type === "render-audio-sequence") {
+        await Promise.all(operation.sources.map((source) => readFile(source.uri)));
+        await writeFile(operation.outputUri, "original-pcm");
+        return { ...sequenceResult(operation), publication: await realPublication(operation.outputUri) };
+      }
+      muxCalls += 1;
+      await readFile(operation.videoUri);
+      const consumed = await readFile(operation.audioUri);
+      await writeFile(operation.outputUri, consumed);
+      return { ...muxResult(operation), publication: await realPublication(operation.outputUri) };
+    });
+    const media = new MediaApplicationService({ engine, history, executions: repository, artifacts, clock: () => now });
+    const resolvedMedia = protectConsumption ? media : {
+      execute: media.execute.bind(media),
+      cleanupOwnedOutputs: media.cleanupOwnedOutputs.bind(media),
+      getExecutionRecord: media.getExecutionRecord.bind(media),
+      assertOwnedOutputPublication: async () => undefined
+    };
+    const service = new ResolvedAudioPlanApplicationService({ history, media: resolvedMedia, intents: repository, clock: () => now });
+    const plan = service.compile({ id: "pcm-boundary", audioOutputUri: uris.pcm, outputChannelLayout: "stereo", normalization: { type: "none" } });
+    const request = { id: "pcm-boundary", plan, visual: { ...visual(plan), uri: uris.visual }, outputUri: uris.output, exportId: "pcm-boundary", presetId: "fixture" };
+    return { root, uris, history, artifacts, repository, service, request, getMuxCalls: () => muxCalls };
+  }
+
+  const control = await runCase(false);
+  try {
+    await control.service.execute(control.request);
+    assert.equal(control.getMuxCalls(), 1);
+    assert.equal(await readFile(control.uris.output, "utf8"), "foreign-pcm", "unguarded control reproduces wrong PCM consumption");
+    assert.equal(control.history.current.exports.length, 1);
+  } finally {
+    await rm(control.root, { recursive: true, force: true });
+  }
+
+  const guarded = await runCase(true);
+  try {
+    await assert.rejects(guarded.service.execute(guarded.request),
+      (error) => error instanceof MediaApplicationError && error.code === "MEDIA_RECOVERY_FAILED");
+    assert.equal(guarded.getMuxCalls(), 0, "publication mismatch must fail before mux engine execution");
+    assert.equal(guarded.history.current.exports.length, 0);
+    assert.equal((await guarded.repository.get("pcm-boundary:mux")).attempts.at(-1).errorCode, "MEDIA_INPUT_ARTIFACT_CHANGED");
+    assert.equal(await readFile(guarded.uris.pcm, "utf8"), "foreign-pcm", "foreign replacement must survive cleanup");
+    assert.equal(await readFile(guarded.uris.visual, "utf8"), "visual");
+    assert.equal(await guarded.artifacts.kind(guarded.uris.output), "missing");
+  } finally {
+    await rm(guarded.root, { recursive: true, force: true });
+  }
+});
+
+test("descriptor-bearing resolved audio fails closed when source verification capability is absent", async () => {
+  const project = projectFixture();
+  project.sources.find((item) => item.id === "a").technicalDescriptor = sourceDescriptor("a");
+  const fixture = services(undefined, project);
+  const plan = fixture.service.compile({ id: "no-verifier", audioOutputUri: "/render/no-verifier.wav", outputChannelLayout: "stereo", normalization: { type: "none" } });
+  await assert.rejects(
+    fixture.service.execute({ id: "no-verifier", plan, visual: visual(plan), outputUri: "/render/no-verifier.mp4", exportId: "no-verifier", presetId: "fixture" }),
+    (error) => error instanceof ResolvedAudioPlanError && error.code === "AUDIO_PLAN_SOURCE_VERIFICATION_UNAVAILABLE"
+  );
+  assert.equal(fixture.engine.calls.length, 0);
+  assert.equal(fixture.history.current.exports.length, 0);
 });
 
 test("commit followed by undo during rendering cannot restore authority to the old plan", async () => {

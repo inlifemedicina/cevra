@@ -14,6 +14,32 @@ function legacySource(id) {
   return { id, kind: "video", uri: `file:///${id}.mp4`, displayName: id, durationMs: 1_000 };
 }
 
+function technicalDescriptor(basis = "post-ingest") {
+  return {
+    version: 1,
+    basis,
+    content: { sha256: "a".repeat(64), sizeBytes: 1234 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra-media-ffmpeg",
+      engineVersion: "0.2.1",
+      engineApiVersion: 1
+    },
+    video: {
+      codec: "h264",
+      pixelFormat: "yuv420p",
+      avgFrameRate: "30000/1001",
+      rFrameRate: "30000/1001",
+      rotationDegrees: 0,
+      colorPrimaries: "bt709",
+      colorTransfer: "bt709",
+      colorSpace: "bt709",
+      colorRange: "tv"
+    },
+    audio: { codec: "aac" }
+  };
+}
+
 function legacyProject({ name, revision, sources, transcript, headEntryId, headSnapshotId }) {
   return {
     schemaVersion: 1,
@@ -79,6 +105,41 @@ test("project package round-trips history and redo state", () => {
   assert.ok(serialized.files["manifest.json"]);
   assert.ok(serialized.files["project.json"]);
   assert.ok(serialized.files["history/journal.jsonl"] !== undefined);
+});
+
+test("V2 package and history preserve the optional source technical descriptor through undo and redo", () => {
+  let seq = 0;
+  const project = createEmptyProject({ id: "p-descriptor", name: "Descriptor", now: fixedTime });
+  project.sources.push({
+    id: "source-descriptor",
+    kind: "video",
+    uri: "/media/source.mov",
+    displayName: "source.mov",
+    durationMs: 1000,
+    checksum: "legacy:unchanged",
+    technicalDescriptor: technicalDescriptor("ingest")
+  });
+  const history = new ProjectHistory(project, {
+    idGenerator: () => `descriptor-${++seq}`,
+    clock: () => fixedTime
+  });
+  history.commit({ type: "project.rename", name: "After descriptor" });
+  history.undo();
+
+  const serialized = serializeProjectPackage(history, fixedTime);
+  const manifest = JSON.parse(serialized.files["manifest.json"]);
+  const restored = deserializeProjectPackage(serialized, {
+    idGenerator: () => `restored-descriptor-${++seq}`,
+    clock: () => fixedTime
+  });
+
+  assert.equal(manifest.projectSchemaVersion, 2);
+  assert.equal(manifest.formatVersion, 2);
+  assert.deepEqual(restored.current.sources[0].technicalDescriptor, technicalDescriptor("ingest"));
+  assert.equal(restored.current.sources[0].checksum, "legacy:unchanged");
+  assert.equal(restored.canRedo, true);
+  assert.deepEqual(restored.redo().sources[0].technicalDescriptor, technicalDescriptor("ingest"));
+  assert.deepEqual(restored.undo().sources[0].technicalDescriptor, technicalDescriptor("ingest"));
 });
 
 test("tampered current project is rejected", () => {
