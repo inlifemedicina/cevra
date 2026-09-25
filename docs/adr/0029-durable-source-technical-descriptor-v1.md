@@ -86,6 +86,23 @@ sources once per execution and uses a trusted internal pre-commit guard before
 a `source-content-verified` claim. Source hashing does not attest that a
 caller-provided visual represents the same edit.
 
+The resolved-audio vertical also binds the Audio Sequence child execution, its
+typed output URI, file result and original publication evidence. It re-proves
+that publication immediately before the mux consumes the PCM and again before
+canonical export promotion. A renamed/replaced inode therefore fails before
+promotion and is preserved as foreign. POSIX device/inode evidence does not
+cryptographically prove immutability of bytes written in place; that residual
+threat boundary remains explicit.
+
+A standalone retry of `mux-audio` carrying `durationValidation` is refused
+before creating an attempt/job or invoking an engine. Such operations can rely
+on transient source and intermediate-publication guards that are intentionally
+not serialized. A new composite resolved-audio execution must instead rebuild
+and re-run those guards under a new ID. Historical independent retries and mux
+operations without that validation marker retain their existing contract. This
+closes an unsafe shortcut; it does not provide optimized reuse of completed
+composite stages after failure.
+
 ## Compatibility and exclusions
 
 The extension is additive to Project IR v2 and is preserved by current

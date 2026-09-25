@@ -1,14 +1,16 @@
 # CEVRA Durable Source Technical Descriptor V1 — Evidence
 
-Status: **IN DEVELOPMENT / independent review pending**
+Status: **IN DEVELOPMENT / focused independent re-review pending**
 
-Date: 2026-09-24
+Date: 2026-09-25
 
 Base: `b00ad159bc0080c31355c8b59d1d5ba22524b2ff`
 
 Branch: `feat/durable-source-technical-descriptor-v1`
 
-Code checkpoint: `1a24b1b53a52b5f50aede13db40be2c3415c7e45`
+Initial code checkpoint: `1a24b1b53a52b5f50aede13db40be2c3415c7e45`
+
+Post-review remediation code checkpoint: `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358fa`
 
 Architecture: [ADR 0029](adr/0029-durable-source-technical-descriptor-v1.md)
 
@@ -54,6 +56,39 @@ The resolved-audio guard test proves two distinct sources are each hashed once,
 multiple clips do not multiply hashing, every decisive recheck happens while
 the canonical export count is zero, source change prevents promotion and
 attempt-owned outputs are cleaned through existing publication ownership.
+
+## Post-review remediation
+
+Three confirmed review findings and the directly related PCM boundary were
+addressed in code checkpoint `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358fa`:
+
+- isolated retry of a duration-validated mux now fails with
+  `MEDIA_OPERATION_NOT_RETRYABLE` before any new attempt, job or engine call;
+  `recoverPending()` reaches the same policy, while unrelated retry contracts
+  remain characterized;
+- post-ingest descriptor adoption snapshots once and validates request shape,
+  locale, actor and identifiers before deriving execution values or translating
+  an error. Malformed values and a throwing getter return a typed
+  `SOURCE_DESCRIPTOR_INVALID_REQUEST` with zero probe/hash/mutation;
+- Node identity observes cancellation after the last read and after final
+  asynchronous stability checks. One-chunk and multi-chunk real-file tests
+  prove cancellation and handle closure; an uncancelled control preserves the
+  exact digest and byte count;
+- the historical P-PCM hypothesis was **confirmed** in a controlled comparison:
+  replacing the published sequence PCM by atomic rename before mux caused the
+  unguarded control to consume the foreign bytes and promote them. Production
+  now re-proves the original child publication before mux and before export
+  promotion. The protected case makes zero mux engine calls, creates no export
+  and preserves the foreign replacement. Device/inode proof does not detect
+  hostile in-place rewriting of the same inode.
+
+The Application and Media Node directed suites passed **135/135** and **91/91**
+on this checkpoint. The existing functional catalog now includes a real managed
+probe + Node identity descriptor acquisition, positive sequence/mux/export and
+changed-source rejection using separate synthetic sources. The script builds
+and parses locally; the exact managed FFmpeg runtime was not available in this
+local workspace, so native execution is **NOT RUN** here and remains required
+before merge.
 
 ## Compatibility characterization
 
@@ -111,7 +146,7 @@ characterization values, not platform performance guarantees.
 
 ## Validation state
 
-The final local validation on code checkpoint
+The pre-review local validation on initial code checkpoint
 `1a24b1b53a52b5f50aede13db40be2c3415c7e45` passed:
 
 - repository build and all Node/TypeScript workspace tests: 476/476;
@@ -127,8 +162,13 @@ only the existing managed-Transcription Python 3.12 requirement. Re-running
 the complete repository CI command with the bundled Python 3.12 runtime passed;
 the failed portability invocation is not product evidence.
 
-Final remote normal CI and any naturally triggered exact managed runtime run
-remain pending until this branch is pushed. ADR 0029 remains **ACCEPTED
+Historical normal CI run `36084236839` on documentation head
+`0750473cc29e8333fa67dd7c7baafad9b9654321` passed 5/5 jobs; it is not evidence
+for the remediation checkpoint. Final broad local regression and remote normal
+CI remain pending at this documentation checkpoint. The feature push allowlist
+does not naturally run the exact workflow; the future pull-request path filter
+does include the changed Application/Media files and must execute the updated
+descriptor-bearing catalog before merge. ADR 0029 remains **ACCEPTED
 DIRECTION / IN DEVELOPMENT** and the product progress baseline remains **48%**
 until independent review, PR, merge and closeout.
 

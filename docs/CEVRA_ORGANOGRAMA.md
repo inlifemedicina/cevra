@@ -17,7 +17,7 @@ CEVRA VIDS
 ├─ 2. CURRENT RECONCILIATION / CORRECTNESS GATES
 │   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
 │   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
-│   │   └─ MR-V01 Durable Source Technical Descriptor V1 [IN DEVELOPMENT / REVIEW PENDING]
+│   │   └─ MR-V01 Durable Source Technical Descriptor V1 [IN DEVELOPMENT / FOCUSED RE-REVIEW PENDING]
 │   └─ Transcript Cache V1 reconciliation/final closeout
 │
 ├─ 3. EDITORIAL INTELLIGENCE
@@ -94,4 +94,5 @@ ProjectHistory Scalability V2 is closed and preserved as a foundation after PR #
 
 MR-V01 is the active bounded Slice 4 implementation within that gate. It keeps
 Project IR/History/Package at V2, adds no migration and remains pending
-independent review; it does not start Cut Compiler or reopen Transcript Cache.
+focused independent re-review after its bounded retry, cancellation and PCM
+consumption remediations; it does not start Cut Compiler or reopen Transcript Cache.
