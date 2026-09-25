@@ -179,17 +179,21 @@ export class AlignmentApplicationService {
     let sourceBefore: TranscriptSourceVerificationV1 | undefined;
     let executionBefore: AlignmentExecutionIdentity | undefined;
     if (normalized.cachePolicy !== "bypass" && this.cache && this.sourceIdentity && identityProvider && typeof this.media.identity === "function") {
-      try {
-        const [sourceIdentity, executionIdentity, mediaIdentity] = await Promise.all([
-          verifyTranscriptSource(this.sourceIdentity, source.uri, signal),
-          identityProvider.describeAlignmentExecution(identityRequest, signal),
-          this.media.identity()
-        ]);
-        sourceBefore = sourceIdentity;
-        executionBefore = executionIdentity;
-        if (mediaIdentity.kind === "media") mediaPreparation = mediaPreparationIdentity(mediaIdentity);
-      } catch (cause) {
-        if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
+      const [sourceProof, executionProof, mediaProof] = await Promise.allSettled([
+        verifyTranscriptSource(this.sourceIdentity, source.uri, signal),
+        identityProvider.describeAlignmentExecution(identityRequest, signal),
+        this.media.identity()
+      ]);
+      for (const proof of [sourceProof, executionProof, mediaProof]) {
+        if (proof.status === "rejected" && isAbort(proof.reason, signal)) {
+          throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, proof.reason);
+        }
+      }
+      if (sourceProof.status === "fulfilled") sourceBefore = sourceProof.value;
+      else if (source.technicalDescriptor) throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId, sourceProof.reason);
+      if (executionProof.status === "fulfilled") executionBefore = executionProof.value;
+      if (mediaProof.status === "fulfilled" && mediaProof.value.kind === "media") {
+        mediaPreparation = mediaPreparationIdentity(mediaProof.value);
       }
       if (sourceBefore) assertDescriptorMatches(source, sourceBefore, locale, executionId);
       if (sourceBefore && executionBefore && mediaPreparation && alignmentExecutionMatches(executionBefore, identity)) {

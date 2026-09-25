@@ -711,6 +711,17 @@ test("descriptor mismatch and a changed HIT stamp fail closed without cache prom
   assert.equal(changed.history.current.history.revision, 0);
 });
 
+test("descriptor-bearing transcription fails closed when strong source proof is unavailable", async () => {
+  const engine = cacheableEngine(async () => assert.fail("unverified descriptor source must not transcribe"));
+  const descriptorSource = source("source-1", "video", { technicalDescriptor: technicalDescriptor() });
+  const sourceIdentity = sourceIdentityPort();
+  sourceIdentity.captureSource = async () => { throw Object.assign(new Error("unsupported"), { code: "SOURCE_IDENTITY_UNSUPPORTED" }); };
+  const active = fixture(engine, projectWith([descriptorSource]), { cache: new MemoryCache(), sourceIdentity });
+  await assert.rejects(active.service.transcribeSource({ sourceId: "source-1" }), (error) => error.code === "TRANSCRIPTION_APP_PROJECT_CONFLICT");
+  assert.equal(engine.calls.length, 0);
+  assert.equal(active.history.current.history.revision, 0);
+});
+
 test("fresh transcription timestamps the produced result and cache HIT preserves that producer time", async () => {
   const cache = new MemoryCache();
   const producedAt = "2026-09-15T12:01:00.000Z";

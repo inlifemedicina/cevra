@@ -335,6 +335,25 @@ test("alignment cache HIT rejects a changed operational source stamp before prom
   assert.equal(active.history.current.history.revision, 0);
 });
 
+test("descriptor-bearing alignment fails closed when strong source proof is unavailable", async () => {
+  const value = project();
+  value.sources[0].technicalDescriptor = {
+    version: 1,
+    basis: "ingest",
+    content: structuredClone(alignmentSourceIdentity),
+    method: { profile: "cevra.source-technical.v1", engineId: "test.media", engineVersion: "1.0.0", engineApiVersion: 1 },
+    video: { codec: "h264" },
+    audio: { codec: "aac" }
+  };
+  const sourceIdentity = sourceIdentityPort();
+  sourceIdentity.captureSource = async () => { throw Object.assign(new Error("unsupported"), { code: "SOURCE_IDENTITY_UNSUPPORTED" }); };
+  const engine = cacheableAlignmentEngine(async () => assert.fail("unverified descriptor source must not align"));
+  const active = setup({ project: value, engine, media: cacheableMedia({ calls: 0 }), additions: { cache: new AlignmentMemoryCache(), sourceIdentity } });
+  await assert.rejects(active.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT");
+  assert.equal(engine.calls.length, 0);
+  assert.equal(active.history.current.history.revision, 0);
+});
+
 test("alignment snapshots cache policy and caller fields before its first await", async () => {
   const cache = new AlignmentMemoryCache();
   await setup({
