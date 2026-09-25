@@ -12,6 +12,8 @@ Initial code checkpoint: `1a24b1b53a52b5f50aede13db40be2c3415c7e45`
 
 Post-review remediation code checkpoint: `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358fa`
 
+Final guard-error checkpoint: `9cbb1d0a9f3cddcdc3ea525e6d44396fb5fbd748`
+
 Architecture: [ADR 0029](adr/0029-durable-source-technical-descriptor-v1.md)
 
 ## Implemented scope
@@ -81,6 +83,11 @@ addressed in code checkpoint `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358fa`:
   promotion. The protected case makes zero mux engine calls, creates no export
   and preserves the foreign replacement. Device/inode proof does not detect
   hostile in-place rewriting of the same inode.
+
+Follow-up checkpoint `9cbb1d0a9f3cddcdc3ea525e6d44396fb5fbd748`
+preserves the typed `MEDIA_INPUT_ARTIFACT_CHANGED` guard failure in the mux
+attempt record instead of collapsing it to a generic engine failure; the
+Application suite remained **135/135**.
 
 The Application and Media Node directed suites passed **135/135** and **91/91**
 on this checkpoint. The existing functional catalog now includes a real managed

@@ -1654,7 +1654,8 @@ verification for the resolved-audio export vertical. Reopen performs no media
 read; legacy sources remain valid without a verified-content claim. The
 [code checkpoint](../packages/application/src/source-technical-descriptor.ts)
 initially landed at `1a24b1b53a52b5f50aede13db40be2c3415c7e45`. Post-review
-remediation checkpoint `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358fa`
+remediation checkpoints `5f57dcc1ae3fe0da2fed3b2f341cb8d66a1358fa` and
+`9cbb1d0a9f3cddcdc3ea525e6d44396fb5fbd748`
 refuses unsafe isolated retries of validated mux operations, validates descriptor
 adoption inputs before deriving locale/IDs, observes final-chunk cancellation and
 re-proves the original Audio Sequence PCM publication before mux consumption and
