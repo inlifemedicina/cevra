@@ -3,7 +3,7 @@
 **Status:** IN DEVELOPMENT / RECONCILED — INDEPENDENT REVIEW PENDING  
 **Canonical base:** `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`  
 **Historical donor:** `700bb35a65fe8bf7552ab7621d41455dd463e7f9`  
-**Reconciled code head:** `f9ce196b726fca48133e148fd1c83ef2a9f3f76e`
+**Reconciled code head:** `22a3b66fe6b43d731410d0332b125d23ffb001b8`
 
 ## Scope reconciled
 
@@ -31,7 +31,7 @@ cache corruption can authorize a project mutation by itself.
 
 On the reconciled code head:
 
-- `@cevra/application`: 158/158 PASS, including prefer/refresh/bypass,
+- `@cevra/application`: 160/160 PASS, including prefer/refresh/bypass,
   descriptor mismatch, HIT operational recheck, pre/post identity drift,
   invalid payload, request snapshot, idempotent no-op and redo preservation.
 - `@cevra/transcript-cache`: 12/12 PASS, including closed canonical data,
@@ -48,7 +48,7 @@ On the reconciled code head:
 Full local regression after reconciliation passed:
 
 - monorepo build, including the Desktop frontend: PASS;
-- Node/TypeScript: 537/537 PASS across Desktop, Desktop Host, Application,
+- Node/TypeScript: 539/539 PASS across Desktop, Desktop Host, Application,
   contracts, i18n, Project IR, Project Store, Transcript Cache, Media,
   Transcription and Alignment;
 - Python 3.12: 77/77 PASS across Media, Transcription and Alignment;
