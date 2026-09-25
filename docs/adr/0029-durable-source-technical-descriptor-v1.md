@@ -1,6 +1,6 @@
 # ADR 0029 — Durable Source Technical Descriptor V1
 
-Status: **ACCEPTED DIRECTION / IN DEVELOPMENT**
+Status: **IMPLEMENTED / CLOSED**
 
 Date: 2026-09-24
 
@@ -116,6 +116,35 @@ Tauri/WebView API, Composition authority, color transform, HDR policy or new
 dependency. A scalability gate must be revisited before workflows that create
 many timeline/Cut Compiler commits; provenance is not removed to conceal
 history growth.
+
+## Closeout
+
+PR [#46](https://github.com/inlifemedicina/cevra/pull/46) merged the approved
+feature head `f6df275d0bb30cede04ceaf13223933d4b8e4194` by normal merge commit
+`0c8a09c185d1496faa4783f8b9495cd90dff9a21` on 2026-09-25. Post-merge CI run
+`36161031848` passed all five jobs and post-merge Audio Sequence Exact Runtime
+run `36161031859` passed on that merge commit, including the real
+descriptor-bearing Application audio-plan/final-mux catalog. Independent
+adversarial review concluded **APPROVE FOR PR WITH NON-BLOCKING NOTES** after
+the bounded retry, request-validation, final-chunk cancellation and PCM
+publication-consumption remediations.
+
+The following remain deliberate V1 limits:
+
+- same-inode in-place mutation of the CEVRA-owned PCM intermediate is not
+  cryptographically detected. An additional full-content hash is deferred as
+  disproportionate I/O for this ephemeral, execution-private intermediate;
+  revisit an expanded operational stamp or a demonstrably superior equivalent
+  when intermediates are reused beyond the live execution, become
+  shared/synchronized/user-visible, Windows publication identity is
+  implemented, or a real corrupted-export report occurs;
+- publication identity is POSIX-only and unsupported strong identity fails
+  closed; Windows export support is not claimed by this slice;
+- probe-versus-hash TOCTOU is reduced, not eliminated;
+- descriptor/source repetition must be remeasured before high-commit-volume
+  timeline or Cut Compiler workflows and deduplicated only if evidence warrants;
+- optimized composite recovery that reuses validated completed stages is not
+  delivered.
 
 ## Product-owner delegation
 

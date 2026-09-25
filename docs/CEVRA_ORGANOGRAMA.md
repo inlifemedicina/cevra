@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-09-24
+**Updated:** 2026-09-25
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 
 ```text
@@ -17,8 +17,8 @@ CEVRA VIDS
 ├─ 2. CURRENT RECONCILIATION / CORRECTNESS GATES
 │   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
 │   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
-│   │   └─ MR-V01 Durable Source Technical Descriptor V1 [IN DEVELOPMENT / FOCUSED RE-REVIEW PENDING]
-│   └─ Transcript Cache V1 reconciliation/final closeout
+│   │   └─ MR-V01 Durable Source Technical Descriptor V1 [IMPLEMENTED / CLOSED]
+│   └─ Transcript Cache V1 reconciliation/final closeout [NEXT CANONICAL STEP]
 │
 ├─ 3. EDITORIAL INTELLIGENCE
 │   ├─ editorial transcript / analysis
@@ -92,7 +92,9 @@ The dependency roadmap was **not reset**. The explicit new checkpoint is **UX Su
 
 ProjectHistory Scalability V2 is closed and preserved as a foundation after PR #30. The measured O(commits × transcript payload) failure was removed with compact snapshots and exact transcript blobs while preserving Project IR and V1 compatibility. The cross-platform/runtime correctness prerequisites are also closed. The current active gate is the approved coordinated Media Runtime adjustment gate, followed by Transcript Cache V1 reconciliation/final closeout. Revalidate the cache/history storage relationship during that later cache closeout; the two systems remain separate.
 
-MR-V01 is the active bounded Slice 4 implementation within that gate. It keeps
-Project IR/History/Package at V2, adds no migration and remains pending
-focused independent re-review after its bounded retry, cancellation and PCM
-consumption remediations; it does not start Cut Compiler or reopen Transcript Cache.
+MR-V01 is closed as the bounded Slice 4 implementation within that gate after
+PR #46 and successful post-merge CI plus Exact Runtime. It keeps Project
+IR/History/Package at V2, adds no migration and does not start Cut Compiler.
+Transcript Cache V1 reconciliation/final closeout is the next canonical step.
+Before future timeline/Cut Compiler workflows create many commits, remeasure
+descriptor/source repetition and decide deduplication only if evidence warrants.
