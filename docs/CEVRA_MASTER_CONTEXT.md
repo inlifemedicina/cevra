@@ -1118,9 +1118,11 @@ in favor of the shared MR-V01 `SourceContentIdentityPort` and Desktop
 `NodeMediaArtifactStore`. Descriptor mismatch fails closed, legacy sources may
 cache only from a strong current proof, HIT uses one full proof plus an
 operational recheck, and fresh MISS/refresh uses pre/post proofs. Current
-ProjectHistory V2 remains canonical and the cache remains disposable. Focused
-independent review and final branch CI remain the active gates; progress stays
-**48%**. See [ADR 0018](adr/0018-transcript-cache-v1.md) and the
+ProjectHistory V2 remains canonical and the cache remains disposable. Normal
+PR CI `36185809432`, push CI `36185805935` and Exact Runtime `36185809431`
+passed on reconciled head `fcb067ee614051c132e657d577eb53b9b43c9767`;
+focused independent review remains the active gate and progress stays **48%**.
+See [ADR 0018](adr/0018-transcript-cache-v1.md) and the
 [reconciliation evidence](CEVRA_TRANSCRIPT_CACHE_V1_EVIDENCE.md).
 
 ---
@@ -1726,7 +1728,7 @@ remain mandatory; this clarification narrows no prior safety policy.
 
 **Transcript Cache V1 — IN DEVELOPMENT / RECONCILED — INDEPENDENT REVIEW PENDING.** PR #24, branch `feat/transcript-cache-v1`, remains open, draft and unmerged. Historical donor head `700bb35a65fe8bf7552ab7621d41455dd463e7f9` is reconciled onto canonical main `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`; code head `22a3b66fe6b43d731410d0332b125d23ffb001b8` reuses MR-V01 source identity and current ProjectHistory V2. A valid Alignment HIT performs zero PCM extraction, worker execution or model-weight hashing; fresh execution retains authoritative pre/post-worker verification.
 
-Historical GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS on the old donor only. Reconciled-head CI and focused independent review remain required. No merge has occurred.
+Historical GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS on the old donor only. Reconciled-head normal PR CI `36185809432`, push CI `36185805935` and Exact Runtime `36185809431` passed on `fcb067ee614051c132e657d577eb53b9b43c9767`; focused independent review remains required. No merge has occurred.
 
 Current dependency blockers/gates:
 
@@ -1797,7 +1799,7 @@ Current dependency blockers/gates:
 - **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
-- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 and is reconciled onto current main at code head `22a3b66fe6b43d731410d0332b125d23ffb001b8`; focused independent review and current-head CI remain required. Historical run `35625702675` is donor-only evidence.
+- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 and is reconciled onto current main at code head `22a3b66fe6b43d731410d0332b125d23ffb001b8`; reconciled-head normal CI and Exact Runtime passed, while focused independent review remains required. Historical run `35625702675` is donor-only evidence.
 - **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
 
 ---

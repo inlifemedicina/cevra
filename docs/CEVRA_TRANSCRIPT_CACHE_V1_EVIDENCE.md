@@ -58,10 +58,13 @@ Full local regression after reconciliation passed:
 - local Rust/Tauri: NOT RUN because `cargo` was unavailable; remote Tauri CI is
   the required evidence.
 
-GitHub CI belongs to the final branch head and is recorded here only after its
-run. Historical run `35625702675` (5/5 SUCCESS) belongs to donor head
+GitHub validation on reconciled head
+`fcb067ee614051c132e657d577eb53b9b43c9767` completed successfully: normal PR
+CI run `36185809432` passed 5/5, push CI run `36185805935` passed 5/5, and
+managed macOS arm64 Exact Runtime run `36185809431` passed. Historical run
+`35625702675` (5/5 SUCCESS) belongs to donor head
 `700bb35a65fe8bf7552ab7621d41455dd463e7f9` and is not evidence for the
-reconciled code.
+reconciled implementation.
 
 ## Bounded performance characterization
 
@@ -87,8 +90,8 @@ model-weight hashing.
 ## Remaining gate and limits
 
 - Focused independent review is required before PR #24 can leave draft state.
-- Normal CI must pass on the reconciled final SHA; managed ML/runtime evidence
-  is reported separately and synthetic engines are not represented as native ML.
+- Managed runtime evidence covers the existing exact catalog; synthetic
+  Application tests are not represented as native transcription/alignment ML.
 - At-rest cache encryption, cache UI, cloud synchronization and permanent audit
   retention remain outside V1.
 - Process-local model attestation deliberately does not survive restart and
