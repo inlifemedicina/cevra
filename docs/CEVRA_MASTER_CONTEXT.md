@@ -1083,7 +1083,7 @@ safe crash-leftover PCM reclamation and the non-blocking cleanup-retry behavior
 remain deferred. Transcript Cache V1 is the next dependency-correct product
 slice.
 
-## 16A.4 Transcript Cache V1 — IN DEVELOPMENT
+## 16A.4 Transcript Cache V1 — IN DEVELOPMENT / RECONCILED — INDEPENDENT REVIEW PENDING
 
 Work began from canonical `main`
 `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` on
@@ -1109,6 +1109,19 @@ block a valid fresh promotion. Cache hits preserve original producer execution
 metadata and still traverse current application validation, stale guards and
 normal `transcript.set`/`ProjectHistory`; a semantically identical canonical
 result creates no revision. No editorial transcript/analysis work has started.
+
+The historical donor at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`
+has now been reconciled onto canonical main
+`0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`; reconciled code head is
+`f9ce196b726fca48133e148fd1c83ef2a9f3f76e`. The donor file hasher was removed
+in favor of the shared MR-V01 `SourceContentIdentityPort` and Desktop
+`NodeMediaArtifactStore`. Descriptor mismatch fails closed, legacy sources may
+cache only from a strong current proof, HIT uses one full proof plus an
+operational recheck, and fresh MISS/refresh uses pre/post proofs. Current
+ProjectHistory V2 remains canonical and the cache remains disposable. Focused
+independent review and final branch CI remain the active gates; progress stays
+**48%**. See [ADR 0018](adr/0018-transcript-cache-v1.md) and the
+[reconciliation evidence](CEVRA_TRANSCRIPT_CACHE_V1_EVIDENCE.md).
 
 ---
 
@@ -1711,9 +1724,9 @@ New material cost, privacy exposure, destructive behavior or objective/architect
 change still requires explicit treatment. Independent review and merge gates
 remain mandatory; this clarification narrows no prior safety policy.
 
-**Transcript Cache V1 — IN DEVELOPMENT / PAUSED FOR DEPENDENCY RECONCILIATION.** PR #24, branch `feat/transcript-cache-v1`, is open, draft and unmerged at head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`. Strong local validation is recorded. The Alignment verification optimization is complete: a valid cache HIT uses immutable pinned execution identity and performs zero Alignment model-artifact hashing; a fresh execution retains authoritative pre/post-worker verification.
+**Transcript Cache V1 — IN DEVELOPMENT / RECONCILED — INDEPENDENT REVIEW PENDING.** PR #24, branch `feat/transcript-cache-v1`, remains open, draft and unmerged. Historical donor head `700bb35a65fe8bf7552ab7621d41455dd463e7f9` is reconciled onto canonical main `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`; code head `f9ce196b726fca48133e148fd1c83ef2a9f3f76e` reuses MR-V01 source identity and current ProjectHistory V2. A valid Alignment HIT performs zero PCM extraction, worker execution or model-weight hashing; fresh execution retains authoritative pre/post-worker verification.
 
-GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS. The remaining gate is focused independent review and reconciliation against the changed ProjectHistory persistence baseline. No merge has occurred, and this feature branch does not modify PR #24.
+Historical GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS on the old donor only. Reconciled-head CI and focused independent review remain required. No merge has occurred.
 
 Current dependency blockers/gates:
 
@@ -1784,7 +1797,7 @@ Current dependency blockers/gates:
 - **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
-- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, paused for dependency reconciliation. GitHub Actions run `35625702675`, attempt 2, completed 5/5 SUCCESS; focused independent review and reconciliation against the changed history baseline remain required.
+- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24 and is reconciled onto current main at code head `f9ce196b726fca48133e148fd1c83ef2a9f3f76e`; focused independent review and current-head CI remain required. Historical run `35625702675` is donor-only evidence.
 - **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
 
 ---
@@ -1831,7 +1844,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Reconcile and close Transcript Cache V1/PR #24 now that MR-V01 is closed; retain draft/unmerged status until its focused dependency review and current remote CI complete.
+1. Complete focused independent review and final CI for the reconciled Transcript Cache V1/PR #24; retain draft/unmerged status until that gate passes.
 2. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
 3. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
 4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.

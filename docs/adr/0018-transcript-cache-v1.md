@@ -1,7 +1,7 @@
 # ADR 0018 — Transcript Cache V1
 
-**Status:** Proposed by this implementation
-**Date:** 2026-09-15
+**Status:** ACCEPTED / IN DEVELOPMENT
+**Date:** 2026-09-25
 
 ## Context
 
@@ -45,19 +45,31 @@ is added.
 
 ## Strong source and execution identity
 
-Before cache lookup, CEVRA streams the current regular local source file into
-SHA-256 using bounded 1 MiB chunks. The identity is
-`sha256:<64-lowercase-hex>` plus exact byte length. Symlinks, remote/UNC URIs,
+Before cache lookup, Application reuses the MR-V01 `SourceContentIdentityPort`
+and Desktop `NodeMediaArtifactStore`; Transcript Cache owns no second media
+hasher. The shared implementation captures the regular local source, streams a
+bounded SHA-256 proof, and returns lowercase hexadecimal `sha256` plus exact
+`sizeBytes` with a non-persisted operational stamp. Symlinks, remote/UNC URIs,
 ambiguous file state, replacement during hashing and unavailable storage yield
-a safe cache bypass. Path and mtime never enter the durable key. Identical bytes
-at different paths/projects can therefore reuse a result.
+a safe cache bypass for legacy sources. Path, mtime and inode never enter the
+durable key. Identical bytes at different paths/projects can therefore reuse a
+result. `SourceAsset.checksum` remains legacy provenance and is not cache
+identity.
+
+When `SourceAsset.technicalDescriptor` exists, the freshly verified content
+must equal its adopted SHA-256 and size. A mismatch fails closed before engine
+execution or canonical mutation; it is not silently converted into a cache
+miss. A legacy source without a descriptor may still use a strong current
+content proof without creating or changing a descriptor.
 
 For a cacheable fresh execution the same strong identity is recomputed after
 the engine completes and before cache write or canonical promotion. Execution
 identity is also described again. Any proven source or exact-execution change
 fails closed as an application conflict with no cache write and no Project IR
-mutation. A cache hit needs one fresh identity immediately before lookup because
-there is no intervening long ML execution.
+mutation. A cache hit performs one full current content proof before lookup and
+a cheap operational stamp recheck immediately before promotion. A fresh miss or
+refresh performs full source proof before and after engine execution. The cache
+never uses URI or operational metadata as portable content identity.
 
 Caching is additive. Engines may implement provider-neutral execution identity
 provider interfaces. If exact identity cannot be proven, the application
@@ -203,3 +215,9 @@ miss and may later be evicted. It requires no Project IR or Project Store
 migration. No Project IR schema/command, Media Runtime operation, cache UI,
 model manager, editorial analysis, diarization, cloud cache or synchronization
 is part of V1.
+
+The pre-reconciliation development cache used a different source-identity
+shape. Transcript Cache V1 was never released, so those disposable entries are
+intentionally invalidated rather than migrated. Current ProjectHistory V2,
+compact transcript blobs, undo/redo and Desktop checkpoint/reopen remain the
+canonical persistence path; cache deletion or corruption cannot affect them.
