@@ -168,13 +168,13 @@ function isCanonicalPositiveRational(value: unknown): value is string {
   if (!match) return false;
   const numerator = BigInt(match[1]!);
   const denominator = BigInt(match[2]!);
-  return greatestCommonDivisor(numerator, denominator) === 1n;
+  return greatestCommonDivisor(numerator, denominator) === BigInt(1);
 }
 
 function greatestCommonDivisor(left: bigint, right: bigint): bigint {
   let a = left;
   let b = right;
-  while (b !== 0n) [a, b] = [b, a % b];
+  while (b !== BigInt(0)) [a, b] = [b, a % b];
   return a;
 }
 

@@ -421,7 +421,7 @@ function normalizedRational(value: string | undefined, label: string, key: "avgF
   if (!match) throw new Error(`${label} is malformed.`);
   const numerator = BigInt(match[1]!);
   const denominator = BigInt(match[2]!);
-  if (numerator === 0n || denominator === 0n) return {};
+  if (numerator === BigInt(0) || denominator === BigInt(0)) return {};
   const divisor = gcd(numerator, denominator);
   return { [key]: `${numerator / divisor}/${denominator / divisor}` };
 }
@@ -447,7 +447,7 @@ function compact<T extends Record<string, unknown>>(value: T): T {
 function gcd(left: bigint, right: bigint): bigint {
   let a = left;
   let b = right;
-  while (b !== 0n) [a, b] = [b, a % b];
+  while (b !== BigInt(0)) [a, b] = [b, a % b];
   return a;
 }
 

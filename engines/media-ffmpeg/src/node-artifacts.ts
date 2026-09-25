@@ -167,7 +167,7 @@ function stampFromStats(
   canonicalPath: string,
   metadata: BigIntStats
 ): SourceStamp {
-  if (metadata.size < 0n || metadata.size > BigInt(Number.MAX_SAFE_INTEGER)) {
+  if (metadata.size < BigInt(0) || metadata.size > BigInt(Number.MAX_SAFE_INTEGER)) {
     throw new NodeSourceContentIdentityError("SOURCE_IDENTITY_UNSUPPORTED", "Source byte size exceeds the exact V1 numeric range.");
   }
   return {
