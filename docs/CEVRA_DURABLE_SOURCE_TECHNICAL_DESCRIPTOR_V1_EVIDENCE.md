@@ -180,12 +180,20 @@ vulnerabilities, `git diff --check` passed and 21 changed-document local links
 resolved. A first broad invocation with the shell's Python 3.9.6 reproduced only
 the known managed-Transcription version gate; the directed Desktop Host rerun
 with Python 3.12.14 passed **70/70**. Local Rust/Tauri remains NOT RUN because
-`cargo` is unavailable. Remote normal CI remains pending. The feature push allowlist
+`cargo` is unavailable. At that local-validation checkpoint, remote normal CI
+had not yet completed. The feature push allowlist
 does not naturally run the exact workflow; the future pull-request path filter
 does include the changed Application/Media files and must execute the updated
 descriptor-bearing catalog before merge. ADR 0029 remains **ACCEPTED
 DIRECTION / IN DEVELOPMENT** and the product progress baseline remains **48%**
 until independent review, PR, merge and closeout.
+
+Remote normal CI run `36090798711` (`push`) completed **5/5 SUCCESS** on
+implementation/documentation head `2cf0e1afaddd991562f17f60de9cec0b0f5c9cda`:
+Monorepo, Tauri, Media Runtime reproducibility, Transcription and Alignment.
+The exact managed runtime workflow was not triggered by the feature-push branch
+allowlist; this is **NOT RUN**, not a pass, and the pull-request path gate remains
+required for the new descriptor-bearing functional catalog.
 
 Implementation environment recorded for traceability: Codex Desktop. The task
 requested GPT-5.6 Sol with High reasoning; repository evidence cannot
