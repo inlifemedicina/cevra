@@ -1,4 +1,4 @@
-import type { CaptionCue, EditCommand, ProjectIR, SourceTranscript, StyleState, TimelineClip, TranscriptProvenanceStage } from "./types.js";
+import type { CaptionCue, EditCommand, ProjectIR, SourceTechnicalDescriptorV1, SourceTranscript, StyleState, TimelineClip, TranscriptProvenanceStage } from "./types.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
 import { assertValidProjectIR, validateProjectIR } from "./validation.js";
 
@@ -10,7 +10,15 @@ export type ProjectCommandErrorCode =
   | "PROJECT_TRANSCRIPT_MISSING"
   | "PROJECT_TRANSCRIPT_DIGEST_MISMATCH"
   | "PROJECT_TRANSCRIPT_STALE"
-  | "PROJECT_TRANSCRIPT_NO_OP";
+  | "PROJECT_TRANSCRIPT_NO_OP"
+  | "PROJECT_SOURCE_DESCRIPTOR_INVALID"
+  | "PROJECT_SOURCE_DESCRIPTOR_SOURCE_UNKNOWN"
+  | "PROJECT_SOURCE_DESCRIPTOR_SOURCE_INELIGIBLE"
+  | "PROJECT_SOURCE_DESCRIPTOR_URI_MISMATCH"
+  | "PROJECT_SOURCE_DESCRIPTOR_STALE"
+  | "PROJECT_SOURCE_DESCRIPTOR_CONTENT_MISMATCH"
+  | "PROJECT_SOURCE_DESCRIPTOR_BASIS_MISMATCH"
+  | "PROJECT_SOURCE_DESCRIPTOR_NO_OP";
 
 export class ProjectCommandError extends Error {
   readonly code: ProjectCommandErrorCode;
@@ -43,6 +51,9 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
       next.sourceTranscripts = next.sourceTranscripts.filter((transcript) => transcript.sourceId !== command.sourceId);
       break;
     }
+    case "source.technicalDescriptor.set":
+      applySourceTechnicalDescriptorSet(next, command);
+      break;
     case "transcript.set":
       applyTranscriptSet(next, command);
       break;
@@ -89,6 +100,67 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
   next.project.updatedAt = now;
   next.timeline.durationMs = calculateTimelineDuration(next.timeline.clips);
   return assertValidProjectIR(next);
+}
+
+function applySourceTechnicalDescriptorSet(
+  project: ProjectIR,
+  command: Extract<EditCommand, { type: "source.technicalDescriptor.set" }>
+): void {
+  if (typeof command.sourceId !== "string" || command.sourceId.trim().length === 0
+    || typeof command.expectedSourceUri !== "string" || command.expectedSourceUri.length === 0
+    || !isRecord(command.expectedTechnicalDescriptor)
+    || (command.expectedTechnicalDescriptor.state !== "absent" && command.expectedTechnicalDescriptor.state !== "value")) {
+    throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_INVALID", "Source technical descriptor command is invalid.");
+  }
+  const source = project.sources.find((item) => item.id === command.sourceId);
+  if (!source) throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_SOURCE_UNKNOWN", `Unknown source ${command.sourceId}.`);
+  if (source.kind !== "audio" && source.kind !== "video") {
+    throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_SOURCE_INELIGIBLE", `Source ${source.id} cannot own a V1 technical descriptor.`);
+  }
+  if (source.uri !== command.expectedSourceUri) {
+    throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_URI_MISMATCH", "Expected source URI is no longer current.");
+  }
+
+  const current = source.technicalDescriptor;
+  if (command.expectedTechnicalDescriptor.state === "absent") {
+    if (current !== undefined) throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_STALE", "Expected source technical descriptor is no longer absent.");
+  } else {
+    if (!("value" in command.expectedTechnicalDescriptor) || current === undefined
+      || !deepEqual(current, command.expectedTechnicalDescriptor.value)) {
+      throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_STALE", "Expected source technical descriptor is no longer current.");
+    }
+  }
+
+  let candidate: SourceTechnicalDescriptorV1;
+  try {
+    candidate = clone(command.technicalDescriptor);
+  } catch {
+    throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_INVALID", "Source technical descriptor must be serializable Project IR data.");
+  }
+  const validation = validateProjectIR({
+    ...project,
+    sources: project.sources.map((item) => item.id === source.id ? { ...item, technicalDescriptor: candidate } : item)
+  });
+  if (!validation.ok) {
+    throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_INVALID", "Source technical descriptor candidate is invalid.");
+  }
+
+  if (current === undefined) {
+    if (candidate.basis !== "post-ingest") {
+      throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_BASIS_MISMATCH", "First command adoption must use post-ingest basis.");
+    }
+  } else {
+    if (candidate.basis !== current.basis) {
+      throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_BASIS_MISMATCH", "Source technical descriptor basis is immutable.");
+    }
+    if (!deepEqual(candidate.content, current.content)) {
+      throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_CONTENT_MISMATCH", "A source technical descriptor cannot replace the adopted content identity.");
+    }
+    if (deepEqual(candidate, current)) {
+      throwSourceDescriptorError("PROJECT_SOURCE_DESCRIPTOR_NO_OP", "Source technical descriptor is identical to the current evidence.");
+    }
+  }
+  source.technicalDescriptor = candidate;
 }
 
 function applyTranscriptSet(project: ProjectIR, command: Extract<EditCommand, { type: "transcript.set" }>): void {
@@ -179,6 +251,10 @@ function applyTranscriptRemove(project: ProjectIR, command: Extract<EditCommand,
 }
 
 function throwTranscriptError(code: ProjectCommandErrorCode, message: string): never {
+  throw new ProjectCommandError(code, message);
+}
+
+function throwSourceDescriptorError(code: ProjectCommandErrorCode, message: string): never {
   throw new ProjectCommandError(code, message);
 }
 

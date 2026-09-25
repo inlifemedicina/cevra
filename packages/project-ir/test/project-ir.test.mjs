@@ -38,6 +38,33 @@ function source(id = "source-1", kind = "video", overrides = {}) {
   return { id, kind, uri: `file:///${id}.mp4`, displayName: id, durationMs: 10_000, ...overrides };
 }
 
+function technicalDescriptor(overrides = {}) {
+  return {
+    version: 1,
+    basis: "post-ingest",
+    content: { sha256: "a".repeat(64), sizeBytes: 1234 },
+    method: {
+      profile: "cevra.source-technical.v1",
+      engineId: "cevra.media.ffmpeg",
+      engineVersion: "0.3.0",
+      engineApiVersion: 1
+    },
+    video: {
+      codec: "h264",
+      pixelFormat: "yuv420p",
+      avgFrameRate: "30000/1001",
+      rFrameRate: "30/1",
+      rotationDegrees: 0,
+      colorPrimaries: "bt709",
+      colorTransfer: "bt709",
+      colorSpace: "bt709",
+      colorRange: "tv"
+    },
+    audio: { codec: "aac" },
+    ...overrides
+  };
+}
+
 function transcriptionStage(overrides = {}) {
   return {
     kind: "transcription",
@@ -170,6 +197,137 @@ test("factory creates schema v2 with source-scoped transcripts and no legacy tra
   assert.deepEqual(project.sourceTranscripts, []);
   assert.equal(Object.hasOwn(project, "transcript"), false);
   assert.equal(validateProjectIR(project).ok, true);
+});
+
+test("schema v2 validates the closed optional source technical descriptor without changing v1 acceptance", () => {
+  const valid = createEmptyProject({ id: "descriptor-project", now: fixedTime });
+  valid.sources.push(source("descriptor-source", "video", { technicalDescriptor: technicalDescriptor() }));
+  assert.equal(validateProjectIR(valid).ok, true);
+
+  const absent = createEmptyProject({ id: "descriptor-absent", now: fixedTime });
+  absent.sources.push(source());
+  assert.equal(validateProjectIR(absent).ok, true);
+
+  const legacyHomonym = v1Project({
+    sources: [source("legacy", "video", { technicalDescriptor: { historical: true } })]
+  });
+  assert.equal(validateProjectIRv1(legacyHomonym).ok, true);
+
+  const invalidCases = [
+    ["top-level extra", { ...technicalDescriptor(), extra: true }],
+    ["unknown version", { ...technicalDescriptor(), version: 2 }],
+    ["unknown profile", { ...technicalDescriptor(), method: { ...technicalDescriptor().method, profile: "other" } }],
+    ["uppercase digest", { ...technicalDescriptor(), content: { sha256: "A".repeat(64), sizeBytes: 1 } }],
+    ["unsafe size", { ...technicalDescriptor(), content: { sha256: "a".repeat(64), sizeBytes: Number.MAX_SAFE_INTEGER + 1 } }],
+    ["unreduced rational", { ...technicalDescriptor(), video: { codec: "h264", avgFrameRate: "60000/2002" } }],
+    ["zero sentinel", { ...technicalDescriptor(), video: { codec: "h264", avgFrameRate: "0/0" } }],
+    ["control string", { ...technicalDescriptor(), audio: { codec: "aac\n" } }],
+    ["nested extra", { ...technicalDescriptor(), video: { codec: "h264", hdr: true } }]
+  ];
+  for (const [label, descriptor] of invalidCases) {
+    const project = createEmptyProject({ id: `invalid-${label}`, now: fixedTime });
+    project.sources.push(source("source-1", "video", { technicalDescriptor: descriptor }));
+    assert.equal(validateProjectIR(project).ok, false, label);
+  }
+
+  const oversized = technicalDescriptor({
+    method: { ...technicalDescriptor().method, engineId: "🧪".repeat(64), engineVersion: "🧪".repeat(64) },
+    video: Object.fromEntries([
+      "codec", "pixelFormat", "colorPrimaries", "colorTransfer", "colorSpace", "colorRange"
+    ].map((key) => [key, "🧪".repeat(64)])),
+    audio: { codec: "🧪".repeat(64) }
+  });
+  const oversizedProject = createEmptyProject({ id: "oversized", now: fixedTime });
+  oversizedProject.sources.push(source("source-1", "video", { technicalDescriptor: oversized }));
+  const oversizedResult = validateProjectIR(oversizedProject);
+  assert.equal(oversizedResult.ok, false);
+  assert.equal(oversizedResult.issues.some((issue) => issue.code === "size"), true);
+
+  const audioWithVideo = createEmptyProject({ id: "kind", now: fixedTime });
+  audioWithVideo.sources.push(source("audio", "audio", { technicalDescriptor: technicalDescriptor() }));
+  assert.equal(validateProjectIR(audioWithVideo).ok, false);
+});
+
+test("source technical descriptor command adopts once, preserves guards, and treats equality as a no-op", () => {
+  let sequence = 0;
+  const project = createEmptyProject({ id: "descriptor-command", now: fixedTime });
+  project.sources.push(source());
+  project.sourceTranscripts.push(sourceTranscript());
+  const history = new ProjectHistory(project, {
+    idGenerator: () => `descriptor-${++sequence}`,
+    clock: () => fixedTime
+  });
+  const beforeTranscript = clone(history.current.sourceTranscripts[0]);
+  const beforeChecksum = history.current.sources[0].checksum;
+  const descriptor = technicalDescriptor();
+  const adopted = history.commit({
+    type: "source.technicalDescriptor.set",
+    sourceId: "source-1",
+    expectedSourceUri: "file:///source-1.mp4",
+    expectedTechnicalDescriptor: { state: "absent" },
+    technicalDescriptor: descriptor
+  });
+  assert.deepEqual(adopted.sources[0].technicalDescriptor, descriptor);
+  assert.deepEqual(adopted.sourceTranscripts[0], beforeTranscript);
+  assert.equal(adopted.sources[0].checksum, beforeChecksum);
+  assert.equal(history.entries.at(-1).command.type, "source.technicalDescriptor.set");
+
+  history.commit({ type: "project.rename", name: "redo target" });
+  history.undo();
+  const beforeNoOp = historyState(history);
+  assertProjectCommandError(() => history.commit({
+    type: "source.technicalDescriptor.set",
+    sourceId: "source-1",
+    expectedSourceUri: "file:///source-1.mp4",
+    expectedTechnicalDescriptor: { state: "value", value: clone(descriptor) },
+    technicalDescriptor: clone(descriptor)
+  }), "PROJECT_SOURCE_DESCRIPTOR_NO_OP");
+  assert.deepStrictEqual(historyState(history), beforeNoOp);
+  assert.equal(history.redo().project.name, "redo target");
+});
+
+test("source technical descriptor command rejects stale identity, replacement, and basis rewrite without history mutation", () => {
+  const current = technicalDescriptor();
+  const makeProject = () => {
+    const project = createEmptyProject({ id: "descriptor-guards", now: fixedTime });
+    project.sources.push(source("source-1", "video", { checksum: "legacy", technicalDescriptor: current }));
+    return project;
+  };
+  const changedMethod = { ...technicalDescriptor(), method: { ...technicalDescriptor().method, engineVersion: "0.3.1" } };
+  const cases = [
+    ["uri", { expectedSourceUri: "file:///other.mp4", technicalDescriptor: changedMethod }, "PROJECT_SOURCE_DESCRIPTOR_URI_MISMATCH"],
+    ["expected absent", { expectedTechnicalDescriptor: { state: "absent" }, technicalDescriptor: changedMethod }, "PROJECT_SOURCE_DESCRIPTOR_STALE"],
+    ["stale expected", { expectedTechnicalDescriptor: { state: "value", value: { ...current, method: { ...current.method, engineVersion: "old" } } }, technicalDescriptor: changedMethod }, "PROJECT_SOURCE_DESCRIPTOR_STALE"],
+    ["content", { technicalDescriptor: { ...changedMethod, content: { sha256: "b".repeat(64), sizeBytes: 1234 } } }, "PROJECT_SOURCE_DESCRIPTOR_CONTENT_MISMATCH"],
+    ["basis", { technicalDescriptor: { ...changedMethod, basis: "ingest" } }, "PROJECT_SOURCE_DESCRIPTOR_BASIS_MISMATCH"]
+  ];
+  for (const [label, overrides, code] of cases) {
+    const history = historyWithRedo(makeProject(), `descriptor-${label}`);
+    const before = historyState(history);
+    assertProjectCommandError(() => history.commit({
+      type: "source.technicalDescriptor.set",
+      sourceId: "source-1",
+      expectedSourceUri: "file:///source-1.mp4",
+      expectedTechnicalDescriptor: { state: "value", value: clone(current) },
+      technicalDescriptor: changedMethod,
+      ...overrides
+    }), code);
+    assert.deepStrictEqual(historyState(history), before, label);
+    assert.equal(history.redo().project.name, "C", label);
+  }
+
+  const absentHistory = new ProjectHistory(createEmptyProject({ id: "absent", now: fixedTime }), { clock: () => fixedTime });
+  absentHistory.current.sources;
+  const imageProject = createEmptyProject({ id: "image", now: fixedTime });
+  imageProject.sources.push(source("image", "image", { uri: "file:///image.png" }));
+  const imageHistory = new ProjectHistory(imageProject, { clock: () => fixedTime });
+  assertProjectCommandError(() => imageHistory.commit({
+    type: "source.technicalDescriptor.set",
+    sourceId: "image",
+    expectedSourceUri: "file:///image.png",
+    expectedTechnicalDescriptor: { state: "absent" },
+    technicalDescriptor: { ...technicalDescriptor(), basis: "post-ingest", video: undefined, audio: undefined }
+  }), "PROJECT_SOURCE_DESCRIPTOR_SOURCE_INELIGIBLE");
 });
 
 test("TranscriptState public shape remains usable as the nested payload", () => {
