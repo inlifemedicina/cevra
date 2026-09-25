@@ -1,8 +1,8 @@
 # Transcript Cache V1 — reconciliation evidence
 
-**Status:** IN DEVELOPMENT / RECONCILED — INDEPENDENT REVIEW PENDING  
-**Canonical base:** `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`  
-**Historical donor:** `700bb35a65fe8bf7552ab7621d41455dd463e7f9`  
+**Status:** IN DEVELOPMENT / RECONCILED — INDEPENDENT REVIEW PENDING
+**Canonical base:** `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`
+**Historical donor:** `700bb35a65fe8bf7552ab7621d41455dd463e7f9`
 **Reconciled code head:** `22a3b66fe6b43d731410d0332b125d23ffb001b8`
 
 ## Scope reconciled
