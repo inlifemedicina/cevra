@@ -24,6 +24,7 @@ import prepare_ffmpeg_source
 import prepare_vendor
 import schema_validator
 import _cevra_runtime as runtime_args
+from runtime_integrity import required_notice_paths
 
 
 def write_sparse_float_wav(path: Path, samples: int, channels: int = 2) -> None:
@@ -658,6 +659,27 @@ class RuntimeBuildTests(unittest.TestCase):
         for invalid in ({"value": 11, "items": []}, {"value": 1, "items": [1, 2, 3]}, {"value": float("inf"), "items": []}):
             with self.assertRaises(schema_validator.SchemaValidationError):
                 schema_validator.validate(invalid, schema)
+
+    def test_schema_validator_enforces_platform_conditional_and_not(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {"platform": {"type": "string"}, "zlib": {"type": "object"}},
+            "required": ["platform"],
+            "allOf": [{
+                "if": {"properties": {"platform": {"const": "win32"}}, "required": ["platform"]},
+                "then": {"required": ["zlib"]},
+                "else": {"not": {"required": ["zlib"]}},
+            }],
+        }
+        schema_validator.validate({"platform": "win32", "zlib": {}}, schema)
+        schema_validator.validate({"platform": "darwin"}, schema)
+        for invalid in ({"platform": "win32"}, {"platform": "darwin", "zlib": {}}):
+            with self.assertRaises(schema_validator.SchemaValidationError):
+                schema_validator.validate(invalid, schema)
+
+    def test_windows_runtime_requires_static_zlib_license_notice_only_on_windows(self) -> None:
+        self.assertEqual(required_notice_paths("win32")["zlib-license"], "licenses/zlib/LICENSE")
+        self.assertNotIn("zlib-license", required_notice_paths("darwin"))
 
     def test_python_pruning_removes_pip_tkinter_and_tcl(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

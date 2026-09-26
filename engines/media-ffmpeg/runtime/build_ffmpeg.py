@@ -16,6 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 PIN = VERSIONS["ffmpeg"]
+ZLIB_PIN = VERSIONS["zlib"]
 INSTALL_PREFIX = "/cevra-media-runtime"
 
 COMMON_FLAGS = [
@@ -100,7 +101,83 @@ def validate_flags(flags: list[str]) -> None:
         raise SystemExit("CEVRA FFmpeg builds must enable zlib for typed PNG frame extraction")
 
 
-def build(source: Path, prefix: Path, jobs: int) -> None:
+def read_json(path: Path, name: str) -> dict[str, object]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"invalid {name}") from exc
+    if not isinstance(value, dict):
+        raise SystemExit(f"invalid {name}")
+    return value
+
+
+def validate_zlib_prefix(prefix: Path) -> dict[str, object]:
+    files = {
+        "zlib.h": prefix / "include/zlib.h",
+        "zconf.h": prefix / "include/zconf.h",
+        "zlib.lib": prefix / "lib/zlib.lib",
+        "license": prefix / "licenses/zlib/LICENSE",
+        "provenance": prefix / "provenance/zlib.json",
+    }
+    for name, path in files.items():
+        if path.is_symlink() or not path.is_file():
+            raise SystemExit(f"prepared Windows zlib prefix is missing {name}: {path}")
+    provenance = read_json(files["provenance"], "zlib build provenance")
+    expected = {
+        "id": "zlib",
+        "version": ZLIB_PIN["version"],
+        "license": ZLIB_PIN["license"],
+        "source": ZLIB_PIN["source"],
+        "sourceSignature": ZLIB_PIN["signature"],
+        "signingKeySource": ZLIB_PIN["signingKey"],
+        "signingFingerprint": ZLIB_PIN["signingFingerprint"],
+        "verifiedSignerFingerprint": ZLIB_PIN["signingFingerprint"].upper(),
+        "sourceArchiveSha256": ZLIB_PIN["archiveSha256"],
+        "sourceSignatureSha256": ZLIB_PIN["signatureSha256"],
+        "signingKeySourceSha256": ZLIB_PIN["signingKeySourceSha256"],
+        "signingKeySha256": ZLIB_PIN["signingKeySha256"],
+        "licenseSha256": ZLIB_PIN["licenseSha256"],
+        "staticLink": True,
+        "sourceModified": False,
+        "machine": "x64",
+        "crt": "static-mt",
+        "buildMethod": "win32/Makefile.msc",
+        "licenseFile": "licenses/zlib/LICENSE",
+    }
+    if any(provenance.get(key) != value for key, value in expected.items()):
+        raise SystemExit("prepared Windows zlib provenance does not match the pinned static build")
+    digest_fields = {
+        "librarySha256": files["zlib.lib"],
+        "zlibHeaderSha256": files["zlib.h"],
+        "zconfHeaderSha256": files["zconf.h"],
+        "licenseSha256": files["license"],
+    }
+    for field, path in digest_fields.items():
+        if provenance.get(field) != sha256(path):
+            raise SystemExit(f"prepared Windows zlib {field} does not match its file")
+    source_paths = {
+        "sourceArchive": (f"sources/zlib/zlib-{ZLIB_PIN['version']}.tar.xz", ZLIB_PIN["archiveSha256"]),
+        "sourceSignatureFile": (f"sources/zlib/zlib-{ZLIB_PIN['version']}.tar.xz.asc", ZLIB_PIN["signatureSha256"]),
+        "signingKeyFile": ("sources/zlib/mark-adler.asc", ZLIB_PIN["signingKeySha256"]),
+        "signingKeySourceFile": ("sources/zlib/mark-adler-pgp.html", ZLIB_PIN["signingKeySourceSha256"]),
+    }
+    for field, (relative, digest) in source_paths.items():
+        if provenance.get(field) != relative:
+            raise SystemExit(f"prepared Windows zlib {field} is invalid")
+        path = prefix / relative
+        if path.is_symlink() or not path.is_file() or sha256(path) != digest:
+            raise SystemExit(f"prepared Windows zlib source artifact is invalid: {relative}")
+    instructions = prefix / "sources/zlib/BUILD.md"
+    if provenance.get("buildInstructions") != "sources/zlib/BUILD.md" or not instructions.is_file():
+        raise SystemExit("prepared Windows zlib build instructions are missing")
+    if not isinstance(provenance.get("toolchain"), dict):
+        raise SystemExit("prepared Windows zlib provenance is missing toolchain identification")
+    if not isinstance(provenance.get("smoke"), str) or not str(provenance["smoke"]).startswith("zlib=1.3.2 roundtrip="):
+        raise SystemExit("prepared Windows zlib provenance is missing a successful static-link smoke")
+    return provenance
+
+
+def build(source: Path, prefix: Path, jobs: int, zlib_prefix: Path | None = None) -> None:
     system = platform.system()
     if system not in PLATFORM_FLAGS:
         raise SystemExit(f"unsupported build host {system}")
@@ -136,6 +213,13 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
     validate_flags(flags)
     env = os.environ.copy()
     env["SOURCE_DATE_EPOCH"] = "0"
+    zlib_provenance: dict[str, object] | None = None
+    if system == "Windows":
+        if zlib_prefix is None:
+            raise SystemExit("Windows FFmpeg build requires --zlib-prefix with the pinned prepared zlib 1.3.2 input")
+        zlib_provenance = validate_zlib_prefix(zlib_prefix)
+        env["INCLUDE"] = str(zlib_prefix / "include") + (";" + env["INCLUDE"] if env.get("INCLUDE") else "")
+        env["LIB"] = str(zlib_prefix / "lib") + (";" + env["LIB"] if env.get("LIB") else "")
 
     # configure is a POSIX shell script. On Windows this script is expected to run inside
     # an MSYS2/Git-Bash environment with the MSVC toolchain environment already activated.
@@ -224,6 +308,12 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
 
     provenance_directory = prefix / "provenance"
     provenance_directory.mkdir(parents=True, exist_ok=True)
+    if system == "Windows":
+        assert zlib_prefix is not None and zlib_provenance is not None
+        shutil.copytree(zlib_prefix / "licenses/zlib", prefix / "licenses/zlib", symlinks=False)
+        shutil.copytree(zlib_prefix / "sources/zlib", prefix / "sources/zlib", symlinks=False)
+        shutil.copy2(zlib_prefix / "provenance/zlib.json", prefix / "provenance/zlib.json")
+
     build_provenance = {
         "id": "ffmpeg",
         "version": actual_version,
@@ -247,6 +337,16 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
         "signingKeyFile": "sources/ffmpeg/ffmpeg-devel.asc",
         "buildInstructions": "sources/ffmpeg/BUILD.md",
     }
+    if zlib_provenance is not None:
+        build_provenance["zlib"] = {
+            "version": zlib_provenance["version"],
+            "license": zlib_provenance["license"],
+            "sourceArchiveSha256": zlib_provenance["sourceArchiveSha256"],
+            "librarySha256": zlib_provenance["librarySha256"],
+            "staticLink": True,
+            "preparedBuildInput": True,
+            "provenance": "provenance/zlib.json",
+        }
     (provenance_directory / "ffmpeg.json").write_text(json.dumps(build_provenance, indent=2) + "\n", encoding="utf-8")
 
 
@@ -255,8 +355,14 @@ def main() -> int:
     ap.add_argument("source", type=Path)
     ap.add_argument("prefix", type=Path)
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 2)
+    ap.add_argument("--zlib-prefix", type=Path)
     args = ap.parse_args()
-    build(args.source.resolve(), args.prefix.resolve(), args.jobs)
+    build(
+        args.source.resolve(),
+        args.prefix.resolve(),
+        args.jobs,
+        args.zlib_prefix.resolve() if args.zlib_prefix is not None else None,
+    )
     print(args.prefix.resolve())
     return 0
 

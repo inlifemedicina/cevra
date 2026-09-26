@@ -76,12 +76,17 @@ DARWIN_PYTHON_NOTICE_PATHS = {
     "python-bzip2-license": "licenses/python/components/bzip2-1.0.8-LICENSE.txt",
     "python-libffi-license": "licenses/python/components/libffi-3.4.8-LICENSE.txt",
 }
+WINDOWS_ZLIB_NOTICE_PATHS = {
+    "zlib-license": "licenses/zlib/LICENSE",
+}
 
 
 def required_notice_paths(platform_name: Optional[str] = None) -> dict[str, str]:
     result = dict(REQUIRED_NOTICE_PATHS)
     if (platform_name or _platform()) == "darwin":
         result.update(DARWIN_PYTHON_NOTICE_PATHS)
+    if (platform_name or _platform()) == "win32":
+        result.update(WINDOWS_ZLIB_NOTICE_PATHS)
     return result
 
 
@@ -243,6 +248,7 @@ def verify_release_bundle(
     expected_upstream_version: str,
     expected_upstream_commit: str,
     expected_upstream_contract: str,
+    expected_windows_zlib: Optional[dict[str, str]] = None,
 ) -> dict[str, Any]:
     root = runtime_root.absolute()
     if root.is_symlink() or not root.is_dir():
@@ -437,6 +443,83 @@ def verify_release_bundle(
     toolchain = _object(ffmpeg.get("toolchain"), "ffmpeg.toolchain")
     if ffmpeg_provenance.get("toolchain") != toolchain:
         raise RuntimeIntegrityError("FFmpeg toolchain provenance is invalid")
+    if str(manifest.get("platform")) == "win32":
+        if expected_windows_zlib is None:
+            raise RuntimeIntegrityError("Windows runtime verifier is missing the pinned zlib policy")
+        zlib = _object(ffmpeg.get("zlib"), "ffmpeg.zlib")
+        zlib_provenance_path = _safe_path(root, zlib.get("provenance"), "ffmpeg.zlib.provenance")
+        _check_hash(zlib_provenance_path, zlib.get("provenanceSha256"), "ffmpeg.zlib.provenanceSha256")
+        zlib_provenance = _read_json(zlib_provenance_path, "Windows zlib provenance")
+        zlib_checks = {
+            "id": "zlib",
+            "version": expected_windows_zlib["version"],
+            "license": expected_windows_zlib["license"],
+            "source": expected_windows_zlib["source"],
+            "sourceSignature": expected_windows_zlib["signature"],
+            "signingKeySource": expected_windows_zlib["signingKey"],
+            "signingFingerprint": expected_windows_zlib["signingFingerprint"],
+            "verifiedSignerFingerprint": expected_windows_zlib["signingFingerprint"].upper(),
+            "sourceArchiveSha256": expected_windows_zlib["archiveSha256"],
+            "sourceSignatureSha256": expected_windows_zlib["signatureSha256"],
+            "signingKeySourceSha256": expected_windows_zlib["signingKeySourceSha256"],
+            "signingKeySha256": expected_windows_zlib["signingKeySha256"],
+            "licenseSha256": expected_windows_zlib["licenseSha256"],
+            "staticLink": True,
+            "sourceModified": False,
+            "machine": "x64",
+            "crt": "static-mt",
+            "buildMethod": "win32/Makefile.msc",
+            "sourceArchive": f"sources/zlib/zlib-{expected_windows_zlib['version']}.tar.xz",
+            "sourceSignatureFile": f"sources/zlib/zlib-{expected_windows_zlib['version']}.tar.xz.asc",
+            "signingKeyFile": "sources/zlib/mark-adler.asc",
+            "signingKeySourceFile": "sources/zlib/mark-adler-pgp.html",
+            "buildInstructions": "sources/zlib/BUILD.md",
+            "licenseFile": "licenses/zlib/LICENSE",
+        }
+        for key, value in zlib_checks.items():
+            if zlib.get(key) != value or zlib_provenance.get(key) != value:
+                raise RuntimeIntegrityError(f"Windows zlib provenance does not match the release pin: {key}")
+        for field in ("librarySha256", "zlibHeaderSha256", "zconfHeaderSha256"):
+            value = _digest(zlib.get(field), f"ffmpeg.zlib.{field}")
+            if zlib_provenance.get(field) != value:
+                raise RuntimeIntegrityError(f"Windows zlib provenance content is invalid: {field}")
+        for field in ("preparedBuildInput",):
+            if zlib.get(field) is not True:
+                raise RuntimeIntegrityError(f"Windows zlib manifest field is invalid: {field}")
+        if not isinstance(zlib.get("smoke"), str) or not zlib["smoke"].startswith("zlib=1.3.2 roundtrip="):
+            raise RuntimeIntegrityError("Windows zlib static-link smoke result is invalid")
+        if zlib_provenance.get("smoke") != zlib.get("smoke"):
+            raise RuntimeIntegrityError("Windows zlib smoke provenance is inconsistent")
+        zlib_toolchain = _object(zlib.get("toolchain"), "ffmpeg.zlib.toolchain")
+        if zlib_provenance.get("toolchain") != zlib_toolchain:
+            raise RuntimeIntegrityError("Windows zlib toolchain provenance is invalid")
+        zlib_artifacts = {
+            "sourceArchive": "sourceArchiveSha256",
+            "sourceSignatureFile": "sourceSignatureSha256",
+            "signingKeyFile": "signingKeySha256",
+            "signingKeySourceFile": "signingKeySourceSha256",
+            "licenseFile": "licenseSha256",
+        }
+        for path_field, digest_field in zlib_artifacts.items():
+            _check_hash(
+                _safe_path(root, zlib.get(path_field), f"ffmpeg.zlib.{path_field}"),
+                zlib.get(digest_field),
+                f"ffmpeg.zlib.{digest_field}",
+            )
+        _safe_path(root, zlib.get("buildInstructions"), "ffmpeg.zlib.buildInstructions")
+        zlib_summary = {
+            "version": zlib["version"],
+            "license": zlib["license"],
+            "sourceArchiveSha256": zlib["sourceArchiveSha256"],
+            "librarySha256": zlib["librarySha256"],
+            "staticLink": True,
+            "preparedBuildInput": True,
+            "provenance": "provenance/zlib.json",
+        }
+        if ffmpeg_provenance.get("zlib") != zlib_summary:
+            raise RuntimeIntegrityError("FFmpeg provenance does not bind the Windows zlib input")
+    elif "zlib" in ffmpeg or "zlib" in ffmpeg_provenance:
+        raise RuntimeIntegrityError("non-Windows runtime contains unexpected Windows zlib build provenance")
 
     notices = manifest["notices"]
     if not isinstance(notices, list):

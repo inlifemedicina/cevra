@@ -5,6 +5,13 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["format", "formatVersion", "runtimeVersion", "workerVersion", "platform", "arch", "bundleTreeSha256", "binFiles", "python", "worker", "upstream", "ffmpeg", "notices"],
+  "allOf": [
+    {
+      "if": { "properties": { "platform": { "const": "win32" } }, "required": ["platform"] },
+      "then": { "properties": { "ffmpeg": { "required": ["zlib"] } } },
+      "else": { "properties": { "ffmpeg": { "not": { "required": ["zlib"] } } } }
+    }
+  ],
   "properties": {
     "format": { "const": "cevra-media-runtime" },
     "formatVersion": { "const": 1 },
@@ -65,7 +72,8 @@
           "type": "object", "additionalProperties": false,
           "required": ["host", "arch", "compiler", "python", "sourceDateEpoch"],
           "properties": { "host": { "$ref": "#/$defs/text" }, "arch": { "$ref": "#/$defs/text" }, "compiler": { "$ref": "#/$defs/text" }, "python": { "$ref": "#/$defs/text" }, "sourceDateEpoch": { "const": "0" } }
-        }
+        },
+        "zlib": { "$ref": "#/$defs/zlib" }
       }
     },
     "notices": { "type": "array", "minItems": 5, "maxItems": 32, "items": { "$ref": "#/$defs/notice" } }
@@ -85,6 +93,31 @@
     "component": {
       "type": "object", "additionalProperties": false, "required": ["id", "version", "license"],
       "properties": { "id": { "$ref": "#/$defs/text" }, "version": { "$ref": "#/$defs/text" }, "license": { "$ref": "#/$defs/text" }, "providedByPlatform": { "enum": ["true"] } }
+    },
+    "zlib": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "license", "source", "sourceSignature", "signingKeySource", "signingFingerprint", "verifiedSignerFingerprint", "sourceArchiveSha256", "sourceSignatureSha256", "signingKeySourceSha256", "signingKeySha256", "licenseSha256", "librarySha256", "zlibHeaderSha256", "zconfHeaderSha256", "staticLink", "preparedBuildInput", "sourceModified", "machine", "crt", "buildMethod", "provenance", "provenanceSha256", "sourceArchive", "sourceSignatureFile", "signingKeyFile", "signingKeySourceFile", "buildInstructions", "licenseFile", "smoke", "toolchain"],
+      "properties": {
+        "version": { "const": "1.3.2" }, "license": { "const": "Zlib" },
+        "source": { "$ref": "#/$defs/text" }, "sourceSignature": { "$ref": "#/$defs/text" }, "signingKeySource": { "$ref": "#/$defs/text" },
+        "signingFingerprint": { "$ref": "#/$defs/text" }, "verifiedSignerFingerprint": { "$ref": "#/$defs/text" },
+        "sourceArchiveSha256": { "$ref": "#/$defs/hash" }, "sourceSignatureSha256": { "$ref": "#/$defs/hash" },
+        "signingKeySourceSha256": { "$ref": "#/$defs/hash" }, "signingKeySha256": { "$ref": "#/$defs/hash" },
+        "licenseSha256": { "$ref": "#/$defs/hash" }, "librarySha256": { "$ref": "#/$defs/hash" },
+        "zlibHeaderSha256": { "$ref": "#/$defs/hash" }, "zconfHeaderSha256": { "$ref": "#/$defs/hash" },
+        "staticLink": { "const": true }, "preparedBuildInput": { "const": true }, "sourceModified": { "const": false },
+        "machine": { "const": "x64" }, "crt": { "const": "static-mt" }, "buildMethod": { "const": "win32/Makefile.msc" },
+        "provenance": { "const": "provenance/zlib.json" }, "provenanceSha256": { "$ref": "#/$defs/hash" },
+        "sourceArchive": { "$ref": "#/$defs/path" }, "sourceSignatureFile": { "$ref": "#/$defs/path" },
+        "signingKeyFile": { "$ref": "#/$defs/path" }, "signingKeySourceFile": { "$ref": "#/$defs/path" },
+        "buildInstructions": { "$ref": "#/$defs/path" }, "licenseFile": { "$ref": "#/$defs/path" },
+        "smoke": { "$ref": "#/$defs/text" },
+        "toolchain": {
+          "type": "object", "additionalProperties": false,
+          "required": ["host", "arch", "compiler", "python", "sourceDateEpoch"],
+          "properties": { "host": { "$ref": "#/$defs/text" }, "arch": { "$ref": "#/$defs/text" }, "compiler": { "$ref": "#/$defs/text" }, "python": { "$ref": "#/$defs/text" }, "sourceDateEpoch": { "const": "0" } }
+        }
+      }
     },
     "pruning": {
       "type": "object", "additionalProperties": false,

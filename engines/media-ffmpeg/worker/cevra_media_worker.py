@@ -33,6 +33,19 @@ EXPECTED_FFMPEG_VERSION = "9.0.1"
 EXPECTED_FFMPEG_SOURCE = "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz"
 EXPECTED_FFMPEG_SIGNATURE = "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz.asc"
 EXPECTED_FFMPEG_FINGERPRINT = "FCF986EA15E6E293A5644F10B4322F04D67658D8"
+EXPECTED_WINDOWS_ZLIB = {
+    "version": "1.3.2",
+    "source": "https://zlib.net/zlib-1.3.2.tar.xz",
+    "archiveSha256": "d7a0654783a4da529d1bb793b7ad9c3318020af77667bcae35f95d0e42a792f3",
+    "signature": "https://zlib.net/zlib-1.3.2.tar.xz.asc",
+    "signatureSha256": "03ce710347e2f84fa7ed0a6ae6a93467b08031a3022fc296da40220a83b96667",
+    "signingKey": "https://madler.net/madler/pgp.html",
+    "signingKeySourceSha256": "939bc34e71648cb70793c711d86a58c302a624f84c8600cfa62f2fdd3c925022",
+    "signingKeySha256": "27f818fd93326e4531c6b094f0edc4c331a1c77ec6449675a3929ae3274d85ac",
+    "signingFingerprint": "5ED46A6721D365587791E2AA783FCD8E58BCAFBA",
+    "license": "Zlib",
+    "licenseSha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+}
 EXPECTED_PYTHON_VERSION = "3.12.14"
 
 
@@ -67,6 +80,7 @@ if RELEASE_MODE:
         expected_upstream_version=UPSTREAM_VERSION,
         expected_upstream_commit=UPSTREAM_COMMIT,
         expected_upstream_contract=UPSTREAM_CONTRACT,
+        expected_windows_zlib=EXPECTED_WINDOWS_ZLIB if sys.platform == "win32" else None,
     )
 
 from cevra_native_tools import AUDIO_CODECS as DELIVERY_AUDIO_CODECS

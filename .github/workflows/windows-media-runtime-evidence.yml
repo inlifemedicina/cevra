@@ -26,6 +26,10 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
+      - name: Initialize bounded evidence directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\windows-h264-evidence" | Out-Null
+
       - name: Report runner and bootstrap toolchain
         shell: pwsh
         run: |
@@ -57,7 +61,7 @@ jobs:
           & "$env:RUNNER_TEMP\cevra-python\python.exe" -I -B engines/media-ffmpeg/runtime/prepare_python_runtime.py "$env:RUNNER_TEMP\cevra-python" --verify-only
           & "$env:RUNNER_TEMP\cevra-python\python.exe" -I -B -c "import platform,struct; print(platform.python_version(), platform.machine(), struct.calcsize('P') * 8)"
 
-      - name: Verify exact FFmpeg source signature and prepare vendor
+      - name: Verify exact FFmpeg and zlib source signatures and prepare vendor
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -66,8 +70,18 @@ jobs:
           gpg --version
           gpgv --version
           & "$env:RUNNER_TEMP\cevra-python\python.exe" -I -B engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "$env:RUNNER_TEMP\ffmpeg-source"
+          & "$env:RUNNER_TEMP\cevra-python\python.exe" -I -B engines/media-ffmpeg/runtime/prepare_zlib_source.py "$env:RUNNER_TEMP\zlib-source"
           & "$env:RUNNER_TEMP\cevra-python\python.exe" -I -B engines/media-ffmpeg/runtime/prepare_vendor.py "$env:RUNNER_TEMP\ffmpeg-skill"
           & "$env:RUNNER_TEMP\cevra-python\python.exe" -I -B engines/media-ffmpeg/runtime/prepare_vendor.py "$env:RUNNER_TEMP\ffmpeg-skill" --verify-only
+          Copy-Item "$env:RUNNER_TEMP\zlib-source\zlib-1.3.2\CEVRA_SOURCE_PROVENANCE.json" "$env:RUNNER_TEMP\windows-h264-evidence\zlib-source-provenance.json"
+
+      - name: Build and smoke-test pinned static zlib 1.3.2 with MSVC
+        shell: cmd
+        run: |
+          call "%CEVRA_VSDEVCMD%" -arch=x64 -host_arch=x64
+          "%RUNNER_TEMP%\cevra-python\python.exe" -I -B engines\media-ffmpeg\runtime\build_zlib.py "%RUNNER_TEMP%\zlib-source\zlib-1.3.2" "%RUNNER_TEMP%\cevra-zlib"
+          copy /Y "%RUNNER_TEMP%\cevra-zlib\provenance\zlib.json" "%RUNNER_TEMP%\windows-h264-evidence\zlib-build-provenance.json"
+          copy /Y "%RUNNER_TEMP%\cevra-zlib\provenance\zlib-build.log" "%RUNNER_TEMP%\windows-h264-evidence\zlib-build.log"
 
       - name: Build exact pinned FFmpeg 9.0.1 with MSVC and Media Foundation
         shell: cmd
@@ -75,7 +89,7 @@ jobs:
           call "%CEVRA_VSDEVCMD%" -arch=x64 -host_arch=x64
           set "PATH=%PATH%;C:\msys64\usr\bin;C:\Program Files\Git\usr\bin"
           set "CC=cl"
-          "%RUNNER_TEMP%\cevra-python\python.exe" -I -B engines\media-ffmpeg\runtime\build_ffmpeg.py "%RUNNER_TEMP%\ffmpeg-source\ffmpeg-9.0.1" "%RUNNER_TEMP%\cevra-ffmpeg" --jobs 4
+          "%RUNNER_TEMP%\cevra-python\python.exe" -I -B engines\media-ffmpeg\runtime\build_ffmpeg.py "%RUNNER_TEMP%\ffmpeg-source\ffmpeg-9.0.1" "%RUNNER_TEMP%\cevra-ffmpeg" --jobs 4 --zlib-prefix "%RUNNER_TEMP%\cevra-zlib"
 
       - name: Assemble and verify the exact private Media Runtime
         shell: pwsh
@@ -92,13 +106,14 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $evidence = Join-Path $env:RUNNER_TEMP 'windows-h264-evidence'
-          New-Item -ItemType Directory -Path $evidence | Out-Null
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           & "$env:RUNNER_TEMP\cevra-media-runtime\python\python.exe" -I -B engines/media-ffmpeg/test_functional/windows_h264_mf_feasibility.py --runtime-root "$env:RUNNER_TEMP\cevra-media-runtime" --scratch "$env:RUNNER_TEMP\windows-h264-scratch" --output "$evidence\result.json"
           $probeExit = $LASTEXITCODE
           & "$env:RUNNER_TEMP\cevra-media-runtime\bin\ffmpeg.exe" -buildconf *> "$evidence\ffmpeg-buildconf.txt"
           & "$env:RUNNER_TEMP\cevra-media-runtime\bin\ffmpeg.exe" -hide_banner -h encoder=h264_mf *> "$evidence\h264-mf-options.txt"
           Copy-Item "$env:RUNNER_TEMP\cevra-media-runtime\manifest.json" "$evidence\runtime-manifest.json"
           Copy-Item "$env:RUNNER_TEMP\cevra-media-runtime\provenance\ffmpeg.json" "$evidence\ffmpeg-provenance.json"
+          Copy-Item "$env:RUNNER_TEMP\cevra-media-runtime\provenance\zlib.json" "$evidence\zlib-runtime-provenance.json"
           exit $probeExit
 
       - name: Upload bounded native evidence

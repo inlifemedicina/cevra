@@ -105,6 +105,82 @@ def worker_version(worker: Path) -> str:
     return match.group(1)
 
 
+def windows_zlib_metadata(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> dict[str, Any]:
+    pin = VERSIONS["zlib"]
+    provenance_path = component(runtime, "provenance/zlib.json")
+    provenance = read_json(provenance_path, "Windows zlib provenance")
+    expected = {
+        "id": "zlib",
+        "version": pin["version"],
+        "license": pin["license"],
+        "source": pin["source"],
+        "sourceSignature": pin["signature"],
+        "signingKeySource": pin["signingKey"],
+        "signingFingerprint": pin["signingFingerprint"],
+        "verifiedSignerFingerprint": pin["signingFingerprint"].upper(),
+        "sourceArchiveSha256": pin["archiveSha256"],
+        "sourceSignatureSha256": pin["signatureSha256"],
+        "signingKeySourceSha256": pin["signingKeySourceSha256"],
+        "signingKeySha256": pin["signingKeySha256"],
+        "licenseSha256": pin["licenseSha256"],
+        "staticLink": True,
+        "sourceModified": False,
+        "machine": "x64",
+        "crt": "static-mt",
+        "buildMethod": "win32/Makefile.msc",
+        "sourceArchive": f"sources/zlib/zlib-{pin['version']}.tar.xz",
+        "sourceSignatureFile": f"sources/zlib/zlib-{pin['version']}.tar.xz.asc",
+        "signingKeyFile": "sources/zlib/mark-adler.asc",
+        "signingKeySourceFile": "sources/zlib/mark-adler-pgp.html",
+        "buildInstructions": "sources/zlib/BUILD.md",
+        "licenseFile": "licenses/zlib/LICENSE",
+    }
+    if any(provenance.get(key) != value for key, value in expected.items()):
+        raise SystemExit("Windows zlib provenance does not match the pinned static build input")
+    for field in ("librarySha256", "zlibHeaderSha256", "zconfHeaderSha256"):
+        value = provenance.get(field)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise SystemExit(f"Windows zlib provenance is missing {field}")
+    if not isinstance(provenance.get("toolchain"), dict):
+        raise SystemExit("Windows zlib provenance is missing toolchain identification")
+    if not isinstance(provenance.get("smoke"), str) or not provenance["smoke"].startswith("zlib=1.3.2 roundtrip="):
+        raise SystemExit("Windows zlib provenance is missing its static-link smoke result")
+    artifact_hashes = {
+        expected["sourceArchive"]: pin["archiveSha256"],
+        expected["sourceSignatureFile"]: pin["signatureSha256"],
+        expected["signingKeyFile"]: pin["signingKeySha256"],
+        expected["signingKeySourceFile"]: pin["signingKeySourceSha256"],
+        expected["licenseFile"]: pin["licenseSha256"],
+    }
+    for relative, digest in artifact_hashes.items():
+        path = component(runtime, str(relative))
+        if sha256(path) != digest:
+            raise SystemExit(f"Windows zlib compliance artifact digest mismatch: {relative}")
+    component(runtime, str(expected["buildInstructions"]))
+    summary = {
+        "version": pin["version"],
+        "license": pin["license"],
+        "sourceArchiveSha256": pin["archiveSha256"],
+        "librarySha256": provenance["librarySha256"],
+        "staticLink": True,
+        "preparedBuildInput": True,
+        "provenance": "provenance/zlib.json",
+    }
+    if ffmpeg_provenance.get("zlib") != summary:
+        raise SystemExit("FFmpeg provenance does not bind the pinned Windows zlib build input")
+    return {
+        **expected,
+        "librarySha256": provenance["librarySha256"],
+        "zlibHeaderSha256": provenance["zlibHeaderSha256"],
+        "zconfHeaderSha256": provenance["zconfHeaderSha256"],
+        "provenance": "provenance/zlib.json",
+        "provenanceSha256": sha256(provenance_path),
+        "preparedBuildInput": True,
+        "smoke": provenance["smoke"],
+        "toolchain": provenance["toolchain"],
+    }
+
+
 def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
     runtime = runtime_dir.absolute()
     if runtime.is_symlink() or not runtime.is_dir():
@@ -203,6 +279,7 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
         raise SystemExit("FFmpeg compliance source artifact digest mismatch")
     if not isinstance(ffmpeg_provenance.get("toolchain"), dict):
         raise SystemExit("FFmpeg provenance is missing toolchain identification")
+    zlib_metadata = windows_zlib_metadata(runtime, ffmpeg_provenance) if sys_platform() == "win32" else None
 
     return {
         "format": "cevra-media-runtime", "formatVersion": 1,
@@ -243,6 +320,7 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
             "signingKeyFile": ffmpeg_provenance["signingKeyFile"],
             "buildInstructions": ffmpeg_provenance["buildInstructions"],
             "toolchain": ffmpeg_provenance["toolchain"],
+            **({"zlib": zlib_metadata} if zlib_metadata is not None else {}),
         },
         "notices": [
             {"id": ident, "path": relative, "sha256": sha256(runtime / relative), **component_notice_metadata.get(ident, {})}
