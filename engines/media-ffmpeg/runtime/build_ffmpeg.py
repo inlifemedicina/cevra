@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,8 @@ VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 PIN = VERSIONS["ffmpeg"]
 ZLIB_PIN = VERSIONS["zlib"]
 INSTALL_PREFIX = "/cevra-media-runtime"
+MSVC_DEPENDENCY_FILTER = HERE / "msvc_dependencies.awk"
+MSVC_DEPENDENCY_FILTER_ID = "cevra-msvc-dependency-filter-v1"
 
 COMMON_FLAGS = [
     "--disable-autodetect",
@@ -177,6 +180,36 @@ def validate_zlib_prefix(prefix: Path) -> dict[str, object]:
     return provenance
 
 
+def install_msvc_dependency_filter(source: Path, helper: Path = MSVC_DEPENDENCY_FILTER) -> dict[str, str]:
+    """Replace FFmpeg's generated inline MSVC awk with a file-backed filter.
+
+    GNU make/MSYS can remove one escaping layer from FFmpeg's inline
+    ``gsub(/\\\\/, "/")`` program before awk receives it.  FFmpeg ticket
+    #9360 documents the resulting unterminated expression.  Keeping the awk
+    program in a file avoids Windows command-line backslash interpretation
+    without changing the verified release source archive.
+    """
+    config = source / "ffbuild/config.mak"
+    if not config.is_file():
+        raise SystemExit("FFmpeg configure did not produce ffbuild/config.mak")
+    if helper.is_symlink() or not helper.is_file():
+        raise SystemExit(f"CEVRA MSVC dependency filter is missing: {helper}")
+    text = config.read_text(encoding="utf-8")
+    expected = " | awk '/including/ { sub(/^.*file: */, \"\"); gsub(/\\\\/, \"/\"); if (!match($$0, / /)) print \"$@:\", $$0 }' > $(@:.o=.d)"
+    count = text.count(expected)
+    if count != 1:
+        raise SystemExit(f"unexpected FFmpeg MSVC dependency command ({count} matches); refusing an unreviewed build adjustment")
+    helper_path = helper.resolve().as_posix()
+    replacement = f" | awk -v target=\"$@\" -f {shlex.quote(helper_path)} > $(@:.o=.d)"
+    config.write_text(text.replace(expected, replacement), encoding="utf-8")
+    return {
+        "id": MSVC_DEPENDENCY_FILTER_ID,
+        "helperSha256": sha256(helper),
+        "generatedFile": "ffbuild/config.mak",
+        "sourceArchiveModified": "false",
+    }
+
+
 def build(source: Path, prefix: Path, jobs: int, zlib_prefix: Path | None = None) -> None:
     system = platform.system()
     if system not in PLATFORM_FLAGS:
@@ -231,6 +264,10 @@ def build(source: Path, prefix: Path, jobs: int, zlib_prefix: Path | None = None
         raise SystemExit("make is required to build FFmpeg")
 
     run([shell, str(configure), *flags], cwd=source, env=env)
+    build_adjustments: list[dict[str, str]] = []
+    if system == "Windows":
+        env["VSLANG"] = "1033"
+        build_adjustments.append(install_msvc_dependency_filter(source))
     run([make, f"-j{max(1, jobs)}"], cwd=source, env=env)
     with tempfile.TemporaryDirectory(prefix="cevra-ffmpeg-install-", dir=prefix.parent) as stage_name:
         # GNU make under MSYS accepts the native Windows drive only in
@@ -347,6 +384,8 @@ def build(source: Path, prefix: Path, jobs: int, zlib_prefix: Path | None = None
             "preparedBuildInput": True,
             "provenance": "provenance/zlib.json",
         }
+    if build_adjustments:
+        build_provenance["buildAdjustments"] = build_adjustments
     (provenance_directory / "ffmpeg.json").write_text(json.dumps(build_provenance, indent=2) + "\n", encoding="utf-8")
 
 

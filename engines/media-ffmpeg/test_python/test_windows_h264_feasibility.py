@@ -5,7 +5,9 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import stat
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -227,6 +229,44 @@ class WindowsH264FeasibilityTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as captured:
                 build_ffmpeg.validate_zlib_prefix(root)
             self.assertIn("sourceArchive", str(captured.exception))
+
+    def test_msvc_dependency_filter_replaces_only_the_known_generated_command(self) -> None:
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            config = root / "ffbuild/config.mak"
+            config.parent.mkdir()
+            command = " | awk '/including/ { sub(/^.*file: */, \"\"); gsub(/\\\\/, \"/\"); if (!match($$0, / /)) print \"$@:\", $$0 }' > $(@:.o=.d)"
+            config.write_text(f"CCDEP=cl -showIncludes{command}\n", encoding="utf-8")
+            result = build_ffmpeg.install_msvc_dependency_filter(root)
+            adjusted = config.read_text(encoding="utf-8")
+            self.assertEqual(result["id"], "cevra-msvc-dependency-filter-v1")
+            self.assertEqual(result["helperSha256"], build_ffmpeg.sha256(build_ffmpeg.MSVC_DEPENDENCY_FILTER))
+            self.assertNotIn("gsub", adjusted)
+            self.assertIn('awk -v target="$@" -f ', adjusted)
+            self.assertIn("msvc_dependencies.awk", adjusted)
+
+    def test_msvc_dependency_filter_fails_closed_on_upstream_command_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            config = root / "ffbuild/config.mak"
+            config.parent.mkdir()
+            config.write_text("CCDEP=unexpected\n", encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                build_ffmpeg.install_msvc_dependency_filter(root)
+
+    def test_file_backed_msvc_dependency_filter_normalizes_include_paths(self) -> None:
+        awk = shutil.which("awk")
+        if awk is None:
+            self.skipTest("awk is unavailable")
+        observed = subprocess.run(
+            [awk, "-v", "target=libavdevice/alldevices.o", "-f", str(build_ffmpeg.MSVC_DEPENDENCY_FILTER)],
+            input="Note: including file: C:\\sdk\\include\\header.h\n",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        ).stdout
+        self.assertEqual(observed, "libavdevice/alldevices.o: C:/sdk/include/header.h\n")
 
 
 if __name__ == "__main__":
