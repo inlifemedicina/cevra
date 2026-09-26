@@ -1,11 +1,14 @@
 # Transcript Cache V1 — reconciliation evidence
 
-**Status:** IN DEVELOPMENT / FINAL MODEL-SELECTION REMEDIATION — FOCUSED MICRO-REVIEW PENDING
+**Status:** IMPLEMENTED / CLOSED
 **Canonical base:** `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`
 **Historical donor:** `700bb35a65fe8bf7552ab7621d41455dd463e7f9`
 **Historical reconciled code checkpoint:** `22a3b6616f0844622048dad5ef1beb8c313badfb`
-**Preceding remediation code head:** `0b5df56f3db677553825d630eeb4e09ee048bd54`
+**Pre-final-remediation head:** `52a778b5e7f902cb67f4bfe6074641956f6bc513`
+**R1–R4 remediation code head:** `0b5df56f3db677553825d630eeb4e09ee048bd54`
 **Final model-selection code head:** `20d91f556e77b4e9abb71681cb08b5848cd9a7ac`
+**Approved feature head:** `005f5e87cf47c9a717cefd374b3dc43de2984466`
+**Feature merge:** PR #24 / `86c1f88d19f04c1fb919eafed0b9409e2fe726eb`
 
 ## Scope reconciled
 
@@ -68,6 +71,22 @@ On model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac`:
 - Remote validation on the same code head: push CI `36243443422` (5/5), PR CI
   `36243446501` (5/5) and managed Exact Runtime `36243446485` all completed
   SUCCESS.
+
+The approved feature head `005f5e87cf47c9a717cefd374b3dc43de2984466`
+passed push CI `36243908655` (5/5), PR CI `36243910683` (5/5) and managed
+Exact Runtime `36243910685`. Final independent micro-review concluded
+**APPROVE TO UNDRAFT WITH NON-BLOCKING NOTES** with no remaining BLOCKER, HIGH,
+MEDIUM or LOW finding.
+
+## Post-merge evidence
+
+PR #24 merged by normal merge commit
+`86c1f88d19f04c1fb919eafed0b9409e2fe726eb`, with parents canonical main
+`0cf28cf780e9008c29fb45e7e98b3ccb57b64e68` and approved feature head
+`005f5e87cf47c9a717cefd374b3dc43de2984466`. On that merge SHA:
+
+- main push CI `36245088430`: SUCCESS, 5/5;
+- managed Audio Sequence Exact Runtime `36245088427`: SUCCESS.
 
 ## Prior remediation evidence
 
@@ -148,11 +167,10 @@ content integrity is mandatory. Legacy bypass/no-cache adds zero hashes. Tests
 prove Alignment HIT performs zero PCM extraction, zero worker calls and zero
 model-weight hashing.
 
-## Remaining gate and limits
+## Closed scope and remaining limits
 
-- R2 source continuity, R3 optional-`undefined` handling and R4 descriptor
-  integrity are independently approved. One final focused micro-review of the
-  model-selection delta is required before PR #24 can leave draft state.
+- R2 source continuity, R3 optional-`undefined` handling, R4 descriptor
+  integrity and the final model-selection delta are independently approved.
 - Managed runtime evidence covers the existing exact catalog; synthetic
   Application tests are not represented as native transcription/alignment ML.
 - At-rest cache encryption, cache UI, cloud synchronization and permanent audit
