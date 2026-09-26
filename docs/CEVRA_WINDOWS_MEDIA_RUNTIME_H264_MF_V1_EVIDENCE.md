@@ -128,3 +128,10 @@ They are diagnostic history, not encoder evidence and not repeated as PASS.
 The Windows result remains a failure by design until the missing approved build
 input is resolved; the green normal and macOS runs do not convert it into an
 encoder PASS.
+
+## Director impact
+
+This evidence changes no Director authority. A future typed capability may
+report whether Windows H.264 export is available, but the Director receives no
+filesystem, codec-policy or raw worker authority; while K1 remains blocked,
+Windows H.264 stays unavailable rather than silently selecting another codec.
