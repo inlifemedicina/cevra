@@ -152,7 +152,7 @@ def _runtime_components(executable: Path) -> list[dict[str, str]]:
     script = """import ctypes,json,platform,ssl,sqlite3,zlib,lzma,bz2
 try:
  process = ctypes.CDLL(None)
-except OSError:
+except (OSError, TypeError):
  process = None
 def native_version(symbol, fallback):
  if process is None:
