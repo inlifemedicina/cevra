@@ -107,7 +107,59 @@ Export local é sempre independente. Publishing e performance analytics ficam p�
 
 **Bridge Skill** apoia CEVRA Vids com agente externo, usa Agent Protocol tipado e depende do app para execução. Não é segundo editor.
 
-**Creator Skill** é superfície agent-native standalone. Lite e Full compartilham um único núcleo editorial/criativo/QA; Full possui workspace visual e entrega vídeo final sem Desktop. Reutilizar Project IR, runtimes, composição e UI quando prático; subset necessário é versionado/conversível, não semântica divergente. Handoff Creator→Vids é opcional.
+**Creator Skill** é superfície agent-native standalone. CEVRA Creator e CEVRA Studio compartilham um único núcleo editorial/criativo/QA; CEVRA Studio possui workspace visual e entrega vídeo final sem Desktop. Reutilizar Project IR, runtimes, composição e UI quando prático; subset necessário é versionado/conversível, não semântica divergente. Handoff Creator→Vids é opcional.
+
+### Creator runtime topology — approved 2026-09-22
+
+Creator segue o modelo de simplicidade agent-native observado no EDVID, mas não replica um segundo stack audiovisual. A distribuição Creator é independente do CEVRA Vids Desktop e não exige Desktop instalado, aberto ou em execução. Ela consome uma distribuição standalone compatível do **mesmo CEVRA Core reutilizável** usado pelo Vids.
+
+O Core necessário ao Creator deve ser callable sem a camada de apresentação/Tauri e preservar Project IR/ProjectHistory, application services, Media Runtime, transcription/alignment, Creative Intelligence, QA, composition adapters, preview/render/export e demais fundações pertinentes. Desktop e Creator são consumidores distintos do mesmo núcleo; melhorias compartilháveis não são reimplementadas em paralelo.
+
+“Headless” define a fronteira arquitetural, não o processo final: biblioteca + launcher, processo local dedicado ou outra topologia ficam para decisão posterior. Ver ADR 0022.
+
+A experiência externa permanece EDVID-level simple: mídia + instrução natural → análise/estratégia → execução → preview → refinamento conversacional → resultado local. Project IR, engines, schemas e detalhes de runtime permanecem invisíveis ao usuário comum.
+
+### Creator intelligence layering — approved 2026-09-22
+
+Creator adota inteligência híbrida em três camadas:
+
+1. **Host AI** — conversa, interpretação, raciocínio aberto, criatividade, gosto editorial, contextualização por usuário/nicho/objetivo e interpretação de refinamentos. Pode usar evidência externa atual quando capability/permissão permitirem; isso permanece evidência consultiva, não estado audiovisual canônico.
+2. **Creator Skill** — maestro/orchestration playbook: ensina ao host como usar CEVRA, quais evidências/capabilities pedir, ordem de trabalho, progressive disclosure, strategy/approval, execução, preview, QA, refinamento e export. A Skill é intelectualmente relevante e preserva a dinâmica direta observada no EDVID.
+3. **CEVRA Creative Intelligence/Core** — conhecimento editorial reutilizável, playbooks, invariantes, políticas, validação, Project IR/history, regras de timing/áudio/caption/assets, QA, composição e execução tipada compartilhados entre CEVRA Creator, CEVRA Studio e Vids.
+
+Claude pode raciocinar sobre o material; Claude não é source of truth. Regras críticas podem existir como orientação na Skill e como garantia validada no Core.
+
+A inteligência observável útil do EDVID será inventariada em detalhe e classificada clean-room em HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE-RUNTIME, evitando tanto omissão quanto um `SKILL.md` monolítico que replique a arquitetura do EDVID. Ver ADR 0023.
+
+### Creator tool surface and token efficiency — approved 2026-09-22
+
+Creator usa Tool Interface provider-neutral em duas camadas: uma superfície primária pequena e semântica para project/inspect/plan/apply/preview/QA/export/progress/cancel/discovery e capacidades especializadas mais granulares carregadas progressivamente quando a tarefa exigir. Nomes finais e schemas ficam para o contrato específico.
+
+**Eficiência de tokens/contexto é requisito arquitetural.** Usar progressive tool disclosure, evidências compactas e delimitadas, transcript editorial compacto, deltas/revisões em vez de reenvio de estado completo, cache determinístico válido e drill-down apenas sob demanda. Redução de custo não pode reduzir correção; o agente pode escalar evidência quando necessário.
+
+A Tool Interface do agente não substitui a interface humana. CEVRA Studio mantém preview, timeline diretamente editável, controles visuais de legenda/headline/layout/assets/áudio e inspector progressivo sobre o mesmo Project IR/history. O objetivo é preservar e melhorar a combinação EDVID de conversa + superfície visual, não criar uma caixa de chat obrigatória para toda alteração. Ver ADR 0024.
+
+### Creator local project lifecycle — approved 2026-09-22
+
+Creator cria/abre automaticamente um projeto CEVRA local a partir de pasta de mídia ou arquivos fornecidos diretamente, sem wizard obrigatório. Conversa/sessão do provider nunca é o projeto. Project IR/ProjectHistory permanecem canônicos e permitem retomada por outro host compatível ou pelo workspace visual.
+
+Para edições rápidas one-shot, a robustez local não deve virar custo de contexto: usar resumo compacto, revisão/delta, evidência mínima e nenhum dump completo de Project IR. O mesmo Core/command/history é usado; não existe um segundo engine descartável. Artefatos derivados podem seguir cleanup posterior, enquanto export humano permanece previsível e acessível. Ver ADR 0025.
+
+### Creator mobile/remote host experience — approved 2026-09-23
+
+Creator deve funcionar bem a partir de superfícies mobile/remote compatíveis, com Claude Code mobile como primeiro alvo concreto, sem tornar Anthropic dependência arquitetural. O caminho preferencial inicial mantém o CEVRA Core e a mídia no desktop/local node confiável e usa transporte/remote-control oficial do host para conversa, progresso, cancelamento, preview/resultados e refinamentos.
+
+Execução totalmente cloud fica opcional e futura, condicionada a staging, privacidade, custo, retenção, permissões e distribuição do Core. Mobile não implica cloud render nem storage permanente. Ver ADR 0026.
+
+### CEVRA Creator / CEVRA Studio boundary — approved 2026-09-23
+
+CEVRA Creator e CEVRA Studio compartilham o mesmo núcleo editorial/criativo/QA, Project IR/ProjectHistory, Agent Protocol e arquitetura de execução.
+
+**CEVRA Creator** é conversational-first e deve conseguir completar o fluxo inteiro até preview, refinamento e export final local. Não é demo nem meia edição. Pode ter preview/review leve, mas não promete o workspace visual completo.
+
+**CEVRA Studio** contém todo o CEVRA Creator e adiciona workspace visual diretamente editável com timeline, inspector, controles de captions/text/layout/assets/audio, More Controls e Advanced sobre o mesmo projeto.
+
+Engines/capabilities não são artificialmente separados entre CEVRA Creator e CEVRA Studio por esta decisão. Hardware, packs, providers, entitlement e pricing ficam separados. Os nomes aprovados são **CEVRA Creator** e **CEVRA Studio**. Ver ADR 0027.
 
 ## Creation Modes V1
 

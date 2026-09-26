@@ -1840,13 +1840,91 @@ Current dependency blockers/gates:
 
 - **CANONICAL:** PR #25 Director direction is incorporated in the dedicated Director record without its stale branch handoff.
 - **CANONICAL:** PR #26 decision families D1–D23 and I1–I19 are reconciled into dedicated editorial, visual, composition and integration records; provider-specific claims remain implementation-time verification gates.
-- **CANONICAL:** Bridge Skill supports Vids through the typed Agent Protocol; Creator Skill is a standalone agent-native product surface. Lite/Full share one editorial core, and Creator Full must deliver final output without Desktop.
+- **CANONICAL:** Bridge Skill supports Vids through the typed Agent Protocol; Creator Skill is a standalone agent-native product surface. CEVRA Creator / CEVRA Studio share one editorial core, and CEVRA Studio must deliver final output without Desktop.
 - **CANONICAL:** the fix-now/defer, execution-feasibility, Product Owner pause, coordinated Media Runtime, acceptance-catalog and Director-impact rules are permanent agent policy in `AGENTS.md`.
 - **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
 - **IMPLEMENTED/CLOSED:** Transcript Cache V1 merged through PR #24 at `86c1f88d19f04c1fb919eafed0b9409e2fe726eb`. Historical reconciled checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb` and preceding remediation head `0b5df56f3db677553825d630eeb4e09ee048bd54` are superseded by final model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac` and approved feature head `005f5e87cf47c9a717cefd374b3dc43de2984466`; post-merge CI and Exact Runtime passed. Historical run `35625702675` remains donor-only evidence.
 - **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
+
+---
+
+## 2026-09-22 — Creator Skill standalone runtime topology
+
+- **CANONICAL:** Creator Skill is an agent-native standalone product surface; it does not require CEVRA Vids Desktop installed, open or running.
+- **CANONICAL:** Creator and Vids consume the same reusable CEVRA Core foundations rather than maintaining parallel audiovisual stacks. Creator may ship a standalone compatible distribution of those Core/runtime components.
+- **CANONICAL:** reusable Creator-relevant application/domain/runtime capabilities must remain callable without React/Tauri presentation state. “Headless” is a boundary requirement; exact local process/IPC packaging remains undecided.
+- **CANONICAL:** preserve EDVID-level conversational simplicity while keeping CEVRA Project IR/history, typed execution, managed runtimes, QA, provenance and provider neutrality underneath.
+- **CANONICAL:** Claude Code is the first priority Creator host, not a canonical-state owner or architectural dependency. The same provider-neutral Agent Protocol/Core must remain adaptable to Codex, local/self-hosted and future hosts.
+- **CANONICAL:** extract/adapt useful EDVID behavioral intelligence systematically, but place invariants and reusable editorial behavior in the appropriate CEVRA Skill/Core/Creative Intelligence layer rather than cloning EDVID's loose-file/runtime architecture.
+- **ADR:** docs/adr/0022-creator-skill-runtime-topology.md.
+
+---
+
+## 2026-09-22 — Creator Skill hybrid intelligence layering
+
+- **CANONICAL:** Creator uses three coordinated intelligence layers: Host AI for conversation/open-ended creative reasoning; Creator Skill for orchestration/playbook/progressive disclosure; CEVRA Creative Intelligence/Core for reusable editorial knowledge, invariants, validation, typed execution and QA.
+- **CANONICAL:** Claude Code may personalize reasoning to the user's stated audience, niche, format and goals and may consume authorized current external evidence, but neither Claude nor external research becomes canonical audiovisual state.
+- **CANONICAL:** the Creator Skill remains intellectually meaningful and EDVID-like in workflow directness; it is not reduced to a thin command catalog. Reusable invariants and semantics nevertheless remain shared and enforceable outside the host.
+- **CANONICAL:** critical rules may be duplicated intentionally as Skill guidance plus Core enforcement.
+- **CANONICAL:** perform a detailed clean-room inventory of useful observable EDVID intelligence and explicitly classify each behavior into HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE-RUNTIME before Creator implementation closure.
+- **ADR:** docs/adr/0023-creator-skill-intelligence-layering.md.
+
+---
+
+## 2026-09-22 — Creator Tool Interface and token efficiency
+
+- **CANONICAL:** Creator uses a two-layer provider-neutral Tool Interface: a small semantic default surface plus progressively disclosed specialized typed editing tools.
+- **CANONICAL:** token/context cost is a first-class design constraint. Prefer compact bounded evidence, progressive tool disclosure, delta/revision state, valid deterministic cache reuse and on-demand drill-down; do not load complete raw Project IR/machine JSON/tool catalogs into normal host context.
+- **CANONICAL:** cost efficiency never authorizes silent correctness degradation; detailed evidence remains available by escalation.
+- **CANONICAL:** capability/version discovery, structured progress, cancellation and stable errors are part of the eventual Creator/Agent Protocol contract.
+- **CANONICAL:** Agent Tool Interface and human visual workspace are separate surfaces. CEVRA Studio retains preview, directly editable timeline and visible controls such as captions, headline/style/layout/assets/audio as capabilities mature; ordinary visual adjustments must not require chat-only interaction.
+- **CANONICAL:** AI edits and direct user edits converge on the same Project IR/history/typed command system.
+- **ADR:** docs/adr/0024-creator-tool-interface-and-token-efficiency.md.
+
+---
+
+## 2026-09-22 — Creator local project lifecycle
+
+- **CANONICAL:** Creator creates/opens a local CEVRA project automatically from a media folder or directly supplied media; no mandatory setup wizard for ordinary use.
+- **CANONICAL:** provider conversation/session is never the project. Project IR/ProjectHistory and CEVRA-managed storage own canonical audiovisual state.
+- **CANONICAL:** projects can be resumed by another compatible host or visual surface without reconstructing state from chat history.
+- **CANONICAL:** short one-shot edits use a token-efficient fast path with compact state/evidence, revision/delta references and no whole-project Project IR transfer by default; this is not a second editing engine.
+- **CANONICAL:** original media stays immutable; caches/previews/intermediates are derived; exports remain predictably user-accessible.
+- **ADR:** docs/adr/0025-creator-project-lifecycle-and-one-shot.md.
+
+---
+
+## 2026-09-23 — Creator mobile/remote host experience
+
+- **CANONICAL:** Creator should be easy to operate from compatible mobile/remote agent surfaces; Claude Code mobile is the first concrete target experience, not an architectural dependency.
+- **CANONICAL:** preferred initial topology keeps media and heavy CEVRA Core execution on a trusted local/desktop node while the mobile host provides conversation/control through official mechanisms.
+- **CANONICAL:** mobile support does not imply cloud render or permanent cloud media storage. Fully cloud-executed Creator is optional future work behind explicit staging/privacy/cost/retention/permission decisions.
+- **CANONICAL:** the same provider-neutral Agent Protocol/Core must remain adaptable to future Codex/local/other mobile or remote hosts.
+- **ADR:** docs/adr/0026-creator-mobile-remote-host-experience.md.
+
+---
+
+## 2026-09-23 — Creator-oriented EDVID end-to-end decomposition — COMPLETED
+
+- **AUDIT COMPLETED:** the pinned 83-file EDVID baseline was re-decomposed specifically for Creator product/architecture using the existing canonical parity evidence plus direct reinspection of Skill, preview UI, style catalog, shortform/longform references, installer/runtime workflow and helper topology.
+- **EVIDENCE:** `docs/CEVRA_CREATOR_EDVID_DECOMPOSITION.md` maps the complete user journey to HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE / VISUAL WORKSPACE / PROVIDER boundaries.
+- **FINDING:** no observed EDVID user-experience requirement forces a reversal of ADRs 0022–0026. The primary product risk is losing EDVID simplicity through overexposed internal complexity, not inability of CEVRA architecture to reproduce the workflow.
+- **FINDING:** EDVID's direct visual preview/timeline/style chooser is a first-class part of its experience and must remain represented in CEVRA Studio planning; EDVID is not a chat-only product.
+- **FINDING:** EDVID's token-economy patterns (packed transcript, bounded visual review, numeric-first QA, cached analysis, selective context) are high-value behaviors to preserve and extend.
+- **PROCESS:** the decision queue in the decomposition document is product input only; it does not pre-approve CEVRA Creator / CEVRA Studio, host UX, evidence, autonomy, workspace, security, installation or implementation details.
+
+---
+
+## 2026-09-23 — CEVRA Creator / CEVRA Studio product boundary
+
+- **CANONICAL:** CEVRA Creator and CEVRA Studio share one editorial/creative/QA core, Project IR/ProjectHistory, Agent Protocol and execution architecture.
+- **CANONICAL:** CEVRA Creator is a complete conversational-first editing product: it can analyze, edit, preview, refine and export a final local video; it is not a demo or partial editor.
+- **CANONICAL:** CEVRA Studio includes the entire CEVRA Creator workflow and adds the directly editable visual workspace, timeline, inspector, More Controls and Advanced over the same project/history.
+- **CANONICAL:** CEVRA Creator / CEVRA Studio are not defined by separate intelligence quality or duplicated runtimes. Optional capability entitlement/hardware/provider/commercial limits remain separate decisions.
+- **NAMING — APPROVED:** **CEVRA Creator** = conversational-first complete product; **CEVRA Studio** = Creator + full visual editing workspace. CEVRA Creator / CEVRA Studio are retired as product names.
+- **ADR:** docs/adr/0027-creator-studio-product-boundary.md.
 
 ---
 

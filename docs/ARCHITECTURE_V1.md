@@ -187,6 +187,60 @@ CEVRA Vids may detect supported local agent installations and, only after explic
 
 Skill management uses an owner-scoped manifest with version, hashes, minimum and maximum compatibility, rollback metadata and provenance. It never modifies non-CEVRA skills, follows destructive symlinks, blindly overwrites a Git checkout, removes user configuration or secrets, or requires administrator privileges when user-scoped installation is possible. An embedded agent may use an internal skill or control surface without global installation.
 
+### 9.1 Creator Skill standalone runtime
+
+The Creator Skill is an agent-native product surface, distinct from the Bridge Skill. CEVRA Studio must be able to produce and export a final local video without requiring CEVRA Vids Desktop to be installed, open or running.
+
+Creator is distributed with access to a compatible standalone form of the **same reusable CEVRA Core** consumed by Vids. Reusable application/domain/runtime capabilities needed by Creator must therefore remain callable without React/Tauri presentation state. Desktop and Creator do not own separate audiovisual semantics, Project IR variants, FFmpeg runtimes or editorial engines.
+
+The final local process/IPC packaging is intentionally deferred. “Headless” here is a separation-of-concerns requirement, not a commitment to a daemon or service architecture.
+
+Claude Code is the first priority external Creator host, but the Creator contract and Core are provider-neutral. Codex, local/self-hosted and future compatible hosts target the same Agent Protocol and typed CEVRA capabilities.
+
+The user-facing Creator experience should preserve EDVID-level directness: natural-language request, strategy/approval when applicable, execution, preview, conversational refinement and final local result. CEVRA's internal Project IR, engines, schemas and runtime topology are not exposed unless an advanced diagnostic/developer surface explicitly requires them.
+
+See [ADR 0022](adr/0022-creator-skill-runtime-topology.md).
+
+### 9.2 Creator Tool Interface and visual workspace
+
+Creator exposes a provider-neutral two-layer agent tool surface: a small semantic default catalog and progressively disclosed specialized typed editing capabilities. Both compile through the same Agent Protocol/application/ProjectHistory/Project IR path. Raw shell, FFmpeg/filtergraph internals and unrestricted engine access remain excluded.
+
+Token/context efficiency is a first-class constraint. Prefer bounded projections, compact editorial transcripts, revision/delta state, cached deterministic analysis and drill-down evidence over repeatedly loading raw machine data or a complete tool catalog.
+
+This agent surface is independent from the human visual workspace. CEVRA Studio retains preview, a directly editable timeline, caption/headline/style/layout/asset/audio controls and contextual progressive controls over the same canonical project/history. AI and direct user edits remain interoperable rather than requiring chat for every adjustment.
+
+See [ADR 0024](adr/0024-creator-tool-interface-and-token-efficiency.md).
+
+### 9.3 Creator local project lifecycle
+
+Creator automatically creates or opens a local CEVRA project from a media folder or directly supplied media without a mandatory setup wizard. Provider conversation/session state is never canonical audiovisual state.
+
+Projects remain resumable across compatible hosts and Creator/Vids surfaces because Project IR/ProjectHistory and CEVRA-managed project storage own the state.
+
+Short one-shot edits use a token-efficient fast path: compact project summary, minimum evidence, revision/delta references and no whole-project Project IR transfer by default. This fast path reuses the same typed command/history/Core semantics rather than introducing a separate disposable editor.
+
+See [ADR 0025](adr/0025-creator-project-lifecycle-and-one-shot.md).
+
+### 9.4 Creator mobile and remote host experience
+
+Creator targets good mobile/remote-host usability. Claude Code mobile is the first concrete target, but the contract remains provider-neutral.
+
+The preferred initial model keeps media and heavy audiovisual execution on the trusted local/desktop node running standalone CEVRA Core while an official host mobile/remote-control surface drives the Creator session. Fully cloud-executed Creator remains optional future work and must not become a silent prerequisite.
+
+See [ADR 0026](adr/0026-creator-mobile-remote-host-experience.md).
+
+### 9.5 Creator conversational and visual product boundary
+
+CEVRA Creator is the complete conversational-first editing product capable of reaching final local export through the shared Creator Core. It does not require the full directly editable visual workspace.
+
+CEVRA Studio includes all CEVRA Creator capabilities and adds the visual editing workspace, layered timeline, inspector and progressive manual controls over the same canonical project/history.
+
+CEVRA Creator / CEVRA Studio do not represent separate editorial brains or audiovisual runtimes. Capability entitlements and commercial packaging remain separate concerns.
+
+The approved surface names are **CEVRA Creator** for the conversational-first product and **CEVRA Studio** for the visual-workspace product.
+
+See [ADR 0027](adr/0027-creator-studio-product-boundary.md).
+
 ## 10. Content Intelligence
 
 Content Intelligence is an optional, provider-neutral domain within Orbit. It preserves research, source records, signals, questions, trends, ideas, briefs, scripts, future analytics feedback, future publishing providers and future content memory. It may serve CEVRA Vids and other Orbit products through application services and stable references.
@@ -232,6 +286,20 @@ CEVRA Creative Intelligence
 A router selects only the skills and playbooks relevant to the current task. It does not load every creative capability into the agent context simultaneously. Playbook categories may include Cinematic, Product, Fashion, Property, Food, Social Hook, Motion Graphics, Music, Anime, Cartoon, 3D/CGI and future categories.
 
 Before incorporating an external skill, CEVRA verifies source, version, license and commercial compatibility. MIT, Apache and BSD sources are preferred. Paid or proprietary skills, including BUDOSKILL, are not copied or redistributed without an explicit license. Public descriptions may guide an original implementation; permissive public skills may be studied or reused according to their licenses.
+
+### 13.1 Creator hybrid intelligence layering
+
+Creator uses three coordinated intelligence layers:
+
+- **Host AI:** conversation, contextual interpretation, open-ended creative reasoning and proposal generation over bounded CEVRA evidence.
+- **Creator Skill:** orchestration/playbook and progressive-disclosure layer that defines how the host requests evidence and capabilities, proposes strategy, executes, previews, refines and exports.
+- **CEVRA Creative Intelligence/Core:** reusable editorial knowledge, invariants, typed validation, Project IR/history, QA and execution semantics shared by CEVRA Creator, CEVRA Studio and Vids.
+
+The host may personalize creative reasoning to the user's stated audience, niche, format and goals, and may consume current external evidence when an authorized provider/capability exists. External recommendations remain non-canonical evidence. Provider-specific or transient social-platform guidance must not become generic Core truth.
+
+Critical invariants may be taught in the Skill and independently enforced by Core validation. No provider owns canonical audiovisual state.
+
+Useful EDVID behavior is inventoried and clean-room classified into HOST / CREATOR SKILL / CREATIVE INTELLIGENCE / CORE-RUNTIME rather than copied wholesale into one host-specific skill. See [ADR 0023](adr/0023-creator-skill-intelligence-layering.md).
 
 ## 14. Marketplace and package direction
 
