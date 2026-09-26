@@ -17,7 +17,8 @@ CEVRA VIDS
 ├─ 2. CURRENT RECONCILIATION / CORRECTNESS GATES
 │   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
 │   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
-│   │   └─ MR-V01 Durable Source Technical Descriptor V1 [IMPLEMENTED / CLOSED]
+│   │   ├─ MR-V01 Durable Source Technical Descriptor V1 [IMPLEMENTED / CLOSED]
+│   │   └─ Slice 5A Native Windows Media Runtime / h264_mf feasibility [IN DEVELOPMENT]
 │   └─ Transcript Cache V1 [IMPLEMENTED / CLOSED]
 │
 ├─ 3. EDITORIAL INTELLIGENCE
@@ -102,8 +103,10 @@ normalizes known optional `undefined` inputs without opening the schema, and
 enforces adopted descriptor integrity independently of cache policy. Independent
 review and post-merge CI plus Exact Runtime passed.
 
-The next planned engineering step is **editorial transcript / analysis — NOT
-STARTED**. It begins only after the remaining coordinated Media Runtime gate is
-resolved; no editorial-analysis work is part of this closeout.
+The current bounded engineering step is **Slice 5A — Native Windows Media
+Runtime / h264_mf feasibility — IN DEVELOPMENT**. It produces exact native
+evidence only; Windows product enablement remains a separate 5B decision.
+Editorial transcript / analysis remains **NOT STARTED** and begins only after
+the remaining coordinated Media Runtime dependency gate is resolved.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.

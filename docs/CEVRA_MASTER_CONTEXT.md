@@ -1484,12 +1484,13 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` after the Durable Media Execution Archive V1 closeout:
+Canonical remote `main` after the Transcript Cache V1 docs closeout (PR #48),
+and the verified baseline before the Windows evidence branch:
 
-`b00ad159bc0080c31355c8b59d1d5ba22524b2ff`
+`c1b233cc1344a1f0bcd1a55bb5a91f5350b26833`
 
-PR #45 merged the docs-only closeout after PR #44 implemented Durable Media
-Execution Archive V1. The feature and closeout used normal merge commits.
+The older `b00ad159bc0080c31355c8b59d1d5ba22524b2ff` value remains historical:
+it was the canonical main after PR #45, before MR-V01 and Transcript Cache V1.
 
 ## 24.2 Important merged milestones
 
@@ -1515,6 +1516,8 @@ Execution Archive V1. The feature and closeout used normal merge commits.
 | Audio Measurement V1 | #38 | `282d29ec2252f5f488050b3b4efba4ec2cfcfe76` | IMPLEMENTED / CLOSED |
 | Application Resolved Audio Plan V1 | #42 | `ff744592e7cf14b40018e3781440fb74b343f7a0` | IMPLEMENTED / CLOSED |
 | Durable Media Execution Archive V1 | #44 | `f5518102ace30d54659334d995712b36d0a4f6b7` | IMPLEMENTED / CLOSED |
+| Durable Source Technical Descriptor V1 / MR-V01 | #46 | `0c8a09c185d1496faa4783f8b9495cd90dff9a21` | IMPLEMENTED / CLOSED |
+| Transcript Cache V1 | #24 | `86c1f88d19f04c1fb919eafed0b9409e2fe726eb` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1780,6 +1783,34 @@ Current dependency blockers/gates:
 1. complete the approved coordinated Media Runtime adjustment gate;
 2. begin editorial transcript/analysis only after its remaining dependency
    gate is resolved; this next planned step is not started.
+
+### Coordinated Media Runtime residual matrix — reconciled 2026-09-26
+
+This table updates the historical spike against merged code. It is a residual
+map, not a new authority and not a claim that the global gate is closed.
+
+| ID | Current state / evidence | Remaining gap and dependent consumer | Acceptance / next action |
+|---|---|---|---|
+| MR-A01 | **IMPLEMENTED / CLOSED** by Audio Sequence Runtime V1 (ADR 0020). | None for its bounded PCM primitive; broader product flow remains under A05/A06. | Preserve exact-runtime audio catalog. |
+| MR-A02 | **IMPLEMENTED / CLOSED** by Audio Measurement V1 (ADR 0021). | Measurement does not approve a treatment/mastering policy. | Use its evidence only in an explicitly approved consumer. |
+| MR-A03 | **IMPLEMENTED / CLOSED in the bounded sequence executor**: per-item gain/fades and deterministic placement. | No claim of a universal voice chain. | Preserve executor bounds and continuity tests. |
+| MR-A04 | **NOT IMPLEMENTED.** | Approved conventional EQ/compression/de-ess/limiting/denoise subset and listening evidence; future audio-policy consumer. | Delimit after measurement evidence; no default mastering chain. |
+| MR-A05 | **PARTIAL:** audio sequence, final mux and resolved plan are implemented; normalization is intentionally `NONE`. | Remaining normalization/treatment choices and full editable J-cut consumer. | Separate typed consumer acceptance from already-closed primitives. |
+| MR-A06 | **PARTIAL:** Application orchestration, history promotion and durable recovery exist for the bounded resolved-audio vertical. | End-to-end editable experience, preview/Composition integration and UI. | Build consumers without moving editorial authority into the worker. |
+| MR-V01 | **IMPLEMENTED / CLOSED** by ADR 0029 / PR #46. | Source/history scale must be remeasured before many-commit timeline/Cut Compiler flows. | Preserve descriptor authority and critical-consumption verification. |
+| MR-V02 | **NOT IMPLEMENTED.** | Approved HDR→SDR dependency/profile, real footage, both targets and human acceptance; export consumer. | Dependency/legal/profile decision before implementation. |
+| MR-Q01 | **PARTIAL:** probe, silence and audio-measurement evidence exist. | Bounded assembled-plan QA such as missing black-frame diagnostics and Application severity policy. | Stabilize consumer/report requirements before extending runtime. |
+| K1 | **ACTIVE — Slice 5A.** `h264_mf` is approved only as first candidate; production Windows allow-lists remain empty. | Native exact-runtime encode/decode/sync evidence, then 5B ownership/lifecycle/Application integration and representative hardware. | Run the branch-scoped Windows evidence workflow; never infer enablement from enumeration. |
+| K2 | **PARTIAL:** K2-T3 durable source evidence is implemented by MR-V01. | K2-T1/T2/T4 HDR→SDR numerical transform, failure policy and human review remain open. | Execute only after MR-V02 dependency/profile approval. |
+| K3 | **PARTIAL:** resolved audio/mux ownership and stream-copy evidence exist. | Composition-produced visual output and full preview/export correspondence. | Composition consumer must pass its own typed integration evidence. |
+| K4 | **PENDING.** | Composition candidates still need live-preview/shared-path and original-source quality criteria. | ADR 0012 benchmark gate; not part of Windows 5A. |
+| K5 | **PARTIAL release gate.** macOS exact runtime paths are evidenced; Windows product export and clean-machine closure are not. | Full core/import/edit/preview/export/HDR/update closure on both promised targets. | 5A informs Windows feasibility; it does not homologate Windows release. |
+
+[Windows H.264 feasibility evidence](CEVRA_WINDOWS_MEDIA_RUNTIME_H264_MF_V1_EVIDENCE.md)
+records the exact Slice 5A recipe and result. The coordinated gate remains
+**ACTIVE**. These rows distinguish implementation prerequisites, consumer
+acceptance and release/platform closure; they do not require the complete
+editable product before building its bounded prerequisites.
 
 ---
 
