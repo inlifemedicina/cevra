@@ -28,7 +28,7 @@ PRUNING_POLICY = {
     ],
     "globs": [
         "bin/pip*", "bin/idle*", "bin/2to3*", "bin/tclsh*", "bin/wish*",
-        "lib/itcl*", "lib/thread*", "lib/libtcl*", "lib/libtk*",
+        "lib/itcl*", "lib/thread[0-9]*", "lib/libtcl*", "lib/libtk*",
         "lib/python3.12/lib-dynload/_tkinter*", "share/man/man1/pip*", "share/man/man1/idle*", "share/man/man1/2to3*",
     ],
 }

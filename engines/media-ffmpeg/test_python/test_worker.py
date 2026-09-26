@@ -662,7 +662,7 @@ class RuntimeBuildTests(unittest.TestCase):
     def test_python_pruning_removes_pip_tkinter_and_tcl(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for relative in ("lib/python3.12/ensurepip", "lib/python3.12/tkinter", "lib/tcl9", "bin/pip3"):
+            for relative in ("lib/python3.12/ensurepip", "lib/python3.12/tkinter", "lib/tcl9", "lib/thread2.8", "bin/pip3"):
                 path = root / relative
                 if path.suffix or path.name.startswith("pip"):
                     path.parent.mkdir(parents=True, exist_ok=True)
@@ -674,7 +674,17 @@ class RuntimeBuildTests(unittest.TestCase):
             self.assertIn("lib/python3.12/ensurepip", removed)
             self.assertIn("lib/python3.12/tkinter", removed)
             self.assertIn("lib/tcl9", removed)
+            self.assertIn("lib/thread2.8", removed)
             self.assertIn("bin/pip3", removed)
+
+    def test_python_pruning_preserves_windows_threading_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            threading = root / "Lib" / "threading.py"
+            threading.parent.mkdir(parents=True)
+            threading.write_text("# standard library fixture\n", encoding="utf-8")
+            prepare_python_runtime._prune(root)
+            self.assertTrue(threading.is_file())
 
     def test_ffmpeg_digest_failure_happens_before_gpg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
