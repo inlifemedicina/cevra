@@ -48,6 +48,7 @@ export class FasterWhisperModelIdentityResolver {
 
   async describe(signal?: AbortSignal): Promise<TranscriptionExecutionIdentity | undefined> {
     try {
+      if (this.profile.allowModelDownload) return undefined;
       if (this.profile.device === "auto" || this.profile.computeType === "default") return undefined;
       const resolved = await resolveModelDirectory(this.profile, this.modelId);
       if (!resolved) return undefined;

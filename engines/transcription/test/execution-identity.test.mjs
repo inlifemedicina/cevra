@@ -105,6 +105,7 @@ test("only fixed device and compute profiles produce an exact cache identity", a
   assert.equal(cuda.computeType, "float16");
   assert.equal(await new FasterWhisperModelIdentityResolver({ ...profile, device: "auto", computeType: "int8" }, "base").describe(), undefined);
   assert.equal(await new FasterWhisperModelIdentityResolver({ ...profile, device: "cpu", computeType: "default" }, "base").describe(), undefined);
+  assert.equal(await new FasterWhisperModelIdentityResolver({ ...profile, allowModelDownload: true, device: "cpu", computeType: "int8" }, "base").describe(), undefined);
 }));
 
 test("snapshot symlink escaping the trusted model repository makes identity unavailable", async () => withTemp(async (root) => {
