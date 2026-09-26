@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-25, MR-V01 merged and closed by PR #46 at `0c8a09c185d1496faa4783f8b9495cd90dff9a21`
+**Last decision reconciliation:** 2026-09-26, Transcript Cache V1 merged and closed by PR #24 at `86c1f88d19f04c1fb919eafed0b9409e2fe726eb`
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1080,10 +1080,11 @@ therefore scales with the loaded model plus the active segment window, not the
 complete source duration. Full PT-weight smoke remains a packaging/release gate;
 safe crash-leftover PCM reclamation and the non-blocking cleanup-retry behavior
 (a successful second cleanup attempt still fails that alignment attempt closed)
-remain deferred. Transcript Cache V1 is the next dependency-correct product
-slice.
+remain deferred. Transcript Cache V1 is implemented and closed; editorial
+transcript/analysis is the next planned step, still gated by the active
+coordinated Media Runtime work.
 
-## 16A.4 Transcript Cache V1 — IN DEVELOPMENT / FINAL MODEL-SELECTION REMEDIATION — FOCUSED MICRO-REVIEW PENDING
+## 16A.4 Transcript Cache V1 — IMPLEMENTED / CLOSED
 
 Work began from canonical `main`
 `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` on
@@ -1137,8 +1138,13 @@ Normal PR CI `36186823219`, push CI `36186819057` and Exact Runtime
 the later remediation. Preceding remediation code head
 `0b5df56f3db677553825d630eeb4e09ee048bd54` passed PR CI `36236680016`
 (5/5), push CI `36236678600` (5/5) and managed Exact Runtime `36236680022`.
-R2–R4 are independently approved. One focused model-selection micro-review
-remains the active gate and progress stays **48%**.
+Final independent review concluded **APPROVE TO UNDRAFT WITH NON-BLOCKING
+NOTES**. Approved feature head `005f5e87cf47c9a717cefd374b3dc43de2984466`
+merged through PR #24 by normal merge commit
+`86c1f88d19f04c1fb919eafed0b9409e2fe726eb`. Post-merge main CI
+`36245088430` passed 5/5 and managed Exact Runtime `36245088427` passed on the
+merge SHA. Transcript Cache V1 is implemented and closed; progress stays
+**48%**.
 See [ADR 0018](adr/0018-transcript-cache-v1.md) and the
 [reconciliation evidence](CEVRA_TRANSCRIPT_CACHE_V1_EVIDENCE.md).
 
@@ -1409,9 +1415,9 @@ Foundation / Media Runtime       [CLOSED]
 → decision/document reconciliation [CLOSED]
 → ProjectHistory Scalability V2  [CLOSED]
 → small cross-platform/runtime correctness prerequisites [CLOSED]
-→ coordinated Media Runtime adjustment gate
-→ Transcript Cache V1 reconciliation/final closeout
-→ editorial transcript / analysis
+→ coordinated Media Runtime adjustment gate [ACTIVE]
+→ Transcript Cache V1 [CLOSED]
+→ editorial transcript / analysis [NOT STARTED]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1743,7 +1749,7 @@ New material cost, privacy exposure, destructive behavior or objective/architect
 change still requires explicit treatment. Independent review and merge gates
 remain mandatory; this clarification narrows no prior safety policy.
 
-**Transcript Cache V1 — IN DEVELOPMENT / FINAL MODEL-SELECTION REMEDIATION — FOCUSED MICRO-REVIEW PENDING.** PR #24, branch `feat/transcript-cache-v1`, remains open, draft and unmerged. Historical donor head `700bb35a65fe8bf7552ab7621d41455dd463e7f9` is reconciled onto canonical main `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`; historical reconciled checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb`, preceding remediation code head `0b5df56f3db677553825d630eeb4e09ee048bd54` and final model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac` reuse MR-V01 source identity and current ProjectHistory V2. A valid Alignment HIT performs zero PCM extraction, worker execution or model-weight hashing; fresh execution retains authoritative pre/post-worker verification.
+**Transcript Cache V1 — IMPLEMENTED / CLOSED.** PR #24 merged approved feature head `005f5e87cf47c9a717cefd374b3dc43de2984466` by normal merge commit `86c1f88d19f04c1fb919eafed0b9409e2fe726eb`. Historical donor head `700bb35a65fe8bf7552ab7621d41455dd463e7f9`, reconciled checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb`, preceding remediation code `0b5df56f3db677553825d630eeb4e09ee048bd54` and final model-selection code `20d91f556e77b4e9abb71681cb08b5848cd9a7ac` preserve the reviewed lineage while reusing MR-V01 source identity and current ProjectHistory V2. A valid Alignment HIT performs zero PCM extraction, worker execution or model-weight hashing; fresh execution retains authoritative pre/post-worker verification.
 
 For legacy sources, identity failure may bypass the cache and preserve the
 normal engine path. For descriptor-bearing sources, identity failure is a
@@ -1765,13 +1771,15 @@ remediation code head `0b5df56f3db677553825d630eeb4e09ee048bd54` passed PR CI
 `36236680022`. Final model-selection code head
 `20d91f556e77b4e9abb71681cb08b5848cd9a7ac` passed push CI `36243443422`
 (5/5), PR CI `36243446501` (5/5) and managed Exact Runtime `36243446485`.
-R2–R4 are independently approved; one focused review of final model selection
-remains required. No merge has occurred.
+The final independent micro-review concluded **APPROVE TO UNDRAFT WITH
+NON-BLOCKING NOTES**. Post-merge main CI `36245088430` passed 5/5 and managed
+Exact Runtime `36245088427` passed on the feature merge SHA.
 
 Current dependency blockers/gates:
 
 1. complete the approved coordinated Media Runtime adjustment gate;
-2. reconcile and close Transcript Cache V1, revalidating its relationship to history/storage.
+2. begin editorial transcript/analysis only after its remaining dependency
+   gate is resolved; this next planned step is not started.
 
 ---
 
@@ -1837,7 +1845,7 @@ Current dependency blockers/gates:
 - **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
-- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24. Historical reconciled checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb` and preceding remediation head `0b5df56f3db677553825d630eeb4e09ee048bd54` are superseded by final model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac`; R2–R4 are approved and one focused model-selection micro-review remains required. Historical run `35625702675` is donor-only evidence.
+- **IMPLEMENTED/CLOSED:** Transcript Cache V1 merged through PR #24 at `86c1f88d19f04c1fb919eafed0b9409e2fe726eb`. Historical reconciled checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb` and preceding remediation head `0b5df56f3db677553825d630eeb4e09ee048bd54` are superseded by final model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac` and approved feature head `005f5e87cf47c9a717cefd374b3dc43de2984466`; post-merge CI and Exact Runtime passed. Historical run `35625702675` remains donor-only evidence.
 - **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
 
 ---
@@ -1849,7 +1857,7 @@ Do not guess these in future chats:
 1. final composition engine (HyperFrames vs Remotion vs other) — benchmark pending;
 2. **SUPERSEDED / RESOLVED by PR #14:** the finalized bounded Project IR v2 implementation plan merged before Slice A began;
 3. **RESOLVED by ADR 0017 and PR #22:** provider-neutral local CTC forced-alignment adapter, PT/EN model pins and stale-digest application integration; packaging/model-manager distribution remains unresolved;
-4. final Transcript Cache V1 closeout after dependency reconciliation and focused review; PR #24 remains draft/unmerged;
+4. **RESOLVED by ADR 0018 and PR #24:** Transcript Cache V1 is implemented and closed after dependency reconciliation, focused review and post-merge evidence;
 5. final transcription model default for production quality;
 6. production transcription-runtime assembly/update mechanism;
 7. production model-asset identity, update and distribution mechanism;
@@ -1884,8 +1892,8 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete focused independent review and final CI for the reconciled Transcript Cache V1/PR #24; retain draft/unmerged status until that gate passes.
-2. Continue with editorial analysis, strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order.
+1. Complete the still-active coordinated Media Runtime adjustment gate.
+2. Then begin the next planned step, editorial transcript/analysis, followed by strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order. Editorial transcript/analysis is **NOT STARTED**.
 3. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
 4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
 5. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.

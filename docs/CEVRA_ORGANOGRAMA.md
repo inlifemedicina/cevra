@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-09-25
+**Updated:** 2026-09-26
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 
 ```text
@@ -18,7 +18,7 @@ CEVRA VIDS
 │   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
 │   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
 │   │   └─ MR-V01 Durable Source Technical Descriptor V1 [IMPLEMENTED / CLOSED]
-│   └─ Transcript Cache V1 [FINAL REMEDIATION / FOCUSED MICRO-REVIEW PENDING]
+│   └─ Transcript Cache V1 [IMPLEMENTED / CLOSED]
 │
 ├─ 3. EDITORIAL INTELLIGENCE
 │   ├─ editorial transcript / analysis
@@ -90,16 +90,20 @@ The dependency roadmap was **not reset**. The explicit new checkpoint is **UX Su
 
 ## Reconciliation note — 2026-09-21
 
-ProjectHistory Scalability V2 is closed and preserved as a foundation after PR #30. The measured O(commits × transcript payload) failure was removed with compact snapshots and exact transcript blobs while preserving Project IR and V1 compatibility. The cross-platform/runtime correctness prerequisites are also closed. The current active gate is the approved coordinated Media Runtime adjustment gate, followed by Transcript Cache V1 reconciliation/final closeout. Revalidate the cache/history storage relationship during that later cache closeout; the two systems remain separate.
+ProjectHistory Scalability V2 is closed and preserved as a foundation after PR #30. The measured O(commits × transcript payload) failure was removed with compact snapshots and exact transcript blobs while preserving Project IR and V1 compatibility. The cross-platform/runtime correctness prerequisites are also closed. The current active gate remains the approved coordinated Media Runtime adjustment gate. Transcript Cache V1 is closed and remains separate from canonical history/storage.
 
 MR-V01 is closed as the bounded Slice 4 implementation within that gate after
 PR #46 and successful post-merge CI plus Exact Runtime. It keeps Project
 IR/History/Package at V2, adds no migration and does not start Cut Compiler.
-Transcript Cache V1 is reconciled onto the current MR-V01/ProjectHistory V2
-baseline. Final remediation binds cache identity to the actually selected
-Transcription model, adds source anti-ABA continuity, normalizes known optional
-`undefined` inputs without opening the schema, and enforces adopted descriptor
-integrity independently of cache policy. Focused R1–R4 micro-review and final CI
-are the remaining gates.
+Transcript Cache V1 is implemented and closed by PR #24 on the current
+MR-V01/ProjectHistory V2 baseline. Its final implementation binds cache identity
+to the actually selected Transcription model, adds source anti-ABA continuity,
+normalizes known optional `undefined` inputs without opening the schema, and
+enforces adopted descriptor integrity independently of cache policy. Independent
+review and post-merge CI plus Exact Runtime passed.
+
+The next planned engineering step is **editorial transcript / analysis — NOT
+STARTED**. It begins only after the remaining coordinated Media Runtime gate is
+resolved; no editorial-analysis work is part of this closeout.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.

@@ -1,7 +1,8 @@
 # ADR 0018 — Transcript Cache V1
 
-**Status:** ACCEPTED / IN DEVELOPMENT
+**Status:** IMPLEMENTED / CLOSED
 **Date:** 2026-09-25
+**Closed:** 2026-09-26
 
 ## Context
 
@@ -261,3 +262,29 @@ shape. Transcript Cache V1 was never released, so those disposable entries are
 intentionally invalidated rather than migrated. Current ProjectHistory V2,
 compact transcript blobs, undo/redo and Desktop checkpoint/reopen remain the
 canonical persistence path; cache deletion or corruption cannot affect them.
+
+## Implementation closure
+
+Feature PR #24 merged approved head
+`005f5e87cf47c9a717cefd374b3dc43de2984466` by normal merge commit
+`86c1f88d19f04c1fb919eafed0b9409e2fe726eb` on 2026-09-26. Post-merge main
+CI `36245088430` passed all five jobs and managed Audio Sequence Exact Runtime
+`36245088427` passed on the same merge SHA. Independent review concluded
+**APPROVE TO UNDRAFT WITH NON-BLOCKING NOTES** with no remaining BLOCKER, HIGH,
+MEDIUM or LOW finding.
+
+The closed V1 guarantees a derived, disposable and noncanonical cache; shared
+MR-V01 source identity with no duplicate source hasher; mandatory descriptor
+integrity and process-local source anti-ABA continuity; exact executed-model
+identity including Mobius `turbo`; one local-model selector shared by execution
+identity and Desktop presence; direct-root precedence; root-level Hugging Face
+resolution through `refs/main`; untrusted HIT payload validation; typed
+Transcription policies; Alignment HIT avoidance of PCM extraction, worker
+execution and model hashing; and bounded integrity-checked private storage.
+Project IR, ProjectHistory and Project Store remain authoritative and unchanged.
+
+Alignment cache behavior is implemented and tested at Application/engine level,
+not exposed as a production Desktop user workflow. Encryption at rest, cache
+UI/configuration, cloud/sync, permanent retention, first-fingerprint
+optimization, Model Manager work, bounded O(n) eviction enumeration and cleanup
+of irrecoverable development envelopes remain outside this closed V1.
