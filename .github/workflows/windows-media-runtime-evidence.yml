@@ -29,6 +29,7 @@ jobs:
       - name: Report runner and bootstrap toolchain
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsBuildNumber, OsArchitecture
           python --version
           tar --version
@@ -44,6 +45,8 @@ jobs:
       - name: Bootstrap the exact pinned private CPython
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           $versions = Get-Content engines/media-ffmpeg/runtime/versions.json -Raw | ConvertFrom-Json
           $pin = $versions.python.artifacts.'win32-x64'
           $archive = Join-Path $env:RUNNER_TEMP 'cevra-python-windows.tar.gz'
@@ -57,6 +60,8 @@ jobs:
       - name: Verify exact FFmpeg source signature and prepare vendor
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           $env:PATH = "$env:PATH;C:\msys64\usr\bin;C:\Program Files\Git\usr\bin"
           gpg --version
           gpgv --version
@@ -75,6 +80,8 @@ jobs:
       - name: Assemble and verify the exact private Media Runtime
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
           & "$env:RUNNER_TEMP\cevra-python\python.exe" -I -B engines/media-ffmpeg/runtime/assemble_runtime.py "$env:RUNNER_TEMP\cevra-media-runtime" --python-root "$env:RUNNER_TEMP\cevra-python" --ffmpeg-prefix "$env:RUNNER_TEMP\cevra-ffmpeg" --vendor-source "$env:RUNNER_TEMP\ffmpeg-skill"
           & "$env:RUNNER_TEMP\cevra-media-runtime\python\python.exe" -I -B "$env:RUNNER_TEMP\cevra-media-runtime\worker\cevra_media_worker.py" --info
 
@@ -83,6 +90,7 @@ jobs:
         continue-on-error: true
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $evidence = Join-Path $env:RUNNER_TEMP 'windows-h264-evidence'
           New-Item -ItemType Directory -Path $evidence | Out-Null
           & "$env:RUNNER_TEMP\cevra-media-runtime\python\python.exe" -I -B engines/media-ffmpeg/test_functional/windows_h264_mf_feasibility.py --runtime-root "$env:RUNNER_TEMP\cevra-media-runtime" --scratch "$env:RUNNER_TEMP\windows-h264-scratch" --output "$evidence\result.json"

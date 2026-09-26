@@ -150,8 +150,13 @@ def _assert_pruned(root: Path) -> None:
 
 def _runtime_components(executable: Path) -> list[dict[str, str]]:
     script = """import ctypes,json,platform,ssl,sqlite3,zlib,lzma,bz2
-process = ctypes.CDLL(None)
+try:
+ process = ctypes.CDLL(None)
+except OSError:
+ process = None
 def native_version(symbol, fallback):
+ if process is None:
+  return fallback
  try:
   fn = getattr(process, symbol); fn.restype = ctypes.c_char_p
   return fn().decode().split(',')[0]
@@ -167,7 +172,15 @@ components = [
  {'id':'libffi','version':'3.4.8','license':'MIT'}]
 if platform.system() == 'Darwin': components[3]['providedByPlatform'] = 'true'
 print(json.dumps(components))"""
-    result = subprocess.run([str(executable), "-I", "-B", "-c", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30, check=True)
+    result = subprocess.run(
+        [str(executable), "-I", "-B", "-c", script],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"managed CPython component inventory failed: {result.stderr.strip()}")
     return json.loads(result.stdout)
 
 
