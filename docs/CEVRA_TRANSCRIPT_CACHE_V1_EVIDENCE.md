@@ -1,10 +1,11 @@
 # Transcript Cache V1 — reconciliation evidence
 
-**Status:** IN DEVELOPMENT / FINAL REMEDIATION — FOCUSED MICRO-REVIEW PENDING
+**Status:** IN DEVELOPMENT / FINAL MODEL-SELECTION REMEDIATION — FOCUSED MICRO-REVIEW PENDING
 **Canonical base:** `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`
 **Historical donor:** `700bb35a65fe8bf7552ab7621d41455dd463e7f9`
 **Historical reconciled code checkpoint:** `22a3b6616f0844622048dad5ef1beb8c313badfb`
-**Final remediation code head:** `0b5df56f3db677553825d630eeb4e09ee048bd54`
+**Preceding remediation code head:** `0b5df56f3db677553825d630eeb4e09ee048bd54`
+**Final model-selection code head:** `20d91f556e77b4e9abb71681cb08b5848cd9a7ac`
 
 ## Scope reconciled
 
@@ -30,12 +31,13 @@
   without adding a third full hash. The stamp is process-local anti-ABA
   evidence, not a cryptographic identity or protection from a privileged actor
   able to restore all kernel-controlled evidence.
-- FasterWhisper execution identity follows the worker's actual selection:
-  a valid direct prepopulated root has precedence; otherwise exactly one
-  provable Hugging Face layout is required. Multiple plausible layouts or an
-  untrusted direct revision bypass the cache rather than guessing. A
-  download-enabled profile also bypasses because local bytes cannot prove the
-  model that may be resolved.
+- FasterWhisper execution identity and Desktop presence use one engine-level
+  selection helper. A valid direct prepopulated root has worker precedence;
+  otherwise the exact root-level Hugging Face repository from the pinned 1.2.1
+  model map requires a resolvable `refs/main` snapshot. `turbo` maps to
+  `mobiuslabsgmbh/faster-whisper-large-v3-turbo`; a synthetic Systran turbo,
+  `hub/` layout, orphan snapshot, wrong ref, untrusted direct revision or
+  download-enabled profile cannot produce cache identity.
 - Known optional request fields explicitly set to `undefined` are normalized as
   absent after one getter read; unknown fields remain rejected by the closed
   request boundary.
@@ -47,19 +49,40 @@ The cache is derived, disposable and noncanonical. Project IR, ProjectHistory
 and Project Store remain authoritative. No cache record, cache deletion or
 cache corruption can authorize a project mutation by itself.
 
-## Directed evidence
+## Final model-selection evidence
 
-On final remediation code head `0b5df56f3db677553825d630eeb4e09ee048bd54`:
+On model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac`:
+
+- Transcription execution identity: 18/18 PASS, covering the exhaustive pinned
+  alias map, Mobius turbo, direct precedence, root-level Hugging Face,
+  `refs/main`, hub/orphan/fake rejection and selected/non-selected mutation.
+- Desktop Host: 74/74 PASS, including production presence for direct, base HF
+  and Mobius turbo plus rejection of fake Systran turbo, hub-only and orphan
+  layouts.
+- Transcription worker Python: 11/11 PASS; deterministic direct-root predicate
+  characterization remains aligned without downloading a model.
+- Focused approved R2–R4 regressions: 12/12 PASS. Their production files have
+  no semantic delta from the preceding head.
+- Full local build and Node/TypeScript regression: 561/561 PASS; `npm audit`
+  reports zero vulnerabilities and `git diff --check` passes.
+- Remote validation on the same code head: push CI `36243443422` (5/5), PR CI
+  `36243446501` (5/5) and managed Exact Runtime `36243446485` all completed
+  SUCCESS.
+
+## Prior remediation evidence
+
+On preceding remediation code head `0b5df56f3db677553825d630eeb4e09ee048bd54`:
 
 - Focused Transcription + Alignment Application: 68/68 PASS, including
   descriptor enforcement under prefer/refresh/bypass/no-cache, exact hash
   counts, source ABA continuity, optional-`undefined` snapshots, HIT/MISS,
   invalid payload, idempotent no-op and redo preservation.
-- Transcription model execution identity: 11/11 PASS for direct root, both
-  supported Hugging Face layouts, mixed-layout ambiguity, actual/unused
-  candidate mutation, trusted revision and Node/Python required-file parity.
+- Transcription model execution identity: 11/11 PASS for the then-implemented
+  direct/root/hub layout matrix, mixed-layout ambiguity, actual/unused candidate
+  mutation, trusted revision and Node/Python required-file parity. The final
+  model-selection evidence above supersedes that obsolete hub interpretation.
 - Transcription worker Python: 11/11 PASS, including direct-root precedence and
-  incomplete-direct fallback to the hub-layout contract.
+  incomplete-direct fallback to the model alias with its configured cache root.
 - Desktop real filesystem: A→B→A same-size source mutation with restored mtime
   fails before canonical promotion; production composition retains the shared
   `NodeMediaArtifactStore` even when no transcript cache is configured.
@@ -95,7 +118,7 @@ The immediately preceding reviewed head
 `52a778b5e7f902cb67f4bfe6074641956f6bc513` completed normal PR CI
 `36186823219`, push CI `36186819057` and managed Exact Runtime
 `36186823479` successfully. These runs are historical evidence only and do not
-prove the final remediation code. Final remediation code head
+prove the later remediation code. Preceding remediation code head
 `0b5df56f3db677553825d630eeb4e09ee048bd54` passed PR CI `36236680016`
 (5/5), push CI `36236678600` (5/5) and managed Exact Runtime `36236680022`.
 Historical run `35625702675` (5/5 SUCCESS) belongs to donor head
@@ -127,8 +150,9 @@ model-weight hashing.
 
 ## Remaining gate and limits
 
-- One focused independent micro-review of remediation R1–R4 is required before
-  PR #24 can leave draft state.
+- R2 source continuity, R3 optional-`undefined` handling and R4 descriptor
+  integrity are independently approved. One final focused micro-review of the
+  model-selection delta is required before PR #24 can leave draft state.
 - Managed runtime evidence covers the existing exact catalog; synthetic
   Application tests are not represented as native transcription/alignment ML.
 - At-rest cache encryption, cache UI, cloud synchronization and permanent audit

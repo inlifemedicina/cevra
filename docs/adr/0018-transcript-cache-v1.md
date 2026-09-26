@@ -103,18 +103,23 @@ The closed transcription key contains:
 - result-normalization version;
 - reviewed runtime/decode pipeline version.
 
-The FasterWhisper adapter mirrors the worker's source selection. When the model
-cache root itself satisfies the worker's closed direct CTranslate2 file
-predicate, that root has precedence and is cacheable only when trusted host
-configuration supplies an exact revision; nested Hugging Face layouts are then
-not fingerprinted as executed bytes. Otherwise the resolver discovers both
-supported Hugging Face layouts. Exactly one provable candidate is required;
-multiple plausible layouts bypass cache rather than guessing undocumented
-FasterWhisper/Hugging Face precedence. A profile that permits model download
-also bypasses cache identity because the locally fingerprinted candidate no
-longer proves which bytes execution may resolve. The model digest is a SHA-256 over a
-canonical sorted manifest of every selected runtime artifact's relative path,
-byte length and SHA-256. A strong,
+The FasterWhisper adapter and Desktop presence gate share one closed local-model
+selection helper tied to the pinned FasterWhisper 1.2.1 alias map. `tiny`,
+`base`, `small`, `medium` and `large-v3` resolve to their exact Systran
+repositories, while `turbo` resolves to
+`mobiuslabsgmbh/faster-whisper-large-v3-turbo`; future FasterWhisper pin
+changes require explicit map review. When the model cache root itself satisfies
+the worker's closed direct CTranslate2 file predicate, that root has precedence
+and is cacheable only when trusted host configuration supplies an exact
+revision. Otherwise only the root-level Hugging Face cache repository for the
+mapped identity is eligible. It must have a valid `refs/main` whose exact
+revision names a complete snapshot. `hub/`, orphan snapshots and synthetic
+repository names are not executable candidates for this worker contract and
+cannot satisfy Desktop presence. Unprovable selection safely bypasses cache. A
+profile that permits model download also bypasses cache identity because local
+bytes do not prove which model execution may resolve. The model digest is a
+SHA-256 over a canonical sorted manifest of every selected runtime artifact's
+relative path, byte length and SHA-256. A strong,
 cheap in-process change detector uses canonical logical/resolved identity plus
 `dev`, `ino`, byte size, nanosecond mtime and nanosecond ctime to decide whether
 that manifest must be rehashed. Filesystems that cannot prove unchanged state

@@ -1083,7 +1083,7 @@ safe crash-leftover PCM reclamation and the non-blocking cleanup-retry behavior
 remain deferred. Transcript Cache V1 is the next dependency-correct product
 slice.
 
-## 16A.4 Transcript Cache V1 — IN DEVELOPMENT / FINAL REMEDIATION — FOCUSED MICRO-REVIEW PENDING
+## 16A.4 Transcript Cache V1 — IN DEVELOPMENT / FINAL MODEL-SELECTION REMEDIATION — FOCUSED MICRO-REVIEW PENDING
 
 Work began from canonical `main`
 `099a88ceed9a274254d0ffc7e9fd457f7d63d5ae` on
@@ -1113,28 +1113,32 @@ result creates no revision. No editorial transcript/analysis work has started.
 The historical donor at `700bb35a65fe8bf7552ab7621d41455dd463e7f9`
 has now been reconciled onto canonical main
 `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`; reconciled code head is
-`22a3b6616f0844622048dad5ef1beb8c313badfb`, and the final remediation code
-head is `0b5df56f3db677553825d630eeb4e09ee048bd54`. The donor file hasher was removed
+`22a3b6616f0844622048dad5ef1beb8c313badfb`; the preceding remediation code
+head is `0b5df56f3db677553825d630eeb4e09ee048bd54`, and the final model-selection
+code head is `20d91f556e77b4e9abb71681cb08b5848cd9a7ac`. The donor file hasher was removed
 in favor of the shared MR-V01 `SourceContentIdentityPort` and Desktop
 `NodeMediaArtifactStore`. Descriptor integrity now applies independently of
 cache policy or availability; legacy bypass/no-cache retains zero added source
 hashes, while descriptor-bearing fresh execution uses pre/post proof.
 PRE/POST source continuity includes the MR-V01 operational stamp to reject
-reproduced A→B→A mutation without a third full hash. FasterWhisper identity
-selects the direct prepopulated root when the worker would, accepts exactly one
-provable Hugging Face layout otherwise, and bypasses ambiguous layouts. Known
-optional `undefined` request fields normalize as absent without weakening the
-closed request schema. Current ProjectHistory V2 remains canonical and the
-cache remains disposable.
+reproduced A→B→A mutation without a third full hash. FasterWhisper identity and
+Desktop presence now share the pinned 1.2.1 model map and local selection:
+direct root first, then only the exact root-level mapped Hugging Face repository
+with resolvable `refs/main`. `turbo` is
+`mobiuslabsgmbh/faster-whisper-large-v3-turbo`; hub-only, orphan and synthetic
+Systran turbo layouts do not prove availability or identity. Known optional
+`undefined` request fields normalize as absent without weakening the closed
+request schema. Current ProjectHistory V2 remains canonical and the cache
+remains disposable.
 
 Normal PR CI `36186823219`, push CI `36186819057` and Exact Runtime
 `36186823479` passed on preceding reviewed head
 `52a778b5e7f902cb67f4bfe6074641956f6bc513`; they are historical, not proof of
-the final remediation. Final remediation code head
+the later remediation. Preceding remediation code head
 `0b5df56f3db677553825d630eeb4e09ee048bd54` passed PR CI `36236680016`
 (5/5), push CI `36236678600` (5/5) and managed Exact Runtime `36236680022`.
-One focused R1–R4 micro-review remains the active gate and progress stays
-**48%**.
+R2–R4 are independently approved. One focused model-selection micro-review
+remains the active gate and progress stays **48%**.
 See [ADR 0018](adr/0018-transcript-cache-v1.md) and the
 [reconciliation evidence](CEVRA_TRANSCRIPT_CACHE_V1_EVIDENCE.md).
 
@@ -1739,7 +1743,7 @@ New material cost, privacy exposure, destructive behavior or objective/architect
 change still requires explicit treatment. Independent review and merge gates
 remain mandatory; this clarification narrows no prior safety policy.
 
-**Transcript Cache V1 — IN DEVELOPMENT / FINAL REMEDIATION — FOCUSED MICRO-REVIEW PENDING.** PR #24, branch `feat/transcript-cache-v1`, remains open, draft and unmerged. Historical donor head `700bb35a65fe8bf7552ab7621d41455dd463e7f9` is reconciled onto canonical main `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`; historical reconciled code checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb` and final remediation code head `0b5df56f3db677553825d630eeb4e09ee048bd54` reuse MR-V01 source identity and current ProjectHistory V2. A valid Alignment HIT performs zero PCM extraction, worker execution or model-weight hashing; fresh execution retains authoritative pre/post-worker verification.
+**Transcript Cache V1 — IN DEVELOPMENT / FINAL MODEL-SELECTION REMEDIATION — FOCUSED MICRO-REVIEW PENDING.** PR #24, branch `feat/transcript-cache-v1`, remains open, draft and unmerged. Historical donor head `700bb35a65fe8bf7552ab7621d41455dd463e7f9` is reconciled onto canonical main `0cf28cf780e9008c29fb45e7e98b3ccb57b64e68`; historical reconciled checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb`, preceding remediation code head `0b5df56f3db677553825d630eeb4e09ee048bd54` and final model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac` reuse MR-V01 source identity and current ProjectHistory V2. A valid Alignment HIT performs zero PCM extraction, worker execution or model-weight hashing; fresh execution retains authoritative pre/post-worker verification.
 
 For legacy sources, identity failure may bypass the cache and preserve the
 normal engine path. For descriptor-bearing sources, identity failure is a
@@ -1755,11 +1759,14 @@ Historical GitHub Actions run `35625702675`, attempt 2, completed 5/5
 SUCCESS on the old donor only. The immediately preceding reviewed head
 `52a778b5e7f902cb67f4bfe6074641956f6bc513` passed normal PR CI
 `36186823219`, push CI `36186819057` and Exact Runtime `36186823479`;
-these are historical rather than final-remediation evidence. Final remediation
-code head `0b5df56f3db677553825d630eeb4e09ee048bd54` passed PR CI
+these are historical rather than current model-selection evidence. Preceding
+remediation code head `0b5df56f3db677553825d630eeb4e09ee048bd54` passed PR CI
 `36236680016` (5/5), push CI `36236678600` (5/5) and managed Exact Runtime
-`36236680022`. One focused R1–R4 micro-review remains required. No merge has
-occurred.
+`36236680022`. Final model-selection code head
+`20d91f556e77b4e9abb71681cb08b5848cd9a7ac` passed push CI `36243443422`
+(5/5), PR CI `36243446501` (5/5) and managed Exact Runtime `36243446485`.
+R2–R4 are independently approved; one focused review of final model selection
+remains required. No merge has occurred.
 
 Current dependency blockers/gates:
 
@@ -1830,7 +1837,7 @@ Current dependency blockers/gates:
 - **IMPLEMENTED/CLOSED:** ADR 0019 and PR #30 implement compact ProjectHistory snapshots with exact content-addressed per-source transcript blobs, explicitly not editorial `transcriptDigest` and not Transcript Cache. Merge commit `b6f201afa73aae0aa85f8a3d4187a568ab749e72` preserves Project IR, journal, undo/redo/restore, ADR 0016 recovery and V1 compatibility; post-merge CI run `35668351461` passed 5/5.
 - **TECHNICAL DIRECTION:** Fable K1–K5 are retained with their benchmark/license/platform gates; no runtime code or dependency was changed by the reconciliation.
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
-- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24. Historical reconciled code checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb` is superseded by final remediation code head `0b5df56f3db677553825d630eeb4e09ee048bd54`; one focused R1–R4 micro-review remains required. Historical run `35625702675` is donor-only evidence.
+- **STATUS:** Transcript Cache V1 remains draft/unmerged in PR #24. Historical reconciled checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb` and preceding remediation head `0b5df56f3db677553825d630eeb4e09ee048bd54` are superseded by final model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac`; R2–R4 are approved and one focused model-selection micro-review remains required. Historical run `35625702675` is donor-only evidence.
 - **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
 
 ---
