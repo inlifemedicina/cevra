@@ -25,12 +25,13 @@ import { ProjectHistory } from "@cevra/project-ir";
 import {
   assertModelCacheIsolated,
   FasterWhisperTranscriptionAdapter,
+  resolveLocalFasterWhisperModel,
   resolveRuntimePaths as resolveTranscriptionRuntimePaths,
   type LocalTranscriptionAdapterOptions,
   type SupportedTranscriptionModelId
 } from "@cevra/transcription-faster-whisper";
 import { FileTranscriptCache } from "@cevra/transcript-cache";
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { DesktopPersistenceError, DesktopProjectPersistence } from "./persistence.js";
 import {
@@ -372,7 +373,9 @@ async function createTranscriptionServices(
   const modelId = transcriptionModel(environment.CEVRA_TRANSCRIPTION_MODEL_ID);
   // This is intentionally only a cheap presence gate. The existing adapter
   // healthcheck remains authoritative for runtime/model integrity.
-  if (!modelSnapshotPresent(modelCacheDir, modelId)) return { capability: unavailable("model-not-available") };
+  if (!await resolveLocalFasterWhisperModel({ modelCacheDir, allowModelDownload: false }, modelId)) {
+    return { capability: unavailable("model-not-available") };
+  }
   try {
     const mode = environment.CEVRA_TRANSCRIPTION_MODE === "development" ? "development" : "managed";
     const runtime: LocalTranscriptionAdapterOptions["runtime"] = mode === "development"
@@ -459,18 +462,6 @@ function runtimeComponent(root: string, value: unknown, requiredPrefix: string):
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function modelSnapshotPresent(cacheRoot: string, modelId: string): boolean {
-  if (!isAbsolute(cacheRoot) || !existsSync(cacheRoot)) return false;
-  const repository = `models--Systran--faster-whisper-${modelId}`;
-  const snapshots = resolve(cacheRoot, "hub", repository, "snapshots");
-  const alternateSnapshots = resolve(cacheRoot, repository, "snapshots");
-  return directoryExists(snapshots) || directoryExists(alternateSnapshots);
-}
-
-function directoryExists(value: string): boolean {
-  try { return lstatSync(value).isDirectory() && readdirSync(value, { withFileTypes: true }).some((entry) => entry.isDirectory()); } catch { return false; }
 }
 
 function requiredEnvironment(environment: NodeJS.ProcessEnv, name: string): string {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rename, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rename, rm, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -7,13 +7,30 @@ import {
   FasterWhisperModelIdentityResolver,
   FASTER_WHISPER_DIRECT_REQUIRED_FILES,
   FASTER_WHISPER_DIRECT_VOCABULARY_FILES,
+  FASTER_WHISPER_MODEL_REPOSITORIES,
+  FASTER_WHISPER_VERSION,
+  fasterWhisperRepositoryDirectory,
+  resolveLocalFasterWhisperModel,
   TRANSCRIPTION_RUNTIME_PIPELINE_VERSION
 } from "../dist/index.js";
 
 const revision = "d90ca5fe260221311c53c58e660288d3deb8d356";
 
+test("CEVRA model aliases map exhaustively to the pinned Faster-Whisper 1.2.1 repositories", () => {
+  assert.equal(FASTER_WHISPER_VERSION, "1.2.1");
+  assert.deepEqual(FASTER_WHISPER_MODEL_REPOSITORIES, {
+    tiny: "Systran/faster-whisper-tiny",
+    base: "Systran/faster-whisper-base",
+    small: "Systran/faster-whisper-small",
+    medium: "Systran/faster-whisper-medium",
+    "large-v3": "Systran/faster-whisper-large-v3",
+    turbo: "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
+  });
+  assert.equal(fasterWhisperRepositoryDirectory("turbo"), "models--mobiuslabsgmbh--faster-whisper-large-v3-turbo");
+});
+
 test("Hugging Face snapshot identity resolves exact revision and strong artifact manifest", async () => withTemp(async (root) => {
-  const { blobs } = await createHfSnapshot(root, "hub", "v1");
+  const { blobs } = await createHfSnapshot(root, "root", "v1");
   const resolver = new FasterWhisperModelIdentityResolver({ modelCacheDir: root, device: "cpu", computeType: "int8" }, "base");
   const first = await resolver.describe();
   assert.equal(first.modelRevision, revision);
@@ -42,7 +59,7 @@ test("a sole root Hugging Face layout is provable", async () => withTemp(async (
 test("direct prepopulated root has worker-aligned precedence over nested Hugging Face layouts", async () => withTemp(async (root) => {
   await createDirectModel(root, "direct");
   const directOnly = await new FasterWhisperModelIdentityResolver({ modelCacheDir: root, trustedModelRevision: revision, device: "cpu", computeType: "int8" }, "base").describe();
-  const { blobs } = await createHfSnapshot(root, "hub", "unused-hf");
+  const { blobs } = await createHfSnapshot(root, "root", "unused-hf");
   const mixedResolver = new FasterWhisperModelIdentityResolver({ modelCacheDir: root, trustedModelRevision: revision, device: "cpu", computeType: "int8" }, "base");
   const mixed = await mixedResolver.describe();
   assert.equal(mixed.modelArtifactDigest, directOnly.modelArtifactDigest);
@@ -50,10 +67,59 @@ test("direct prepopulated root has worker-aligned precedence over nested Hugging
   assert.equal((await mixedResolver.describe()).modelArtifactDigest, mixed.modelArtifactDigest, "unused nested layout must not alter direct execution identity");
 }));
 
-test("multiple plausible Hugging Face layouts make execution identity unavailable", async () => withTemp(async (root) => {
+test("hub-only Hugging Face layout is not executable by the configured worker contract", async () => withTemp(async (root) => {
   await createHfSnapshot(root, "hub", "hub-layout");
-  await createHfSnapshot(root, "root", "root-layout");
   assert.equal(await new FasterWhisperModelIdentityResolver({ modelCacheDir: root, device: "cpu", computeType: "int8" }, "base").describe(), undefined);
+}));
+
+test("an unused hub layout cannot perturb a selected root-level Hugging Face identity", async () => withTemp(async (root) => {
+  await createHfSnapshot(root, "root", "selected-root");
+  const resolver = new FasterWhisperModelIdentityResolver({ modelCacheDir: root, device: "cpu", computeType: "int8" }, "base");
+  const selected = await resolver.describe();
+  const { blobs } = await createHfSnapshot(root, "hub", "unused-hub");
+  assert.equal((await resolver.describe())?.modelArtifactDigest, selected?.modelArtifactDigest);
+  await writeFile(join(blobs, "model"), "unused-hub-mutated");
+  assert.equal((await resolver.describe())?.modelArtifactDigest, selected?.modelArtifactDigest);
+}));
+
+test("turbo identity resolves the pinned mobiuslabsgmbh repository rather than a synthetic Systran repository", async () => withTemp(async (root) => {
+  await createHfSnapshot(root, "root", "turbo", "mobiuslabsgmbh/faster-whisper-large-v3-turbo");
+  const identity = await new FasterWhisperModelIdentityResolver({ modelCacheDir: root, device: "cpu", computeType: "int8" }, "turbo").describe();
+  assert.equal(identity?.modelId, "mobiuslabsgmbh/faster-whisper-large-v3-turbo");
+  assert.equal(identity?.resultModelId, "turbo");
+}));
+
+test("a synthetic Systran turbo repository is neither selected nor cacheable", async () => withTemp(async (root) => {
+  await createHfSnapshot(root, "root", "fake-turbo", "Systran/faster-whisper-turbo");
+  assert.equal(await resolveLocalFasterWhisperModel({ modelCacheDir: root }, "turbo"), undefined);
+  assert.equal(await new FasterWhisperModelIdentityResolver({ modelCacheDir: root, device: "cpu", computeType: "int8" }, "turbo").describe(), undefined);
+}));
+
+test("an orphan single snapshot without refs/main is not a provable executable alias", async () => withTemp(async (root) => {
+  await createHfSnapshot(root, "root", "orphan", "Systran/faster-whisper-base", false);
+  assert.equal(await new FasterWhisperModelIdentityResolver({ modelCacheDir: root, device: "cpu", computeType: "int8" }, "base").describe(), undefined);
+}));
+
+test("a missing or wrong refs/main target cannot prove local model selection", async () => withTemp(async (root) => {
+  const { repository } = await createHfSnapshot(root, "root", "wrong-ref");
+  await writeFile(join(repository, "refs", "main"), "a".repeat(40));
+  assert.equal(await resolveLocalFasterWhisperModel({ modelCacheDir: root }, "base"), undefined);
+  assert.equal(await new FasterWhisperModelIdentityResolver({ modelCacheDir: root, device: "cpu", computeType: "int8" }, "base").describe(), undefined);
+}));
+
+test("local selection mirrors direct-root precedence before root-level Hugging Face resolution", async () => withTemp(async (root) => {
+  await createHfSnapshot(root, "root", "hf");
+  const hf = await resolveLocalFasterWhisperModel({ modelCacheDir: root }, "base");
+  assert.equal(hf?.kind, "hugging-face");
+  assert.equal(hf?.repositoryId, "Systran/faster-whisper-base");
+  assert.equal(hf?.revision, revision);
+
+  await createDirectModel(root, "direct");
+  const direct = await resolveLocalFasterWhisperModel({ modelCacheDir: root }, "base");
+  assert.equal(direct?.kind, "direct");
+  assert.equal(direct?.directory, await realpath(root));
+  assert.equal(direct?.repositoryId, "Systran/faster-whisper-base");
+  assert.equal(await resolveLocalFasterWhisperModel({ modelCacheDir: root, allowModelDownload: true }, "base"), undefined);
 }));
 
 test("model fingerprint memo invalidates same-size restored-mtime writes and reuses unchanged state", async () => withTemp(async (root) => {
@@ -145,12 +211,15 @@ async function createDirectModel(root, suffix = "fixture") {
   await writeFile(join(root, "vocabulary.txt"), "vocabulary-" + suffix);
 }
 
-async function createHfSnapshot(root, placement, suffix) {
-  const repository = join(root, ...(placement === "hub" ? ["hub"] : []), "models--Systran--faster-whisper-base");
+async function createHfSnapshot(root, placement, suffix, repositoryId = "Systran/faster-whisper-base", includeRef = true) {
+  const repository = join(root, ...(placement === "hub" ? ["hub"] : []), `models--${repositoryId.replaceAll("/", "--")}`);
   const snapshot = join(repository, "snapshots", revision);
   const blobs = join(repository, "blobs");
-  await mkdir(snapshot, { recursive: true }); await mkdir(blobs); await mkdir(join(repository, "refs"));
-  await writeFile(join(repository, "refs", "main"), revision);
+  await mkdir(snapshot, { recursive: true }); await mkdir(blobs);
+  if (includeRef) {
+    await mkdir(join(repository, "refs"));
+    await writeFile(join(repository, "refs", "main"), revision);
+  }
   for (const [logical, blob] of [["config.json", "config"], ["model.bin", "model"], ["tokenizer.json", "tokenizer"], ["vocabulary.txt", "vocabulary"]]) {
     await writeFile(join(blobs, blob), blob + "-" + suffix);
     await symlink("../../blobs/" + blob, join(snapshot, logical));
