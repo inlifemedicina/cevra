@@ -61,6 +61,34 @@ def run(argv: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
         raise SystemExit(proc.returncode)
 
 
+def compiler_banner(system: str, env: dict[str, str]) -> str:
+    """Return a bounded compiler identity for release provenance.
+
+    MSVC reports its banner on stderr and does not implement the GCC-style
+    ``--version`` switch.  Treating every host as GCC prevented a successful
+    Windows build from reaching provenance generation even after compilation.
+    """
+    compiler = env.get("CC") or ("cl" if system == "Windows" else "cc")
+    argv = [compiler] if system == "Windows" else [compiler, "--version"]
+    try:
+        proc = subprocess.run(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=env,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SystemExit(f"could not identify compiler {compiler}: {exc}") from exc
+    lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+    if not lines:
+        raise SystemExit(f"could not identify compiler {compiler}")
+    if system != "Windows" and proc.returncode != 0:
+        raise SystemExit(f"compiler identity command failed ({proc.returncode}): {compiler}")
+    return lines[0]
+
+
 def validate_flags(flags: list[str]) -> None:
     forbidden = ("--enable-gpl", "--enable-nonfree", "--enable-libx264", "--enable-libx265")
     bad = [flag for flag in flags if flag.startswith(forbidden)]
@@ -121,7 +149,11 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
     run([shell, str(configure), *flags], cwd=source, env=env)
     run([make, f"-j{max(1, jobs)}"], cwd=source, env=env)
     with tempfile.TemporaryDirectory(prefix="cevra-ffmpeg-install-", dir=prefix.parent) as stage_name:
-        run([make, f"DESTDIR={stage_name}", "install"], cwd=source, env=env)
+        # GNU make under MSYS accepts the native Windows drive only in
+        # forward-slash form.  Keep the stable configure prefix while staging
+        # into the runner-owned temporary directory.
+        stage_destination = Path(stage_name).as_posix() if system == "Windows" else stage_name
+        run([make, f"DESTDIR={stage_destination}", "install"], cwd=source, env=env)
         staged_prefix = Path(stage_name) / INSTALL_PREFIX.lstrip("/")
         if not staged_prefix.is_dir():
             raise SystemExit("FFmpeg staged install did not produce the stable runtime prefix")
@@ -179,7 +211,7 @@ def build(source: Path, prefix: Path, jobs: int) -> None:
         if not source_file.is_file():
             raise SystemExit(f"verified FFmpeg source artifact is missing: {source_name}")
         shutil.copy2(source_file, source_directory / target_name)
-    compiler = subprocess.run([os.environ.get("CC", "cc"), "--version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True).stdout.splitlines()[0]
+    compiler = compiler_banner(system, env)
     toolchain = {"host": system, "arch": platform.machine() or "unknown", "compiler": compiler, "python": platform.python_version(), "sourceDateEpoch": "0"}
     build_instructions = (
         f"# Reproducing CEVRA FFmpeg {PIN['version']}\n\n"

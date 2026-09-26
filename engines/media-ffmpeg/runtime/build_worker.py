@@ -30,6 +30,14 @@ def python_version(python_executable: Path) -> str:
     return proc.stdout.strip()
 
 
+def _managed_python_root(python_executable: Path) -> Path:
+    """Locate the prepared runtime root for POSIX and root-level Windows Python."""
+    for candidate in (python_executable.parent, python_executable.parent.parent):
+        if (candidate / "CEVRA_PYTHON_PROVENANCE.json").is_file():
+            return candidate
+    raise SystemExit("managed Python provenance is not adjacent to its executable")
+
+
 def build(output_dir: Path, python_executable: Path, vendor_source: Path | None = None) -> Path:
     """Stage the persistent worker for CEVRA's private managed CPython runtime.
 
@@ -68,7 +76,7 @@ def build(output_dir: Path, python_executable: Path, vendor_source: Path | None 
         if not source.is_file():
             raise SystemExit(f"required release notice missing: {source}")
         shutil.copy2(source, output_dir / name)
-    python_root = python_executable.parent.parent
+    python_root = _managed_python_root(python_executable)
     python_license = next((candidate for candidate in (
         python_root / "LICENSE.txt",
         python_root / "LICENSE",
