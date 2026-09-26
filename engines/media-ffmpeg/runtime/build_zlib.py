@@ -66,7 +66,6 @@ def validate_source(source: Path) -> dict[str, object]:
         "verifiedSignerFingerprint": PIN["signingFingerprint"].upper(),
         "archiveSha256": PIN["archiveSha256"],
         "signatureSha256": PIN["signatureSha256"],
-        "signingKeySourceSha256": PIN["signingKeySourceSha256"],
         "signingKeySha256": PIN["signingKeySha256"],
         "license": PIN["license"],
         "licenseSha256": PIN["licenseSha256"],
@@ -170,7 +169,6 @@ def build(source: Path, prefix: Path) -> Path:
         "CEVRA_SOURCE_ARCHIVE.tar.xz": f"zlib-{PIN['version']}.tar.xz",
         "CEVRA_SOURCE_ARCHIVE.tar.xz.asc": f"zlib-{PIN['version']}.tar.xz.asc",
         "CEVRA_SIGNING_KEY.asc": "mark-adler.asc",
-        "CEVRA_SIGNING_KEY_SOURCE.html": "mark-adler-pgp.html",
     }
     for source_name, target_name in source_inputs.items():
         item = source / source_name
@@ -210,7 +208,6 @@ def build(source: Path, prefix: Path) -> Path:
         "verifiedSignerFingerprint": provenance["verifiedSignerFingerprint"],
         "sourceArchiveSha256": PIN["archiveSha256"],
         "sourceSignatureSha256": PIN["signatureSha256"],
-        "signingKeySourceSha256": PIN["signingKeySourceSha256"],
         "signingKeySha256": PIN["signingKeySha256"],
         "licenseSha256": PIN["licenseSha256"],
         "librarySha256": sha256(built_library),
@@ -233,7 +230,6 @@ def build(source: Path, prefix: Path) -> Path:
         "sourceArchive": f"sources/zlib/zlib-{PIN['version']}.tar.xz",
         "sourceSignatureFile": f"sources/zlib/zlib-{PIN['version']}.tar.xz.asc",
         "signingKeyFile": "sources/zlib/mark-adler.asc",
-        "signingKeySourceFile": "sources/zlib/mark-adler-pgp.html",
         "buildInstructions": "sources/zlib/BUILD.md",
         "licenseFile": "licenses/zlib/LICENSE",
     }

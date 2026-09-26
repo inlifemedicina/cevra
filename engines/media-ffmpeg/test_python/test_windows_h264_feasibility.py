@@ -208,7 +208,6 @@ class WindowsH264FeasibilityTests(unittest.TestCase):
                 "verifiedSignerFingerprint": build_ffmpeg.ZLIB_PIN["signingFingerprint"],
                 "sourceArchiveSha256": build_ffmpeg.ZLIB_PIN["archiveSha256"],
                 "sourceSignatureSha256": build_ffmpeg.ZLIB_PIN["signatureSha256"],
-                "signingKeySourceSha256": build_ffmpeg.ZLIB_PIN["signingKeySourceSha256"],
                 "signingKeySha256": build_ffmpeg.ZLIB_PIN["signingKeySha256"],
                 "licenseSha256": build_ffmpeg.ZLIB_PIN["licenseSha256"],
                 "librarySha256": hashlib.sha256(b"fixture").hexdigest(),

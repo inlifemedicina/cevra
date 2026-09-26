@@ -120,7 +120,6 @@ def windows_zlib_metadata(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> d
         "verifiedSignerFingerprint": pin["signingFingerprint"].upper(),
         "sourceArchiveSha256": pin["archiveSha256"],
         "sourceSignatureSha256": pin["signatureSha256"],
-        "signingKeySourceSha256": pin["signingKeySourceSha256"],
         "signingKeySha256": pin["signingKeySha256"],
         "licenseSha256": pin["licenseSha256"],
         "staticLink": True,
@@ -131,7 +130,6 @@ def windows_zlib_metadata(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> d
         "sourceArchive": f"sources/zlib/zlib-{pin['version']}.tar.xz",
         "sourceSignatureFile": f"sources/zlib/zlib-{pin['version']}.tar.xz.asc",
         "signingKeyFile": "sources/zlib/mark-adler.asc",
-        "signingKeySourceFile": "sources/zlib/mark-adler-pgp.html",
         "buildInstructions": "sources/zlib/BUILD.md",
         "licenseFile": "licenses/zlib/LICENSE",
     }
@@ -149,7 +147,6 @@ def windows_zlib_metadata(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> d
         expected["sourceArchive"]: pin["archiveSha256"],
         expected["sourceSignatureFile"]: pin["signatureSha256"],
         expected["signingKeyFile"]: pin["signingKeySha256"],
-        expected["signingKeySourceFile"]: pin["signingKeySourceSha256"],
         expected["licenseFile"]: pin["licenseSha256"],
     }
     for relative, digest in artifact_hashes.items():

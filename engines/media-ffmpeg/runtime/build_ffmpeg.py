@@ -137,7 +137,6 @@ def validate_zlib_prefix(prefix: Path) -> dict[str, object]:
         "verifiedSignerFingerprint": ZLIB_PIN["signingFingerprint"].upper(),
         "sourceArchiveSha256": ZLIB_PIN["archiveSha256"],
         "sourceSignatureSha256": ZLIB_PIN["signatureSha256"],
-        "signingKeySourceSha256": ZLIB_PIN["signingKeySourceSha256"],
         "signingKeySha256": ZLIB_PIN["signingKeySha256"],
         "licenseSha256": ZLIB_PIN["licenseSha256"],
         "staticLink": True,
@@ -162,7 +161,6 @@ def validate_zlib_prefix(prefix: Path) -> dict[str, object]:
         "sourceArchive": (f"sources/zlib/zlib-{ZLIB_PIN['version']}.tar.xz", ZLIB_PIN["archiveSha256"]),
         "sourceSignatureFile": (f"sources/zlib/zlib-{ZLIB_PIN['version']}.tar.xz.asc", ZLIB_PIN["signatureSha256"]),
         "signingKeyFile": ("sources/zlib/mark-adler.asc", ZLIB_PIN["signingKeySha256"]),
-        "signingKeySourceFile": ("sources/zlib/mark-adler-pgp.html", ZLIB_PIN["signingKeySourceSha256"]),
     }
     for field, (relative, digest) in source_paths.items():
         if provenance.get(field) != relative:

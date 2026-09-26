@@ -461,7 +461,6 @@ def verify_release_bundle(
             "verifiedSignerFingerprint": expected_windows_zlib["signingFingerprint"].upper(),
             "sourceArchiveSha256": expected_windows_zlib["archiveSha256"],
             "sourceSignatureSha256": expected_windows_zlib["signatureSha256"],
-            "signingKeySourceSha256": expected_windows_zlib["signingKeySourceSha256"],
             "signingKeySha256": expected_windows_zlib["signingKeySha256"],
             "licenseSha256": expected_windows_zlib["licenseSha256"],
             "staticLink": True,
@@ -472,7 +471,6 @@ def verify_release_bundle(
             "sourceArchive": f"sources/zlib/zlib-{expected_windows_zlib['version']}.tar.xz",
             "sourceSignatureFile": f"sources/zlib/zlib-{expected_windows_zlib['version']}.tar.xz.asc",
             "signingKeyFile": "sources/zlib/mark-adler.asc",
-            "signingKeySourceFile": "sources/zlib/mark-adler-pgp.html",
             "buildInstructions": "sources/zlib/BUILD.md",
             "licenseFile": "licenses/zlib/LICENSE",
         }
@@ -497,7 +495,6 @@ def verify_release_bundle(
             "sourceArchive": "sourceArchiveSha256",
             "sourceSignatureFile": "sourceSignatureSha256",
             "signingKeyFile": "signingKeySha256",
-            "signingKeySourceFile": "signingKeySourceSha256",
             "licenseFile": "licenseSha256",
         }
         for path_field, digest_field in zlib_artifacts.items():

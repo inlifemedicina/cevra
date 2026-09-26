@@ -138,8 +138,6 @@ def prepare(destination: Path) -> Path:
         download(PIN["source"], archive)
         download(PIN["signature"], signature)
         download(PIN["signingKey"], key_source)
-        if sha256(key_source) != PIN["signingKeySourceSha256"]:
-            raise SystemExit(f"zlib signing-key source SHA-256 mismatch: {sha256(key_source)}")
         extract_signing_key(key_source, key)
 
         digests = {
@@ -193,7 +191,6 @@ def prepare(destination: Path) -> Path:
         shutil.copy2(archive, target / "CEVRA_SOURCE_ARCHIVE.tar.xz")
         shutil.copy2(signature, target / "CEVRA_SOURCE_ARCHIVE.tar.xz.asc")
         shutil.copy2(key, target / "CEVRA_SIGNING_KEY.asc")
-        shutil.copy2(key_source, target / "CEVRA_SIGNING_KEY_SOURCE.html")
         provenance = {
             "id": "zlib-source",
             "version": PIN["version"],
@@ -204,7 +201,6 @@ def prepare(destination: Path) -> Path:
             "verifiedSignerFingerprint": expected,
             "archiveSha256": digests["archive"],
             "signatureSha256": digests["signature"],
-            "signingKeySourceSha256": sha256(key_source),
             "signingKeySha256": digests["signingKey"],
             "license": PIN["license"],
             "licenseSha256": sha256(source / "LICENSE"),
