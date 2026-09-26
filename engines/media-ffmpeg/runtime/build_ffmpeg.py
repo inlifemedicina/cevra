@@ -197,7 +197,7 @@ def install_msvc_dependency_filter(source: Path, helper: Path = MSVC_DEPENDENCY_
     text = config.read_text(encoding="utf-8")
     expected = " | awk '/including/ { sub(/^.*file: */, \"\"); gsub(/\\\\/, \"/\"); if (!match($$0, / /)) print \"$@:\", $$0 }' > $(@:.o=.d)"
     count = text.count(expected)
-    if count != 1:
+    if count != 4:
         raise SystemExit(f"unexpected FFmpeg MSVC dependency command ({count} matches); refusing an unreviewed build adjustment")
     helper_path = helper.resolve().as_posix()
     replacement = f" | awk -v target=\"$@\" -f {shlex.quote(helper_path)} > $(@:.o=.d)"
@@ -206,6 +206,7 @@ def install_msvc_dependency_filter(source: Path, helper: Path = MSVC_DEPENDENCY_
         "id": MSVC_DEPENDENCY_FILTER_ID,
         "helperSha256": sha256(helper),
         "generatedFile": "ffbuild/config.mak",
+        "generatedCommandCount": str(count),
         "sourceArchiveModified": "false",
     }
 

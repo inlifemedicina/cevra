@@ -236,13 +236,17 @@ class WindowsH264FeasibilityTests(unittest.TestCase):
             config = root / "ffbuild/config.mak"
             config.parent.mkdir()
             command = " | awk '/including/ { sub(/^.*file: */, \"\"); gsub(/\\\\/, \"/\"); if (!match($$0, / /)) print \"$@:\", $$0 }' > $(@:.o=.d)"
-            config.write_text(f"CCDEP=cl -showIncludes{command}\n", encoding="utf-8")
+            config.write_text(
+                "".join(f"{variable}=cl -showIncludes{command}\n" for variable in ("CCDEP", "CXXDEP", "OBJCDEP", "ASDEP")),
+                encoding="utf-8",
+            )
             result = build_ffmpeg.install_msvc_dependency_filter(root)
             adjusted = config.read_text(encoding="utf-8")
             self.assertEqual(result["id"], "cevra-msvc-dependency-filter-v1")
+            self.assertEqual(result["generatedCommandCount"], "4")
             self.assertEqual(result["helperSha256"], build_ffmpeg.sha256(build_ffmpeg.MSVC_DEPENDENCY_FILTER))
             self.assertNotIn("gsub", adjusted)
-            self.assertIn('awk -v target="$@" -f ', adjusted)
+            self.assertEqual(adjusted.count('awk -v target="$@" -f '), 4)
             self.assertIn("msvc_dependencies.awk", adjusted)
 
     def test_msvc_dependency_filter_fails_closed_on_upstream_command_drift(self) -> None:
