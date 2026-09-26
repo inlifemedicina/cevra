@@ -711,6 +711,25 @@ class RuntimeBuildTests(unittest.TestCase):
                 download.assert_not_called()
                 self.assertFalse(destination.exists())
 
+    def test_ffmpeg_gpg_path_uses_cygpath_on_windows(self) -> None:
+        conversion = mock.Mock(returncode=0, stdout="/d/scratch/source.tar.xz\n", stderr="")
+        with mock.patch.object(prepare_ffmpeg_source.shutil, "which", return_value="C:/Program Files/Git/usr/bin/cygpath.exe"), \
+             mock.patch.object(prepare_ffmpeg_source.subprocess, "run", return_value=conversion) as run:
+            converted = prepare_ffmpeg_source.gpg_path(Path("D:/scratch/source.tar.xz"), platform_name="nt")
+        self.assertEqual(converted, "/d/scratch/source.tar.xz")
+        run.assert_called_once_with(
+            ["C:/Program Files/Git/usr/bin/cygpath.exe", "-u", "D:/scratch/source.tar.xz"],
+            stdout=prepare_ffmpeg_source.subprocess.PIPE,
+            stderr=prepare_ffmpeg_source.subprocess.PIPE,
+            text=True,
+        )
+
+    def test_ffmpeg_gpg_path_preserves_posix_path(self) -> None:
+        path = Path("/tmp/source.tar.xz")
+        with mock.patch.object(prepare_ffmpeg_source.shutil, "which") as which:
+            self.assertEqual(prepare_ffmpeg_source.gpg_path(path, platform_name="posix"), str(path))
+        which.assert_not_called()
+
     def test_ffmpeg_archive_extraction_rejects_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

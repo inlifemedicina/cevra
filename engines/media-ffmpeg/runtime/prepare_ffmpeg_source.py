@@ -39,6 +39,24 @@ def command(argv: list[str], env: dict[str, str] | None = None) -> str:
     return (proc.stdout or "") + (proc.stderr or "")
 
 
+def gpg_path(path: Path, platform_name: str | None = None) -> str:
+    """Translate native paths for the MSYS/Git GnuPG shipped on Windows runners."""
+    if (platform_name or os.name) != "nt":
+        return str(path)
+    cygpath = shutil.which("cygpath")
+    if cygpath is None:
+        raise SystemExit("cygpath is required to pass confined paths to GnuPG on Windows")
+    proc = subprocess.run(
+        [cygpath, "-u", str(path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        raise SystemExit(f"could not translate Windows path for GnuPG: {path}")
+    return proc.stdout.strip()
+
+
 def signature_matches(status_output: str, expected_fingerprint: str) -> bool:
     expected = expected_fingerprint.upper()
     for line in status_output.splitlines():
@@ -98,15 +116,15 @@ def prepare(destination: Path) -> Path:
         gnupg = temp / "gnupg"
         gnupg.mkdir(mode=0o700)
         env = os.environ.copy()
-        env["GNUPGHOME"] = str(gnupg)
-        listing = command(["gpg", "--batch", "--with-colons", "--import-options", "show-only", "--import", str(key)], env=env)
+        env["GNUPGHOME"] = gpg_path(gnupg)
+        listing = command(["gpg", "--batch", "--with-colons", "--import-options", "show-only", "--import", gpg_path(key)], env=env)
         fingerprints = {line.split(":")[9].upper() for line in listing.splitlines() if line.startswith("fpr:") and len(line.split(":")) > 9}
         expected = PIN["signingFingerprint"].upper()
         if expected not in fingerprints:
             raise SystemExit(f"FFmpeg signing key fingerprint mismatch: expected {expected}")
         keyring = temp / "ffmpeg-signing-key.gpg"
-        command(["gpg", "--batch", "--yes", "--dearmor", "--output", str(keyring), str(key)], env=env)
-        verification = command(["gpgv", "--status-fd", "1", "--keyring", str(keyring), str(signature), str(archive)], env=env)
+        command(["gpg", "--batch", "--yes", "--dearmor", "--output", gpg_path(keyring), gpg_path(key)], env=env)
+        verification = command(["gpgv", "--status-fd", "1", "--keyring", gpg_path(keyring), gpg_path(signature), gpg_path(archive)], env=env)
         if not signature_matches(verification, expected):
             raise SystemExit(f"FFmpeg release signature was not made by pinned fingerprint {expected}")
 
