@@ -2,6 +2,11 @@ import type { AlignmentLanguage, AlignmentRequest, ExecutionContext } from "@cev
 
 export const ALIGNMENT_PROTOCOL_VERSION = 1 as const;
 export const CEVRA_ALIGNMENT_VERSION = "0.1.0" as const;
+export const ALIGNMENT_MAX_WINDOW_MS = 30_000 as const;
+export const ALIGNMENT_MAX_TOKENS_PER_WINDOW = 1_024 as const;
+export const ALIGNMENT_WILDCARD_ALGORITHM_VERSION = "whisperx-3.8.6-wildcard-v1" as const;
+export const ALIGNMENT_PIPELINE_VERSION = "ctc-windowed-v1" as const;
+export const ALIGNMENT_RESULT_VALIDATION_VERSION = "alignment-result-v1" as const;
 export const WHISPERX_BASELINE_VERSION = "3.8.6" as const;
 export const WHISPERX_BASELINE_COMMIT = "3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0" as const;
 

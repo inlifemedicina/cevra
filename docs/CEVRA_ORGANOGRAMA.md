@@ -18,7 +18,7 @@ CEVRA VIDS
 │   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
 │   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
 │   │   └─ MR-V01 Durable Source Technical Descriptor V1 [IMPLEMENTED / CLOSED]
-│   └─ Transcript Cache V1 reconciliation/final closeout [NEXT CANONICAL STEP]
+│   └─ Transcript Cache V1 [FINAL REMEDIATION / FOCUSED MICRO-REVIEW PENDING]
 │
 ├─ 3. EDITORIAL INTELLIGENCE
 │   ├─ editorial transcript / analysis
@@ -95,6 +95,11 @@ ProjectHistory Scalability V2 is closed and preserved as a foundation after PR #
 MR-V01 is closed as the bounded Slice 4 implementation within that gate after
 PR #46 and successful post-merge CI plus Exact Runtime. It keeps Project
 IR/History/Package at V2, adds no migration and does not start Cut Compiler.
-Transcript Cache V1 reconciliation/final closeout is the next canonical step.
+Transcript Cache V1 is reconciled onto the current MR-V01/ProjectHistory V2
+baseline. Final remediation binds cache identity to the actually selected
+Transcription model, adds source anti-ABA continuity, normalizes known optional
+`undefined` inputs without opening the schema, and enforces adopted descriptor
+integrity independently of cache policy. Focused R1–R4 micro-review and final CI
+are the remaining gates.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.

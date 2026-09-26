@@ -4,6 +4,7 @@ import type {
   EngineIdentity,
   ExecutionContext,
   TranscriptionEngineAdapter,
+  TranscriptionExecutionIdentity,
   TranscriptionRequest,
   TranscriptionResult
 } from "@cevra/contracts";
@@ -19,11 +20,13 @@ import {
   type TranscriptionWorkerRunner
 } from "./types.js";
 import { normalizeWorkerResult, validateAndNormalizeRequest, validateModelCacheDir, validateModelId } from "./validation.js";
+import { FasterWhisperModelIdentityResolver } from "./execution-identity.js";
 
 export class FasterWhisperTranscriptionAdapter implements TranscriptionEngineAdapter {
   private readonly runner: TranscriptionWorkerRunner;
   private readonly modelId: SupportedTranscriptionModelId;
   private activeJobId: string | undefined;
+  private readonly executionIdentity: FasterWhisperModelIdentityResolver;
 
   constructor(private readonly options: LocalTranscriptionAdapterOptions) {
     this.modelId = options.profile.modelId ?? DEFAULT_TRANSCRIPTION_MODEL_ID;
@@ -36,6 +39,11 @@ export class FasterWhisperTranscriptionAdapter implements TranscriptionEngineAda
       throw new LocalTranscriptionError("TRANSCRIPTION_INVALID_REQUEST", "The configured transcription compute type is not allow-listed.");
     }
     this.runner = options.runner ?? new ProcessTranscriptionWorkerRunner({ runtime: options.runtime });
+    this.executionIdentity = new FasterWhisperModelIdentityResolver(options.profile, this.modelId);
+  }
+
+  async describeTranscriptionExecution(_request: TranscriptionRequest, signal?: AbortSignal): Promise<TranscriptionExecutionIdentity | undefined> {
+    return this.executionIdentity.describe(signal);
   }
 
   async identity(): Promise<EngineIdentity> {

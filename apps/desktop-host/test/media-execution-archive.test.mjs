@@ -26,6 +26,7 @@ import { NodeMediaArtifactStore } from "@cevra/media-ffmpeg";
 import { createEmptyProject, ProjectHistory } from "@cevra/project-ir";
 
 const now = "2026-09-23T12:00:00.000Z";
+const transcriptionModelRevision = "d90ca5fe260221311c53c58e660288d3deb8d356";
 
 async function root(t) {
   const value = await mkdtemp(resolve(tmpdir(), "cevra-media-archive-"));
@@ -153,7 +154,7 @@ async function managedTranscriptionEnvironment(root, modelCacheDir) {
   const packageRoot = resolve(sitePackages, "faster_whisper");
   await mkdir(packageRoot, { recursive: true });
   await writeFile(resolve(packageRoot, "__init__.py"), "__version__ = \"1.2.1\"\n", "utf8");
-  await mkdir(resolve(modelCacheDir, "hub", "models--Systran--faster-whisper-base", "snapshots", "fixture"), { recursive: true });
+  await installHfModelCache(modelCacheDir, "Systran/faster-whisper-base");
   return {
     CEVRA_TRANSCRIPTION_MODE: "managed",
     CEVRA_TRANSCRIPTION_PYTHON: pythonExecutable,
@@ -162,6 +163,28 @@ async function managedTranscriptionEnvironment(root, modelCacheDir) {
     CEVRA_TRANSCRIPTION_MODEL_ID: "base",
     CEVRA_PRIVATE_PYTHON_ROOT: privatePythonRoot
   };
+}
+
+async function installDirectModel(root) {
+  await mkdir(root, { recursive: true });
+  await writeFile(resolve(root, "config.json"), "{}", "utf8");
+  await writeFile(resolve(root, "model.bin"), "model", "utf8");
+  await writeFile(resolve(root, "tokenizer.json"), "{}", "utf8");
+  await writeFile(resolve(root, "vocabulary.txt"), "vocabulary", "utf8");
+}
+
+async function installHfModelCache(root, repositoryId, { placement = "root", includeRef = true } = {}) {
+  const repository = resolve(
+    root,
+    ...(placement === "hub" ? ["hub"] : []),
+    `models--${repositoryId.replaceAll("/", "--")}`
+  );
+  const snapshot = resolve(repository, "snapshots", transcriptionModelRevision);
+  await installDirectModel(snapshot);
+  if (includeRef) {
+    await mkdir(resolve(repository, "refs"), { recursive: true });
+    await writeFile(resolve(repository, "refs", "main"), transcriptionModelRevision, "utf8");
+  }
 }
 
 async function open(t, suppliedRoot) {
@@ -653,6 +676,65 @@ test("production startup keeps canonical project open when a classified archive 
   await session.close();
 });
 
+test("Desktop model presence gate mirrors the worker-aligned shared local selection", async (t) => {
+  const fixture = await open(t);
+  await fixture.project.persistence.close();
+  const bootstrapCache = resolve(fixture.root, "transcription-model-bootstrap");
+  const environment = await managedTranscriptionEnvironment(fixture.root, bootstrapCache);
+  const cases = [
+    {
+      name: "direct root",
+      modelId: "base",
+      install: installDirectModel,
+      expected: { available: true, reason: "available" }
+    },
+    {
+      name: "root-level Hugging Face",
+      modelId: "base",
+      install: (root) => installHfModelCache(root, "Systran/faster-whisper-base"),
+      expected: { available: true, reason: "available" }
+    },
+    {
+      name: "actual turbo repository",
+      modelId: "turbo",
+      install: (root) => installHfModelCache(root, "mobiuslabsgmbh/faster-whisper-large-v3-turbo"),
+      expected: { available: true, reason: "available" }
+    },
+    {
+      name: "synthetic Systran turbo repository",
+      modelId: "turbo",
+      install: (root) => installHfModelCache(root, "Systran/faster-whisper-turbo"),
+      expected: { available: false, reason: "model-not-available" }
+    },
+    {
+      name: "hub-only repository",
+      modelId: "base",
+      install: (root) => installHfModelCache(root, "Systran/faster-whisper-base", { placement: "hub" }),
+      expected: { available: false, reason: "model-not-available" }
+    },
+    {
+      name: "orphan snapshot",
+      modelId: "base",
+      install: (root) => installHfModelCache(root, "Systran/faster-whisper-base", { includeRef: false }),
+      expected: { available: false, reason: "model-not-available" }
+    }
+  ];
+
+  for (const [index, value] of cases.entries()) {
+    const modelCacheDir = resolve(fixture.root, `model-presence-${index}`);
+    await value.install(modelCacheDir);
+    const session = await createProductionDesktopSession({
+      ...environment,
+      CEVRA_PROJECT_PERSISTENCE_ROOT: fixture.root,
+      CEVRA_HOST_RECOVERY: "1",
+      CEVRA_TRANSCRIPTION_MODEL_CACHE: modelCacheDir,
+      CEVRA_TRANSCRIPTION_MODEL_ID: value.modelId
+    });
+    assert.deepEqual(session.state().capabilities.transcription, value.expected, value.name);
+    await session.close();
+  }
+});
+
 test("degraded Media startup still protects its configured runtime from the Transcription model cache", async (t) => {
   const fixture = await open(t);
   const mediaRuntimeRoot = await installConfiguredMediaRuntime(fixture.root);
@@ -698,6 +780,9 @@ test("degraded Media startup keeps Transcription available with an isolated mode
   assert.equal(state.project.project.id, fixture.projectId);
   assert.deepEqual(state.capabilities.mediaImport, { available: false, reason: "archive-unavailable" });
   assert.deepEqual(state.capabilities.transcription, { available: true, reason: "available" });
+  assert.equal(session.services.transcription.cache, undefined, "fixture config intentionally has no transcript cache");
+  assert.ok(session.services.transcription.sourceIdentity instanceof NodeMediaArtifactStore,
+    "source integrity capability must remain wired independently of cache availability");
   assert.equal(await readFile(foreign, "utf8"), "protected root isolated sentinel");
   await session.close();
 });

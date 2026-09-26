@@ -673,6 +673,13 @@ fn trusted_runtime_environment(
         "CEVRA_PROJECT_PERSISTENCE_ROOT".into(),
         persistence_root.to_owned(),
     );
+    // Cache location is native-owned and private to the Desktop Host. Failure to
+    // resolve it disables the optimization without disabling transcription.
+    if let Ok(cache_root) = app.path().app_cache_dir() {
+        if let Some(cache_root) = cache_root.join("transcript-cache-v1").to_str() {
+            allowed.insert("CEVRA_TRANSCRIPT_CACHE_ROOT".into(), cache_root.to_owned());
+        }
+    }
     if recovering {
         allowed.insert("CEVRA_HOST_RECOVERY".into(), "1".into());
     }

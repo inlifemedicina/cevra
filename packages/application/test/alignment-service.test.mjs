@@ -57,8 +57,83 @@ function setup(options = {}) {
   const releases = [];
   const audioWorkspace = options.audioWorkspace ?? { async acquire() { return { outputUri: "/tmp/cevra-alignment/audio.wav", async release() { releases.push(true); } }; } };
   const engine = options.engine ?? new Engine();
-  const service = new AlignmentApplicationService({ engine, media, audioWorkspace, history, clock: () => now, idGenerator: () => "alignment-1" });
+  const service = new AlignmentApplicationService({ engine, media, audioWorkspace, history, clock: () => now, idGenerator: () => "alignment-1", ...(options.additions ?? {}) });
   return { service, history, engine, releases, media };
+}
+const alignmentSourceIdentity = { sha256: "a".repeat(64), sizeBytes: 500 };
+function sourceIdentityPort(identify = async () => structuredClone(alignmentSourceIdentity), check = async () => "match") {
+  return {
+    async captureSource(uri) {
+      return { version: 1, uri, canonicalPath: uri, device: "1", inode: "2", sizeBytes: 500, mtimeNs: "3", ctimeNs: "4" };
+    },
+    async identifySource(uri, stamp) {
+      const content = await identify();
+      return { version: 1, content, stamp: { ...stamp, uri }, bytesRead: content.sizeBytes };
+    },
+    checkSource: check
+  };
+}
+function sequencedAlignmentSourceIdentity(stamps, identify = async () => structuredClone(alignmentSourceIdentity)) {
+  let captures = 0;
+  let hashes = 0;
+  return {
+    get captures() { return captures; },
+    get hashes() { return hashes; },
+    async captureSource(uri) {
+      const selected = stamps[Math.min(captures, stamps.length - 1)];
+      captures += 1;
+      return {
+        version: 1, uri, canonicalPath: uri, device: "1", inode: "2", sizeBytes: 500,
+        mtimeNs: "3", ctimeNs: "4", ...selected, uri
+      };
+    },
+    async identifySource(uri, stamp) {
+      hashes += 1;
+      const content = await identify();
+      return { version: 1, content, stamp: { ...stamp, uri }, bytesRead: content.sizeBytes };
+    },
+    async checkSource() { return "match"; }
+  };
+}
+function descriptorProject(content = alignmentSourceIdentity) {
+  const value = project();
+  value.sources[0].technicalDescriptor = {
+    version: 1,
+    basis: "ingest",
+    content: structuredClone(content),
+    method: { profile: "cevra.source-technical.v1", engineId: "test.media", engineVersion: "1.0.0", engineApiVersion: 1 },
+    video: { codec: "h264" },
+    audio: { codec: "aac" }
+  };
+  return value;
+}
+const alignmentExecutionIdentity = {
+  engineId: "test.alignment", engineVersion: "1.0.0", engineApiVersion: 1, workerProtocolVersion: 1,
+  modelId: "model/pt", modelRevision: "revision", modelDigest: "sha256:model", device: "cpu",
+  pipelineVersion: "ctc-v1", requiredSampleRate: 16000, maximumWindowMs: 30000,
+  maximumTokensPerWindow: 1024, wildcardAlgorithmVersion: "wildcard-v1", resultValidationVersion: "alignment-result-v1"
+};
+class AlignmentMemoryCache {
+  entries = new Map(); reads = 0; writes = 0; invalidations = 0;
+  async read(key) { this.reads++; return structuredClone(this.entries.get(JSON.stringify(key))); }
+  async write(key, value) { this.writes++; this.entries.set(JSON.stringify(key), structuredClone(value)); return true; }
+  async invalidate(key) { this.invalidations++; this.entries.delete(JSON.stringify(key)); }
+}
+function cacheableAlignmentEngine(impl) {
+  const engine = new Engine(impl);
+  engine.executionIdentityCalls = 0;
+  engine.describeAlignmentExecution = async () => {
+    engine.executionIdentityCalls++;
+    return structuredClone(alignmentExecutionIdentity);
+  };
+  return engine;
+}
+function cacheableMedia(counter) {
+  return {
+    async identity() { return { id: "test.media", kind: "media", displayName: "Media", version: "1.0.0", apiVersion: 1 }; },
+    async healthcheck() { return { status: "ready", checkedAt: now, checks: [] }; }, async capabilities() { return []; },
+    async execute(operation) { counter.calls++; return { type: "file", outputUri: operation.outputUri }; }
+  };
 }
 function deferred() { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; }
 
@@ -256,4 +331,315 @@ test("engine identity mismatch and media failure map to bounded errors", async (
   const engineFailed = setup({ engine: new Engine(async () => { throw new Error("python traceback /secret/path"); }) });
   await assert.rejects(engineFailed.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_ENGINE_FAILED" && !error.message.includes("secret"));
   assert.equal(engineFailed.history.entries.length, 0);
+});
+
+test("alignment cache MISS writes and HIT bypasses PCM extraction and alignment engine", async () => {
+  const cache = new AlignmentMemoryCache(); const mediaCalls = { calls: 0 };
+  const firstEngine = cacheableAlignmentEngine(async (request) => aligned(request.transcript));
+  const first = setup({ engine: firstEngine, media: cacheableMedia(mediaCalls), additions: { cache, sourceIdentity: sourceIdentityPort() } });
+  const generated = await first.service.alignSource({ sourceId: "source-1", id: "producer" });
+  assert.equal(generated.cacheStatus, "miss"); assert.equal(mediaCalls.calls, 1); assert.equal(firstEngine.calls.length, 1); assert.equal(cache.writes, 1);
+  assert.equal(firstEngine.executionIdentityCalls, 2, "fresh execution verifies identity before and after alignment");
+
+  const hitMedia = { calls: 0 };
+  const hitEngine = cacheableAlignmentEngine(async () => assert.fail("cache hit must not align"));
+  const second = setup({ engine: hitEngine, media: cacheableMedia(hitMedia), additions: { cache, sourceIdentity: sourceIdentityPort() } });
+  const reused = await second.service.alignSource({ sourceId: "source-1", id: "consumer" });
+  assert.equal(reused.cacheStatus, "hit"); assert.equal(hitMedia.calls, 0); assert.equal(hitEngine.calls.length, 0);
+  assert.equal(hitEngine.executionIdentityCalls, 1, "cache hit performs one current identity verification");
+  assert.equal(reused.sourceTranscript.provenance.stages.at(-1).executionId, "producer");
+  assert.equal(reused.sourceTranscript.provenance.stages.at(-1).createdAt, now);
+});
+
+test("alignment cache HIT rejects a changed operational source stamp before promotion", async () => {
+  const cache = new AlignmentMemoryCache();
+  await setup({
+    engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)),
+    media: cacheableMedia({ calls: 0 }),
+    additions: { cache, sourceIdentity: sourceIdentityPort() }
+  }).service.alignSource({ sourceId: "source-1", id: "stamp-producer" });
+  const engine = cacheableAlignmentEngine(async () => assert.fail("changed cache hit must not align"));
+  const active = setup({
+    engine,
+    media: cacheableMedia({ calls: 0 }),
+    additions: { cache, sourceIdentity: sourceIdentityPort(undefined, async () => "changed") }
+  });
+  await assert.rejects(active.service.alignSource({ sourceId: "source-1", id: "stamp-consumer" }), (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT");
+  assert.equal(engine.calls.length, 0);
+  assert.equal(active.history.current.history.revision, 0);
+});
+
+test("descriptor-bearing alignment fails closed when strong source proof is unavailable", async () => {
+  const value = project();
+  value.sources[0].technicalDescriptor = {
+    version: 1,
+    basis: "ingest",
+    content: structuredClone(alignmentSourceIdentity),
+    method: { profile: "cevra.source-technical.v1", engineId: "test.media", engineVersion: "1.0.0", engineApiVersion: 1 },
+    video: { codec: "h264" },
+    audio: { codec: "aac" }
+  };
+  const sourceIdentity = sourceIdentityPort();
+  sourceIdentity.captureSource = async () => { throw Object.assign(new Error("unsupported"), { code: "SOURCE_IDENTITY_UNSUPPORTED" }); };
+  const engine = cacheableAlignmentEngine(async () => assert.fail("unverified descriptor source must not align"));
+  const active = setup({ project: value, engine, media: cacheableMedia({ calls: 0 }), additions: { cache: new AlignmentMemoryCache(), sourceIdentity } });
+  await assert.rejects(active.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT");
+  assert.equal(engine.calls.length, 0);
+  assert.equal(active.history.current.history.revision, 0);
+});
+
+test("alignment snapshots cache policy and caller fields before its first await", async () => {
+  const cache = new AlignmentMemoryCache();
+  await setup({
+    engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)),
+    media: cacheableMedia({ calls: 0 }),
+    additions: { cache, sourceIdentity: sourceIdentityPort() }
+  }).service.alignSource({ sourceId: "source-1", id: "snapshot-producer" });
+  const gate = deferred();
+  const started = deferred();
+  const engine = cacheableAlignmentEngine(async () => assert.fail("captured prefer policy must hit cache"));
+  engine.identity = async () => { started.resolve(); await gate.promise; return { id: "test.alignment", kind: "alignment", displayName: "Test", version: "1.0.0", apiVersion: CEVRA_ENGINE_API_VERSION }; };
+  const active = setup({ engine, media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity: sourceIdentityPort() } });
+  let policyReads = 0;
+  const request = {
+    sourceId: "source-1",
+    id: "snapshot-consumer",
+    get cachePolicy() { policyReads += 1; return policyReads === 1 ? "prefer" : "bypass"; },
+    actor: { type: "user" }
+  };
+  const pending = active.service.alignSource(request);
+  await started.promise;
+  request.sourceId = "missing";
+  request.id = "mutated";
+  request.actor = { type: "agent", id: "mutated" };
+  gate.resolve();
+  const outcome = await pending;
+  assert.equal(outcome.cacheStatus, "hit");
+  assert.equal(outcome.sourceId, "source-1");
+  assert.equal(policyReads, 1);
+});
+
+test("alignment cache HIT remains usable with absent, unavailable, or corrupt local models while a MISS fails closed", async () => {
+  const cache = new AlignmentMemoryCache();
+  const sourceIdentity = sourceIdentityPort();
+  const seed = setup({
+    engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)),
+    media: cacheableMedia({ calls: 0 }),
+    additions: { cache, sourceIdentity }
+  });
+  await seed.service.alignSource({ sourceId: "source-1", id: "cached-producer" });
+
+  for (const condition of ["absent", "unavailable", "corrupt"]) {
+    const hitMedia = { calls: 0 };
+    const unavailable = cacheableAlignmentEngine(async () => { throw new Error(`local model ${condition}`); });
+    const hit = setup({ engine: unavailable, media: cacheableMedia(hitMedia), additions: { cache, sourceIdentity } });
+    const reused = await hit.service.alignSource({ sourceId: "source-1", id: `cached-consumer-${condition}` });
+    assert.equal(reused.cacheStatus, "hit");
+    assert.equal(unavailable.executionIdentityCalls, 1);
+    assert.equal(unavailable.calls.length, 0, "cache identity lookup must not execute or verify local model artifacts");
+    assert.equal(hitMedia.calls, 0);
+  }
+
+  const unavailable = cacheableAlignmentEngine(async () => { throw new Error("local model corrupt"); });
+  const miss = setup({ engine: unavailable, media: cacheableMedia({ calls: 0 }), additions: { cache: new AlignmentMemoryCache(), sourceIdentity } });
+  await assert.rejects(miss.service.alignSource({ sourceId: "source-1", id: "fresh-consumer" }), (error) => error.code === "ALIGNMENT_APP_ENGINE_FAILED");
+  assert.equal(unavailable.calls.length, 1, "a fresh miss must reach fail-closed execution verification");
+  assert.equal(miss.history.current.history.revision, 0);
+});
+
+test("post-execution model integrity rejection writes no cache and promotes no transcript", async () => {
+  const cache = new AlignmentMemoryCache(); const mediaCalls = { calls: 0 };
+  const engine = cacheableAlignmentEngine(async () => { throw new Error("post-execution model integrity rejection"); });
+  const fixture = setup({ engine, media: cacheableMedia(mediaCalls), additions: { cache, sourceIdentity: sourceIdentityPort() } });
+  await assert.rejects(fixture.service.alignSource({ sourceId: "source-1", id: "mutated-model" }), (error) => error.code === "ALIGNMENT_APP_ENGINE_FAILED");
+  assert.equal(engine.calls.length, 1);
+  assert.equal(mediaCalls.calls, 1);
+  assert.equal(cache.writes, 0);
+  assert.equal(fixture.history.current.history.revision, 0);
+});
+
+test("fresh alignment timestamps the cleaned producer result and cache HIT preserves that producer time", async () => {
+  const cache = new AlignmentMemoryCache();
+  const producedAt = "2026-09-15T12:02:00.000Z";
+  let phase = "lookup";
+  let freshClockCalls = 0;
+  const engine = cacheableAlignmentEngine(async (request) => {
+    assert.equal(freshClockCalls, 0, "producer clock must not run before engine completion");
+    phase = "produced";
+    return aligned(request.transcript);
+  });
+  const audioWorkspace = {
+    async acquire() {
+      return { outputUri: "/tmp/cevra-alignment/audio.wav", async release() { assert.equal(phase, "produced"); phase = "cleaned"; } };
+    }
+  };
+  const sourceIdentity = sourceIdentityPort();
+  const fresh = setup({
+    engine,
+    media: cacheableMedia({ calls: 0 }),
+    audioWorkspace,
+    additions: {
+      cache,
+      sourceIdentity,
+      clock: () => { freshClockCalls++; assert.equal(phase, "cleaned"); return producedAt; }
+    }
+  });
+  const generated = await fresh.service.alignSource({ sourceId: "source-1", id: "original-aligner" });
+  assert.equal(freshClockCalls, 1);
+  assert.equal(generated.sourceTranscript.provenance.stages.at(-1).createdAt, producedAt);
+
+  let hitClockCalls = 0;
+  const hit = setup({
+    engine: cacheableAlignmentEngine(async () => assert.fail("cache hit must bypass engine")),
+    media: cacheableMedia({ calls: 0 }),
+    additions: {
+      cache,
+      sourceIdentity,
+      clock: () => { hitClockCalls++; throw new Error("consumer clock must not replace cached producer time"); }
+    }
+  });
+  const reused = await hit.service.alignSource({ sourceId: "source-1", id: "consumer-aligner" });
+  assert.equal(hitClockCalls, 0);
+  assert.equal(reused.sourceTranscript.provenance.stages.at(-1).createdAt, producedAt);
+  assert.equal(reused.sourceTranscript.provenance.stages.at(-1).executionId, "original-aligner");
+});
+
+test("alignment cache write failure still promotes and corrupt payload falls back to fresh execution", async () => {
+  const denied = { async read() { return undefined; }, async write() { throw new Error("denied"); }, async invalidate() {} };
+  const sourceIdentity = sourceIdentityPort();
+  const promoted = setup({ engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)), media: cacheableMedia({ calls: 0 }), additions: { cache: denied, sourceIdentity } });
+  assert.equal((await promoted.service.alignSource({ sourceId: "source-1" })).historyMutated, true);
+
+  const cache = new AlignmentMemoryCache(); const keySeed = setup({ engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)), media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  await keySeed.service.alignSource({ sourceId: "source-1" });
+  const [key] = cache.entries.keys(); cache.entries.set(key, { producerExecutionId: "bad", producedAt: now, payload: { modelId: "model/pt" } });
+  const engine = cacheableAlignmentEngine(async (request) => aligned(request.transcript));
+  const fallback = setup({ engine, media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  assert.equal((await fallback.service.alignSource({ sourceId: "source-1" })).cacheStatus, "miss");
+  assert.equal(engine.calls.length, 1); assert.equal(cache.invalidations, 1);
+});
+
+test("source change during fresh alignment prevents cache and canonical promotion", async () => {
+  const cache = new AlignmentMemoryCache(); let hashes = 0;
+  const sourceIdentity = sourceIdentityPort(async () => ({ ...alignmentSourceIdentity, sha256: (++hashes === 1 ? "a" : "c").repeat(64) }));
+  const fixture = setup({ engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)), media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  await assert.rejects(fixture.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT");
+  assert.equal(fixture.history.current.history.revision, 0); assert.equal(cache.writes, 0);
+});
+
+test("cached alignment still rejects a transcript replaced during lookup", async () => {
+  const cache = new AlignmentMemoryCache();
+  const sourceIdentity = sourceIdentityPort();
+  const seed = setup({ engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)), media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  await seed.service.alignSource({ sourceId: "source-1", id: "cached-aligner" });
+
+  const engine = cacheableAlignmentEngine(async () => assert.fail("cache hit must not run alignment"));
+  const active = setup({ engine, media: cacheableMedia({ calls: 0 }), additions: { cache, sourceIdentity } });
+  const read = cache.read.bind(cache);
+  cache.read = async (cacheKey) => {
+    const previous = active.history.current.sourceTranscripts[0];
+    const replacement = createSourceTranscript({
+      ...canonical(),
+      transcript: transcript("en"),
+      provenance: { sourceChecksum: "sha256:media", stages: [{ kind: "transcription", executionId: "replacement", engineId: "test.tx", engineVersion: "1", engineApiVersion: "1", modelId: "base", createdAt: now }] }
+    });
+    active.history.commit({ type: "transcript.set", transcript: replacement, expectedCurrentTranscriptDigest: previous.transcriptDigest });
+    return read(cacheKey);
+  };
+  await assert.rejects(active.service.alignSource({ sourceId: "source-1" }), (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT");
+  assert.equal(engine.calls.length, 0);
+  assert.equal(active.history.current.sourceTranscripts[0].transcript.language, "en");
+  assert.equal(active.history.current.history.revision, 1);
+});
+
+test("known optional undefined alignment fields are absent-equivalent while unknown undefined stays rejected", async () => {
+  for (const field of ["id", "locale", "actor", "cachePolicy"]) {
+    const engine = new Engine();
+    const active = setup({ engine });
+    const outcome = await active.service.alignSource({ sourceId: "source-1", [field]: undefined });
+    assert.equal(outcome.historyMutated, true, field);
+    assert.equal(engine.calls.length, 1, field);
+  }
+  let reads = 0;
+  await setup().service.alignSource({ sourceId: "source-1", get locale() { reads += 1; return undefined; } });
+  assert.equal(reads, 1);
+  const engine = new Engine(async () => assert.fail("unknown field must fail before engine"));
+  const rejected = setup({ engine });
+  await assert.rejects(
+    rejected.service.alignSource({ sourceId: "source-1", unknown: undefined }),
+    (error) => error.code === "ALIGNMENT_APP_INVALID_REQUEST"
+  );
+  assert.equal(engine.calls.length, 0);
+});
+
+test("descriptor integrity is independent of alignment cache policy and availability", async () => {
+  const mismatched = descriptorProject({ sha256: "c".repeat(64), sizeBytes: 500 });
+  for (const scenario of [
+    { policy: "prefer", additions: { cache: new AlignmentMemoryCache(), sourceIdentity: sourceIdentityPort() } },
+    { policy: "refresh", additions: { cache: new AlignmentMemoryCache(), sourceIdentity: sourceIdentityPort() } },
+    { policy: "bypass", additions: { cache: new AlignmentMemoryCache(), sourceIdentity: sourceIdentityPort() } },
+    { policy: "prefer", additions: { sourceIdentity: sourceIdentityPort() } }
+  ]) {
+    const engine = cacheableAlignmentEngine(async () => assert.fail("descriptor mismatch must fail before alignment"));
+    const mediaCalls = { calls: 0 };
+    const active = setup({ project: mismatched, engine, media: cacheableMedia(mediaCalls), additions: scenario.additions });
+    await assert.rejects(
+      active.service.alignSource({ sourceId: "source-1", cachePolicy: scenario.policy }),
+      (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT"
+    );
+    assert.equal(engine.calls.length, 0);
+    assert.equal(mediaCalls.calls, 0);
+    assert.equal(active.history.entries.length, 0);
+    assert.equal(scenario.additions.cache?.writes ?? 0, 0);
+  }
+});
+
+test("descriptor fresh alignment hashes twice across bypass and no-cache while legacy bypass hashes zero times", async () => {
+  for (const additions of [{ cache: new AlignmentMemoryCache() }, {}]) {
+    const sourceIdentity = sequencedAlignmentSourceIdentity([{}, {}]);
+    const mediaCalls = { calls: 0 };
+    const active = setup({
+      project: descriptorProject(),
+      engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)),
+      media: cacheableMedia(mediaCalls),
+      additions: { ...additions, sourceIdentity }
+    });
+    const outcome = await active.service.alignSource({
+      sourceId: "source-1",
+      cachePolicy: additions.cache ? "bypass" : "prefer"
+    });
+    assert.equal(outcome.historyMutated, true);
+    assert.equal(sourceIdentity.hashes, 2);
+    assert.equal(mediaCalls.calls, 1);
+  }
+  const sourceIdentity = sequencedAlignmentSourceIdentity([{}, {}]);
+  const legacy = setup({
+    engine: cacheableAlignmentEngine(async (request) => aligned(request.transcript)),
+    media: cacheableMedia({ calls: 0 }),
+    additions: { cache: new AlignmentMemoryCache(), sourceIdentity }
+  });
+  await legacy.service.alignSource({ sourceId: "source-1", cachePolicy: "bypass" });
+  assert.equal(sourceIdentity.hashes, 0);
+  assert.equal(sourceIdentity.captures, 0);
+});
+
+test("same-content ABA operational stamp change blocks alignment cache and canonical promotion", async () => {
+  const cache = new AlignmentMemoryCache();
+  const sourceIdentity = sequencedAlignmentSourceIdentity([{ ctimeNs: "4" }, { ctimeNs: "5" }]);
+  const engine = cacheableAlignmentEngine(async (request) => aligned(request.transcript));
+  const mediaCalls = { calls: 0 };
+  const active = setup({ engine, media: cacheableMedia(mediaCalls), additions: { cache, sourceIdentity } });
+  const originalDigest = active.history.current.sourceTranscripts[0].transcriptDigest;
+  await assert.rejects(
+    active.service.alignSource({ sourceId: "source-1", id: "aba-alignment" }),
+    (error) => error.code === "ALIGNMENT_APP_PROJECT_CONFLICT"
+  );
+  assert.equal(sourceIdentity.hashes, 2);
+  assert.equal(engine.calls.length, 1);
+  assert.equal(mediaCalls.calls, 1);
+  assert.equal(cache.writes, 0);
+  assert.equal(cache.entries.size, 0);
+  assert.equal(active.history.current.sourceTranscripts[0].transcriptDigest, originalDigest);
+  assert.equal(active.history.entries.length, 0);
+  assert.equal(active.releases.length, 1);
 });

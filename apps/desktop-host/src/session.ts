@@ -25,11 +25,13 @@ import { ProjectHistory } from "@cevra/project-ir";
 import {
   assertModelCacheIsolated,
   FasterWhisperTranscriptionAdapter,
+  resolveLocalFasterWhisperModel,
   resolveRuntimePaths as resolveTranscriptionRuntimePaths,
   type LocalTranscriptionAdapterOptions,
   type SupportedTranscriptionModelId
 } from "@cevra/transcription-faster-whisper";
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { FileTranscriptCache } from "@cevra/transcript-cache";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { DesktopPersistenceError, DesktopProjectPersistence } from "./persistence.js";
 import {
@@ -205,15 +207,16 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
     recoveredSession: environment.CEVRA_HOST_RECOVERY === "1"
   });
   const configuredMediaRuntime = configuredMediaRuntimePaths(environment);
+  const sourceIdentity = new NodeMediaArtifactStore();
   let media: Awaited<ReturnType<typeof createMediaServices>> | undefined;
   let mediaArchiveFailure: "archive-full" | "archive-unavailable" | undefined;
   try {
     const history = opened.history;
     const executions = await opened.persistence.openMediaExecutionRepository(history.current.project.id);
-    const recovery = composeMediaApplicationServices(history, executions, unavailableMediaEngine());
+    const recovery = composeMediaApplicationServices(history, executions, unavailableMediaEngine(), sourceIdentity);
     await recovery.application.reconcilePendingWithoutReplay();
     await recovery.resolvedAudioPlan.reconcilePendingWithoutReplay();
-    media = await createMediaServices(history, environment, executions, configuredMediaRuntime);
+    media = await createMediaServices(history, environment, executions, configuredMediaRuntime, sourceIdentity);
   } catch (cause) {
     if (!isDesktopMediaExecutionArchiveOperationalError(cause)) {
       await media?.close?.().catch(() => undefined);
@@ -230,7 +233,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
     const history = opened.history;
     const transcription = configuredMediaRuntime.invalid
       ? { capability: unavailable("runtime-invalid") }
-      : await createTranscriptionServices(history, environment, configuredMediaRuntime.paths?.root);
+      : await createTranscriptionServices(history, environment, configuredMediaRuntime.paths?.root, sourceIdentity);
     return new DesktopSession({
       history,
       ...(media?.ingest ? { ingest: media.ingest } : {}),
@@ -255,7 +258,8 @@ async function createMediaServices(
   history: ProjectHistory,
   environment: NodeJS.ProcessEnv,
   executions: MediaExecutionRepository & MediaExecutionIntentRepository,
-  configuredRuntime: ConfiguredMediaRuntime
+  configuredRuntime: ConfiguredMediaRuntime,
+  sourceIdentity: NodeMediaArtifactStore
 ): Promise<{
   capability: CapabilityState;
   ingest?: LocalSourceIngestService;
@@ -266,10 +270,10 @@ async function createMediaServices(
   runtimeRoot?: string;
 }> {
   if (configuredRuntime.invalid) {
-    return { capability: unavailable("runtime-invalid"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
+    return { capability: unavailable("runtime-invalid"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine(), sourceIdentity) };
   }
   if (!configuredRuntime.paths) {
-    return { capability: unavailable("runtime-not-configured"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
+    return { capability: unavailable("runtime-not-configured"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine(), sourceIdentity) };
   }
   try {
     const runtime = configuredRuntime.paths;
@@ -286,9 +290,9 @@ async function createMediaServices(
     const health = await engine.healthcheck();
     if (health.status === "unavailable") {
       await worker.close();
-      return { capability: unavailable("runtime-invalid"), runtimeRoot: root, ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
+      return { capability: unavailable("runtime-invalid"), runtimeRoot: root, ...composeMediaApplicationServices(history, executions, unavailableMediaEngine(), sourceIdentity) };
     }
-    const services = composeMediaApplicationServices(history, executions, engine);
+    const services = composeMediaApplicationServices(history, executions, engine, sourceIdentity);
     return {
       capability: available(),
       ingest: new LocalSourceIngestService({ media: services.application, history, identity: services.artifacts }),
@@ -302,7 +306,7 @@ async function createMediaServices(
       runtimeRoot: root
     };
   } catch {
-    return { capability: unavailable("runtime-invalid"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine()) };
+    return { capability: unavailable("runtime-invalid"), ...composeMediaApplicationServices(history, executions, unavailableMediaEngine(), sourceIdentity) };
   }
 }
 
@@ -324,13 +328,13 @@ function configuredMediaRuntimePaths(environment: NodeJS.ProcessEnv): Configured
 function composeMediaApplicationServices(
   history: ProjectHistory,
   executions: MediaExecutionRepository & MediaExecutionIntentRepository,
-  engine: MediaEngineAdapter
+  engine: MediaEngineAdapter,
+  artifacts = new NodeMediaArtifactStore()
 ): {
   application: MediaApplicationService;
   resolvedAudioPlan: ResolvedAudioPlanApplicationService;
   artifacts: NodeMediaArtifactStore;
 } {
-  const artifacts = new NodeMediaArtifactStore();
   const application = new MediaApplicationService({ engine, history, executions, artifacts });
   return {
     application,
@@ -353,7 +357,12 @@ function unavailableMediaEngine(): MediaEngineAdapter {
   };
 }
 
-async function createTranscriptionServices(history: ProjectHistory, environment: NodeJS.ProcessEnv, mediaRuntimeRoot?: string): Promise<{
+async function createTranscriptionServices(
+  history: ProjectHistory,
+  environment: NodeJS.ProcessEnv,
+  mediaRuntimeRoot: string | undefined,
+  sourceIdentity: NodeMediaArtifactStore
+): Promise<{
   capability: CapabilityState;
   service?: TranscriptionApplicationService;
 }> {
@@ -364,7 +373,9 @@ async function createTranscriptionServices(history: ProjectHistory, environment:
   const modelId = transcriptionModel(environment.CEVRA_TRANSCRIPTION_MODEL_ID);
   // This is intentionally only a cheap presence gate. The existing adapter
   // healthcheck remains authoritative for runtime/model integrity.
-  if (!modelSnapshotPresent(modelCacheDir, modelId)) return { capability: unavailable("model-not-available") };
+  if (!await resolveLocalFasterWhisperModel({ modelCacheDir, allowModelDownload: false }, modelId)) {
+    return { capability: unavailable("model-not-available") };
+  }
   try {
     const mode = environment.CEVRA_TRANSCRIPTION_MODE === "development" ? "development" : "managed";
     const runtime: LocalTranscriptionAdapterOptions["runtime"] = mode === "development"
@@ -395,7 +406,17 @@ async function createTranscriptionServices(history: ProjectHistory, environment:
     });
     const health = await adapter.healthcheck();
     if (health.status !== "ready") return { capability: unavailable("runtime-invalid") };
-    return { capability: available(), service: new TranscriptionApplicationService({ engine: adapter, history }) };
+    const cacheRoot = environment.CEVRA_TRANSCRIPT_CACHE_ROOT;
+    const cache = cacheRoot && isAbsolute(cacheRoot) ? new FileTranscriptCache(cacheRoot) : undefined;
+    return {
+      capability: available(),
+      service: new TranscriptionApplicationService({
+        engine: adapter,
+        history,
+        sourceIdentity,
+        ...(cache ? { cache } : {})
+      })
+    };
   } catch {
     return { capability: unavailable("runtime-invalid") };
   }
@@ -441,18 +462,6 @@ function runtimeComponent(root: string, value: unknown, requiredPrefix: string):
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function modelSnapshotPresent(cacheRoot: string, modelId: string): boolean {
-  if (!isAbsolute(cacheRoot) || !existsSync(cacheRoot)) return false;
-  const repository = `models--Systran--faster-whisper-${modelId}`;
-  const snapshots = resolve(cacheRoot, "hub", repository, "snapshots");
-  const alternateSnapshots = resolve(cacheRoot, repository, "snapshots");
-  return directoryExists(snapshots) || directoryExists(alternateSnapshots);
-}
-
-function directoryExists(value: string): boolean {
-  try { return lstatSync(value).isDirectory() && readdirSync(value, { withFileTypes: true }).some((entry) => entry.isDirectory()); } catch { return false; }
 }
 
 function requiredEnvironment(environment: NodeJS.ProcessEnv, name: string): string {

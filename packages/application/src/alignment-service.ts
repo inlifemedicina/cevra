@@ -3,7 +3,10 @@ import {
   type AlignmentAudioLease,
   type AlignmentAudioWorkspace,
   type AlignmentEngineAdapter,
+  type AlignmentExecutionIdentity,
+  type AlignmentExecutionIdentityProvider,
   type AlignmentLanguage,
+  type AlignmentRequest,
   type AlignmentResult,
   type EngineIdentity,
   type MediaEngineAdapter
@@ -17,10 +20,24 @@ import {
   type JournalActor,
   type ProjectHistory,
   type ProjectIR,
+  type SourceAsset,
   type SourceTranscript,
   type TranscriptProvenanceStage,
   type TranscriptState
 } from "@cevra/project-ir";
+import {
+  hasTranscriptSourceContinuity,
+  isAlignmentIdentityProvider,
+  mediaPreparationIdentity,
+  verifyTranscriptSource,
+  type AlignmentCacheKey,
+  type AlignmentMediaPreparationIdentity,
+  type TranscriptCachePolicy,
+  type TranscriptCacheStatus,
+  type TranscriptResultCache,
+  type TranscriptSourceVerificationV1
+} from "./transcript-cache.js";
+import type { SourceContentIdentityPort } from "./source-technical-descriptor.js";
 
 export type AlignmentApplicationErrorCode =
   | "ALIGNMENT_APP_INVALID_REQUEST"
@@ -73,6 +90,7 @@ export interface AlignSourceRequest {
   id?: string;
   locale?: CevraLocale;
   actor?: JournalActor;
+  cachePolicy?: TranscriptCachePolicy;
 }
 
 export interface AlignSourceOutcome {
@@ -81,6 +99,8 @@ export interface AlignSourceOutcome {
   result: AlignmentResult;
   sourceTranscript: SourceTranscript;
   project: ProjectIR;
+  cacheStatus: TranscriptCacheStatus;
+  historyMutated: boolean;
 }
 
 export interface AlignmentApplicationServiceOptions {
@@ -88,6 +108,8 @@ export interface AlignmentApplicationServiceOptions {
   media: MediaEngineAdapter;
   audioWorkspace: AlignmentAudioWorkspace;
   history: ProjectHistory;
+  cache?: TranscriptResultCache;
+  sourceIdentity?: SourceContentIdentityPort;
   clock?: () => string;
   idGenerator?: () => string;
 }
@@ -97,6 +119,8 @@ export class AlignmentApplicationService {
   private readonly media: MediaEngineAdapter;
   private readonly audioWorkspace: AlignmentAudioWorkspace;
   private readonly history: ProjectHistory;
+  private readonly cache: TranscriptResultCache | undefined;
+  private readonly sourceIdentity: SourceContentIdentityPort | undefined;
   private readonly clock: () => string;
   private readonly idGenerator: () => string;
 
@@ -105,13 +129,15 @@ export class AlignmentApplicationService {
     this.media = options.media;
     this.audioWorkspace = options.audioWorkspace;
     this.history = options.history;
+    this.cache = options.cache;
+    this.sourceIdentity = options.sourceIdentity;
     this.clock = options.clock ?? (() => new Date().toISOString());
     this.idGenerator = options.idGenerator ?? defaultId;
   }
 
   async alignSource(request: AlignSourceRequest, signal?: AbortSignal): Promise<AlignSourceOutcome> {
     const before = this.history.current;
-    const requestRecord = isRecord(request) ? request : undefined;
+    const requestRecord = snapshotRequest(request);
     const locale = isLocale(requestRecord?.locale) ? requestRecord.locale : before.project.defaultLocale;
     const executionId = this.executionId(requestRecord, locale);
     const normalized = validateRequest(requestRecord, locale, executionId);
@@ -130,6 +156,9 @@ export class AlignmentApplicationService {
     const projectIdBefore = before.project.id;
     const revisionBefore = before.history.revision;
     const snapshotBefore = before.history.headSnapshotId;
+    const journalEntryCountBefore = this.history.entries.length;
+    const sourceUriBefore = source.uri;
+    const descriptorBefore = source.technicalDescriptor ? clone(source.technicalDescriptor) : undefined;
     assertNotCancelled(signal, locale, executionId);
 
     let identity: EngineIdentity;
@@ -142,9 +171,74 @@ export class AlignmentApplicationService {
     }
     assertNotCancelled(signal, locale, executionId);
 
+    const identityProvider = isAlignmentIdentityProvider(this.engine)
+      ? this.engine as AlignmentEngineAdapter & AlignmentExecutionIdentityProvider : undefined;
+    const identityRequest: AlignmentRequest = { inputUri: source.uri, language, transcript: clone(current.transcript) };
+    let mediaPreparation: AlignmentMediaPreparationIdentity | undefined;
+    let cacheStatus: TranscriptCacheStatus = "bypass";
+    let cacheKey: AlignmentCacheKey | undefined;
+    let sourceBefore: TranscriptSourceVerificationV1 | undefined;
+    let executionBefore: AlignmentExecutionIdentity | undefined;
+    const descriptorRequiresProof = source.technicalDescriptor !== undefined;
+    const cacheIdentityRequested = normalized.cachePolicy !== "bypass"
+      && this.cache !== undefined
+      && this.sourceIdentity !== undefined
+      && identityProvider !== undefined
+      && typeof this.media.identity === "function";
+    if (descriptorRequiresProof && !this.sourceIdentity) {
+      throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+    }
+    if (descriptorRequiresProof || cacheIdentityRequested) {
+      const [sourceProof, executionProof, mediaProof] = await Promise.allSettled([
+        verifyTranscriptSource(this.sourceIdentity!, source.uri, signal),
+        cacheIdentityRequested
+          ? identityProvider!.describeAlignmentExecution(identityRequest, signal)
+          : Promise.resolve(undefined),
+        cacheIdentityRequested ? this.media.identity!() : Promise.resolve(undefined)
+      ]);
+      for (const proof of [sourceProof, executionProof, mediaProof]) {
+        if (proof.status === "rejected" && isAbort(proof.reason, signal)) {
+          throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, proof.reason);
+        }
+      }
+      if (sourceProof.status === "fulfilled") sourceBefore = sourceProof.value;
+      else if (descriptorRequiresProof) throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId, sourceProof.reason);
+      if (executionProof.status === "fulfilled") executionBefore = executionProof.value;
+      if (mediaProof.status === "fulfilled" && mediaProof.value?.kind === "media") {
+        mediaPreparation = mediaPreparationIdentity(mediaProof.value);
+      }
+      if (sourceBefore) assertDescriptorMatches(source, sourceBefore, locale, executionId);
+      if (cacheIdentityRequested && sourceBefore && executionBefore && mediaPreparation && alignmentExecutionMatches(executionBefore, identity)) {
+        cacheKey = { schemaVersion: 1, kind: "alignment", source: sourceBefore.cacheIdentity, inputTranscriptDigest, language, execution: executionBefore, mediaPreparation };
+        cacheStatus = normalized.cachePolicy === "refresh" ? "refresh" : "miss";
+      }
+    }
+
+    let result: AlignmentResult | undefined;
+    let candidate: SourceTranscript | undefined;
+    let producerExecutionId = executionId;
+    let producedAt: string | undefined;
+    if (normalized.cachePolicy === "prefer" && cacheKey && this.cache) {
+      try {
+        const cached = await this.cache.read(cacheKey, signal);
+        if (cached) {
+          try {
+            result = validateAlignmentResult(cached.payload, current.transcript, language, source.durationMs);
+            assertAlignmentResultIdentity(result, executionBefore);
+            producerExecutionId = cached.producerExecutionId;
+            producedAt = cached.producedAt;
+            candidate = buildAlignedCandidate(source.id, current, result, identity, inputTranscriptDigest, producerExecutionId, producedAt);
+            cacheStatus = "hit";
+          } catch { result = undefined; candidate = undefined; await this.cache.invalidate(cacheKey); }
+        }
+      } catch (cause) {
+        if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
+      }
+    }
+
     let lease: AlignmentAudioLease | undefined;
     try {
-      try {
+      if (!result) try {
         lease = await this.audioWorkspace.acquire(executionId);
         assertLease(lease);
         const mediaResult = await this.media.execute({
@@ -162,59 +256,70 @@ export class AlignmentApplicationService {
       }
       assertNotCancelled(signal, locale, executionId);
 
-      let rawResult: AlignmentResult;
-      try {
-        rawResult = await this.engine.align({
-          inputUri: lease.outputUri,
-          language,
-          transcript: clone(current.transcript)
-        }, { jobId: executionId, locale, ...(signal ? { signal } : {}) });
-      } catch (cause) {
-        if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
-        throw appError("ALIGNMENT_APP_ENGINE_FAILED", locale, executionId, cause);
-      }
-      assertNotCancelled(signal, locale, executionId);
+      if (!result) {
+        let rawResult: AlignmentResult;
+        try {
+          rawResult = await this.engine.align({
+            inputUri: lease!.outputUri,
+            language,
+            transcript: clone(current.transcript)
+          }, { jobId: executionId, locale, ...(signal ? { signal } : {}) });
+        } catch (cause) {
+          if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
+          throw appError("ALIGNMENT_APP_ENGINE_FAILED", locale, executionId, cause);
+        }
+        assertNotCancelled(signal, locale, executionId);
 
-      const completedLease = lease;
-      lease = undefined;
-      try {
-        await releaseAudioLease(completedLease);
-      } catch (cause) {
-        throw appError("ALIGNMENT_APP_AUDIO_CLEANUP_FAILED", locale, executionId, cause);
+        const completedLease = lease!;
+        lease = undefined;
+        try {
+          await releaseAudioLease(completedLease);
+        } catch (cause) {
+          throw appError("ALIGNMENT_APP_AUDIO_CLEANUP_FAILED", locale, executionId, cause);
+        }
+
+        try {
+          result = validateAlignmentResult(rawResult, current.transcript, language, source.durationMs);
+          assertAlignmentResultIdentity(result, executionBefore);
+          producedAt = this.clock();
+          candidate = buildAlignedCandidate(source.id, current, result, identity, inputTranscriptDigest, executionId, producedAt);
+        } catch (cause) {
+          throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId, cause);
+        }
+        if (sourceBefore && this.sourceIdentity && (descriptorRequiresProof || cacheKey)) {
+          if (cacheKey && executionBefore && identityProvider && mediaPreparation) {
+            if (!await alignmentIdentityStable(this.sourceIdentity, source, identityProvider, identityRequest, sourceBefore, executionBefore, identity, this.media, mediaPreparation, locale, executionId, signal)) {
+              throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+            }
+            try { await this.cache!.write(cacheKey, { producerExecutionId: executionId, producedAt, payload: result }, signal); }
+            catch (cause) { if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause); }
+          } else {
+            let sourceAfter: TranscriptSourceVerificationV1;
+            try {
+              sourceAfter = await verifyTranscriptSource(this.sourceIdentity, source.uri, signal);
+            } catch (cause) {
+              if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
+              throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId, cause);
+            }
+            assertDescriptorMatches(source, sourceAfter, locale, executionId);
+            if (!hasTranscriptSourceContinuity(sourceBefore, sourceAfter)) {
+              throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+            }
+          }
+        }
+      } else if (cacheStatus === "hit" && sourceBefore && this.sourceIdentity) {
+        let sourceState: Awaited<ReturnType<SourceContentIdentityPort["checkSource"]>>;
+        try {
+          sourceState = await this.sourceIdentity.checkSource(source.uri, sourceBefore.verified.stamp, signal);
+        } catch (cause) {
+          if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
+          sourceState = "changed";
+        }
+        if (sourceState !== "match") throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
       }
 
-      let result: AlignmentResult;
-      let candidate: SourceTranscript;
-      try {
-        result = validateAlignmentResult(rawResult, current.transcript, language, source.durationMs);
-        const speakerState = deriveTranscriptSpeakerState(result.transcript);
-        if (speakerState !== current.speakerState) throw new Error("Alignment changed speaker coverage.");
-        const alignmentStage: TranscriptProvenanceStage = {
-          kind: "alignment",
-          executionId,
-          engineId: identity.id,
-          engineVersion: identity.version,
-          engineApiVersion: String(identity.apiVersion),
-          modelId: result.modelId,
-          ...(result.modelRevision !== undefined ? { modelRevision: result.modelRevision } : {}),
-          ...(result.modelDigest !== undefined ? { modelDigest: result.modelDigest } : {}),
-          inputTranscriptDigest,
-          createdAt: this.clock()
-        };
-        candidate = createSourceTranscript({
-          sourceId: source.id,
-          wordTiming: "aligned",
-          speakerState,
-          transcript: result.transcript,
-          provenance: {
-            ...(current.provenance.sourceChecksum !== undefined ? { sourceChecksum: current.provenance.sourceChecksum } : {}),
-            stages: appendAlignmentStage(current.provenance.stages, alignmentStage)
-          },
-          ...(current.extensions !== undefined ? { extensions: clone(current.extensions) } : {})
-        });
-      } catch (cause) {
-        throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId, cause);
-      }
+      if (!result) throw appError("ALIGNMENT_APP_ENGINE_FAILED", locale, executionId);
+      if (!candidate || !producedAt) throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId);
 
       const latest = this.history.current;
       const latestSource = latest.sources.find((item) => item.id === source.id);
@@ -222,7 +327,10 @@ export class AlignmentApplicationService {
       if (latest.project.id !== projectIdBefore
         || latest.history.revision !== revisionBefore
         || latest.history.headSnapshotId !== snapshotBefore
+        || this.history.entries.length !== journalEntryCountBefore
         || latestSource?.kind !== source.kind
+        || latestSource.uri !== sourceUriBefore
+        || JSON.stringify(latestSource.technicalDescriptor) !== JSON.stringify(descriptorBefore)
         || latestTranscript?.transcriptDigest !== inputTranscriptDigest) {
         throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
       }
@@ -240,7 +348,7 @@ export class AlignmentApplicationService {
       }
       const registered = project.sourceTranscripts.find((item) => item.sourceId === source.id);
       if (!registered) throw appError("ALIGNMENT_APP_COMMIT_FAILED", locale, executionId);
-      return { executionId, sourceId: source.id, result: clone(result), sourceTranscript: clone(registered), project };
+      return { executionId, sourceId: source.id, result: clone(result), sourceTranscript: clone(registered), project, cacheStatus, historyMutated: true };
     } catch (cause) {
       if (lease) {
         const failedLease = lease;
@@ -266,17 +374,93 @@ export class AlignmentApplicationService {
   }
 }
 
-function validateRequest(request: Record<string, unknown> | undefined, locale: CevraLocale, executionId: string): { sourceId: string; actor: JournalActor } {
+function validateRequest(request: Record<string, unknown> | undefined, locale: CevraLocale, executionId: string): { sourceId: string; actor: JournalActor; cachePolicy: TranscriptCachePolicy } {
   try {
     if (!request) throw new Error("Alignment request must be an object.");
-    rejectUnexpectedKeys(request, ["sourceId", "id", "locale", "actor"], "request");
+    rejectUnexpectedKeys(request, ["sourceId", "id", "locale", "actor", "cachePolicy"], "request");
     if (typeof request.sourceId !== "string" || request.sourceId.trim().length === 0) throw new Error("sourceId must be non-empty.");
     if (request.id !== undefined && request.id !== executionId) throw new Error("Execution ID is invalid.");
     if (request.locale !== undefined && !isLocale(request.locale)) throw new Error("locale is unsupported.");
-    return { sourceId: request.sourceId, actor: validateActor(request.actor) };
+    return { sourceId: request.sourceId, actor: validateActor(request.actor), cachePolicy: normalizeCachePolicy(request.cachePolicy) };
   } catch (cause) {
     throw appError("ALIGNMENT_APP_INVALID_REQUEST", locale, executionId, cause);
   }
+}
+
+async function alignmentIdentityStable(
+  sourceIdentity: SourceContentIdentityPort,
+  source: SourceAsset,
+  provider: AlignmentExecutionIdentityProvider,
+  request: AlignmentRequest,
+  sourceBefore: TranscriptSourceVerificationV1,
+  executionBefore: AlignmentExecutionIdentity,
+  engine: EngineIdentity,
+  media: MediaEngineAdapter,
+  mediaBefore: AlignmentMediaPreparationIdentity,
+  locale: CevraLocale,
+  executionId: string,
+  signal?: AbortSignal
+): Promise<boolean> {
+  try {
+    const [sourceAfter, executionAfter, mediaAfter] = await Promise.all([
+      verifyTranscriptSource(sourceIdentity, source.uri, signal),
+      provider.describeAlignmentExecution(request, signal),
+      media.identity()
+    ]);
+    assertDescriptorMatches(source, sourceAfter, locale, executionId);
+    return !!executionAfter && alignmentExecutionMatches(executionAfter, engine)
+      && hasTranscriptSourceContinuity(sourceBefore, sourceAfter)
+      && JSON.stringify(executionBefore) === JSON.stringify(executionAfter)
+      && JSON.stringify(mediaBefore) === JSON.stringify(mediaPreparationIdentity(mediaAfter));
+  } catch (cause) {
+    if (isAbort(cause, signal)) throw cause;
+    return false;
+  }
+}
+
+function assertDescriptorMatches(
+  source: SourceAsset,
+  verification: TranscriptSourceVerificationV1,
+  locale: CevraLocale,
+  executionId: string
+): void {
+  const expected = source.technicalDescriptor?.content;
+  if (expected && (expected.sha256 !== verification.cacheIdentity.sha256
+    || expected.sizeBytes !== verification.cacheIdentity.sizeBytes)) {
+    throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+  }
+}
+
+function snapshotRequest(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  try {
+    const snapshot: Record<string, unknown> = {};
+    const optional = new Set(["id", "locale", "actor", "cachePolicy"]);
+    for (const key of Object.keys(value)) {
+      const field = value[key];
+      if (field === undefined && optional.has(key)) continue;
+      snapshot[key] = field === undefined ? undefined : clone(field);
+    }
+    return snapshot;
+  } catch {
+    return undefined;
+  }
+}
+
+function alignmentExecutionMatches(value: AlignmentExecutionIdentity, engine: EngineIdentity): boolean {
+  return value.engineId === engine.id && value.engineVersion === engine.version && value.engineApiVersion === engine.apiVersion;
+}
+
+function assertAlignmentResultIdentity(result: AlignmentResult, identity?: AlignmentExecutionIdentity): void {
+  if (identity && (result.modelId !== identity.modelId || result.modelRevision !== identity.modelRevision || result.modelDigest !== identity.modelDigest)) {
+    throw new Error("Alignment result model identity changed.");
+  }
+}
+
+function normalizeCachePolicy(value: unknown): TranscriptCachePolicy {
+  if (value === undefined) return "prefer";
+  if (value === "prefer" || value === "refresh" || value === "bypass") return value;
+  throw new Error("cachePolicy is unsupported.");
 }
 
 function normalizeLanguage(value: string | undefined, locale: CevraLocale, executionId: string): AlignmentLanguage {
@@ -354,6 +538,31 @@ function validateAlignmentResult(value: unknown, current: TranscriptState, langu
 
 function appendAlignmentStage(stages: readonly TranscriptProvenanceStage[], alignment: TranscriptProvenanceStage): TranscriptProvenanceStage[] {
   return [...stages.map(clone), alignment];
+}
+
+function buildAlignedCandidate(
+  sourceId: string,
+  current: SourceTranscript,
+  result: AlignmentResult,
+  identity: EngineIdentity,
+  inputTranscriptDigest: SourceTranscript["transcriptDigest"],
+  producerExecutionId: string,
+  producedAt: string
+): SourceTranscript {
+  const speakerState = deriveTranscriptSpeakerState(result.transcript);
+  if (speakerState !== current.speakerState) throw new Error("Alignment changed speaker coverage.");
+  const alignmentStage: TranscriptProvenanceStage = {
+    kind: "alignment", executionId: producerExecutionId, engineId: identity.id, engineVersion: identity.version,
+    engineApiVersion: String(identity.apiVersion), modelId: result.modelId,
+    ...(result.modelRevision !== undefined ? { modelRevision: result.modelRevision } : {}),
+    ...(result.modelDigest !== undefined ? { modelDigest: result.modelDigest } : {}),
+    inputTranscriptDigest, createdAt: producedAt
+  };
+  return createSourceTranscript({
+    sourceId, wordTiming: "aligned", speakerState, transcript: result.transcript,
+    provenance: { ...(current.provenance.sourceChecksum !== undefined ? { sourceChecksum: current.provenance.sourceChecksum } : {}), stages: appendAlignmentStage(current.provenance.stages, alignmentStage) },
+    ...(current.extensions !== undefined ? { extensions: clone(current.extensions) } : {})
+  });
 }
 
 function assertAlignmentIdentity(value: unknown): asserts value is EngineIdentity {
