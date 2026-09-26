@@ -57,19 +57,30 @@ result. `SourceAsset.checksum` remains legacy provenance and is not cache
 identity.
 
 When `SourceAsset.technicalDescriptor` exists, the freshly verified content
-must equal its adopted SHA-256 and size. A mismatch fails closed before engine
-execution or canonical mutation; it is not silently converted into a cache
-miss. A legacy source without a descriptor may still use a strong current
-content proof without creating or changing a descriptor.
+must equal its adopted SHA-256 and size regardless of `prefer`, `refresh`,
+`bypass` or cache availability. A mismatch or unavailable identity capability
+fails closed before engine execution or canonical mutation; bypass disables
+cache use, not canonical source integrity. A legacy source without a descriptor
+may still use a strong current content proof without creating or changing a
+descriptor. Identity failure for that legacy source may bypass only the cache
+optimization and preserve the existing engine path.
 
-For a cacheable fresh execution the same strong identity is recomputed after
-the engine completes and before cache write or canonical promotion. Execution
-identity is also described again. Any proven source or exact-execution change
+For a cacheable fresh execution—and for any expensive execution against a
+descriptor-bearing source—the same strong identity is recomputed after the
+engine completes and before cache write or canonical promotion. Execution
+identity is also described again when cacheable. Portable SHA-256/size equality
+and continuity of the non-persisted operational stamp are both required across
+the expensive execution: URI, canonical path, device, inode, byte size,
+nanosecond mtime and nanosecond ctime. This anti-ABA condition closes reproduced
+A→B→A replacement without adding a third full hash, but is not cryptographic
+identity and does not claim protection from a privileged actor capable of
+restoring every kernel-controlled field. Any source or exact-execution change
 fails closed as an application conflict with no cache write and no Project IR
 mutation. A cache hit performs one full current content proof before lookup and
-a cheap operational stamp recheck immediately before promotion. A fresh miss or
-refresh performs full source proof before and after engine execution. The cache
-never uses URI or operational metadata as portable content identity.
+a cheap operational stamp recheck immediately before promotion. Fresh
+cacheable or descriptor-bearing execution performs full source proof before and
+after engine execution. The cache never persists URI or operational metadata in
+its portable content identity.
 
 Caching is additive. Engines may implement provider-neutral execution identity
 provider interfaces. If exact identity cannot be proven, the application
@@ -92,11 +103,18 @@ The closed transcription key contains:
 - result-normalization version;
 - reviewed runtime/decode pipeline version.
 
-The FasterWhisper adapter resolves a trusted Hugging Face snapshot revision from
-the local refs/snapshot layout. A prepopulated direct CTranslate2 directory is
-cacheable only when trusted host configuration explicitly supplies an exact
-revision. Its model digest is a SHA-256 over a canonical sorted manifest of
-every runtime artifact's relative path, byte length and SHA-256. A strong,
+The FasterWhisper adapter mirrors the worker's source selection. When the model
+cache root itself satisfies the worker's closed direct CTranslate2 file
+predicate, that root has precedence and is cacheable only when trusted host
+configuration supplies an exact revision; nested Hugging Face layouts are then
+not fingerprinted as executed bytes. Otherwise the resolver discovers both
+supported Hugging Face layouts. Exactly one provable candidate is required;
+multiple plausible layouts bypass cache rather than guessing undocumented
+FasterWhisper/Hugging Face precedence. A profile that permits model download
+also bypasses cache identity because the locally fingerprinted candidate no
+longer proves which bytes execution may resolve. The model digest is a SHA-256 over a
+canonical sorted manifest of every selected runtime artifact's relative path,
+byte length and SHA-256. A strong,
 cheap in-process change detector uses canonical logical/resolved identity plus
 `dev`, `ino`, byte size, nanosecond mtime and nanosecond ctime to decide whether
 that manifest must be rehashed. Filesystems that cannot prove unchanged state
@@ -190,11 +208,12 @@ filesystem permission, new frontend command or source pathname in an entry.
 At-rest encryption is deferred; users may delete cache data safely without
 affecting projects.
 
-Cache corruption, absence, deletion, hashing failure, model-identity failure,
-write failure and eviction failure default to bypass/miss. They do not make
-transcription or alignment unavailable. Cancellation prevents promotion and is
-propagated through bounded hashing/cache work without weakening existing worker
-termination/reaping.
+Cache corruption, absence, deletion, model-identity failure, write failure and
+eviction failure default to bypass/miss. Source hashing failure also bypasses
+cache for a legacy source. It fails closed for a descriptor-bearing source,
+because adopted content equivalence is mandatory independently of caching.
+Cancellation prevents promotion and is propagated through bounded
+hashing/cache work without weakening existing worker termination/reaping.
 
 ## Consequences and deferred work
 
@@ -205,10 +224,26 @@ the complete hit latency. Source hashing remains proportional in time but not
 memory to source size. An alignment hit reads/hashes zero local model bytes;
 fresh execution pays one complete model verification per unchanged process
 state and cheap exact-state checks immediately before and after the worker.
+Legacy bypass/no-cache execution adds zero source hashes; cache HIT uses one
+full source hash plus a cheap operational check; cache MISS/refresh uses two
+full source hashes. Descriptor-bearing HIT uses the same one-plus-check pattern,
+while descriptor-bearing fresh execution—including bypass/no-cache—uses two
+full hashes around the engine.
 This avoids repeated 377 MiB/1.26 GiB weight hashing without weakening the
 closed allow-list or cryptographic proof. The cache is cross-project reusable
 and bounded, yet remains strictly subordinate to current application
 validation and canonical state.
+
+The first provable Transcription execution identity in a process may hash the
+complete selected local model artifact manifest; for large models this can mean
+gigabytes of reads. Subsequent descriptions reuse a process-local strong
+detector only while model filesystem state is unchanged. Reducing that initial
+cost requires an equally strong immutable package/model identity and may not
+weaken exact executed-model proof merely to improve startup latency.
+
+Alignment Cache V1 Application/engine behavior is implemented and tested, but
+`AlignmentApplicationService` is not yet exposed through the production
+Desktop user workflow.
 
 Cache format evolution uses version invalidation: an old key/envelope becomes a
 miss and may later be evicted. It requires no Project IR or Project Store
