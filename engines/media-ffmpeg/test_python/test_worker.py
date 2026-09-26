@@ -755,6 +755,29 @@ class RuntimeBuildTests(unittest.TestCase):
                 prepare_vendor.prepare(destination)
             self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
 
+    def test_vendor_checkout_disables_line_ending_rewrites(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "vendor"
+            calls: list[tuple[tuple[str, ...], Path | None]] = []
+
+            def fake_run(*argv: str, cwd: Path | None = None) -> str:
+                calls.append((argv, cwd))
+                if argv[:2] == ("git", "clone"):
+                    destination.mkdir()
+                if argv == ("git", "rev-parse", "HEAD"):
+                    return prepare_vendor.PIN["commit"]
+                return ""
+
+            with mock.patch.object(prepare_vendor, "run", side_effect=fake_run), \
+                 mock.patch.object(prepare_vendor, "verify_prepared"), \
+                 mock.patch.object(prepare_vendor.shutil, "rmtree"):
+                prepare_vendor.prepare(destination)
+
+            self.assertIn(
+                (("git", "-c", "core.autocrlf=false", "checkout", "--detach", prepare_vendor.PIN["commit"]), destination),
+                calls,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
