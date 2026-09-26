@@ -410,7 +410,8 @@ async function createTranscriptionServices(
       service: new TranscriptionApplicationService({
         engine: adapter,
         history,
-        ...(cache ? { cache, sourceIdentity } : {})
+        sourceIdentity,
+        ...(cache ? { cache } : {})
       })
     };
   } catch {

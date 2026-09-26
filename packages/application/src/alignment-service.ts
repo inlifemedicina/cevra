@@ -26,6 +26,7 @@ import {
   type TranscriptState
 } from "@cevra/project-ir";
 import {
+  hasTranscriptSourceContinuity,
   isAlignmentIdentityProvider,
   mediaPreparationIdentity,
   verifyTranscriptSource,
@@ -178,11 +179,22 @@ export class AlignmentApplicationService {
     let cacheKey: AlignmentCacheKey | undefined;
     let sourceBefore: TranscriptSourceVerificationV1 | undefined;
     let executionBefore: AlignmentExecutionIdentity | undefined;
-    if (normalized.cachePolicy !== "bypass" && this.cache && this.sourceIdentity && identityProvider && typeof this.media.identity === "function") {
+    const descriptorRequiresProof = source.technicalDescriptor !== undefined;
+    const cacheIdentityRequested = normalized.cachePolicy !== "bypass"
+      && this.cache !== undefined
+      && this.sourceIdentity !== undefined
+      && identityProvider !== undefined
+      && typeof this.media.identity === "function";
+    if (descriptorRequiresProof && !this.sourceIdentity) {
+      throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+    }
+    if (descriptorRequiresProof || cacheIdentityRequested) {
       const [sourceProof, executionProof, mediaProof] = await Promise.allSettled([
-        verifyTranscriptSource(this.sourceIdentity, source.uri, signal),
-        identityProvider.describeAlignmentExecution(identityRequest, signal),
-        this.media.identity()
+        verifyTranscriptSource(this.sourceIdentity!, source.uri, signal),
+        cacheIdentityRequested
+          ? identityProvider!.describeAlignmentExecution(identityRequest, signal)
+          : Promise.resolve(undefined),
+        cacheIdentityRequested ? this.media.identity!() : Promise.resolve(undefined)
       ]);
       for (const proof of [sourceProof, executionProof, mediaProof]) {
         if (proof.status === "rejected" && isAbort(proof.reason, signal)) {
@@ -190,13 +202,13 @@ export class AlignmentApplicationService {
         }
       }
       if (sourceProof.status === "fulfilled") sourceBefore = sourceProof.value;
-      else if (source.technicalDescriptor) throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId, sourceProof.reason);
+      else if (descriptorRequiresProof) throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId, sourceProof.reason);
       if (executionProof.status === "fulfilled") executionBefore = executionProof.value;
-      if (mediaProof.status === "fulfilled" && mediaProof.value.kind === "media") {
+      if (mediaProof.status === "fulfilled" && mediaProof.value?.kind === "media") {
         mediaPreparation = mediaPreparationIdentity(mediaProof.value);
       }
       if (sourceBefore) assertDescriptorMatches(source, sourceBefore, locale, executionId);
-      if (sourceBefore && executionBefore && mediaPreparation && alignmentExecutionMatches(executionBefore, identity)) {
+      if (cacheIdentityRequested && sourceBefore && executionBefore && mediaPreparation && alignmentExecutionMatches(executionBefore, identity)) {
         cacheKey = { schemaVersion: 1, kind: "alignment", source: sourceBefore.cacheIdentity, inputTranscriptDigest, language, execution: executionBefore, mediaPreparation };
         cacheStatus = normalized.cachePolicy === "refresh" ? "refresh" : "miss";
       }
@@ -274,12 +286,26 @@ export class AlignmentApplicationService {
         } catch (cause) {
           throw appError("ALIGNMENT_APP_RESULT_INVALID", locale, executionId, cause);
         }
-        if (cacheKey && sourceBefore && executionBefore && this.cache && identityProvider) {
-          if (!await alignmentIdentityStable(this.sourceIdentity!, source, identityProvider, identityRequest, sourceBefore, executionBefore, identity, this.media, mediaPreparation!, locale, executionId, signal)) {
-            throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+        if (sourceBefore && this.sourceIdentity && (descriptorRequiresProof || cacheKey)) {
+          if (cacheKey && executionBefore && identityProvider && mediaPreparation) {
+            if (!await alignmentIdentityStable(this.sourceIdentity, source, identityProvider, identityRequest, sourceBefore, executionBefore, identity, this.media, mediaPreparation, locale, executionId, signal)) {
+              throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+            }
+            try { await this.cache!.write(cacheKey, { producerExecutionId: executionId, producedAt, payload: result }, signal); }
+            catch (cause) { if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause); }
+          } else {
+            let sourceAfter: TranscriptSourceVerificationV1;
+            try {
+              sourceAfter = await verifyTranscriptSource(this.sourceIdentity, source.uri, signal);
+            } catch (cause) {
+              if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause);
+              throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId, cause);
+            }
+            assertDescriptorMatches(source, sourceAfter, locale, executionId);
+            if (!hasTranscriptSourceContinuity(sourceBefore, sourceAfter)) {
+              throw appError("ALIGNMENT_APP_PROJECT_CONFLICT", locale, executionId);
+            }
           }
-          try { await this.cache.write(cacheKey, { producerExecutionId: executionId, producedAt, payload: result }, signal); }
-          catch (cause) { if (isAbort(cause, signal)) throw appError("ALIGNMENT_APP_CANCELLED", locale, executionId, cause); }
         }
       } else if (cacheStatus === "hit" && sourceBefore && this.sourceIdentity) {
         let sourceState: Awaited<ReturnType<SourceContentIdentityPort["checkSource"]>>;
@@ -383,8 +409,7 @@ async function alignmentIdentityStable(
     ]);
     assertDescriptorMatches(source, sourceAfter, locale, executionId);
     return !!executionAfter && alignmentExecutionMatches(executionAfter, engine)
-      && sourceBefore.cacheIdentity.sha256 === sourceAfter.cacheIdentity.sha256
-      && sourceBefore.cacheIdentity.sizeBytes === sourceAfter.cacheIdentity.sizeBytes
+      && hasTranscriptSourceContinuity(sourceBefore, sourceAfter)
       && JSON.stringify(executionBefore) === JSON.stringify(executionAfter)
       && JSON.stringify(mediaBefore) === JSON.stringify(mediaPreparationIdentity(mediaAfter));
   } catch (cause) {
@@ -410,7 +435,12 @@ function snapshotRequest(value: unknown): Record<string, unknown> | undefined {
   if (!isRecord(value)) return undefined;
   try {
     const snapshot: Record<string, unknown> = {};
-    for (const key of Object.keys(value)) snapshot[key] = clone(value[key]);
+    const optional = new Set(["id", "locale", "actor", "cachePolicy"]);
+    for (const key of Object.keys(value)) {
+      const field = value[key];
+      if (field === undefined && optional.has(key)) continue;
+      snapshot[key] = field === undefined ? undefined : clone(field);
+    }
     return snapshot;
   } catch {
     return undefined;

@@ -698,6 +698,9 @@ test("degraded Media startup keeps Transcription available with an isolated mode
   assert.equal(state.project.project.id, fixture.projectId);
   assert.deepEqual(state.capabilities.mediaImport, { available: false, reason: "archive-unavailable" });
   assert.deepEqual(state.capabilities.transcription, { available: true, reason: "available" });
+  assert.equal(session.services.transcription.cache, undefined, "fixture config intentionally has no transcript cache");
+  assert.ok(session.services.transcription.sourceIdentity instanceof NodeMediaArtifactStore,
+    "source integrity capability must remain wired independently of cache availability");
   assert.equal(await readFile(foreign, "utf8"), "protected root isolated sentinel");
   await session.close();
 });

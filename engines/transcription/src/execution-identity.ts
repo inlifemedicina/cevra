@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { lstat, readdir, readFile, realpath } from "node:fs/promises";
+import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import type { TranscriptionExecutionIdentity } from "@cevra/contracts";
 import {
@@ -16,6 +16,8 @@ export const TRANSCRIPTION_RUNTIME_PIPELINE_VERSION =
   "faster-whisper-1.2.1+ctranslate2-4.8.2+pyav-18.1.0+cevra-normalization-v1" as const;
 const REVISION = /^[0-9a-f]{40,64}$/u;
 const MAX_MODEL_FILES = 512;
+export const FASTER_WHISPER_DIRECT_REQUIRED_FILES = ["config.json", "model.bin", "tokenizer.json"] as const;
+export const FASTER_WHISPER_DIRECT_VOCABULARY_FILES = ["vocabulary.txt", "vocabulary.json"] as const;
 
 interface ModelFingerprint {
   revision: string;
@@ -28,7 +30,12 @@ export interface FasterWhisperModelIdentityResolverOptions {
   onArtifactHashed?: (relativePath: string) => void;
 }
 
-interface ResolvedModelDirectory { directory: string; artifactRoot: string; revision: string }
+interface ResolvedModelDirectory {
+  directory: string;
+  artifactRoot: string;
+  revision: string;
+  layout: "direct" | "hugging-face";
+}
 
 export class FasterWhisperModelIdentityResolver {
   private memo: ModelFingerprint | undefined;
@@ -44,7 +51,9 @@ export class FasterWhisperModelIdentityResolver {
       if (this.profile.device === "auto" || this.profile.computeType === "default") return undefined;
       const resolved = await resolveModelDirectory(this.profile, this.modelId);
       if (!resolved) return undefined;
-      const files = await inventoryFiles(resolved.directory, resolved.artifactRoot, signal);
+      const files = resolved.layout === "direct"
+        ? await inventoryDirectFiles(resolved.directory, signal)
+        : await inventoryFiles(resolved.directory, resolved.artifactRoot, signal);
       const metadataSupportsMemo = files.every((file) => file.dev !== "0" && file.ino !== "0" && file.mtimeNs !== "0" && file.ctimeNs !== "0");
       const detector = metadataSupportsMemo ? files.map((file) => [
         file.path, file.resolvedIdentity, file.dev, file.ino, file.size, file.mtimeNs, file.ctimeNs
@@ -90,7 +99,12 @@ export class FasterWhisperModelIdentityResolver {
 
 async function resolveModelDirectory(profile: FasterWhisperProfile, modelId: SupportedTranscriptionModelId): Promise<ResolvedModelDirectory | undefined> {
   const root = await realpath(profile.modelCacheDir);
+  if (await isPrepopulatedModelDirectory(root)) {
+    if (!profile.trustedModelRevision || !REVISION.test(profile.trustedModelRevision)) return undefined;
+    return { directory: root, artifactRoot: root, revision: profile.trustedModelRevision, layout: "direct" };
+  }
   const repository = `models--Systran--faster-whisper-${modelId}`;
+  const candidates: ResolvedModelDirectory[] = [];
   for (const repositoryRoot of [join(root, "hub", repository), join(root, repository)]) {
     const snapshotRoot = join(repositoryRoot, "snapshots");
     let revision: string | undefined;
@@ -108,11 +122,29 @@ async function resolveModelDirectory(profile: FasterWhisperProfile, modelId: Sup
     if (revision) {
       const directory = resolve(snapshotRoot, revision);
       const actual = await realpath(directory);
-      if (actual === directory || actual.startsWith(`${snapshotRoot}${sep}`)) return { directory: actual, artifactRoot: await realpath(repositoryRoot), revision };
+      if ((actual === directory || actual.startsWith(`${snapshotRoot}${sep}`))
+        && await isPrepopulatedModelDirectory(actual)) {
+        candidates.push({
+          directory: actual,
+          artifactRoot: await realpath(repositoryRoot),
+          revision,
+          layout: "hugging-face"
+        });
+      }
     }
   }
-  if (!profile.trustedModelRevision || !REVISION.test(profile.trustedModelRevision)) return undefined;
-  return { directory: root, artifactRoot: root, revision: profile.trustedModelRevision };
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+export async function isPrepopulatedModelDirectory(directory: string): Promise<boolean> {
+  const isFile = async (name: string): Promise<boolean> => {
+    try { return (await stat(join(directory, name))).isFile(); }
+    catch { return false; }
+  };
+  const required = await Promise.all(FASTER_WHISPER_DIRECT_REQUIRED_FILES.map(isFile));
+  if (!required.every(Boolean)) return false;
+  const vocabulary = await Promise.all(FASTER_WHISPER_DIRECT_VOCABULARY_FILES.map(isFile));
+  return vocabulary.some(Boolean);
 }
 
 interface ModelArtifactState {
@@ -150,6 +182,30 @@ async function inventoryFiles(root: string, artifactRoot: string, signal?: Abort
     }
   }
   await walk(root);
+  if (output.length === 0) throw new Error("Model artifact inventory is empty.");
+  return output.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+}
+
+async function inventoryDirectFiles(root: string, signal?: AbortSignal): Promise<ModelArtifactState[]> {
+  const output: ModelArtifactState[] = [];
+  throwIfAborted(signal);
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    throwIfAborted(signal);
+    const absolute = join(root, entry.name);
+    if (entry.isDirectory()) continue;
+    if (entry.isFile()) {
+      const metadata = await lstat(absolute, { bigint: true });
+      if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Model artifact changed during inventory.");
+      output.push(modelArtifactState(root, absolute, await realpath(absolute), metadata));
+    } else if (entry.isSymbolicLink()) {
+      const target = await realpath(absolute);
+      if (target !== root && !target.startsWith(`${root}${sep}`)) throw new Error("Model artifact symlink escapes its trusted directory.");
+      const metadata = await lstat(target, { bigint: true });
+      if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Model artifact symlink target is invalid.");
+      output.push(modelArtifactState(root, absolute, target, metadata));
+    } else throw new Error("Model artifact is not a regular file.");
+    if (output.length > MAX_MODEL_FILES) throw new Error("Model artifact inventory is too large.");
+  }
   if (output.length === 0) throw new Error("Model artifact inventory is empty.");
   return output.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
 }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -80,4 +81,62 @@ test("trusted cache root stays host-internal and adds no protocol or WebView com
     "allow-desktop-cancel-operation", "allow-desktop-get-state", "allow-desktop-pick-and-ingest-media",
     "allow-desktop-redo", "allow-desktop-transcribe-source", "allow-desktop-undo"
   ].sort());
+});
+
+test("real filesystem ABA source mutation cannot promote a descriptor-bearing transcription", async (t) => {
+  const root = await mkdtemp(resolve(tmpdir(), "cevra-host-source-aba-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const mediaPath = resolve(root, "source.mov");
+  const original = Buffer.from("source-bytes-A");
+  const alternate = Buffer.from("source-bytes-B");
+  assert.equal(original.byteLength, alternate.byteLength);
+  await writeFile(mediaPath, original);
+  const originalMetadata = await stat(mediaPath);
+  const project = createEmptyProject({ id: "aba-project", name: "ABA", locale: "pt-BR", now });
+  project.sources.push({
+    id: "source", kind: "video", uri: mediaPath, displayName: "source.mov", durationMs: 1000,
+    technicalDescriptor: {
+      version: 1,
+      basis: "ingest",
+      content: { sha256: createHash("sha256").update(original).digest("hex"), sizeBytes: original.byteLength },
+      method: {
+        profile: "cevra.source-technical.v1",
+        engineId: "test.media",
+        engineVersion: "1",
+        engineApiVersion: 1
+      },
+      video: { codec: "h264" },
+      audio: { codec: "aac" }
+    }
+  });
+  const history = new ProjectHistory(project, { clock: () => now, idGenerator: () => "aba-history" });
+  let engineCalls = 0;
+  const engine = {
+    async identity() {
+      return { id: "engine", kind: "transcription", displayName: "ABA fixture", version: "1", apiVersion: CEVRA_ENGINE_API_VERSION };
+    },
+    async healthcheck() {}, async capabilities() {},
+    async transcribe() {
+      engineCalls += 1;
+      await writeFile(mediaPath, alternate);
+      assert.deepEqual(await readFile(mediaPath), alternate, "engine observes the transient alternate bytes");
+      await writeFile(mediaPath, original);
+      await utimes(mediaPath, originalMetadata.atime, originalMetadata.mtime);
+      return { transcript: { language: "pt", words: [], segments: [] }, modelId: "model", wordTiming: "none" };
+    }
+  };
+  const service = new TranscriptionApplicationService({
+    engine,
+    history,
+    sourceIdentity: new NodeMediaArtifactStore(),
+    clock: () => now
+  });
+  await assert.rejects(
+    service.transcribeSource({ sourceId: "source", id: "aba", cachePolicy: "bypass" }),
+    (error) => error.code === "TRANSCRIPTION_APP_PROJECT_CONFLICT"
+  );
+  assert.equal(engineCalls, 1);
+  assert.equal(history.entries.length, 0);
+  assert.equal(history.current.history.revision, 0);
+  assert.deepEqual(await readFile(mediaPath), original);
 });

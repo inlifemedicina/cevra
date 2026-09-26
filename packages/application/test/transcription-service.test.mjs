@@ -170,6 +170,28 @@ function sourceIdentityPort(identify = async () => structuredClone(strongSource)
     checkSource: check
   };
 }
+function sequencedSourceIdentity(stamps, identify = async () => structuredClone(strongSource)) {
+  let captures = 0;
+  let hashes = 0;
+  return {
+    get captures() { return captures; },
+    get hashes() { return hashes; },
+    async captureSource(uri) {
+      const selected = stamps[Math.min(captures, stamps.length - 1)];
+      captures += 1;
+      return {
+        version: 1, uri, canonicalPath: uri, device: "1", inode: "2", sizeBytes: 100,
+        mtimeNs: "3", ctimeNs: "4", ...selected, uri
+      };
+    },
+    async identifySource(uri, stamp) {
+      hashes += 1;
+      const content = await identify();
+      return { version: 1, content, stamp: { ...stamp, uri }, bytesRead: content.sizeBytes };
+    },
+    async checkSource() { return "match"; }
+  };
+}
 function cacheOptions(cache, identify = async () => structuredClone(strongSource), check) {
   return { cache, sourceIdentity: sourceIdentityPort(identify, check) };
 }
@@ -887,4 +909,111 @@ test("a canonical project change during cache lookup still blocks cached promoti
   assert.equal(engine.calls.length, 0);
   assert.equal(active.history.current.sourceTranscripts.length, 0);
   assert.equal(active.history.current.history.revision, 1);
+});
+
+test("known optional undefined request fields are absent-equivalent while unknown undefined stays rejected", async () => {
+  for (const field of ["id", "locale", "language", "wordTimestamps", "actor", "cachePolicy"]) {
+    const engine = new FakeTranscriptionEngine(async () => result());
+    const active = fixture(engine);
+    const outcome = await active.service.transcribeSource({ sourceId: "source-1", [field]: undefined });
+    assert.equal(outcome.historyMutated, true, field);
+    assert.equal(engine.calls.length, 1, field);
+  }
+  let reads = 0;
+  const getterRequest = { sourceId: "source-1", get locale() { reads += 1; return undefined; } };
+  await fixture(new FakeTranscriptionEngine(async () => result())).service.transcribeSource(getterRequest);
+  assert.equal(reads, 1);
+  const rejectedEngine = new FakeTranscriptionEngine(async () => assert.fail("unknown field must fail before engine"));
+  const rejected = fixture(rejectedEngine);
+  await assert.rejects(
+    rejected.service.transcribeSource({ sourceId: "source-1", unknown: undefined }),
+    (error) => error.code === "TRANSCRIPTION_APP_INVALID_REQUEST"
+  );
+  assert.equal(rejectedEngine.calls.length, 0);
+});
+
+test("descriptor integrity is independent of transcription cache policy and availability", async () => {
+  const descriptorSource = source("source-1", "video", {
+    technicalDescriptor: technicalDescriptor({ sha256: "c".repeat(64), sizeBytes: 100 })
+  });
+  for (const scenario of [
+    { policy: "prefer", additions: { cache: new MemoryCache(), sourceIdentity: sourceIdentityPort() } },
+    { policy: "refresh", additions: { cache: new MemoryCache(), sourceIdentity: sourceIdentityPort() } },
+    { policy: "bypass", additions: { cache: new MemoryCache(), sourceIdentity: sourceIdentityPort() } },
+    { policy: "prefer", additions: { sourceIdentity: sourceIdentityPort() } }
+  ]) {
+    const engine = cacheableEngine(async () => assert.fail("descriptor mismatch must fail before engine"));
+    const active = fixture(engine, projectWith([descriptorSource]), scenario.additions);
+    const revision = active.history.current.history.revision;
+    await assert.rejects(
+      active.service.transcribeSource({ sourceId: "source-1", cachePolicy: scenario.policy }),
+      (error) => error.code === "TRANSCRIPTION_APP_PROJECT_CONFLICT"
+    );
+    assert.equal(engine.calls.length, 0);
+    assert.equal(active.history.current.history.revision, revision);
+    assert.equal(scenario.additions.cache?.writes ?? 0, 0);
+  }
+});
+
+test("descriptor fresh execution hashes twice across bypass and no-cache while legacy bypass hashes zero times", async () => {
+  for (const additions of [{ cache: new MemoryCache() }, {}]) {
+    const sourceIdentity = sequencedSourceIdentity([{}, {}]);
+    const engine = cacheableEngine();
+    const active = fixture(
+      engine,
+      projectWith([source("source-1", "video", { technicalDescriptor: technicalDescriptor() })]),
+      { ...additions, sourceIdentity }
+    );
+    const outcome = await active.service.transcribeSource({
+      sourceId: "source-1",
+      cachePolicy: additions.cache ? "bypass" : "prefer"
+    });
+    assert.equal(outcome.historyMutated, true);
+    assert.equal(sourceIdentity.hashes, 2);
+    assert.equal(engine.calls.length, 1);
+  }
+  const sourceIdentity = sequencedSourceIdentity([{}, {}]);
+  const legacy = fixture(cacheableEngine(), projectWith(), { cache: new MemoryCache(), sourceIdentity });
+  await legacy.service.transcribeSource({ sourceId: "source-1", cachePolicy: "bypass" });
+  assert.equal(sourceIdentity.hashes, 0);
+  assert.equal(sourceIdentity.captures, 0);
+});
+
+test("same-content ABA operational stamp change blocks transcription cache and canonical promotion", async () => {
+  const cache = new MemoryCache();
+  const sourceIdentity = sequencedSourceIdentity([{ ctimeNs: "4" }, { ctimeNs: "5" }]);
+  const engine = cacheableEngine(async () => result("bytes-observed-during-engine"));
+  const active = fixture(engine, projectWith(), { cache, sourceIdentity });
+  await assert.rejects(
+    active.service.transcribeSource({ sourceId: "source-1", id: "aba-source" }),
+    (error) => error.code === "TRANSCRIPTION_APP_PROJECT_CONFLICT"
+  );
+  assert.equal(sourceIdentity.hashes, 2);
+  assert.equal(engine.calls.length, 1);
+  assert.equal(cache.writes, 0);
+  assert.equal(cache.entries.size, 0);
+  assert.equal(active.history.entries.length, 0);
+  assert.equal(active.history.current.history.revision, 0);
+});
+
+test("source continuity rejects atomic replacement and mtime-only touch, while stable stamps succeed", async () => {
+  for (const stamps of [
+    [{ inode: "2" }, { inode: "9" }],
+    [{ mtimeNs: "3" }, { mtimeNs: "8" }]
+  ]) {
+    const active = fixture(cacheableEngine(), projectWith(), {
+      cache: new MemoryCache(),
+      sourceIdentity: sequencedSourceIdentity(stamps)
+    });
+    await assert.rejects(
+      active.service.transcribeSource({ sourceId: "source-1" }),
+      (error) => error.code === "TRANSCRIPTION_APP_PROJECT_CONFLICT"
+    );
+    assert.equal(active.history.entries.length, 0);
+  }
+  const stable = fixture(cacheableEngine(), projectWith(), {
+    cache: new MemoryCache(),
+    sourceIdentity: sequencedSourceIdentity([{}, {}])
+  });
+  assert.equal((await stable.service.transcribeSource({ sourceId: "source-1" })).historyMutated, true);
 });

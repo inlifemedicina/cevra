@@ -92,6 +92,22 @@ export async function verifyTranscriptSource(
   };
 }
 
+export function hasTranscriptSourceContinuity(
+  before: TranscriptSourceVerificationV1,
+  after: TranscriptSourceVerificationV1
+): boolean {
+  return before.cacheIdentity.sha256 === after.cacheIdentity.sha256
+    && before.cacheIdentity.sizeBytes === after.cacheIdentity.sizeBytes
+    && before.verified.stamp.version === after.verified.stamp.version
+    && before.verified.stamp.uri === after.verified.stamp.uri
+    && before.verified.stamp.canonicalPath === after.verified.stamp.canonicalPath
+    && before.verified.stamp.device === after.verified.stamp.device
+    && before.verified.stamp.inode === after.verified.stamp.inode
+    && before.verified.stamp.sizeBytes === after.verified.stamp.sizeBytes
+    && before.verified.stamp.mtimeNs === after.verified.stamp.mtimeNs
+    && before.verified.stamp.ctimeNs === after.verified.stamp.ctimeNs;
+}
+
 export function isTranscriptionIdentityProvider(
   engine: unknown
 ): engine is TranscriptionExecutionIdentityProvider {

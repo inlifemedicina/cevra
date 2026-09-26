@@ -134,6 +134,15 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(self.calls[0][1], model_dir)
         self.assertTrue(self.calls[0][2]["local_files_only"])
 
+    def test_incomplete_direct_model_uses_the_hub_layout_contract(self):
+        with tempfile.TemporaryDirectory() as model_dir:
+            for name in ("config.json", "model.bin", "vocabulary.txt"):
+                Path(model_dir, name).write_bytes(b"fixture")
+            response = worker.process_message(self.request(modelCacheDir=model_dir))
+        self.assertTrue(response["ok"])
+        self.assertEqual(self.calls[0][1], "base")
+        self.assertEqual(self.calls[0][2]["download_root"], model_dir)
+
     def test_native_word_timestamps_are_returned_when_requested(self):
         response = worker.process_message(self.request(wordTimestamps=True))
         words = response["result"]["segments"][0]["words"]

@@ -20,6 +20,7 @@ import {
   type TranscriptWordTiming
 } from "@cevra/project-ir";
 import {
+  hasTranscriptSourceContinuity,
   isTranscriptionIdentityProvider,
   verifyTranscriptSource,
   type TranscriptCachePolicy,
@@ -153,10 +154,20 @@ export class TranscriptionApplicationService {
     let executionBefore: TranscriptionExecutionIdentity | undefined;
     let cacheKey: TranscriptionCacheKey | undefined;
     let cacheStatus: TranscriptCacheStatus = "bypass";
-    if (normalized.cachePolicy !== "bypass" && this.cache && this.sourceIdentity && identityProvider) {
+    const descriptorRequiresProof = source.technicalDescriptor !== undefined;
+    const cacheIdentityRequested = normalized.cachePolicy !== "bypass"
+      && this.cache !== undefined
+      && this.sourceIdentity !== undefined
+      && identityProvider !== undefined;
+    if (descriptorRequiresProof && !this.sourceIdentity) {
+      throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId);
+    }
+    if (descriptorRequiresProof || cacheIdentityRequested) {
       const [sourceProof, executionProof] = await Promise.allSettled([
-        verifyTranscriptSource(this.sourceIdentity, source.uri, signal),
-        identityProvider.describeTranscriptionExecution(engineRequest, signal)
+        verifyTranscriptSource(this.sourceIdentity!, source.uri, signal),
+        cacheIdentityRequested
+          ? identityProvider!.describeTranscriptionExecution(engineRequest, signal)
+          : Promise.resolve(undefined)
       ]);
       for (const proof of [sourceProof, executionProof]) {
         if (proof.status === "rejected" && isAbort(proof.reason, signal)) {
@@ -164,10 +175,10 @@ export class TranscriptionApplicationService {
         }
       }
       if (sourceProof.status === "fulfilled") sourceBefore = sourceProof.value;
-      else if (source.technicalDescriptor) throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId, sourceProof.reason);
+      else if (descriptorRequiresProof) throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId, sourceProof.reason);
       if (executionProof.status === "fulfilled") executionBefore = executionProof.value;
       if (sourceBefore) assertDescriptorMatches(source, sourceBefore, locale, executionId);
-      if (sourceBefore && executionBefore && executionMatches(executionBefore, identity)) {
+      if (cacheIdentityRequested && sourceBefore && executionBefore && executionMatches(executionBefore, identity)) {
         cacheKey = {
           schemaVersion: 1,
           kind: "transcription",
@@ -221,26 +232,33 @@ export class TranscriptionApplicationService {
       } catch (cause) {
         throw appError("TRANSCRIPTION_APP_RESULT_INVALID", locale, executionId, cause);
       }
-      if (cacheKey && sourceBefore && executionBefore && this.cache && identityProvider && this.sourceIdentity) {
+      if (sourceBefore && this.sourceIdentity && (descriptorRequiresProof || cacheKey)) {
         let sourceAfter: TranscriptSourceVerificationV1 | undefined;
         let executionAfter: TranscriptionExecutionIdentity | undefined;
         try {
           [sourceAfter, executionAfter] = await Promise.all([
             verifyTranscriptSource(this.sourceIdentity, source.uri, signal),
-            identityProvider.describeTranscriptionExecution(engineRequest, signal)
+            cacheKey && identityProvider
+              ? identityProvider.describeTranscriptionExecution(engineRequest, signal)
+              : Promise.resolve(undefined)
           ]);
         } catch (cause) {
           if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause);
         }
-        if (!sourceAfter || !executionAfter || !sameCacheIdentity(sourceBefore, sourceAfter)
-          || !sameJson(executionBefore, executionAfter) || !executionMatches(executionAfter, identity)) {
+        if (!sourceAfter || !hasTranscriptSourceContinuity(sourceBefore, sourceAfter)) {
           throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId);
         }
         assertDescriptorMatches(source, sourceAfter, locale, executionId);
-        try {
-          await this.cache.write(cacheKey, { producerExecutionId: executionId, producedAt, payload: result }, signal);
-        } catch (cause) {
-          if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause);
+        if (cacheKey) {
+          if (!executionBefore || !executionAfter || !sameJson(executionBefore, executionAfter)
+            || !executionMatches(executionAfter, identity)) {
+            throw appError("TRANSCRIPTION_APP_PROJECT_CONFLICT", locale, executionId);
+          }
+          try {
+            await this.cache!.write(cacheKey, { producerExecutionId: executionId, producedAt, payload: result }, signal);
+          } catch (cause) {
+            if (isAbort(cause, signal)) throw appError("TRANSCRIPTION_APP_CANCELLED", locale, executionId, cause);
+          }
         }
       }
     } else if (cacheStatus === "hit" && sourceBefore && this.sourceIdentity) {
@@ -294,7 +312,12 @@ function snapshotRequest(value: unknown): Record<string, unknown> | undefined {
   if (!isRecord(value)) return undefined;
   try {
     const snapshot: Record<string, unknown> = {};
-    for (const key of Object.keys(value)) snapshot[key] = clone(value[key]);
+    const optional = new Set(["id", "locale", "language", "wordTimestamps", "actor", "cachePolicy"]);
+    for (const key of Object.keys(value)) {
+      const field = value[key];
+      if (field === undefined && optional.has(key)) continue;
+      snapshot[key] = field === undefined ? undefined : clone(field);
+    }
     return snapshot;
   } catch {
     return undefined;
@@ -379,10 +402,6 @@ function sameProjectBinding(latest: ProjectIR, latestSource: SourceAsset | undef
     && journalEntryCount === expected.journalEntryCount
     && latestSource?.uri === expected.sourceUri
     && sameJson(latestSource.technicalDescriptor, expected.descriptor);
-}
-
-function sameCacheIdentity(left: TranscriptSourceVerificationV1, right: TranscriptSourceVerificationV1): boolean {
-  return left.cacheIdentity.sha256 === right.cacheIdentity.sha256 && left.cacheIdentity.sizeBytes === right.cacheIdentity.sizeBytes;
 }
 
 function validateActor(value: unknown): JournalActor {
