@@ -18,7 +18,7 @@ CEVRA VIDS
 │   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
 │   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
 │   │   ├─ MR-V01 Durable Source Technical Descriptor V1 [IMPLEMENTED / CLOSED]
-│   │   └─ Slice 5A Native Windows Media Runtime / h264_mf feasibility [VERIFIED / REVIEW PENDING]
+│   │   └─ Slice 5A Native Windows Media Runtime / h264_mf feasibility [VERIFIED / REMEDIATION REVIEW PENDING]
 │   └─ Transcript Cache V1 [IMPLEMENTED / CLOSED]
 │
 ├─ 3. EDITORIAL INTELLIGENCE
@@ -104,10 +104,12 @@ enforces adopted descriptor integrity independently of cache policy. Independent
 review and post-merge CI plus Exact Runtime passed.
 
 The current bounded engineering step is **Slice 5A — Native Windows Media
-Runtime / h264_mf feasibility — VERIFIED / FOCUSED REVIEW PENDING**. Native run
-`36252636826` used the pinned private Python, signed FFmpeg 9.0.1 and signed
-zlib 1.3.2 static input, then passed runtime integrity and the real horizontal/
-vertical encode, decode, timing and negative-control matrix. Windows product
+Runtime / h264_mf feasibility — VERIFIED / REMEDIATION REVIEW PENDING**. Native
+run `36442497813` on `c17aea572e91cc1802e73dba5dad03c6b047f0cd` used the
+pinned private Python, signed FFmpeg 9.0.1 and uniquely selected signed/static
+zlib 1.3.2, schema/integrity-verified the private runtime, and passed the real
+horizontal/vertical encode/decode/timing matrix plus sample-offset and
+container-offset negative controls. Windows product
 enablement remains a separate 5B decision because typed allow-lists,
 publication identity/lifecycle, Application/Desktop integration and
 representative hardware acceptance are not delivered by 5A.
