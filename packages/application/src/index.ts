@@ -11,3 +11,4 @@ export * from "./resolved-audio-plan.js";
 export * from "./types.js";
 export * from "./execution-archive.js";
 export * from "./source-technical-descriptor.js";
+export * from "./editorial-transcript-projection.js";
