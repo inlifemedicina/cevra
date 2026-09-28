@@ -237,6 +237,14 @@ test("runs the real PT-BR projection through a scripted fixture analyzer without
   }
   assert.equal(analyzer.calls[0].invocation.payloadBytes, Buffer.byteLength(analyzer.calls[0].invocation.payload, "utf8"));
   assert.ok(analyzer.calls[0].invocation.payloadBytes <= DEFAULT_SEMANTIC_ANALYSIS_INITIAL_BYTES);
+  console.log(JSON.stringify({
+    semanticFixture: "pt-BR-two-source",
+    sourceCount: ids.length,
+    evidenceFragments: result.evidence.length,
+    requestBytes: result.provenance.requestBytes,
+    responseBytes: result.provenance.responseBytes,
+    analyzerInvocations: result.provenance.invocationCount
+  }));
 });
 
 test("uses the same closed contract for the equivalent EN-US fixture and for one selected source", async () => {
@@ -249,6 +257,13 @@ test("uses the same closed contract for the equivalent EN-US fixture and for one
   assert.deepEqual(result.coverage.requestedSourceReferences, ["S1"]);
   assert.equal(result.evidence.every((item) => item.sourceId === "source-a"), true);
   assert.equal(analyzer.calls[0].envelope.task.locale, "en-US");
+  console.log(JSON.stringify({
+    semanticFixture: "en-US-one-source",
+    evidenceFragments: result.evidence.length,
+    requestBytes: result.provenance.requestBytes,
+    responseBytes: result.provenance.responseBytes,
+    analyzerInvocations: result.provenance.invocationCount
+  }));
 });
 
 test("returns explicit transcript-unavailable/no-speech results without inventing analysis", async () => {
