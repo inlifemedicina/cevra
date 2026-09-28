@@ -23,9 +23,9 @@ CEVRA VIDS
 │   │   └─ Slice 5B Windows H.264 product enablement [NOT STARTED / DECISION GATE]
 │   └─ Transcript Cache V1 [IMPLEMENTED / CLOSED]
 │
-├─ 3. EDITORIAL INTELLIGENCE [CURRENT WORK]
-│   ├─ Editorial Transcript Projection V1 [IN DEVELOPMENT]
-│   ├─ semantic editorial analysis [NOT STARTED]
+├─ 3. EDITORIAL INTELLIGENCE [NEXT DECISION]
+│   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
+│   ├─ Semantic Editorial Analysis V1 [NEXT CANONICAL DECISION / NOT STARTED]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -123,10 +123,13 @@ for downstream audio policy, Windows/HDR export, assembled-plan QA,
 Composition/preview and release closure, but those residual consumers are not a
 serial prerequisite for read-only transcript reasoning. The pre-editorial
 correctness prerequisites are closed. **Editorial Transcript Projection V1 is
-the current work / next canonical implementation**. Its bounded final
-remediation tracks known speaker transitions through partial attribution and
-removes quadratic prefix fitting while preserving the approved projection
-contract. Semantic editorial
-analysis, strategy, take selection and cut planning remain not started.
+IMPLEMENTED / CLOSED** by PR #51 and normal merge commit
+`56161b2af44c9e2de008bb33bc1706d4e2beaf7e`. Its bounded final remediation
+tracks known speaker transitions through partial attribution and removes
+quadratic prefix fitting while preserving the approved projection contract.
+PR CI `36487114791`, PR Exact Runtime `36487114771`, post-merge CI
+`36487922851` and post-merge Exact Runtime `36487922834` passed. **Semantic
+Editorial Analysis V1 is the next canonical decision and remains NOT STARTED**;
+strategy, take selection and cut planning also remain not started.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.

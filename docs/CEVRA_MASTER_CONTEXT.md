@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-28, Editorial Transcript Projection V1 final bounded remediation in development and global weighted progress tracking adopted
+**Last decision reconciliation:** 2026-09-28, Editorial Transcript Projection V1 implemented and closed after PR #51
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1143,8 +1143,8 @@ NOTES**. Approved feature head `005f5e87cf47c9a717cefd374b3dc43de2984466`
 merged through PR #24 by normal merge commit
 `86c1f88d19f04c1fb919eafed0b9409e2fe726eb`. Post-merge main CI
 `36245088430` passed 5/5 and managed Exact Runtime `36245088427` passed on the
-merge SHA. Transcript Cache V1 is implemented and closed; progress stays
-**48%**.
+merge SHA. Transcript Cache V1 is implemented and closed; at that milestone,
+the then-current progress value was **48%**.
 See [ADR 0018](adr/0018-transcript-cache-v1.md) and the
 [reconciliation evidence](CEVRA_TRANSCRIPT_CACHE_V1_EVIDENCE.md).
 
@@ -1418,8 +1418,8 @@ Foundation / Media Runtime       [CLOSED]
 → pre-editorial correctness prerequisites [CLOSED]
 → coordinated Media Runtime adjustment gate [ACTIVE IN PARALLEL: DOWNSTREAM / PLATFORM / EXPORT / RELEASE]
 → Transcript Cache V1 [CLOSED]
-→ Editorial Transcript Projection V1 [IN DEVELOPMENT]
-→ semantic editorial analysis [NOT STARTED]
+→ Editorial Transcript Projection V1 [CLOSED]
+→ Semantic Editorial Analysis V1 [NEXT CANONICAL DECISION / NOT STARTED]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1486,13 +1486,13 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` after the Slice 5A docs closeout (PR #50), and the
-verified baseline before the Editorial Transcript Projection V1 branch:
+Latest code-bearing canonical `main`, after feature PR #51 and before the
+documentation-only closeout of Editorial Transcript Projection V1:
 
-`360bf60d4ed4b0a985c0c254a109fac2d6bc0d64`
+`56161b2af44c9e2de008bb33bc1706d4e2beaf7e`
 
-The older `c1b233cc1344a1f0bcd1a55bb5a91f5350b26833` value remains historical:
-it was the canonical main after PR #48, before Slice 5A.
+The older `360bf60d4ed4b0a985c0c254a109fac2d6bc0d64` value remains historical:
+it was the canonical main after PR #50 and the feature base for PR #51.
 
 ## 24.2 Important merged milestones
 
@@ -1521,6 +1521,7 @@ it was the canonical main after PR #48, before Slice 5A.
 | Durable Source Technical Descriptor V1 / MR-V01 | #46 | `0c8a09c185d1496faa4783f8b9495cd90dff9a21` | IMPLEMENTED / CLOSED |
 | Transcript Cache V1 | #24 | `86c1f88d19f04c1fb919eafed0b9409e2fe726eb` | IMPLEMENTED / CLOSED |
 | Native Windows Media Runtime / `h264_mf` feasibility — Slice 5A | #49 | `660f8cd13f11729d5663e1ff373e9eb91a4bffbb` | IMPLEMENTED / CLOSED |
+| Editorial Transcript Projection V1 | #51 | `56161b2af44c9e2de008bb33bc1706d4e2beaf7e` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1559,7 +1560,7 @@ MR-V02 HDR/export, MR-Q01 assembled-plan QA, K3/K4 Composition/preview and K5
 release closure. Those items no longer form a serial prerequisite for deriving
 a read-only transcript reasoning projection from canonical Project IR.
 
-**Editorial Transcript Projection V1 — ACCEPTED DIRECTION / IN DEVELOPMENT.**
+**Editorial Transcript Projection V1 — IMPLEMENTED / CLOSED.**
 Initial code checkpoint `76c5b1ea1dbbd909b0943a4c0aa0234a5fbb6b67` adds a read-only
 Application projection with profile `cevra.editorial-transcript.v1`. It binds
 to project ID/revision/snapshot and per-source transcript digests, groups
@@ -1568,8 +1569,8 @@ truthfully to segments/no-speech status, preserves exact source/word/segment
 references and emits deterministic UTF-8-bounded pages with stale-safe cursors.
 The projection stores no state, creates no ProjectHistory mutation, exposes no
 source URI/path/raw transcript JSON and invokes no Media Runtime, provider or
-AI. Independent review concluded **APPROVE FOR PR WITH NON-BLOCKING NOTES** and
-identified two bounded LOWs. Remediation code checkpoint
+AI. Independent review initially identified two bounded LOWs and the final
+review concluded **APPROVE FOR PR WITH NON-BLOCKING NOTES**. Remediation code checkpoint
 `ff37555f451f21fadc20b7aff09503915330b0e8` tracks the last known speaker within
 a partially attributed phrase, so `A → unknown → B` splits before B while
 unknown words remain unattributed. This is a **CEVRA NATIVE IMPROVEMENT** over
@@ -1589,10 +1590,16 @@ in directed local runs. A separate 40,000-word first-page characterization
 completed in approximately 125 ms. Timings are local evidence, not portable CI
 thresholds.
 Director impact is a **compatible extension**: the projection supplies bounded
-evidence, not decisions or execution authority. Focused micro-review of only
-the speaker state machine, bounded fitting algorithm and progress documentation
-remains pending. Semantic editorial analysis, strategy, take selection and cut
-planning have not started. Global weighted roadmap progress is **54%**.
+evidence, not decisions or execution authority. Approved feature head
+`844ceac821cf3feabafc236cad3d15f9375fa38b` merged through PR #51 as normal
+merge commit `56161b2af44c9e2de008bb33bc1706d4e2beaf7e`. PR CI `36487114791`
+passed 5/5 and naturally triggered Exact Runtime `36487114771` passed; on the
+merge SHA, CI `36487922851` passed 5/5 and Exact Runtime `36487922834` passed.
+Semantic editorial analysis, strategy, take selection and cut planning have
+not started. A bounded non-blocking performance note remains: an extremely
+pathological uninterrupted phrase spanning many tiny pages may re-evaluate its
+remaining fragment once per page; no current product fixture reproduces a
+blocker. Global weighted roadmap progress is **54%**.
 
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
@@ -1703,7 +1710,7 @@ now provided by the operational archive closed in ADR 0028. This does not claim
 full CEVRA product crash recovery or automatic adoption by future workflows.
 Runtime identity remains 0.3.1 with protocol and third-party pins unchanged.
 Audio Sequence/Measurement, Alignment and `extract-audio` semantics remain
-preserved. Product progress remains **48%**.
+preserved. At that milestone, the then-current progress value was **48%**.
 
 The adversarial remediation on the same feature branch closes the confirmed
 pre-review gaps: final state is rechecked after the `committing` archive save
@@ -1723,7 +1730,7 @@ head `ddee31c84caedc52e60d2db1d36c5e4575360792` passed normal CI run
 Final Pre-PR Adversarial Review concluded **APPROVE FOR PR WITH NON-BLOCKING
 NOTES**, with no reproduced BLOCKER, HIGH or MEDIUM finding. This closes only
 the bounded vertical; Slice 3 in full and the coordinated Media Runtime gate
-remain active. Product progress remains **48%**.
+remain active. At that milestone, the then-current progress value was **48%**.
 
 **Durable Media Execution Archive V1 — IMPLEMENTED / CLOSED.** PR #44 merged
 reviewed feature head `16bf0cb347b9738b9ca84194e67a2cba5056127b`
@@ -1764,7 +1771,8 @@ identity, removal of the residual POSIX `lstat`→`unlink` interval, hostile-wri
 authentication, a complete abrupt process-kill matrix and permanent audit
 retention remain unclaimed. Application Resolved Audio Plan V1 remains closed,
 but the full Slice 3 editable J-cut product experience and the coordinated Media
-Runtime gate remain active. Product progress remains **48%**.
+Runtime gate remain active. At that milestone, the then-current progress value
+was **48%**.
 
 **Durable Source Technical Descriptor V1 / MR-V01 — IMPLEMENTED / CLOSED.**
 The Product Owner approved the bounded authority decision in
@@ -1795,8 +1803,8 @@ Exact Runtime `36153512395` passed on the feature head; post-merge CI
 separates data preservation from semantic compatibility and records the
 required pre-Cut-Compiler/history scalability gate. Same-inode PCM in-place
 mutation, strong Windows publication identity, residual probe/hash TOCTOU and
-optimized composite recovery remain explicit bounded limits. Product progress
-remains **48%**.
+optimized composite recovery remain explicit bounded limits. At that milestone,
+the then-current progress value was **48%**.
 
 **Product-owner technical delegation:** within an explicitly approved slice,
 the technical lead may choose and implement the solution with the best total
@@ -1838,9 +1846,8 @@ Exact Runtime `36245088427` passed on the feature merge SHA.
 Current dependency boundaries:
 
 1. pre-editorial correctness prerequisites are **CLOSED**;
-2. Editorial Transcript Projection V1 is the **ACTIVE / NEXT CANONICAL
-   IMPLEMENTATION** and may proceed without completing unrelated platform or
-   export gates;
+2. Editorial Transcript Projection V1 is **IMPLEMENTED / CLOSED**; Semantic
+   Editorial Analysis V1 is the **NEXT CANONICAL DECISION / NOT STARTED**;
 3. the coordinated Media Runtime gate remains **ACTIVE IN PARALLEL** for its
    named downstream/platform/export/release consumers.
 
@@ -1877,8 +1884,8 @@ Slice 5A is **IMPLEMENTED / CLOSED** only for native Windows runtime and
 STARTED**, and Windows product support remains unclaimed. Slice 5B and the
 remaining coordinated Media Runtime requirements continue under their actual
 consumer/platform dependencies in parallel. They do not serially block the
-active Editorial Transcript Projection V1. Semantic editorial analysis remains
-**NOT STARTED**.
+closed Editorial Transcript Projection V1. Semantic editorial analysis remains
+**NEXT CANONICAL DECISION / NOT STARTED**.
 
 ---
 
@@ -1950,7 +1957,7 @@ active Editorial Transcript Projection V1. Semantic editorial analysis remains
 ## 2026-09-28 — projection remediation and global progress
 
 - **CANONICAL:** CEVRA Vids progress is now the weighted execution of the complete currently planned roadmap, not only user-visible capability acceptance. The Product Owner value is 54%; commits, test counts, repeated work and corrections already represented in the estimate do not independently increase it.
-- **IN DEVELOPMENT:** Editorial Transcript Projection V1 retains its approved read-only contract. Final bounded remediation tracks the last known speaker through unattributed words and performs exact incremental UTF-8 fitting without repeated prefix reconstruction. Focused micro-review and later PR/closeout remain pending.
+- **IMPLEMENTED/CLOSED:** Editorial Transcript Projection V1 merged through PR #51 at `56161b2af44c9e2de008bb33bc1706d4e2beaf7e`. Its approved read-only contract, last-known-speaker remediation and exact incremental UTF-8 fitting passed final independent review plus PR and post-merge CI. Semantic Editorial Analysis V1 is the next canonical decision and remains not started.
 - **CEVRA NATIVE IMPROVEMENT:** partial speaker evidence separates different known speakers even when unattributed words occur between them. Unknown words remain unknown, and this is not a diarization claim.
 
 ---
@@ -1997,9 +2004,9 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete Editorial Transcript Projection V1 through focused independent review and its later PR/closeout gates; it is **IN DEVELOPMENT** on `feat/editorial-transcript-projection-v1`.
-2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for transcript projection.
-3. After the projection is accepted, delimit semantic editorial analysis before strategy/takes/cut planning; none of those semantic stages has started.
+1. Delimit Semantic Editorial Analysis V1 as the **NEXT CANONICAL DECISION / NOT STARTED** before strategy, take selection or cut planning; do not begin those downstream stages implicitly.
+2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
+3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
 5. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
 6. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
