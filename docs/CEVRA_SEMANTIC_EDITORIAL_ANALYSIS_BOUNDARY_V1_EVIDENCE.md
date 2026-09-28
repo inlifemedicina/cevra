@@ -1,10 +1,16 @@
 # Semantic Editorial Analysis Boundary V1 — Evidence
 
-**Status:** IMPLEMENTED ON FEATURE BRANCH / FOCUSED REVIEW PENDING  
-**Date:** 2026-09-28  
-**Canonical base:** `394d959c43c1591b74aa5c1755ec2757a4dee045`  
-**Branch:** `feat/semantic-editorial-analysis-boundary-v1`  
+**Status:** IMPLEMENTED ON FEATURE BRANCH / FOCUSED REVIEW PENDING
+
+**Date:** 2026-09-28
+
+**Canonical base:** `394d959c43c1591b74aa5c1755ec2757a4dee045`
+
+**Branch:** `feat/semantic-editorial-analysis-boundary-v1`
+
 **Code checkpoint:** `30dc2e502a7d64849a5bd12d82e563f5d13b4c8f`
+
+**Payload-characterization test checkpoint:** `f43f100f33c0b054772133c7a853415918518c40`
 
 ## Delivered boundary
 
@@ -52,9 +58,22 @@ Covered scenarios include:
 - ProjectHistory, journal, snapshots and redo unchanged on success/error;
 - deep immutability and caller/output alias isolation.
 
-Initial directed result: **16/16 PASS**. The complete Application and repository
-regressions plus remote CI are recorded in the final implementation handoff;
-this document intentionally does not use a self-referential commit SHA.
+Directed result: **16/16 PASS**. The compact PT-BR two-source fixture delivered
+seven fragments in one 2,322-byte request and received an 828-byte response.
+The equivalent EN-US one-source fixture delivered four fragments in one
+1,648-byte request and received a 356-byte response. These are exact compact
+UTF-8 JSON measurements from the scripted fixture run, not token, latency,
+quality or provider-cost estimates.
+
+The complete Application suite passed **200/200**. The monorepo Node/TypeScript
+regression passed every package before Desktop Host; its first Desktop Host run
+used the macOS system Python 3.9 and correctly classified two managed-runtime
+fixtures as `runtime-invalid`. Re-running that affected package with the
+available explicit Python 3.12.14 test environment passed **74/74**, followed by
+Desktop **45/45**. The complete production build passed and `npm audit` reported
+zero vulnerabilities. No native FFmpeg catalog, ML model download or real
+semantic analyzer was run. Remote CI is recorded in the final implementation
+handoff; this document intentionally does not use a self-referential final SHA.
 
 ## Honest scope
 
