@@ -354,11 +354,16 @@ class WindowsH264FeasibilityTests(unittest.TestCase):
                 build_ffmpeg.verify_zlib_configure_probe(source)
 
     def test_dumpbin_dependency_inventory_rejects_dynamic_zlib(self) -> None:
-        fixture = "Image has the following dependencies:\n    KERNEL32.dll\n    USER32.dll\n"
+        fixture = "Image has the following dependencies:\n    AVICAP32.dll\n    KERNEL32.dll\n    USER32.dll\n"
         with patch.object(build_ffmpeg.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, fixture, "")):
             self.assertEqual(
                 build_ffmpeg.binary_dependencies(Path("ffmpeg.exe"), {}),
-                {"all": ["KERNEL32.dll", "USER32.dll"], "system": ["KERNEL32.dll", "USER32.dll"], "bundled": [], "unexpectedExternal": []},
+                {
+                    "all": ["AVICAP32.dll", "KERNEL32.dll", "USER32.dll"],
+                    "system": ["AVICAP32.dll", "KERNEL32.dll", "USER32.dll"],
+                    "bundled": [],
+                    "unexpectedExternal": [],
+                },
             )
         bad = "Image has the following dependencies:\n    zlib1.dll\n"
         with patch.object(build_ffmpeg.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, bad, "")):

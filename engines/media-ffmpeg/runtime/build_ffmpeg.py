@@ -24,7 +24,7 @@ MSVC_DEPENDENCY_FILTER_ID = "cevra-msvc-dependency-filter-v1"
 MSVC_DEPENDENCY_FILTER_PACKAGED = "sources/ffmpeg/CEVRA_MSVC_DEPENDENCIES.awk"
 ZLIB_SELECTION_METHOD = "msvc-static-lib-search-v1"
 WINDOWS_SYSTEM_DLLS = frozenset({
-    "advapi32.dll", "bcrypt.dll", "cfgmgr32.dll", "combase.dll", "crypt32.dll", "d3d11.dll", "dxgi.dll",
+    "advapi32.dll", "avicap32.dll", "bcrypt.dll", "cfgmgr32.dll", "combase.dll", "crypt32.dll", "d3d11.dll", "dxgi.dll",
     "dxva2.dll", "gdi32.dll", "kernel32.dll", "mf.dll", "mfplat.dll", "mfreadwrite.dll", "mfuuid.dll",
     "ntdll.dll", "ole32.dll", "oleaut32.dll", "propsys.dll", "rpcrt4.dll", "secur32.dll", "shell32.dll",
     "shlwapi.dll", "user32.dll", "version.dll", "winmm.dll", "ws2_32.dll",
