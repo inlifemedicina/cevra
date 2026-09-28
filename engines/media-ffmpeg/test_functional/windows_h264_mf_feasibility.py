@@ -19,8 +19,10 @@ import re
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import wave
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +31,9 @@ FORMAT_VERSION = 1
 AAC_FRAME_SAMPLES = 1024
 SAMPLE_RATE = 48_000
 NEGATIVE_OFFSET_SECONDS = 0.250
+EVENT_FRACTIONS = (0.15, 0.50, 0.85)
+EVENT_COUNT = 3
+MAX_CAPTURE_BYTES = 1024 * 1024
 
 
 def sha256(path: Path) -> str:
@@ -75,20 +80,29 @@ def _peak_working_set(process: subprocess.Popen[str]) -> int | None:
 
 def run_measured(argv: list[str], *, timeout: float = 180.0) -> tuple[subprocess.CompletedProcess[str], float, int | None]:
     started = time.perf_counter()
-    process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    peak: int | None = None
-    while process.poll() is None:
+    with tempfile.TemporaryFile(mode="w+b") as stdout_file, tempfile.TemporaryFile(mode="w+b") as stderr_file:
+        process = subprocess.Popen(argv, stdout=stdout_file, stderr=stderr_file)
+        peak: int | None = None
+        while process.poll() is None:
+            observed = _peak_working_set(process)
+            peak = max(peak or 0, observed or 0) or None
+            if time.perf_counter() - started > timeout:
+                process.kill()
+                process.wait()
+                raise RuntimeError(f"command timed out after {timeout:.1f}s: {argv[0]}")
+            time.sleep(0.02)
         observed = _peak_working_set(process)
         peak = max(peak or 0, observed or 0) or None
-        if time.perf_counter() - started > timeout:
-            process.kill()
-            process.communicate()
-            raise RuntimeError(f"command timed out after {timeout:.1f}s: {argv[0]}")
-        time.sleep(0.02)
-    stdout, stderr = process.communicate()
-    observed = _peak_working_set(process)
-    peak = max(peak or 0, observed or 0) or None
-    return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr), time.perf_counter() - started, peak
+
+        def bounded_text(handle) -> str:
+            handle.flush()
+            size = handle.tell()
+            handle.seek(max(0, size - MAX_CAPTURE_BYTES))
+            return handle.read(MAX_CAPTURE_BYTES).decode("utf-8", errors="replace")
+
+        stdout = bounded_text(stdout_file)
+        stderr = bounded_text(stderr_file)
+        return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr), time.perf_counter() - started, peak
 
 
 def write_click_track(path: Path, duration: float, events: list[float]) -> None:
@@ -142,8 +156,10 @@ def decoded_video_events(ffmpeg: Path, ffprobe: Path, output: Path) -> tuple[lis
         "-show_entries", "frame=best_effort_timestamp_time", "-of", "json", str(output),
     ]).get("frames") or []
     times = [float(item["best_effort_timestamp_time"]) for item in frames]
+    if not times or any(not math.isfinite(value) for value in times) or any(right <= left for left, right in zip(times, times[1:])):
+        raise RuntimeError("decoded video frame timestamps are missing, non-finite, or non-monotonic")
     raw = subprocess.run(
-        [str(ffmpeg), "-v", "error", "-i", str(output), "-map", "0:v:0", "-vf", "scale=1:1,format=gray", "-f", "rawvideo", "-"],
+        [str(ffmpeg), "-v", "error", "-i", str(output), "-map", "0:v:0", "-vf", "scale=1:1,format=gray", "-fps_mode", "passthrough", "-f", "rawvideo", "-"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120, check=True,
     ).stdout
     levels = [float(value) for value in raw]
@@ -152,7 +168,41 @@ def decoded_video_events(ffmpeg: Path, ffprobe: Path, output: Path) -> tuple[lis
     return event_centers_from_levels(levels, times, 128.0), len(times), times
 
 
-def decoded_audio_events(ffmpeg: Path, output: Path) -> tuple[list[float], int]:
+def audio_frame_timeline(ffprobe: Path, output: Path) -> dict[str, Any]:
+    frames = json_output([
+        str(ffprobe), "-v", "error", "-select_streams", "a:0", "-show_frames",
+        "-show_entries", "frame=best_effort_timestamp_time,nb_samples", "-of", "json", str(output),
+    ]).get("frames") or []
+    if not frames:
+        raise RuntimeError("decoded audio frame timeline is missing")
+    parsed: list[tuple[float, int]] = []
+    for frame in frames:
+        try:
+            pts = float(frame["best_effort_timestamp_time"])
+            samples = int(frame["nb_samples"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise RuntimeError("decoded audio frame timeline is incomplete") from exc
+        if not math.isfinite(pts) or samples <= 0:
+            raise RuntimeError("decoded audio frame timeline contains invalid values")
+        parsed.append((pts, samples))
+    if any(right[0] <= left[0] for left, right in zip(parsed, parsed[1:])):
+        raise RuntimeError("decoded audio frame timestamps are non-monotonic")
+    continuity_tolerance = (1 / SAMPLE_RATE) + 0.000001
+    continuity_errors = [abs(right[0] - (left[0] + left[1] / SAMPLE_RATE)) for left, right in zip(parsed, parsed[1:])]
+    if continuity_errors and max(continuity_errors) > continuity_tolerance:
+        raise RuntimeError(f"decoded audio frame timeline is discontinuous: {max(continuity_errors)}")
+    return {
+        "firstPtsSeconds": parsed[0][0],
+        "lastEndPtsSeconds": parsed[-1][0] + parsed[-1][1] / SAMPLE_RATE,
+        "frameCount": len(parsed),
+        "frameSamples": sum(samples for _, samples in parsed),
+        "maxContinuityErrorSeconds": max(continuity_errors, default=0.0),
+        "continuityToleranceSeconds": continuity_tolerance,
+    }
+
+
+def decoded_audio_events(ffmpeg: Path, ffprobe: Path, output: Path) -> tuple[list[float], int, dict[str, Any]]:
+    timeline = audio_frame_timeline(ffprobe, output)
     raw = subprocess.run(
         [str(ffmpeg), "-v", "error", "-i", str(output), "-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "s16le", "-"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120, check=True,
@@ -170,15 +220,33 @@ def decoded_audio_events(ffmpeg: Path, output: Path) -> tuple[list[float], int]:
             continue
         rms = math.sqrt(sum(float(value) * float(value) for value in part) / len(part)) / 32768.0
         levels.append(rms)
-        times.append((offset + len(part) / 2) / SAMPLE_RATE)
-    return event_centers_from_levels(levels, times, 0.10), len(samples)
+        times.append(timeline["firstPtsSeconds"] + (offset + len(part) / 2) / SAMPLE_RATE)
+    return event_centers_from_levels(levels, times, 0.10), len(samples), timeline
 
 
-def align_events(video: list[float], audio: list[float], tolerance: float) -> dict[str, Any]:
-    if len(video) != len(audio) or not video:
-        raise RuntimeError(f"event count mismatch: video={video}, audio={audio}")
-    errors = [abs(left - right) for left, right in zip(video, audio, strict=True)]
-    return {"videoSeconds": video, "audioSeconds": audio, "errorsMs": [value * 1000 for value in errors], "maxErrorMs": max(errors) * 1000, "passed": max(errors) <= tolerance}
+def align_events(video: list[float], audio: list[float], planned: list[float], tolerance: float) -> dict[str, Any]:
+    counts_valid = len(video) == EVENT_COUNT and len(audio) == EVENT_COUNT and len(planned) == EVENT_COUNT
+    if not counts_valid:
+        return {
+            "plannedSeconds": planned, "videoSeconds": video, "audioSeconds": audio,
+            "eventCounts": {"planned": len(planned), "video": len(video), "audio": len(audio)},
+            "passed": False,
+        }
+    av_errors = [abs(left - right) for left, right in zip(video, audio, strict=True)]
+    video_truth = [abs(observed - truth) for observed, truth in zip(video, planned, strict=True)]
+    audio_truth = [abs(observed - truth) for observed, truth in zip(audio, planned, strict=True)]
+    maximum = max([*av_errors, *video_truth, *audio_truth])
+    return {
+        "plannedSeconds": planned,
+        "videoSeconds": video,
+        "audioSeconds": audio,
+        "eventCounts": {"planned": len(planned), "video": len(video), "audio": len(audio)},
+        "avErrorsMs": [value * 1000 for value in av_errors],
+        "videoTruthErrorsMs": [value * 1000 for value in video_truth],
+        "audioTruthErrorsMs": [value * 1000 for value in audio_truth],
+        "maxErrorMs": maximum * 1000,
+        "passed": maximum <= tolerance,
+    }
 
 
 def stream_map(probe: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -190,85 +258,199 @@ def stream_map(probe: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return result
 
 
-def psnr_average(ffmpeg: Path, output: Path, source_filter: str, frames: int) -> float:
+def psnr_average(ffmpeg: Path, output: Path, source_filter: str, frames: int) -> float | str:
     result = run([
         str(ffmpeg), "-hide_banner", "-i", str(output), "-f", "lavfi", "-i", source_filter,
         "-filter_complex", "[0:v]format=yuv420p[decoded];[1:v]format=yuv420p[reference];[decoded][reference]psnr",
         "-frames:v", str(frames), "-an", "-f", "null", os.devnull,
     ])
-    match = re.search(r"average:([0-9.]+)", result.stderr)
+    match = re.search(r"average:(inf|[0-9.]+)", result.stderr)
     if match is None:
         raise RuntimeError("FFmpeg PSNR summary is missing")
-    return float(match.group(1))
+    return "inf" if match.group(1) == "inf" else float(match.group(1))
 
 
-def execute_case(ffmpeg: Path, ffprobe: Path, scratch: Path, case: dict[str, Any]) -> dict[str, Any]:
-    name = str(case["name"])
-    rate = str(case["rate"])
-    numerator, denominator = (int(value) for value in rate.split("/"))
-    frames = int(case["frames"])
-    duration = frames * denominator / numerator
-    events = [duration * fraction for fraction in (0.10, 0.50, 0.90)]
-    audio = scratch / f"{name}.wav"
-    output = scratch / f"{name}.mp4"
-    write_click_track(audio, duration, events)
-    source_filter = video_filter(int(case["width"]), int(case["height"]), rate, duration, events)
+def rational(value: Any, label: str) -> Fraction:
+    try:
+        parsed = Fraction(str(value))
+    except (ValueError, ZeroDivisionError) as exc:
+        raise RuntimeError(f"invalid {label}: {value}") from exc
+    if parsed <= 0:
+        raise RuntimeError(f"invalid {label}: {value}")
+    return parsed
+
+
+def encode_fixture(
+    ffmpeg: Path,
+    output: Path,
+    audio: Path,
+    source_filter: str,
+    frames: int,
+    *,
+    measured: bool,
+) -> tuple[float | None, int | None]:
     command = [
-        str(ffmpeg), "-hide_banner", "-nostdin", "-y", "-v", "info",
+        str(ffmpeg), "-hide_banner", "-nostdin", "-y", "-nostats", "-v", "error",
         "-f", "lavfi", "-i", source_filter, "-i", str(audio),
         "-map", "0:v:0", "-map", "1:a:0", "-frames:v", str(frames),
         "-c:v", "h264_mf", "-pix_fmt", "nv12", "-b:v", "2M",
         "-c:a", "aac", "-ar", str(SAMPLE_RATE), "-ac", "2", "-movflags", "+faststart", str(output),
     ]
-    completed, wall, peak_rss = run_measured(command)
+    if measured:
+        completed, wall, peak_rss = run_measured(command)
+    else:
+        completed = run(command, check=False, timeout=180)
+        wall, peak_rss = None, None
     if completed.returncode != 0:
         detail = "\n".join(completed.stderr.splitlines()[-40:])
-        raise RuntimeError(f"h264_mf encode failed for {name}\n{detail}")
+        raise RuntimeError(f"h264_mf encode failed for {output.stem}\n{detail}")
     if not output.is_file() or output.stat().st_size == 0:
-        raise RuntimeError(f"h264_mf did not publish an output for {name}")
+        raise RuntimeError(f"h264_mf did not publish an output for {output.stem}")
+    return wall, peak_rss
+
+
+def analyze_output(
+    ffmpeg: Path,
+    ffprobe: Path,
+    output: Path,
+    planned: list[float],
+    tolerance: float,
+) -> dict[str, Any]:
     probe = json_output([
         str(ffprobe), "-v", "error", "-count_frames", "-show_streams", "-show_format", "-of", "json", str(output),
     ])
-    streams = stream_map(probe)
-    video = streams.get("video") or {}
-    audio_stream = streams.get("audio") or {}
-    if video.get("codec_name") != "h264" or audio_stream.get("codec_name") != "aac":
-        raise RuntimeError(f"unexpected codecs for {name}: {video.get('codec_name')}/{audio_stream.get('codec_name')}")
+    all_streams = probe.get("streams") or []
+    video_streams = [stream for stream in all_streams if stream.get("codec_type") == "video"]
+    audio_streams = [stream for stream in all_streams if stream.get("codec_type") == "audio"]
+    if len(all_streams) != 2 or len(video_streams) != 1 or len(audio_streams) != 1:
+        raise RuntimeError(f"unexpected stream shape: total={len(all_streams)} video={len(video_streams)} audio={len(audio_streams)}")
+    video = video_streams[0]
+    audio = audio_streams[0]
+    if video.get("duration") is None or audio.get("duration") is None:
+        raise RuntimeError("per-stream duration evidence is required")
+    if video.get("codec_name") != "h264" or audio.get("codec_name") != "aac":
+        raise RuntimeError(f"unexpected codecs: {video.get('codec_name')}/{audio.get('codec_name')}")
+    if int(audio.get("sample_rate") or 0) != SAMPLE_RATE:
+        raise RuntimeError(f"unexpected audio sample rate: {audio.get('sample_rate')}")
     run([str(ffmpeg), "-v", "error", "-i", str(output), "-map", "0", "-f", "null", os.devnull])
-    video_events, decoded_frames, pts = decoded_video_events(ffmpeg, ffprobe, output)
-    audio_events, decoded_samples = decoded_audio_events(ffmpeg, output)
-    frame_period = denominator / numerator
-    tolerance = frame_period + (1 / SAMPLE_RATE) + (AAC_FRAME_SAMPLES / SAMPLE_RATE)
-    timing = align_events(video_events, audio_events, tolerance)
-    negative = align_events(video_events, [value + NEGATIVE_OFFSET_SECONDS for value in audio_events], tolerance)
-    if not timing["passed"]:
-        raise RuntimeError(f"A/V event oracle failed for {name}: {timing}")
-    if negative["passed"]:
-        raise RuntimeError(f"negative A/V timing control did not fail for {name}")
-    if decoded_frames != frames:
-        raise RuntimeError(f"decoded frame count mismatch for {name}: {decoded_frames} != {frames}")
-    if any(right <= left for left, right in zip(pts, pts[1:])):
-        raise RuntimeError(f"non-monotonic decoded video timestamps for {name}")
-    stream_durations = {
-        "video": float(video.get("duration") or probe.get("format", {}).get("duration") or 0),
-        "audio": float(audio_stream.get("duration") or probe.get("format", {}).get("duration") or 0),
-    }
-    duration_tolerance = tolerance
-    if abs(stream_durations["video"] - duration) > duration_tolerance or abs(stream_durations["audio"] - duration) > duration_tolerance:
-        raise RuntimeError(f"stream duration mismatch for {name}: expected={duration}, actual={stream_durations}")
+    video_events, decoded_frames, video_pts = decoded_video_events(ffmpeg, ffprobe, output)
+    audio_events, decoded_samples, audio_timeline = decoded_audio_events(ffmpeg, ffprobe, output)
+    video_start = float(video.get("start_time"))
+    audio_start = float(audio.get("start_time"))
+    start_tolerance = (1 / SAMPLE_RATE) + 0.000001
+    if abs(video_start - video_pts[0]) > start_tolerance:
+        raise RuntimeError(f"video stream start_time disagrees with first decoded PTS: {video_start}/{video_pts[0]}")
+    if abs(audio_start - audio_timeline["firstPtsSeconds"]) > start_tolerance:
+        raise RuntimeError(f"audio stream start_time disagrees with first decoded PTS: {audio_start}/{audio_timeline['firstPtsSeconds']}")
     return {
-        "name": name,
-        "dimensions": [int(case["width"]), int(case["height"])],
-        "rate": rate,
-        "expectedFrames": frames,
+        "probe": probe,
+        "video": video,
+        "audio": audio,
         "decodedFrames": decoded_frames,
         "decodedAudioSamples": decoded_samples,
+        "videoPts": video_pts,
+        "audioTimeline": audio_timeline,
+        "streamStartSeconds": {"video": video_start, "audio": audio_start},
+        "firstDecodedFramePtsSeconds": {"video": video_pts[0], "audio": audio_timeline["firstPtsSeconds"]},
+        "timing": align_events(video_events, audio_events, planned, tolerance),
+    }
+
+
+def make_container_offset_negative(ffmpeg: Path, positive: Path, output: Path) -> None:
+    result = run([
+        str(ffmpeg), "-hide_banner", "-nostdin", "-y", "-nostats", "-v", "error",
+        "-i", str(positive), "-itsoffset", f"{NEGATIVE_OFFSET_SECONDS:.3f}", "-i", str(positive),
+        "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-copyts", "-start_at_zero", str(output),
+    ], check=False)
+    if result.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
+        raise RuntimeError(f"container-offset negative fixture failed: {' '.join(result.stderr.splitlines()[-20:])}")
+
+
+def execute_case(ffmpeg: Path, ffprobe: Path, scratch: Path, case: dict[str, Any]) -> dict[str, Any]:
+    name = str(case["name"])
+    rate = str(case["rate"])
+    frame_rate = rational(rate, "fixture rate")
+    frames = int(case["frames"])
+    duration = float(Fraction(frames, 1) / frame_rate)
+    planned = [duration * fraction for fraction in EVENT_FRACTIONS]
+    tolerance = float((1 / frame_rate) + Fraction(1, SAMPLE_RATE) + Fraction(AAC_FRAME_SAMPLES, SAMPLE_RATE))
+    width, height = int(case["width"]), int(case["height"])
+    source_filter = video_filter(width, height, rate, duration, planned)
+
+    audio = scratch / f"{name}.wav"
+    output = scratch / f"{name}.mp4"
+    write_click_track(audio, duration, planned)
+    wall, peak_rss = encode_fixture(ffmpeg, output, audio, source_filter, frames, measured=True)
+    positive = analyze_output(ffmpeg, ffprobe, output, planned, tolerance)
+    if not positive["timing"]["passed"]:
+        raise RuntimeError(f"A/V event oracle failed for {name}: {positive['timing']}")
+    video = positive["video"]
+    audio_stream = positive["audio"]
+    if int(video.get("width") or 0) != width or int(video.get("height") or 0) != height:
+        raise RuntimeError(f"output dimensions mismatch for {name}")
+    if rational(video.get("avg_frame_rate"), "output avg_frame_rate") != frame_rate:
+        raise RuntimeError(f"output frame rate mismatch for {name}: {video.get('avg_frame_rate')} != {rate}")
+    if positive["decodedFrames"] != frames:
+        raise RuntimeError(f"decoded frame count mismatch for {name}: {positive['decodedFrames']} != {frames}")
+    expected_samples = round(duration * SAMPLE_RATE)
+    if positive["decodedAudioSamples"] != expected_samples:
+        raise RuntimeError(f"decoded audio sample count mismatch for {name}: {positive['decodedAudioSamples']} != {expected_samples}")
+    stream_durations = {"video": float(video["duration"]), "audio": float(audio_stream["duration"])}
+    if any(abs(value - duration) > tolerance for value in stream_durations.values()):
+        raise RuntimeError(f"stream duration mismatch for {name}: expected={duration}, actual={stream_durations}")
+
+    negative_a_audio = scratch / f"{name}-negative-sample-offset.wav"
+    negative_a_output = scratch / f"{name}-negative-sample-offset.mp4"
+    write_click_track(negative_a_audio, duration, [value + NEGATIVE_OFFSET_SECONDS for value in planned])
+    encode_fixture(ffmpeg, negative_a_output, negative_a_audio, source_filter, frames, measured=False)
+    negative_a = analyze_output(ffmpeg, ffprobe, negative_a_output, planned, tolerance)
+    if negative_a["timing"]["passed"]:
+        raise RuntimeError(f"real sample-offset negative control was accepted for {name}")
+
+    negative_b_output = scratch / f"{name}-negative-container-offset.mp4"
+    make_container_offset_negative(ffmpeg, output, negative_b_output)
+    negative_b = analyze_output(ffmpeg, ffprobe, negative_b_output, planned, tolerance)
+    observed_offset = negative_b["streamStartSeconds"]["audio"] - negative_b["streamStartSeconds"]["video"]
+    if abs(observed_offset - NEGATIVE_OFFSET_SECONDS) > tolerance:
+        raise RuntimeError(f"container-offset control did not retain its real timestamp offset for {name}: {observed_offset}")
+    if negative_b["timing"]["passed"]:
+        raise RuntimeError(f"real container-offset negative control was accepted for {name}")
+
+    return {
+        "name": name,
+        "dimensions": [width, height],
+        "rate": rate,
+        "observedRate": video.get("avg_frame_rate"),
+        "expectedFrames": frames,
+        "decodedFrames": positive["decodedFrames"],
+        "expectedAudioSamples": expected_samples,
+        "decodedAudioSamples": positive["decodedAudioSamples"],
         "expectedDurationSeconds": duration,
         "streamDurationsSeconds": stream_durations,
-        "durationToleranceMs": duration_tolerance * 1000,
+        "containerDurationSeconds": float(positive["probe"].get("format", {}).get("duration") or 0),
+        "durationToleranceMs": tolerance * 1000,
         "timingToleranceMs": tolerance * 1000,
-        "timing": timing,
-        "negativeControl": {**negative, "knownOffsetMs": NEGATIVE_OFFSET_SECONDS * 1000, "expectedPassed": False},
+        "streamStartSeconds": positive["streamStartSeconds"],
+        "firstDecodedFramePtsSeconds": positive["firstDecodedFramePtsSeconds"],
+        "audioFrameTimeline": positive["audioTimeline"],
+        "timing": positive["timing"],
+        "negativeSampleOffset": {
+            "knownOffsetMs": NEGATIVE_OFFSET_SECONDS * 1000,
+            "expectedPassed": False,
+            "detector": negative_a["timing"],
+            "outputBytes": negative_a_output.stat().st_size,
+            "outputSha256": sha256(negative_a_output),
+        },
+        "negativeContainerOffset": {
+            "knownOffsetMs": NEGATIVE_OFFSET_SECONDS * 1000,
+            "observedStreamOffsetMs": observed_offset * 1000,
+            "streamStartSeconds": negative_b["streamStartSeconds"],
+            "firstDecodedFramePtsSeconds": negative_b["firstDecodedFramePtsSeconds"],
+            "expectedPassed": False,
+            "detector": negative_b["timing"],
+            "outputBytes": negative_b_output.stat().st_size,
+            "outputSha256": sha256(negative_b_output),
+        },
         "psnrAverageDb": psnr_average(ffmpeg, output, source_filter, frames),
         "wallSeconds": wall,
         "peakRssBytes": peak_rss,
@@ -316,7 +498,7 @@ def main() -> int:
         manifest = json.loads((runtime / "manifest.json").read_text(encoding="utf-8"))
         buildconf_process = run([str(ffmpeg), "-buildconf"])
         buildconf = buildconf_process.stdout + buildconf_process.stderr
-        required_flags = {"--disable-autodetect", "--disable-gpl", "--disable-nonfree", "--disable-network", "--enable-mediafoundation"}
+        required_flags = {"--disable-autodetect", "--disable-gpl", "--disable-nonfree", "--disable-network", "--enable-mediafoundation", "--enable-zlib", "--pkg-config=false"}
         missing_flags = sorted(flag for flag in required_flags if flag not in buildconf)
         if missing_flags:
             raise RuntimeError(f"exact FFmpeg build is missing required flags: {missing_flags}")
@@ -325,7 +507,14 @@ def main() -> int:
         options = run([str(ffmpeg), "-hide_banner", "-h", "encoder=h264_mf"], check=False)
         worker_info = json_output([str(python), "-I", "-B", str(worker), "--info"])
         worker_health_process = run([str(python), "-I", "-B", str(worker), "--health"], check=False)
-        worker_health = json.loads(worker_health_process.stdout)
+        if worker_health_process.returncode != 0:
+            raise RuntimeError(f"production worker health failed ({worker_health_process.returncode})")
+        try:
+            worker_health = json.loads(worker_health_process.stdout)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("production worker health returned invalid JSON") from exc
+        if not isinstance(worker_health, dict) or worker_health.get("ok") is not True:
+            raise RuntimeError("production worker health did not report ok=true")
         effective_h264 = [item for item in worker_health.get("effectiveDeliveries") or [] if item.get("videoCodec") == "h264"]
         if effective_h264:
             raise RuntimeError("production worker unexpectedly enabled a Windows H.264 delivery")
@@ -344,6 +533,8 @@ def main() -> int:
             "workerInfoPlatform": worker_info.get("runtime", {}).get("platform"),
             "workerHealthOk": worker_health.get("ok"),
             "productionH264Deliveries": effective_h264,
+            "zlibSelection": manifest.get("ffmpeg", {}).get("zlib", {}).get("selection"),
+            "buildAdjustments": manifest.get("ffmpeg", {}).get("buildAdjustments"),
         }
         report["encoder"] = {
             "name": "h264_mf",

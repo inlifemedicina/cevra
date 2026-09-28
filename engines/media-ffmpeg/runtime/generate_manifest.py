@@ -17,6 +17,7 @@ ENGINE = HERE.parent
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ENGINE / "worker"))
 from runtime_integrity import CRITICAL_WORKER_FILES, RuntimeIntegrityError, required_notice_paths, sha256, tree_sha256
+from schema_validator import SchemaValidationError, validate as validate_schema
 
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 
@@ -154,6 +155,9 @@ def windows_zlib_metadata(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> d
         if sha256(path) != digest:
             raise SystemExit(f"Windows zlib compliance artifact digest mismatch: {relative}")
     component(runtime, str(expected["buildInstructions"]))
+    selection = ffmpeg_provenance.get("zlib", {}).get("selection") if isinstance(ffmpeg_provenance.get("zlib"), dict) else None
+    if not isinstance(selection, dict):
+        raise SystemExit("FFmpeg provenance is missing the exact Windows zlib selection proof")
     summary = {
         "version": pin["version"],
         "license": pin["license"],
@@ -162,6 +166,7 @@ def windows_zlib_metadata(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> d
         "staticLink": True,
         "preparedBuildInput": True,
         "provenance": "provenance/zlib.json",
+        "selection": selection,
     }
     if ffmpeg_provenance.get("zlib") != summary:
         raise SystemExit("FFmpeg provenance does not bind the pinned Windows zlib build input")
@@ -175,7 +180,40 @@ def windows_zlib_metadata(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> d
         "preparedBuildInput": True,
         "smoke": provenance["smoke"],
         "toolchain": provenance["toolchain"],
+        "selection": selection,
     }
+
+
+def windows_build_adjustments(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> list[dict[str, Any]]:
+    adjustments = ffmpeg_provenance.get("buildAdjustments")
+    if not isinstance(adjustments, list) or len(adjustments) != 1 or not isinstance(adjustments[0], dict):
+        raise SystemExit("FFmpeg provenance is missing the exact Windows build adjustment")
+    expected = {
+        "id": "cevra-msvc-dependency-filter-v1",
+        "helperPath": "sources/ffmpeg/CEVRA_MSVC_DEPENDENCIES.awk",
+        "generatedFile": "ffbuild/config.mak",
+        "sourcePatternId": "ffmpeg-9.0.1-msvc-inline-awk-v1",
+        "sourcePatternSha256": "885c5a5b7b551aecab5abe5696f76637374291c48ca2f948555f32a66438686f",
+        "generatedCommandCount": 4,
+        "sourceArchiveModified": False,
+    }
+    record = adjustments[0]
+    if any(record.get(key) != value for key, value in expected.items()):
+        raise SystemExit("FFmpeg Windows build adjustment provenance is invalid")
+    helper = component(runtime, expected["helperPath"])
+    digest = record.get("helperSha256")
+    if not isinstance(digest, str) or sha256(helper) != digest:
+        raise SystemExit("FFmpeg packaged MSVC dependency helper does not match provenance")
+    component(runtime, "sources/ffmpeg/BUILD.md")
+    return [dict(record)]
+
+
+def validate_generated_manifest(manifest: dict[str, Any]) -> None:
+    try:
+        schema = json.loads((HERE / "manifest.schema.json").read_text(encoding="utf-8"))
+        validate_schema(manifest, schema)
+    except (OSError, UnicodeError, json.JSONDecodeError, SchemaValidationError) as exc:
+        raise SystemExit(f"generated Media Runtime manifest violates its schema: {exc}") from exc
 
 
 def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
@@ -277,8 +315,9 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
     if not isinstance(ffmpeg_provenance.get("toolchain"), dict):
         raise SystemExit("FFmpeg provenance is missing toolchain identification")
     zlib_metadata = windows_zlib_metadata(runtime, ffmpeg_provenance) if sys_platform() == "win32" else None
+    build_adjustments = windows_build_adjustments(runtime, ffmpeg_provenance) if sys_platform() == "win32" else None
 
-    return {
+    manifest = {
         "format": "cevra-media-runtime", "formatVersion": 1,
         "runtimeVersion": actual_worker, "workerVersion": actual_worker,
         "platform": sys_platform(), "arch": platform.machine() or "unknown",
@@ -318,12 +357,15 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
             "buildInstructions": ffmpeg_provenance["buildInstructions"],
             "toolchain": ffmpeg_provenance["toolchain"],
             **({"zlib": zlib_metadata} if zlib_metadata is not None else {}),
+            **({"buildAdjustments": build_adjustments} if build_adjustments is not None else {}),
         },
         "notices": [
             {"id": ident, "path": relative, "sha256": sha256(runtime / relative), **component_notice_metadata.get(ident, {})}
             for ident, relative in notices_required.items()
         ],
     }
+    validate_generated_manifest(manifest)
+    return manifest
 
 
 def sys_platform() -> str:

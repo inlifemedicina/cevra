@@ -234,6 +234,28 @@ def _run_version(path: Path, probe: bool = False) -> str:
     return match.group(1)
 
 
+def verify_windows_build_adjustments(root: Path, manifest_value: Any, provenance_value: Any) -> None:
+    if not isinstance(manifest_value, list) or len(manifest_value) != 1:
+        raise RuntimeIntegrityError("Windows FFmpeg manifest must contain exactly one build adjustment")
+    adjustment = _object(manifest_value[0], "ffmpeg.buildAdjustments[0]")
+    expected = {
+        "id": "cevra-msvc-dependency-filter-v1",
+        "helperPath": "sources/ffmpeg/CEVRA_MSVC_DEPENDENCIES.awk",
+        "generatedFile": "ffbuild/config.mak",
+        "sourcePatternId": "ffmpeg-9.0.1-msvc-inline-awk-v1",
+        "sourcePatternSha256": "885c5a5b7b551aecab5abe5696f76637374291c48ca2f948555f32a66438686f",
+        "generatedCommandCount": 4,
+        "sourceArchiveModified": False,
+    }
+    if set(adjustment) != {*expected, "helperSha256"} or any(adjustment.get(key) != value for key, value in expected.items()):
+        raise RuntimeIntegrityError("Windows FFmpeg build adjustment is invalid")
+    helper = _safe_path(root, adjustment.get("helperPath"), "ffmpeg.buildAdjustments[0].helperPath")
+    _check_hash(helper, adjustment.get("helperSha256"), "ffmpeg.buildAdjustments[0].helperSha256")
+    _safe_path(root, "sources/ffmpeg/BUILD.md", "ffmpeg.buildInstructions")
+    if provenance_value != manifest_value:
+        raise RuntimeIntegrityError("Windows FFmpeg build adjustment provenance is inconsistent")
+
+
 def verify_release_bundle(
     runtime_root: Path,
     python_executable: Path,
@@ -446,7 +468,19 @@ def verify_release_bundle(
     if str(manifest.get("platform")) == "win32":
         if expected_windows_zlib is None:
             raise RuntimeIntegrityError("Windows runtime verifier is missing the pinned zlib policy")
+        adjustments = ffmpeg.get("buildAdjustments")
+        verify_windows_build_adjustments(root, adjustments, ffmpeg_provenance.get("buildAdjustments"))
         zlib = _object(ffmpeg.get("zlib"), "ffmpeg.zlib")
+        expected_zlib_fields = {
+            "id", "version", "license", "source", "sourceSignature", "signingKeySource", "signingFingerprint",
+            "verifiedSignerFingerprint", "sourceArchiveSha256", "sourceSignatureSha256", "signingKeySha256",
+            "licenseSha256", "librarySha256", "zlibHeaderSha256", "zconfHeaderSha256", "staticLink",
+            "preparedBuildInput", "sourceModified", "machine", "crt", "buildMethod", "provenance",
+            "provenanceSha256", "sourceArchive", "sourceSignatureFile", "signingKeyFile", "buildInstructions",
+            "licenseFile", "smoke", "toolchain", "selection",
+        }
+        if set(zlib) != expected_zlib_fields:
+            raise RuntimeIntegrityError("Windows zlib manifest contains missing or unexpected fields")
         zlib_provenance_path = _safe_path(root, zlib.get("provenance"), "ffmpeg.zlib.provenance")
         _check_hash(zlib_provenance_path, zlib.get("provenanceSha256"), "ffmpeg.zlib.provenanceSha256")
         zlib_provenance = _read_json(zlib_provenance_path, "Windows zlib provenance")
@@ -512,11 +546,74 @@ def verify_release_bundle(
             "staticLink": True,
             "preparedBuildInput": True,
             "provenance": "provenance/zlib.json",
+            "selection": zlib.get("selection"),
         }
         if ffmpeg_provenance.get("zlib") != zlib_summary:
             raise RuntimeIntegrityError("FFmpeg provenance does not bind the Windows zlib input")
-    elif "zlib" in ffmpeg or "zlib" in ffmpeg_provenance:
-        raise RuntimeIntegrityError("non-Windows runtime contains unexpected Windows zlib build provenance")
+        selection = _object(zlib.get("selection"), "ffmpeg.zlib.selection")
+        expected_selection_fields = {
+            "method", "pkgConfigDisabled", "librarySha256", "uniqueVisibleZlibLib", "configureProbe",
+            "dynamicZlibDependency", "binaryDependencies", "functionalSmoke",
+        }
+        if set(selection) != expected_selection_fields:
+            raise RuntimeIntegrityError("Windows zlib selection proof has unexpected fields")
+        if (
+            selection.get("method") != "msvc-static-lib-search-v1"
+            or selection.get("pkgConfigDisabled") is not True
+            or selection.get("uniqueVisibleZlibLib") is not True
+            or selection.get("dynamicZlibDependency") is not False
+            or selection.get("librarySha256") != zlib.get("librarySha256")
+        ):
+            raise RuntimeIntegrityError("Windows zlib selection proof is invalid")
+        configure_probe = _object(selection.get("configureProbe"), "ffmpeg.zlib.selection.configureProbe")
+        if set(configure_probe) != {"enabled", "probeSymbol", "linkArgument", "summarySha256", "summary"}:
+            raise RuntimeIntegrityError("Windows zlib configure proof has unexpected fields")
+        summary = configure_probe.get("summary")
+        if (
+            configure_probe.get("enabled") is not True
+            or configure_probe.get("probeSymbol") != "zlibVersion"
+            or configure_probe.get("linkArgument") != "-lz"
+            or not isinstance(summary, list)
+            or not 1 <= len(summary) <= 20
+            or any(not isinstance(line, str) or not line for line in summary)
+            or hashlib.sha256("\n".join(summary).encode("utf-8")).hexdigest() != _digest(configure_probe.get("summarySha256"), "ffmpeg.zlib.selection.configureProbe.summarySha256")
+        ):
+            raise RuntimeIntegrityError("Windows zlib configure proof is invalid")
+        dependencies = _object(selection.get("binaryDependencies"), "ffmpeg.zlib.selection.binaryDependencies")
+        if set(dependencies) != {"ffmpeg", "ffprobe"}:
+            raise RuntimeIntegrityError("Windows FFmpeg dependency inventory is invalid")
+        for product, value in dependencies.items():
+            inventory = _object(value, f"ffmpeg.zlib.selection.binaryDependencies.{product}")
+            if set(inventory) != {"all", "system", "bundled", "unexpectedExternal"}:
+                raise RuntimeIntegrityError(f"Windows {product} dependency inventory is invalid")
+            values = inventory.get("all")
+            system = inventory.get("system")
+            bundled = inventory.get("bundled")
+            unexpected = inventory.get("unexpectedExternal")
+            if (
+                not isinstance(values, list) or not values
+                or not isinstance(system, list) or not system
+                or not isinstance(bundled, list)
+                or unexpected != []
+                or sorted([*system, *bundled], key=str.lower) != sorted(values, key=str.lower)
+                or any(not isinstance(name, str) or not name.lower().endswith(".dll") for name in values)
+            ):
+                raise RuntimeIntegrityError(f"Windows {product} dependency inventory is invalid")
+            if any(name.lower().startswith("zlib") for name in values):
+                raise RuntimeIntegrityError(f"Windows {product} dynamically depends on zlib")
+        smoke = _object(selection.get("functionalSmoke"), "ffmpeg.zlib.selection.functionalSmoke")
+        if (
+            set(smoke) != {"kind", "status", "bytes", "sha256"}
+            or smoke.get("kind") != "png-roundtrip-v1"
+            or smoke.get("status") != "pass"
+            or not isinstance(smoke.get("bytes"), int)
+            or isinstance(smoke.get("bytes"), bool)
+            or smoke["bytes"] <= 0
+        ):
+            raise RuntimeIntegrityError("Windows FFmpeg PNG/zlib smoke provenance is invalid")
+        _digest(smoke.get("sha256"), "ffmpeg.zlib.selection.functionalSmoke.sha256")
+    elif any(key in ffmpeg or key in ffmpeg_provenance for key in ("zlib", "buildAdjustments")):
+        raise RuntimeIntegrityError("non-Windows runtime contains unexpected Windows-only FFmpeg provenance")
 
     notices = manifest["notices"]
     if not isinstance(notices, list):
