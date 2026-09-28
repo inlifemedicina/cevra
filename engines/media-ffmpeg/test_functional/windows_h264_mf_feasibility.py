@@ -337,7 +337,10 @@ def analyze_output(
     audio_events, decoded_samples, audio_timeline = decoded_audio_events(ffmpeg, ffprobe, output)
     video_start = float(video.get("start_time"))
     audio_start = float(audio.get("start_time"))
-    start_tolerance = (1 / SAMPLE_RATE) + 0.000001
+    # Container start_time may reflect AAC priming/edit-list semantics while
+    # decoded frame PTS identifies the actual sample timeline.  Compare and
+    # retain both, allowing at most one AAC frame plus decimal/sample error.
+    start_tolerance = ((AAC_FRAME_SAMPLES + 1) / SAMPLE_RATE) + 0.000001
     if abs(video_start - video_pts[0]) > start_tolerance:
         raise RuntimeError(f"video stream start_time disagrees with first decoded PTS: {video_start}/{video_pts[0]}")
     if abs(audio_start - audio_timeline["firstPtsSeconds"]) > start_tolerance:
@@ -352,6 +355,10 @@ def analyze_output(
         "audioTimeline": audio_timeline,
         "streamStartSeconds": {"video": video_start, "audio": audio_start},
         "firstDecodedFramePtsSeconds": {"video": video_pts[0], "audio": audio_timeline["firstPtsSeconds"]},
+        "streamStartToFirstPtsErrorMs": {
+            "video": abs(video_start - video_pts[0]) * 1000,
+            "audio": abs(audio_start - audio_timeline["firstPtsSeconds"]) * 1000,
+        },
         "timing": align_events(video_events, audio_events, planned, tolerance),
     }
 
@@ -432,6 +439,7 @@ def execute_case(ffmpeg: Path, ffprobe: Path, scratch: Path, case: dict[str, Any
         "timingToleranceMs": tolerance * 1000,
         "streamStartSeconds": positive["streamStartSeconds"],
         "firstDecodedFramePtsSeconds": positive["firstDecodedFramePtsSeconds"],
+        "streamStartToFirstPtsErrorMs": positive["streamStartToFirstPtsErrorMs"],
         "audioFrameTimeline": positive["audioTimeline"],
         "timing": positive["timing"],
         "negativeSampleOffset": {

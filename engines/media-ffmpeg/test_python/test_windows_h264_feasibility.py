@@ -365,6 +365,16 @@ class WindowsH264FeasibilityTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "dynamic zlib"):
                 build_ffmpeg.binary_dependencies(Path("ffmpeg.exe"), {})
 
+    def test_windows_build_instructions_require_the_complete_reproduction_contract(self) -> None:
+        markers = " ".join((
+            "<FFMPEG_SOURCE>", "<ZLIB_PREFIX>", "<INSTALL_PREFIX>", "SOURCE_DATE_EPOCH=0", "VSLANG=1033",
+            "INCLUDE", "LIB", "--pkg-config=false", "--enable-zlib", "ffbuild/config.mak", "exactly four",
+            "CEVRA_MSVC_DEPENDENCIES.awk", "make", "DESTDIR=<STAGING_ROOT>",
+        ))
+        build_ffmpeg.validate_windows_build_instructions(markers)
+        with self.assertRaisesRegex(SystemExit, "BUILD.md is incomplete"):
+            build_ffmpeg.validate_windows_build_instructions(markers.replace("--pkg-config=false", ""))
+
     def test_msvc_dependency_filter_replaces_only_the_known_generated_command(self) -> None:
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)

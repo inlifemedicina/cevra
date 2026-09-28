@@ -114,6 +114,8 @@ jobs:
           Copy-Item "$env:RUNNER_TEMP\cevra-media-runtime\manifest.json" "$evidence\runtime-manifest.json"
           Copy-Item "$env:RUNNER_TEMP\cevra-media-runtime\provenance\ffmpeg.json" "$evidence\ffmpeg-provenance.json"
           Copy-Item "$env:RUNNER_TEMP\cevra-media-runtime\provenance\zlib.json" "$evidence\zlib-runtime-provenance.json"
+          Copy-Item "$env:RUNNER_TEMP\cevra-media-runtime\sources\ffmpeg\BUILD.md" "$evidence\ffmpeg-BUILD.md"
+          Copy-Item "$env:RUNNER_TEMP\cevra-media-runtime\sources\ffmpeg\CEVRA_MSVC_DEPENDENCIES.awk" "$evidence\CEVRA_MSVC_DEPENDENCIES.awk"
           exit $probeExit
 
       - name: Upload bounded native evidence

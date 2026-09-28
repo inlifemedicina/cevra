@@ -325,6 +325,17 @@ def ffmpeg_png_smoke(binary: Path, probe: Path, env: dict[str, str]) -> dict[str
         return {"kind": "png-roundtrip-v1", "status": "pass", "bytes": output.stat().st_size, "sha256": sha256(output)}
 
 
+def validate_windows_build_instructions(value: str) -> None:
+    required = (
+        "<FFMPEG_SOURCE>", "<ZLIB_PREFIX>", "<INSTALL_PREFIX>", "SOURCE_DATE_EPOCH=0", "VSLANG=1033",
+        "INCLUDE", "LIB", "--pkg-config=false", "--enable-zlib", "ffbuild/config.mak", "exactly four",
+        "CEVRA_MSVC_DEPENDENCIES.awk", "make", "DESTDIR=<STAGING_ROOT>",
+    )
+    missing = [marker for marker in required if marker not in value]
+    if missing:
+        raise SystemExit(f"Windows FFmpeg BUILD.md is incomplete: {missing}")
+
+
 def build(source: Path, prefix: Path, jobs: int, zlib_prefix: Path | None = None) -> None:
     system = platform.system()
     if system not in PLATFORM_FLAGS:
@@ -487,6 +498,8 @@ def build(source: Path, prefix: Path, jobs: int, zlib_prefix: Path | None = None
             "```text\n" + " ".join(flags) + "\n```\n\n"
             f"Recorded toolchain: `{compiler}` on `{system} {platform.machine()}`.\n"
         )
+    if system == "Windows":
+        validate_windows_build_instructions(build_instructions)
     (source_directory / "BUILD.md").write_text(build_instructions, encoding="utf-8")
 
     provenance_directory = prefix / "provenance"
