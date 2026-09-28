@@ -1,6 +1,6 @@
 # Windows Media Runtime / h264_mf Feasibility V1 — Evidence
 
-**Status:** WINDOWS H264_MF FEASIBILITY VERIFIED — PRODUCT ENABLEMENT NOT STARTED
+**Status:** SLICE 5A IMPLEMENTED / CLOSED — WINDOWS H264_MF FEASIBILITY VERIFIED — PRODUCT ENABLEMENT NOT STARTED
 
 **Baseline:** `c1b233cc1344a1f0bcd1a55bb5a91f5350b26833`
 
@@ -8,13 +8,18 @@
 
 **Tested code SHA:** `c17aea572e91cc1802e73dba5dad03c6b047f0cd`
 
+**Approved feature HEAD:** `5a0ca42db757530dbd4b8f6aa8071c74b6c4eee6`
+
+**Feature PR / merge:** PR #49, normal merge commit
+`660f8cd13f11729d5663e1ff373e9eb91a4bffbb`
+
 ## Scope
 
 Slice 5A answers one bounded question: CEVRA's exact, signature-verified
 Windows x64 Media Runtime can build and execute real synthetic H.264/AAC
 encodes with the approved first candidate, `h264_mf`. It does not enable
 Windows in the product, alter the empty Windows encoder allow-lists, certify
-representative consumer hardware, or close K1/K5.
+representative consumer hardware, or close K1 product enablement/K5.
 
 The historical spike run `35721243478` stopped at `actions/setup-python` before
 source verification. The replacement recipe bootstraps the pinned private
@@ -182,6 +187,18 @@ PASS for timing, both physical negatives and the tightened provenance contract.
   `workflow_dispatch`, on the tested code SHA: SUCCESS, including Audio
   Sequence, Audio Measurement and the Application resolved-audio/final-mux
   acceptance catalog. The preceding `36253504626` remains historical.
+- final feature-head CI `36445498724` on
+  `5a0ca42db757530dbd4b8f6aa8071c74b6c4eee6`: 5/5 SUCCESS;
+- PR #49 CI `36455189225`: 5/5 SUCCESS, and PR Exact Runtime
+  `36455189151`: SUCCESS, both on the unchanged approved feature HEAD;
+- post-merge main CI `36456056888`: 5/5 SUCCESS, and post-merge Exact Runtime
+  `36456056825`: SUCCESS, both on merge SHA
+  `660f8cd13f11729d5663e1ff373e9eb91a4bffbb`.
+
+The focused independent re-review concluded **APPROVE FOR PR WITH
+NON-BLOCKING NOTES — SLICE 5A ONLY**. The approved feature HEAD entered `main`
+unchanged. Slice 5A is therefore closed for its bounded feasibility/evidence
+scope; this does not enable Windows product behavior.
 
 System Python 3.9 is not equivalent test evidence because these suites use
 Python 3.12 language/runtime behavior. No heavyweight ML suite or model was
@@ -198,6 +215,23 @@ The smallest correct 5B candidate is a Windows file-identity implementation
 bound to the same publication evidence contract plus lifecycle/cancellation,
 capability smoke, typed allow-list activation and representative-machine tests.
 URI/path/mtime alone is not an acceptable substitute.
+
+Two bounded follow-ups remain non-blocking:
+
+- **W5A-L1:** if the build recipe changes, or before release if still relevant,
+  tighten `verify_zlib_configure_probe()` so the summary is derived from and
+  correlated to the exact `config.log` zlib check line. Current composite
+  evidence remains sufficient because source identity, static-library
+  selection, disabled `pkg-config`, `CONFIG_ZLIB`, dependency inventory and
+  the PNG smoke are independently closed.
+- **W5A-L2:** before or within Windows clean-machine dependency closure, make
+  the DLL parser reject or safely recognize unexpected valid DLL filename
+  punctuation instead of silently omitting it. The current parser covers the
+  exact sealed MSVC build's reachable naming set.
+
+The next gate is a Product Owner / technical-lead decision on whether Slice 5B
+is the dependency-optimal next implementation versus another remaining
+coordinated Media Runtime prerequisite. Slice 5B remains **NOT STARTED**.
 
 No Director authority changes. The coordinated Media Runtime gate remains
 **ACTIVE**, Windows release remains unpromised, and no HDR/editorial/mastering/
