@@ -253,5 +253,14 @@
   "alignment.error.resultInvalid": "O resultado do alinhamento é inválido e não foi aplicado.",
   "alignment.error.projectConflict": "O projeto ou a transcrição mudou durante o alinhamento. O resultado não foi aplicado.",
   "alignment.error.commitFailed": "Não foi possível adicionar a transcrição alinhada ao projeto.",
-  "alignment.error.cancelled": "A operação de alinhamento foi cancelada."
+  "alignment.error.cancelled": "A operação de alinhamento foi cancelada.",
+  "semanticAnalysis.error.invalidRequest": "A solicitação de análise semântica é inválida.",
+  "semanticAnalysis.error.invalidOutput": "O analisador retornou uma resposta inválida.",
+  "semanticAnalysis.error.invalidEvidence": "A resposta do analisador referencia evidência que não foi autorizada ou fornecida.",
+  "semanticAnalysis.error.stale": "O projeto ou a transcrição mudou durante a análise semântica.",
+  "semanticAnalysis.error.cancelled": "A operação de análise semântica foi cancelada.",
+  "semanticAnalysis.error.timeout": "A operação de análise semântica excedeu o tempo limite.",
+  "semanticAnalysis.error.analyzerUnavailable": "Nenhum analisador semântico está disponível no momento.",
+  "semanticAnalysis.error.contextLimit": "O limite de contexto da análise semântica foi atingido. Selecione um escopo menor.",
+  "semanticAnalysis.error.noProgress": "O analisador solicitou evidência que não acrescenta novo contexto autorizado."
 }
