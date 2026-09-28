@@ -30,6 +30,35 @@ def _validate(instance: Any, schema: dict[str, Any], root: dict[str, Any], locat
     if "$ref" in schema:
         _validate(instance, _resolve(root, schema["$ref"]), root, location)
         return
+    all_of = schema.get("allOf", [])
+    if not isinstance(all_of, list) or any(not isinstance(item, dict) for item in all_of):
+        raise SchemaValidationError(f"invalid allOf declaration at {location}")
+    for item in all_of:
+        _validate(instance, item, root, location)
+    if "if" in schema:
+        condition = schema["if"]
+        if not isinstance(condition, dict):
+            raise SchemaValidationError(f"invalid if declaration at {location}")
+        try:
+            _validate(instance, condition, root, location)
+        except SchemaValidationError:
+            selected = schema.get("else")
+        else:
+            selected = schema.get("then")
+        if selected is not None:
+            if not isinstance(selected, dict):
+                raise SchemaValidationError(f"invalid conditional declaration at {location}")
+            _validate(instance, selected, root, location)
+    if "not" in schema:
+        negated = schema["not"]
+        if not isinstance(negated, dict):
+            raise SchemaValidationError(f"invalid not declaration at {location}")
+        try:
+            _validate(instance, negated, root, location)
+        except SchemaValidationError:
+            pass
+        else:
+            raise SchemaValidationError(f"{location} matches a forbidden schema")
     if "const" in schema and instance != schema["const"]:
         raise SchemaValidationError(f"{location} does not match schema const")
     if "enum" in schema and instance not in schema["enum"]:

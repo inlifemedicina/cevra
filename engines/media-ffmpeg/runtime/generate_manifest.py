@@ -17,6 +17,7 @@ ENGINE = HERE.parent
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ENGINE / "worker"))
 from runtime_integrity import CRITICAL_WORKER_FILES, RuntimeIntegrityError, required_notice_paths, sha256, tree_sha256
+from schema_validator import SchemaValidationError, validate as validate_schema
 
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 
@@ -103,6 +104,116 @@ def worker_version(worker: Path) -> str:
     if match is None:
         raise SystemExit("worker source does not declare WORKER_VERSION")
     return match.group(1)
+
+
+def windows_zlib_metadata(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> dict[str, Any]:
+    pin = VERSIONS["zlib"]
+    provenance_path = component(runtime, "provenance/zlib.json")
+    provenance = read_json(provenance_path, "Windows zlib provenance")
+    expected = {
+        "id": "zlib",
+        "version": pin["version"],
+        "license": pin["license"],
+        "source": pin["source"],
+        "sourceSignature": pin["signature"],
+        "signingKeySource": pin["signingKey"],
+        "signingFingerprint": pin["signingFingerprint"],
+        "verifiedSignerFingerprint": pin["signingFingerprint"].upper(),
+        "sourceArchiveSha256": pin["archiveSha256"],
+        "sourceSignatureSha256": pin["signatureSha256"],
+        "signingKeySha256": pin["signingKeySha256"],
+        "licenseSha256": pin["licenseSha256"],
+        "staticLink": True,
+        "sourceModified": False,
+        "machine": "x64",
+        "crt": "static-mt",
+        "buildMethod": "win32/Makefile.msc",
+        "sourceArchive": f"sources/zlib/zlib-{pin['version']}.tar.xz",
+        "sourceSignatureFile": f"sources/zlib/zlib-{pin['version']}.tar.xz.asc",
+        "signingKeyFile": "sources/zlib/mark-adler.asc",
+        "buildInstructions": "sources/zlib/BUILD.md",
+        "licenseFile": "licenses/zlib/LICENSE",
+    }
+    if any(provenance.get(key) != value for key, value in expected.items()):
+        raise SystemExit("Windows zlib provenance does not match the pinned static build input")
+    for field in ("librarySha256", "zlibHeaderSha256", "zconfHeaderSha256"):
+        value = provenance.get(field)
+        if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+            raise SystemExit(f"Windows zlib provenance is missing {field}")
+    if not isinstance(provenance.get("toolchain"), dict):
+        raise SystemExit("Windows zlib provenance is missing toolchain identification")
+    if not isinstance(provenance.get("smoke"), str) or not provenance["smoke"].startswith("zlib=1.3.2 roundtrip="):
+        raise SystemExit("Windows zlib provenance is missing its static-link smoke result")
+    artifact_hashes = {
+        expected["sourceArchive"]: pin["archiveSha256"],
+        expected["sourceSignatureFile"]: pin["signatureSha256"],
+        expected["signingKeyFile"]: pin["signingKeySha256"],
+        expected["licenseFile"]: pin["licenseSha256"],
+    }
+    for relative, digest in artifact_hashes.items():
+        path = component(runtime, str(relative))
+        if sha256(path) != digest:
+            raise SystemExit(f"Windows zlib compliance artifact digest mismatch: {relative}")
+    component(runtime, str(expected["buildInstructions"]))
+    selection = ffmpeg_provenance.get("zlib", {}).get("selection") if isinstance(ffmpeg_provenance.get("zlib"), dict) else None
+    if not isinstance(selection, dict):
+        raise SystemExit("FFmpeg provenance is missing the exact Windows zlib selection proof")
+    summary = {
+        "version": pin["version"],
+        "license": pin["license"],
+        "sourceArchiveSha256": pin["archiveSha256"],
+        "librarySha256": provenance["librarySha256"],
+        "staticLink": True,
+        "preparedBuildInput": True,
+        "provenance": "provenance/zlib.json",
+        "selection": selection,
+    }
+    if ffmpeg_provenance.get("zlib") != summary:
+        raise SystemExit("FFmpeg provenance does not bind the pinned Windows zlib build input")
+    return {
+        **expected,
+        "librarySha256": provenance["librarySha256"],
+        "zlibHeaderSha256": provenance["zlibHeaderSha256"],
+        "zconfHeaderSha256": provenance["zconfHeaderSha256"],
+        "provenance": "provenance/zlib.json",
+        "provenanceSha256": sha256(provenance_path),
+        "preparedBuildInput": True,
+        "smoke": provenance["smoke"],
+        "toolchain": provenance["toolchain"],
+        "selection": selection,
+    }
+
+
+def windows_build_adjustments(runtime: Path, ffmpeg_provenance: dict[str, Any]) -> list[dict[str, Any]]:
+    adjustments = ffmpeg_provenance.get("buildAdjustments")
+    if not isinstance(adjustments, list) or len(adjustments) != 1 or not isinstance(adjustments[0], dict):
+        raise SystemExit("FFmpeg provenance is missing the exact Windows build adjustment")
+    expected = {
+        "id": "cevra-msvc-dependency-filter-v1",
+        "helperPath": "sources/ffmpeg/CEVRA_MSVC_DEPENDENCIES.awk",
+        "generatedFile": "ffbuild/config.mak",
+        "sourcePatternId": "ffmpeg-9.0.1-msvc-inline-awk-v1",
+        "sourcePatternSha256": "885c5a5b7b551aecab5abe5696f76637374291c48ca2f948555f32a66438686f",
+        "generatedCommandCount": 4,
+        "sourceArchiveModified": False,
+    }
+    record = adjustments[0]
+    if any(record.get(key) != value for key, value in expected.items()):
+        raise SystemExit("FFmpeg Windows build adjustment provenance is invalid")
+    helper = component(runtime, expected["helperPath"])
+    digest = record.get("helperSha256")
+    if not isinstance(digest, str) or sha256(helper) != digest:
+        raise SystemExit("FFmpeg packaged MSVC dependency helper does not match provenance")
+    component(runtime, "sources/ffmpeg/BUILD.md")
+    return [dict(record)]
+
+
+def validate_generated_manifest(manifest: dict[str, Any]) -> None:
+    try:
+        schema = json.loads((HERE / "manifest.schema.json").read_text(encoding="utf-8"))
+        validate_schema(manifest, schema)
+    except (OSError, UnicodeError, json.JSONDecodeError, SchemaValidationError) as exc:
+        raise SystemExit(f"generated Media Runtime manifest violates its schema: {exc}") from exc
 
 
 def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
@@ -203,8 +314,10 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
         raise SystemExit("FFmpeg compliance source artifact digest mismatch")
     if not isinstance(ffmpeg_provenance.get("toolchain"), dict):
         raise SystemExit("FFmpeg provenance is missing toolchain identification")
+    zlib_metadata = windows_zlib_metadata(runtime, ffmpeg_provenance) if sys_platform() == "win32" else None
+    build_adjustments = windows_build_adjustments(runtime, ffmpeg_provenance) if sys_platform() == "win32" else None
 
-    return {
+    manifest = {
         "format": "cevra-media-runtime", "formatVersion": 1,
         "runtimeVersion": actual_worker, "workerVersion": actual_worker,
         "platform": sys_platform(), "arch": platform.machine() or "unknown",
@@ -243,12 +356,16 @@ def generate(runtime_dir: Path, python_binary: Path) -> dict[str, Any]:
             "signingKeyFile": ffmpeg_provenance["signingKeyFile"],
             "buildInstructions": ffmpeg_provenance["buildInstructions"],
             "toolchain": ffmpeg_provenance["toolchain"],
+            **({"zlib": zlib_metadata} if zlib_metadata is not None else {}),
+            **({"buildAdjustments": build_adjustments} if build_adjustments is not None else {}),
         },
         "notices": [
             {"id": ident, "path": relative, "sha256": sha256(runtime / relative), **component_notice_metadata.get(ident, {})}
             for ident, relative in notices_required.items()
         ],
     }
+    validate_generated_manifest(manifest)
+    return manifest
 
 
 def sys_platform() -> str:

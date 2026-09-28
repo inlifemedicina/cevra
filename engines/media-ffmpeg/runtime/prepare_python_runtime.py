@@ -28,7 +28,7 @@ PRUNING_POLICY = {
     ],
     "globs": [
         "bin/pip*", "bin/idle*", "bin/2to3*", "bin/tclsh*", "bin/wish*",
-        "lib/itcl*", "lib/thread*", "lib/libtcl*", "lib/libtk*",
+        "lib/itcl*", "lib/thread[0-9]*", "lib/libtcl*", "lib/libtk*",
         "lib/python3.12/lib-dynload/_tkinter*", "share/man/man1/pip*", "share/man/man1/idle*", "share/man/man1/2to3*",
     ],
 }
@@ -75,6 +75,10 @@ def artifact_for_host() -> tuple[str, dict[str, str]]:
     key = platform_key()
     artifact = artifact_for_target(key)
     return key, artifact
+
+
+def license_sha256(artifact: dict[str, str]) -> str:
+    return artifact.get("licenseSha256", PIN["licenseSha256"])
 
 
 def download(url: str, destination: Path) -> None:
@@ -150,8 +154,13 @@ def _assert_pruned(root: Path) -> None:
 
 def _runtime_components(executable: Path) -> list[dict[str, str]]:
     script = """import ctypes,json,platform,ssl,sqlite3,zlib,lzma,bz2
-process = ctypes.CDLL(None)
+try:
+ process = ctypes.CDLL(None)
+except (OSError, TypeError):
+ process = None
 def native_version(symbol, fallback):
+ if process is None:
+  return fallback
  try:
   fn = getattr(process, symbol); fn.restype = ctypes.c_char_p
   return fn().decode().split(',')[0]
@@ -167,7 +176,15 @@ components = [
  {'id':'libffi','version':'3.4.8','license':'MIT'}]
 if platform.system() == 'Darwin': components[3]['providedByPlatform'] = 'true'
 print(json.dumps(components))"""
-    result = subprocess.run([str(executable), "-I", "-B", "-c", script], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30, check=True)
+    result = subprocess.run(
+        [str(executable), "-I", "-B", "-c", script],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise SystemExit(f"managed CPython component inventory failed: {result.stderr.strip()}")
     return json.loads(result.stdout)
 
 
@@ -187,7 +204,7 @@ def verify_prepared(root: Path) -> Path:
         "platform": key,
         "artifact": artifact["url"],
         "artifactSha256": artifact["sha256"],
-        "licenseSha256": PIN["licenseSha256"],
+        "licenseSha256": license_sha256(artifact),
         "verified": True,
     }
     if not isinstance(provenance, dict) or any(provenance.get(field) != value for field, value in expected.items()):
@@ -204,7 +221,7 @@ def verify_prepared(root: Path) -> Path:
     license_path = _license_path(root)
     if license_path is None:
         raise SystemExit("managed CPython license text is missing")
-    if sha256(license_path) != PIN["licenseSha256"]:
+    if sha256(license_path) != license_sha256(artifact):
         raise SystemExit("managed CPython license text does not match the audited pin")
     _assert_pruned(root)
     components = _runtime_components(executable)
@@ -248,7 +265,7 @@ def prepare(destination: Path, archive: Path | None = None) -> Path:
             "platform": key,
             "artifact": artifact["url"],
             "artifactSha256": artifact["sha256"],
-            "licenseSha256": PIN["licenseSha256"],
+            "licenseSha256": license_sha256(artifact),
             "verified": True,
             "pruning": {
                 "policy": PRUNING_POLICY,

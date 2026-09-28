@@ -34,7 +34,9 @@ def prepare(destination: Path) -> None:
         raise SystemExit(f"refusing to replace existing ffmpeg-skill destination: {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     run("git", "clone", "--filter=blob:none", "--no-checkout", PIN["repository"], str(destination))
-    run("git", "checkout", "--detach", PIN["commit"], cwd=destination)
+    # The audited hashes describe repository blobs, not a checkout rewritten by
+    # the runner's global core.autocrlf policy.
+    run("git", "-c", "core.autocrlf=false", "checkout", "--detach", PIN["commit"], cwd=destination)
     actual = run("git", "rev-parse", "HEAD", cwd=destination)
     if actual != PIN["commit"]:
         raise SystemExit(f"ffmpeg-skill checkout mismatch: {actual} != {PIN['commit']}")

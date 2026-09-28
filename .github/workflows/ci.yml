@@ -87,12 +87,14 @@ jobs:
           python -m py_compile
           engines/media-ffmpeg/runtime/assemble_runtime.py
           engines/media-ffmpeg/runtime/build_ffmpeg.py
+          engines/media-ffmpeg/runtime/build_zlib.py
           engines/media-ffmpeg/runtime/build_worker.py
           engines/media-ffmpeg/runtime/generate_manifest.py
           engines/media-ffmpeg/runtime/patch_ffmpeg_skill.py
           engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py
           engines/media-ffmpeg/runtime/prepare_python_runtime.py
           engines/media-ffmpeg/runtime/prepare_vendor.py
+          engines/media-ffmpeg/runtime/prepare_zlib_source.py
           engines/media-ffmpeg/runtime/schema_validator.py
           engines/media-ffmpeg/runtime/validate_bundle_pipeline.py
           engines/media-ffmpeg/worker/cevra_job_control.py
@@ -108,8 +110,10 @@ jobs:
           python -m json.tool engines/media-ffmpeg/runtime/manifest.schema.json >/dev/null
       - name: Run Media Runtime Python unit tests
         run: python -I -B -m unittest discover -s engines/media-ffmpeg/test_python -p 'test_*.py' -v
-      - name: Verify pinned FFmpeg release signature
-        run: python engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "${RUNNER_TEMP}/ffmpeg-source"
+      - name: Verify pinned FFmpeg and zlib release signatures
+        run: |
+          python engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "${RUNNER_TEMP}/ffmpeg-source"
+          python engines/media-ffmpeg/runtime/prepare_zlib_source.py "${RUNNER_TEMP}/zlib-source"
       - name: Prepare and verify pinned ffmpeg-skill
         run: |
           python engines/media-ffmpeg/runtime/prepare_vendor.py "${RUNNER_TEMP}/ffmpeg-skill"

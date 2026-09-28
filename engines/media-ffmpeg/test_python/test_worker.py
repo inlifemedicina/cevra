@@ -24,6 +24,7 @@ import prepare_ffmpeg_source
 import prepare_vendor
 import schema_validator
 import _cevra_runtime as runtime_args
+from runtime_integrity import required_notice_paths
 
 
 def write_sparse_float_wav(path: Path, samples: int, channels: int = 2) -> None:
@@ -659,10 +660,31 @@ class RuntimeBuildTests(unittest.TestCase):
             with self.assertRaises(schema_validator.SchemaValidationError):
                 schema_validator.validate(invalid, schema)
 
+    def test_schema_validator_enforces_platform_conditional_and_not(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {"platform": {"type": "string"}, "zlib": {"type": "object"}},
+            "required": ["platform"],
+            "allOf": [{
+                "if": {"properties": {"platform": {"const": "win32"}}, "required": ["platform"]},
+                "then": {"required": ["zlib"]},
+                "else": {"not": {"required": ["zlib"]}},
+            }],
+        }
+        schema_validator.validate({"platform": "win32", "zlib": {}}, schema)
+        schema_validator.validate({"platform": "darwin"}, schema)
+        for invalid in ({"platform": "win32"}, {"platform": "darwin", "zlib": {}}):
+            with self.assertRaises(schema_validator.SchemaValidationError):
+                schema_validator.validate(invalid, schema)
+
+    def test_windows_runtime_requires_static_zlib_license_notice_only_on_windows(self) -> None:
+        self.assertEqual(required_notice_paths("win32")["zlib-license"], "licenses/zlib/LICENSE")
+        self.assertNotIn("zlib-license", required_notice_paths("darwin"))
+
     def test_python_pruning_removes_pip_tkinter_and_tcl(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for relative in ("lib/python3.12/ensurepip", "lib/python3.12/tkinter", "lib/tcl9", "bin/pip3"):
+            for relative in ("lib/python3.12/ensurepip", "lib/python3.12/tkinter", "lib/tcl9", "lib/thread2.8", "bin/pip3"):
                 path = root / relative
                 if path.suffix or path.name.startswith("pip"):
                     path.parent.mkdir(parents=True, exist_ok=True)
@@ -674,7 +696,17 @@ class RuntimeBuildTests(unittest.TestCase):
             self.assertIn("lib/python3.12/ensurepip", removed)
             self.assertIn("lib/python3.12/tkinter", removed)
             self.assertIn("lib/tcl9", removed)
+            self.assertIn("lib/thread2.8", removed)
             self.assertIn("bin/pip3", removed)
+
+    def test_python_pruning_preserves_windows_threading_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            threading = root / "Lib" / "threading.py"
+            threading.parent.mkdir(parents=True)
+            threading.write_text("# standard library fixture\n", encoding="utf-8")
+            prepare_python_runtime._prune(root)
+            self.assertTrue(threading.is_file())
 
     def test_ffmpeg_digest_failure_happens_before_gpg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -701,6 +733,25 @@ class RuntimeBuildTests(unittest.TestCase):
                 download.assert_not_called()
                 self.assertFalse(destination.exists())
 
+    def test_ffmpeg_gpg_path_uses_cygpath_on_windows(self) -> None:
+        conversion = mock.Mock(returncode=0, stdout="/d/scratch/source.tar.xz\n", stderr="")
+        with mock.patch.object(prepare_ffmpeg_source.shutil, "which", return_value="C:/Program Files/Git/usr/bin/cygpath.exe"), \
+             mock.patch.object(prepare_ffmpeg_source.subprocess, "run", return_value=conversion) as run:
+            converted = prepare_ffmpeg_source.gpg_path(Path("D:/scratch/source.tar.xz"), platform_name="nt")
+        self.assertEqual(converted, "/d/scratch/source.tar.xz")
+        run.assert_called_once_with(
+            ["C:/Program Files/Git/usr/bin/cygpath.exe", "-u", "D:/scratch/source.tar.xz"],
+            stdout=prepare_ffmpeg_source.subprocess.PIPE,
+            stderr=prepare_ffmpeg_source.subprocess.PIPE,
+            text=True,
+        )
+
+    def test_ffmpeg_gpg_path_preserves_posix_path(self) -> None:
+        path = Path("/tmp/source.tar.xz")
+        with mock.patch.object(prepare_ffmpeg_source.shutil, "which") as which:
+            self.assertEqual(prepare_ffmpeg_source.gpg_path(path, platform_name="posix"), str(path))
+        which.assert_not_called()
+
     def test_ffmpeg_archive_extraction_rejects_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -725,6 +776,29 @@ class RuntimeBuildTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "refusing to replace"):
                 prepare_vendor.prepare(destination)
             self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
+
+    def test_vendor_checkout_disables_line_ending_rewrites(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "vendor"
+            calls: list[tuple[tuple[str, ...], Path | None]] = []
+
+            def fake_run(*argv: str, cwd: Path | None = None) -> str:
+                calls.append((argv, cwd))
+                if argv[:2] == ("git", "clone"):
+                    destination.mkdir()
+                if argv == ("git", "rev-parse", "HEAD"):
+                    return prepare_vendor.PIN["commit"]
+                return ""
+
+            with mock.patch.object(prepare_vendor, "run", side_effect=fake_run), \
+                 mock.patch.object(prepare_vendor, "verify_prepared"), \
+                 mock.patch.object(prepare_vendor.shutil, "rmtree"):
+                prepare_vendor.prepare(destination)
+
+            self.assertIn(
+                (("git", "-c", "core.autocrlf=false", "checkout", "--detach", prepare_vendor.PIN["commit"]), destination),
+                calls,
+            )
 
 
 if __name__ == "__main__":

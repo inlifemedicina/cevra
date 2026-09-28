@@ -73,6 +73,20 @@ def assemble(
     ffmpeg_sources = ffmpeg_prefix / "sources" / "ffmpeg"
     if not ffmpeg_sources.is_dir():
         raise SystemExit("FFmpeg release input is missing exact source/compliance artifacts")
+    if os.name == "nt":
+        windows_zlib_inputs = {
+            ffmpeg_prefix / "provenance/zlib.json": Path("provenance/zlib.json"),
+            ffmpeg_prefix / "licenses/zlib/LICENSE": Path("licenses/zlib/LICENSE"),
+        }
+        for source in windows_zlib_inputs:
+            if not source.is_file():
+                raise SystemExit(f"Windows FFmpeg release input is missing zlib compliance evidence: {source}")
+        zlib_sources = ffmpeg_prefix / "sources/zlib"
+        if not zlib_sources.is_dir():
+            raise SystemExit("Windows FFmpeg release input is missing zlib source/provenance artifacts")
+    else:
+        windows_zlib_inputs = {}
+        zlib_sources = None
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=f".{output.name}-", dir=output.parent) as temp_name:
@@ -84,7 +98,11 @@ def assemble(
             raise SystemExit("copied private Python executable is invalid")
         for source, relative in ffmpeg_inputs.items():
             _copy_file(source, stage / relative, relative.as_posix())
+        for source, relative in windows_zlib_inputs.items():
+            _copy_file(source, stage / relative, relative.as_posix())
         shutil.copytree(ffmpeg_sources, stage / "sources" / "ffmpeg", symlinks=False)
+        if zlib_sources is not None:
+            shutil.copytree(zlib_sources, stage / "sources/zlib", symlinks=False)
 
         build_worker(stage, staged_python, vendor_source)
         manifest = generate(stage, staged_python)
@@ -103,6 +121,7 @@ def assemble(
             expected_upstream_version=VERSIONS["ffmpegSkill"]["version"],
             expected_upstream_commit=VERSIONS["ffmpegSkill"]["commit"],
             expected_upstream_contract=VERSIONS["ffmpegSkill"]["contractVersion"],
+            expected_windows_zlib=VERSIONS["zlib"] if os.name == "nt" else None,
         )
         stage.rename(output)
     return output / "manifest.json"
