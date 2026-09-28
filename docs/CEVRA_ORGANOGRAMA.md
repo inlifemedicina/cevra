@@ -2,6 +2,7 @@
 
 **Updated:** 2026-09-28
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
+**Current global weighted roadmap progress:** 54%.
 
 ```text
 CEVRA VIDS
@@ -122,7 +123,10 @@ for downstream audio policy, Windows/HDR export, assembled-plan QA,
 Composition/preview and release closure, but those residual consumers are not a
 serial prerequisite for read-only transcript reasoning. The pre-editorial
 correctness prerequisites are closed. **Editorial Transcript Projection V1 is
-the current work / next canonical implementation**; semantic editorial
+the current work / next canonical implementation**. Its bounded final
+remediation tracks known speaker transitions through partial attribution and
+removes quadratic prefix fitting while preserving the approved projection
+contract. Semantic editorial
 analysis, strategy, take selection and cut planning remain not started.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.

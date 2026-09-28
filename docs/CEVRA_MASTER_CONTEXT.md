@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-26, Transcript Cache V1 merged and closed by PR #24 at `86c1f88d19f04c1fb919eafed0b9409e2fe726eb`
+**Last decision reconciliation:** 2026-09-28, Editorial Transcript Projection V1 final bounded remediation in development and global weighted progress tracking adopted
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1560,7 +1560,7 @@ release closure. Those items no longer form a serial prerequisite for deriving
 a read-only transcript reasoning projection from canonical Project IR.
 
 **Editorial Transcript Projection V1 — ACCEPTED DIRECTION / IN DEVELOPMENT.**
-Code checkpoint `76c5b1ea1dbbd909b0943a4c0aa0234a5fbb6b67` adds a read-only
+Initial code checkpoint `76c5b1ea1dbbd909b0943a4c0aa0234a5fbb6b67` adds a read-only
 Application projection with profile `cevra.editorial-transcript.v1`. It binds
 to project ID/revision/snapshot and per-source transcript digests, groups
 canonical words at a versioned 500 ms gap or known speaker change, falls back
@@ -1568,16 +1568,31 @@ truthfully to segments/no-speech status, preserves exact source/word/segment
 references and emits deterministic UTF-8-bounded pages with stale-safe cursors.
 The projection stores no state, creates no ProjectHistory mutation, exposes no
 source URI/path/raw transcript JSON and invokes no Media Runtime, provider or
-AI. Local directed evidence is 13/13 and the full Application suite is 182/182;
+AI. Independent review concluded **APPROVE FOR PR WITH NON-BLOCKING NOTES** and
+identified two bounded LOWs. Remediation code checkpoint
+`ff37555f451f21fadc20b7aff09503915330b0e8` tracks the last known speaker within
+a partially attributed phrase, so `A → unknown → B` splits before B while
+unknown words remain unattributed. This is a **CEVRA NATIVE IMPROVEMENT** over
+the pinned EDVID helper, not a diarization claim. The same remediation replaces
+quadratic repeated prefix rendering with exact incremental UTF-8 accounting
+and a proven monotonic lower bound while retaining the single canonical
+renderer. Local directed evidence is 15/15 and the full Application suite is
+184/184;
 the generated 5/30/60-minute and 3×30-minute fixtures measured respectively
 75/450/900/1,350 phrases, 9,076/58,531/118,948/175,829 rendered UTF-8 bytes,
 1/1/2/3 default-size pages and approximately 1.5/8.9/31.2/62.6 ms on the local
 host. Practical observed heap growth peaked near 8.1 MiB in that run and is
-GC-sensitive; these are characterization figures, not a product benchmark.
+GC-sensitive; these are characterization figures, not a product benchmark. A
+continuous 10,000-word phrase reduced measured UTF-8 sizing input from about
+195.9 MB / 929 ms before remediation to about 1.31 MB / 95 ms after remediation
+in directed local runs. A separate 40,000-word first-page characterization
+completed in approximately 125 ms. Timings are local evidence, not portable CI
+thresholds.
 Director impact is a **compatible extension**: the projection supplies bounded
-evidence, not decisions or execution authority. Independent focused review
+evidence, not decisions or execution authority. Focused micro-review of only
+the speaker state machine, bounded fitting algorithm and progress documentation
 remains pending. Semantic editorial analysis, strategy, take selection and cut
-planning have not started. Product progress remains **48%**.
+planning have not started. Global weighted roadmap progress is **54%**.
 
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
@@ -1652,13 +1667,21 @@ periodic WAV/M2TS autodetection, stdout/stderr separation, residual ultra-low
 short-term windows, timeout/cancel refinements, relative-gate quantization,
 native Windows process-tree validation and complete EBU/ITU certification.
 
-**Permanent progress-prompt rule:** CEVRA Vids progress toward a fully usable
-functional version has Product Owner baseline **48%**. Carry that baseline in
-progress prompts/status handoffs; do not increase it for test counts, commits
-or an implementation awaiting independent review. Any future change must be
-explicitly grounded in accepted user-visible capability/acceptance evidence,
-not inferred from engineering activity. Closing MR-A02 alone leaves it at 48%
-until the Product Owner evaluates the user-visible capability evidence.
+**SUPERSEDED — 2026-09-28 — former permanent progress-prompt rule:** CEVRA Vids
+progress toward a fully usable functional version had Product Owner baseline
+**48%** and was limited to accepted user-visible capability evidence. This
+paragraph is retained as the historical reporting rule; it is no longer the
+current progress authority.
+
+**CANONICAL — global weighted progress rule:** CEVRA Vids progress represents
+weighted execution of the complete currently planned roadmap, including
+architecture, runtime, security, Project IR/history, persistence, tests/gates,
+platform, editorial intelligence, UI/preview, composition, integrations,
+hardening and release. Weight reflects each block's role in the roadmap. Do not
+increase progress for commit count, test count, repetition of already counted
+work or correction of an error already included in the estimate. The current
+Product Owner value is **54%**. Historical 48% entries remain valid only as
+records of earlier reporting moments.
 
 **Application Resolved Audio Plan V1 (bounded MR-A05/MR-A06 vertical) —
 IMPLEMENTED / CLOSED.** PR #42 merged reviewed feature head
@@ -1923,6 +1946,12 @@ active Editorial Transcript Projection V1. Semantic editorial analysis remains
 - **CANONICAL:** Update Strategy v3 is the dedicated authority for one Update Controller, component classes/manifests, compatibility negotiation, transactional promotion/rollback, model/component reproducibility, Core Runtime Closure, signed updater/distribution, diagnostics and resilience. It does not implement those systems.
 - **IMPLEMENTED/CLOSED:** Transcript Cache V1 merged through PR #24 at `86c1f88d19f04c1fb919eafed0b9409e2fe726eb`. Historical reconciled checkpoint `22a3b6616f0844622048dad5ef1beb8c313badfb` and preceding remediation head `0b5df56f3db677553825d630eeb4e09ee048bd54` are superseded by final model-selection code head `20d91f556e77b4e9abb71681cb08b5848cd9a7ac` and approved feature head `005f5e87cf47c9a717cefd374b3dc43de2984466`; post-merge CI and Exact Runtime passed. Historical run `35625702675` remains donor-only evidence.
 - **PROCESS:** PR #25 and PR #26 were retained after PR #27 because Update Strategy v3 remained unique. The final residual reconciliation incorporates that strategy and its update-adjacent distribution/security rules; closure still requires the final post-merge semantic comparison.
+
+## 2026-09-28 — projection remediation and global progress
+
+- **CANONICAL:** CEVRA Vids progress is now the weighted execution of the complete currently planned roadmap, not only user-visible capability acceptance. The Product Owner value is 54%; commits, test counts, repeated work and corrections already represented in the estimate do not independently increase it.
+- **IN DEVELOPMENT:** Editorial Transcript Projection V1 retains its approved read-only contract. Final bounded remediation tracks the last known speaker through unattributed words and performs exact incremental UTF-8 fitting without repeated prefix reconstruction. Focused micro-review and later PR/closeout remain pending.
+- **CEVRA NATIVE IMPROVEMENT:** partial speaker evidence separates different known speakers even when unattributed words occur between them. Unknown words remain unknown, and this is not a diarization claim.
 
 ---
 
