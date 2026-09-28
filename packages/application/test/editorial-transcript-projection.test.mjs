@@ -52,6 +52,48 @@ function errorCode(code) {
   return (error) => error?.code === code;
 }
 
+function collectPages(service, pageSizes) {
+  const pages = [];
+  let cursor;
+  let pageIndex = 0;
+  do {
+    const maxBytes = pageSizes[pageIndex % pageSizes.length];
+    const page = service.project({ maxBytes, ...(cursor === undefined ? {} : { cursor }) });
+    assert.ok(page.page.byteLength <= maxBytes);
+    pages.push(page);
+    cursor = page.page.nextCursor;
+    pageIndex += 1;
+  } while (cursor !== undefined);
+  return pages;
+}
+
+function assertCompleteContinuation(pages, expectedWordIds) {
+  const units = pages.flatMap((page) => page.reasoningUnits);
+  assert.deepEqual(units.flatMap((unit) => unit.wordIds), expectedWordIds);
+  if (units.length === 1) {
+    assert.equal(units[0].continuation, undefined);
+    return;
+  }
+  assert.deepEqual(units[0].continuation, {
+    scope: "projection-only",
+    continuedFromPrevious: false,
+    continuesOnNextPage: true
+  });
+  for (const unit of units.slice(1, -1)) {
+    assert.deepEqual(unit.continuation, {
+      scope: "projection-only",
+      continuedFromPrevious: true,
+      continuesOnNextPage: true
+    });
+  }
+  assert.deepEqual(units.at(-1).continuation, {
+    scope: "projection-only",
+    continuedFromPrevious: true,
+    continuesOnNextPage: false
+  });
+  assert.equal(pages.at(-1).page.nextCursor, undefined);
+}
+
 test("groups at the versioned 500ms boundary and preserves every canonical word once", () => {
   const words = [
     word("w1", "Olá", 0, 100),
@@ -68,20 +110,31 @@ test("groups at the versioned 500ms boundary and preserves every canonical word 
   assert.deepEqual(output.reasoningUnits.flatMap((unit) => unit.wordIds), words.map((item) => item.id));
 });
 
-test("splits only on known speaker changes and exposes speaker only for coherent units", () => {
-  const words = [
-    word("w1", "um", 0, 100, "speaker-a"),
-    word("w2", "dois", 150, 250),
-    word("w3", "três", 300, 400, "speaker-a"),
-    word("w4", "quatro", 450, 550, "speaker-b")
+test("tracks the last known speaker across partial attribution without inventing unknown speakers", () => {
+  const cases = [
+    { speakers: ["speaker-a", "speaker-a"], groups: [["w0", "w1"]], exposed: ["speaker-a"] },
+    { speakers: ["speaker-a", undefined], groups: [["w0", "w1"]], exposed: [undefined] },
+    { speakers: [undefined, "speaker-a"], groups: [["w0", "w1"]], exposed: [undefined] },
+    { speakers: [undefined, undefined], groups: [["w0", "w1"]], exposed: [undefined] },
+    { speakers: ["speaker-a", undefined, "speaker-a"], groups: [["w0", "w1", "w2"]], exposed: [undefined] },
+    { speakers: ["speaker-a", undefined, "speaker-b"], groups: [["w0", "w1"], ["w2"]], exposed: [undefined, "speaker-b"] },
+    { speakers: [undefined, "speaker-a", "speaker-b"], groups: [["w0", "w1"], ["w2"]], exposed: [undefined, "speaker-b"] },
+    { speakers: [undefined, "speaker-a", "speaker-a"], groups: [["w0", "w1", "w2"]], exposed: [undefined] },
+    { speakers: ["speaker-a", "speaker-b"], groups: [["w0"], ["w1"]], exposed: ["speaker-a", "speaker-b"] }
   ];
-  const { service } = fixture([transcript("s1", { words })]);
-  const output = service.project();
-  assert.equal(output.reasoningUnits.length, 2);
-  assert.deepEqual(output.reasoningUnits[0].wordIds, ["w1", "w2", "w3"]);
-  assert.equal(output.reasoningUnits[0].speakerId, undefined);
-  assert.deepEqual(output.reasoningUnits[1].wordIds, ["w4"]);
-  assert.equal(output.reasoningUnits[1].speakerId, "speaker-b");
+  for (const [caseIndex, scenario] of cases.entries()) {
+    const words = scenario.speakers.map((speakerId, wordIndex) => word(
+      `w${wordIndex}`,
+      `token-${wordIndex}`,
+      wordIndex * 150,
+      wordIndex * 150 + 100,
+      speakerId
+    ));
+    const { service } = fixture([transcript(`s${caseIndex}`, { words })]);
+    const output = service.project();
+    assert.deepEqual(output.reasoningUnits.map((unit) => unit.wordIds), scenario.groups);
+    assert.deepEqual(output.reasoningUnits.map((unit) => unit.speakerId), scenario.exposed);
+  }
 });
 
 test("uses source order by default and explicit requested order without silently omitting unavailable sources", () => {
@@ -208,6 +261,55 @@ test("splits oversized word units only on canonical word boundaries and rejects 
   const huge = transcript("s2", { words: [word("huge", "x".repeat(5_000), 0, 10)] });
   const hugeFixture = fixture([huge]);
   assert.throws(() => hugeFixture.service.project({ maxBytes: 4096 }), errorCode("EDITORIAL_TRANSCRIPT_UNIT_TOO_LARGE"));
+});
+
+test("preserves word order and continuation semantics at every supported page scale and when page size changes", () => {
+  const words = Array.from({ length: 3_000 }, (_, index) => word(
+    `w${index}`,
+    `token-${index}-${"á".repeat(72)}`,
+    index * 100,
+    index * 100 + 50
+  ));
+  const { service } = fixture([transcript("s1", { words })]);
+  const expectedWordIds = words.map((item) => item.id);
+  for (const pageSizes of [[4096], [64 * 1024], [256 * 1024], [4096, 64 * 1024, 256 * 1024]]) {
+    assertCompleteContinuation(collectPages(service, pageSizes), expectedWordIds);
+  }
+});
+
+test("fits a 10,000-word continuous phrase with linearly bounded UTF-8 accounting", () => {
+  const words = Array.from({ length: 10_000 }, (_, index) => word(
+    `w${index}`,
+    `token-${index}`,
+    index * 10,
+    index * 10 + 5
+  ));
+  const { service } = fixture([transcript("s1", { words })]);
+  const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "TextEncoder");
+  const OriginalTextEncoder = globalThis.TextEncoder;
+  let encodedInputBytes = 0;
+  let encodeCalls = 0;
+  class CountingTextEncoder extends OriginalTextEncoder {
+    encode(value = "") {
+      encodedInputBytes += Buffer.byteLength(value, "utf8");
+      encodeCalls += 1;
+      return super.encode(value);
+    }
+  }
+  Object.defineProperty(globalThis, "TextEncoder", { configurable: true, writable: true, value: CountingTextEncoder });
+  const started = performance.now();
+  let page;
+  try {
+    page = service.project({ maxBytes: 64 * 1024 });
+  } finally {
+    Object.defineProperty(globalThis, "TextEncoder", originalDescriptor);
+  }
+  const elapsedMs = performance.now() - started;
+  assert.ok(page.page.nextCursor);
+  assert.ok(page.reasoningUnits[0].wordIds.length > 1_000);
+  assert.ok(encodedInputBytes < 8_000_000, `expected bounded UTF-8 accounting, observed ${encodedInputBytes} input bytes`);
+  assert.ok(encodeCalls < words.length * 5 + 100, `expected linear encode calls, observed ${encodeCalls}`);
+  console.log(JSON.stringify({ fixtureWords: words.length, encodedInputBytes, encodeCalls, elapsedMs: Number(elapsedMs.toFixed(2)) }));
 });
 
 test("is read-only, deterministic, deeply immutable, and does not discard redo", () => {

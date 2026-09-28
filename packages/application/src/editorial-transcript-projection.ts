@@ -275,17 +275,20 @@ function buildSource(sourceId: string, transcript: SourceTranscript | undefined)
 function groupWords(sourceId: string, transcript: SourceTranscript): WordUnitInternal[] {
   const groups: TranscriptWord[][] = [];
   let current: TranscriptWord[] = [];
+  let lastKnownSpeaker: string | undefined;
   for (const word of transcript.transcript.words) {
     const previous = current.at(-1);
     const gapBoundary = previous !== undefined && word.startMs - previous.endMs >= EDITORIAL_TRANSCRIPT_GROUPING_GAP_MS;
-    const speakerBoundary = previous?.speakerId !== undefined
+    const speakerBoundary = lastKnownSpeaker !== undefined
       && word.speakerId !== undefined
-      && previous.speakerId !== word.speakerId;
+      && lastKnownSpeaker !== word.speakerId;
     if (current.length > 0 && (gapBoundary || speakerBoundary)) {
       groups.push(current);
       current = [];
+      lastKnownSpeaker = undefined;
     }
     current.push(word);
+    if (word.speakerId !== undefined) lastKnownSpeaker = word.speakerId;
   }
   if (current.length > 0) groups.push(current);
   return groups.map((words) => wordUnit(sourceId, transcript.transcriptDigest, words));
@@ -391,27 +394,61 @@ function fitUnit(
   if (wordOffset < 0 || wordOffset >= unit.words.length) {
     throw new EditorialTranscriptProjectionError("EDITORIAL_TRANSCRIPT_CURSOR_INVALID", "Word cursor offset is invalid.");
   }
-  const remaining = unit.words.slice(wordOffset);
-  const whole = wordFragment(unit, remaining, wordOffset > 0, false);
+  const whole = wordFragment(unit, wordOffset, unit.words.length, wordOffset > 0, false);
   if (utf8Length(renderUnit(whole)) <= availableBytes) return { unit: whole };
-  let accepted: EditorialTranscriptWordUnit | undefined;
-  let acceptedCount = 0;
-  for (let count = 1; count <= remaining.length; count += 1) {
-    const candidate = wordFragment(unit, remaining.slice(0, count), wordOffset > 0, count < remaining.length);
-    if (utf8Length(renderUnit(candidate)) > availableBytes) break;
-    accepted = candidate;
-    acceptedCount = count;
+  const first = unit.words[wordOffset]!;
+  const firstSpeaker = first.speakerId;
+  const removableSpeakerBytes = firstSpeaker === undefined ? 0 : utf8Length(renderSpeakerTag(firstSpeaker));
+  let speakerCoherent = firstSpeaker !== undefined;
+  let fragmentTextBytes = 0;
+  let hasFragmentText = false;
+  let acceptedEndExclusive: number | undefined;
+  for (let endExclusive = wordOffset + 1; endExclusive < unit.words.length; endExclusive += 1) {
+    const word = unit.words[endExclusive - 1]!;
+    if (endExclusive > wordOffset + 1 && (!speakerCoherent || word.speakerId !== firstSpeaker)) {
+      speakerCoherent = false;
+    }
+    const normalized = normalizeStandaloneText(word.text);
+    if (normalized.length > 0) {
+      const separator = tokenSeparator(hasFragmentText, normalized);
+      fragmentTextBytes += utf8Length(separator) + utf8Length(normalized);
+      hasFragmentText = true;
+    }
+    const continuation: EditorialTranscriptContinuation = {
+      scope: "projection-only",
+      continuedFromPrevious: wordOffset > 0,
+      continuesOnNextPage: true
+    };
+    const prefix = renderUnitPrefix({
+      id: unit.id,
+      startMs: first.startMs,
+      endMs: word.endMs,
+      ...(speakerCoherent ? { speakerId: firstSpeaker } : {}),
+      continuation
+    });
+    const renderedBytes = utf8Length(prefix) + 1 + fragmentTextBytes;
+    if (renderedBytes <= availableBytes) acceptedEndExclusive = endExclusive;
+    else if (!speakerCoherent || renderedBytes - removableSpeakerBytes > availableBytes) {
+      // Text and canonical end time can only grow. A coherent speaker tag can
+      // disappear once; this lower bound proves that even that removal cannot fit.
+      break;
+    }
   }
-  if (accepted === undefined) return undefined;
-  return { unit: accepted, nextWordOffset: wordOffset + acceptedCount };
+  if (acceptedEndExclusive === undefined) return undefined;
+  return {
+    unit: wordFragment(unit, wordOffset, acceptedEndExclusive, wordOffset > 0, true),
+    nextWordOffset: acceptedEndExclusive
+  };
 }
 
 function wordFragment(
   original: WordUnitInternal,
-  words: readonly TranscriptWord[],
+  startIndex: number,
+  endIndex: number,
   continuedFromPrevious: boolean,
   continuesOnNextPage: boolean
 ): EditorialTranscriptWordUnit {
+  const words = original.words.slice(startIndex, endIndex);
   const first = words[0]!;
   const last = words.at(-1)!;
   const speakerId = coherentSpeaker(words);
@@ -443,12 +480,20 @@ function renderSourceHeader(source: EditorialTranscriptProjectionSource): string
   return `## source=${JSON.stringify(source.sourceId)} status=${source.status} transcript=${digest}`;
 }
 
-function renderUnit(unit: EditorialTranscriptReasoningUnit): string {
-  const speaker = unit.speakerId === undefined ? "" : ` speaker=${JSON.stringify(unit.speakerId)}`;
+function renderUnitPrefix(unit: Pick<EditorialTranscriptReasoningUnit, "id" | "startMs" | "endMs" | "speakerId" | "continuation">): string {
+  const speaker = unit.speakerId === undefined ? "" : renderSpeakerTag(unit.speakerId);
   const continuation = unit.continuation === undefined
     ? ""
     : ` continuation=${unit.continuation.continuedFromPrevious ? "from-previous" : "start"}/${unit.continuation.continuesOnNextPage ? "to-next" : "end"}`;
-  return `[${unit.startMs}-${unit.endMs}ms]${speaker}${continuation} unit=${JSON.stringify(unit.id)} ${unit.text}`;
+  return `[${unit.startMs}-${unit.endMs}ms]${speaker}${continuation} unit=${JSON.stringify(unit.id)}`;
+}
+
+function renderSpeakerTag(speakerId: string): string {
+  return ` speaker=${JSON.stringify(speakerId)}`;
+}
+
+function renderUnit(unit: EditorialTranscriptReasoningUnit): string {
+  return `${renderUnitPrefix(unit)} ${unit.text}`;
 }
 
 function appendChunk(chunks: string[], chunk: string, maxBytes: number, currentBytes: number): number | undefined {
@@ -553,11 +598,13 @@ function renderTokenText(tokens: readonly string[]): string {
   for (const token of tokens) {
     const normalized = normalizeStandaloneText(token);
     if (normalized.length === 0) continue;
-    if (output.length === 0) output = normalized;
-    else if (/^[,.;:!?%\])}]/u.test(normalized)) output += normalized;
-    else output += ` ${normalized}`;
+    output += `${tokenSeparator(output.length > 0, normalized)}${normalized}`;
   }
   return output;
+}
+
+function tokenSeparator(hasText: boolean, normalizedToken: string): "" | " " {
+  return !hasText || /^[,.;:!?%\])}]/u.test(normalizedToken) ? "" : " ";
 }
 
 function normalizeStandaloneText(value: string): string {
