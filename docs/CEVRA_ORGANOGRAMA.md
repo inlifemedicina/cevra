@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-09-26
+**Updated:** 2026-09-28
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 
 ```text
@@ -18,7 +18,8 @@ CEVRA VIDS
 │   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
 │   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
 │   │   ├─ MR-V01 Durable Source Technical Descriptor V1 [IMPLEMENTED / CLOSED]
-│   │   └─ Slice 5A Native Windows Media Runtime / h264_mf feasibility [VERIFIED / REMEDIATION REVIEW PENDING]
+│   │   ├─ Slice 5A Native Windows Media Runtime / h264_mf feasibility [IMPLEMENTED / CLOSED]
+│   │   └─ Slice 5B Windows H.264 product enablement [NOT STARTED / DECISION GATE]
 │   └─ Transcript Cache V1 [IMPLEMENTED / CLOSED]
 │
 ├─ 3. EDITORIAL INTELLIGENCE
@@ -103,16 +104,21 @@ normalizes known optional `undefined` inputs without opening the schema, and
 enforces adopted descriptor integrity independently of cache policy. Independent
 review and post-merge CI plus Exact Runtime passed.
 
-The current bounded engineering step is **Slice 5A — Native Windows Media
-Runtime / h264_mf feasibility — VERIFIED / REMEDIATION REVIEW PENDING**. Native
+**Slice 5A — Native Windows Media Runtime / h264_mf feasibility — IMPLEMENTED /
+CLOSED** by PR #49 and normal merge commit
+`660f8cd13f11729d5663e1ff373e9eb91a4bffbb`. Native
 run `36442497813` on `c17aea572e91cc1802e73dba5dad03c6b047f0cd` used the
 pinned private Python, signed FFmpeg 9.0.1 and uniquely selected signed/static
 zlib 1.3.2, schema/integrity-verified the private runtime, and passed the real
 horizontal/vertical encode/decode/timing matrix plus sample-offset and
-container-offset negative controls. Windows product
-enablement remains a separate 5B decision because typed allow-lists,
+container-offset negative controls. Post-merge CI `36456056888` and Exact
+Runtime `36456056825` passed. Windows product enablement remains a separate 5B
+decision because typed allow-lists,
 publication identity/lifecycle, Application/Desktop integration and
 representative hardware acceptance are not delivered by 5A.
+Slice 5B is **NOT STARTED**. The next gate is to decide whether it is the
+dependency-optimal next implementation versus another remaining coordinated
+Media Runtime prerequisite; this closeout does not make that choice.
 Editorial transcript / analysis remains **NOT STARTED** and begins only after
 the remaining coordinated Media Runtime dependency gate is resolved.
 Before future timeline/Cut Compiler workflows create many commits, remeasure

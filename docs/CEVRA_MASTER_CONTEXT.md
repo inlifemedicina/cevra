@@ -1800,7 +1800,7 @@ map, not a new authority and not a claim that the global gate is closed.
 | MR-V01 | **IMPLEMENTED / CLOSED** by ADR 0029 / PR #46. | Source/history scale must be remeasured before many-commit timeline/Cut Compiler flows. | Preserve descriptor authority and critical-consumption verification. |
 | MR-V02 | **NOT IMPLEMENTED.** | Approved HDR→SDR dependency/profile, real footage, both targets and human acceptance; export consumer. | Dependency/legal/profile decision before implementation. |
 | MR-Q01 | **PARTIAL:** probe, silence and audio-measurement evidence exist. | Bounded assembled-plan QA such as missing black-frame diagnostics and Application severity policy. | Stabilize consumer/report requirements before extending runtime. |
-| K1 | **ACTIVE — Slice 5A FEASIBILITY VERIFIED; REMEDIATION REVIEW PENDING; PRODUCT ENABLEMENT NOT STARTED.** Native run `36442497813` on `c17aea572e91cc1802e73dba5dad03c6b047f0cd` built the signed FFmpeg 9.0.1 candidate with uniquely selected pinned static zlib 1.3.2, schema/integrity-verified the private runtime, enumerated `h264_mf` and passed real horizontal plus vertical 30000/1001 encode/probe/decode/timing fixtures. One sample-offset and one real container-offset negative per case were both rejected by the same PTS-aware detector. Production Windows allow-lists remain empty. | Focused independent review of J-1–J-6, then decide 5B typed enablement: Windows publication identity/lifecycle, capability smoke, Application/Desktop integration and representative hardware. | Binary/runtime feasibility is not Windows export, Desktop or release acceptance; URI/path/mtime alone cannot replace strong publication identity. |
+| K1 | **Slice 5A IMPLEMENTED / CLOSED for bounded feasibility evidence; PRODUCT ENABLEMENT NOT STARTED.** PR #49 merged approved head `5a0ca42db757530dbd4b8f6aa8071c74b6c4eee6` as `660f8cd13f11729d5663e1ff373e9eb91a4bffbb` after focused approval. Native run `36442497813` on `c17aea572e91cc1802e73dba5dad03c6b047f0cd` built the signed FFmpeg 9.0.1 candidate with uniquely selected pinned static zlib 1.3.2, schema/integrity-verified the private runtime, enumerated `h264_mf` and passed real horizontal plus vertical 30000/1001 encode/probe/decode/timing fixtures. One sample-offset and one real container-offset negative per case were both rejected by the same PTS-aware detector. Post-merge CI `36456056888` and Exact Runtime `36456056825` passed. Production Windows allow-lists remain empty. | Decide whether 5B typed enablement is the dependency-optimal next implementation versus another coordinated prerequisite. If selected, 5B must cover Windows publication identity/lifecycle, capability smoke, Application/Desktop integration, clean-machine closure and representative hardware. | Binary/runtime feasibility is not Windows export, Desktop or release acceptance; URI/path/mtime alone cannot replace strong publication identity. W5A-L1 configure-log correlation and W5A-L2 broader DLL-name parsing remain bounded non-blocking follow-ups. |
 | K2 | **PARTIAL:** K2-T3 durable source evidence is implemented by MR-V01. | K2-T1/T2/T4 HDR→SDR numerical transform, failure policy and human review remain open. | Execute only after MR-V02 dependency/profile approval. |
 | K3 | **PARTIAL:** resolved audio/mux ownership and stream-copy evidence exist. | Composition-produced visual output and full preview/export correspondence. | Composition consumer must pass its own typed integration evidence. |
 | K4 | **PENDING.** | Composition candidates still need live-preview/shared-path and original-source quality criteria. | ADR 0012 benchmark gate; not part of Windows 5A. |
@@ -1811,6 +1811,13 @@ records the exact Slice 5A recipe and result. The coordinated gate remains
 **ACTIVE**. These rows distinguish implementation prerequisites, consumer
 acceptance and release/platform closure; they do not require the complete
 editable product before building its bounded prerequisites.
+
+Slice 5A is **IMPLEMENTED / CLOSED** only for native Windows runtime and
+`h264_mf` feasibility evidence. K5 remains **PARTIAL**, Slice 5B remains **NOT
+STARTED**, and Windows product support remains unclaimed. The next canonical
+decision gate is to choose whether 5B is now dependency-optimal versus another
+remaining coordinated Media Runtime prerequisite. Editorial transcript /
+analysis remains **NOT STARTED** and was not advanced by this closeout.
 
 ---
 
