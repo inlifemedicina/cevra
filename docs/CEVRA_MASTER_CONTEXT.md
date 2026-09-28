@@ -1415,9 +1415,11 @@ Foundation / Media Runtime       [CLOSED]
 → decision/document reconciliation [CLOSED]
 → ProjectHistory Scalability V2  [CLOSED]
 → small cross-platform/runtime correctness prerequisites [CLOSED]
-→ coordinated Media Runtime adjustment gate [ACTIVE]
+→ pre-editorial correctness prerequisites [CLOSED]
+→ coordinated Media Runtime adjustment gate [ACTIVE IN PARALLEL: DOWNSTREAM / PLATFORM / EXPORT / RELEASE]
 → Transcript Cache V1 [CLOSED]
-→ editorial transcript / analysis [NOT STARTED]
+→ Editorial Transcript Projection V1 [IN DEVELOPMENT]
+→ semantic editorial analysis [NOT STARTED]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1484,13 +1486,13 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Canonical remote `main` after the Transcript Cache V1 docs closeout (PR #48),
-and the verified baseline before the Windows evidence branch:
+Canonical remote `main` after the Slice 5A docs closeout (PR #50), and the
+verified baseline before the Editorial Transcript Projection V1 branch:
 
-`c1b233cc1344a1f0bcd1a55bb5a91f5350b26833`
+`360bf60d4ed4b0a985c0c254a109fac2d6bc0d64`
 
-The older `b00ad159bc0080c31355c8b59d1d5ba22524b2ff` value remains historical:
-it was the canonical main after PR #45, before MR-V01 and Transcript Cache V1.
+The older `c1b233cc1344a1f0bcd1a55bb5a91f5350b26833` value remains historical:
+it was the canonical main after PR #48, before Slice 5A.
 
 ## 24.2 Important merged milestones
 
@@ -1518,6 +1520,7 @@ it was the canonical main after PR #45, before MR-V01 and Transcript Cache V1.
 | Durable Media Execution Archive V1 | #44 | `f5518102ace30d54659334d995712b36d0a4f6b7` | IMPLEMENTED / CLOSED |
 | Durable Source Technical Descriptor V1 / MR-V01 | #46 | `0c8a09c185d1496faa4783f8b9495cd90dff9a21` | IMPLEMENTED / CLOSED |
 | Transcript Cache V1 | #24 | `86c1f88d19f04c1fb919eafed0b9409e2fe726eb` | IMPLEMENTED / CLOSED |
+| Native Windows Media Runtime / `h264_mf` feasibility — Slice 5A | #49 | `660f8cd13f11729d5663e1ff373e9eb91a4bffbb` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1544,6 +1547,37 @@ the existing configurable timeout, liveness, cancellation, settlement,
 worker-exit and artifact-cleanup mechanisms satisfy this bounded prerequisite.
 Real Windows runtime/export execution remains a later validation gate. Windows
 H.264/export, HDR-to-SDR and the coordinated Media Runtime gate are not closed.
+
+**Pre-editorial correctness prerequisites — CLOSED.** Project IR v2
+source-scoped transcripts, local transcription, alignment, ProjectHistory
+Scalability V2, MR-V01 source-content verification, Transcript Cache V1 and the
+bounded audio evidence/execution primitives are implemented. The coordinated
+Media Runtime gate remains **ACTIVE IN PARALLEL** for its actual downstream,
+platform, export and release consumers: Slice 5B Windows product enablement,
+MR-A04 conventional audio policy, residual MR-A05/A06 editable execution,
+MR-V02 HDR/export, MR-Q01 assembled-plan QA, K3/K4 Composition/preview and K5
+release closure. Those items no longer form a serial prerequisite for deriving
+a read-only transcript reasoning projection from canonical Project IR.
+
+**Editorial Transcript Projection V1 — ACCEPTED DIRECTION / IN DEVELOPMENT.**
+Code checkpoint `76c5b1ea1dbbd909b0943a4c0aa0234a5fbb6b67` adds a read-only
+Application projection with profile `cevra.editorial-transcript.v1`. It binds
+to project ID/revision/snapshot and per-source transcript digests, groups
+canonical words at a versioned 500 ms gap or known speaker change, falls back
+truthfully to segments/no-speech status, preserves exact source/word/segment
+references and emits deterministic UTF-8-bounded pages with stale-safe cursors.
+The projection stores no state, creates no ProjectHistory mutation, exposes no
+source URI/path/raw transcript JSON and invokes no Media Runtime, provider or
+AI. Local directed evidence is 13/13 and the full Application suite is 182/182;
+the generated 5/30/60-minute and 3×30-minute fixtures measured respectively
+75/450/900/1,350 phrases, 9,076/58,531/118,948/175,829 rendered UTF-8 bytes,
+1/1/2/3 default-size pages and approximately 1.5/8.9/31.2/62.6 ms on the local
+host. Practical observed heap growth peaked near 8.1 MiB in that run and is
+GC-sensitive; these are characterization figures, not a product benchmark.
+Director impact is a **compatible extension**: the projection supplies bounded
+evidence, not decisions or execution authority. Independent focused review
+remains pending. Semantic editorial analysis, strategy, take selection and cut
+planning have not started. Product progress remains **48%**.
 
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
@@ -1778,11 +1812,14 @@ The final independent micro-review concluded **APPROVE TO UNDRAFT WITH
 NON-BLOCKING NOTES**. Post-merge main CI `36245088430` passed 5/5 and managed
 Exact Runtime `36245088427` passed on the feature merge SHA.
 
-Current dependency blockers/gates:
+Current dependency boundaries:
 
-1. complete the approved coordinated Media Runtime adjustment gate;
-2. begin editorial transcript/analysis only after its remaining dependency
-   gate is resolved; this next planned step is not started.
+1. pre-editorial correctness prerequisites are **CLOSED**;
+2. Editorial Transcript Projection V1 is the **ACTIVE / NEXT CANONICAL
+   IMPLEMENTATION** and may proceed without completing unrelated platform or
+   export gates;
+3. the coordinated Media Runtime gate remains **ACTIVE IN PARALLEL** for its
+   named downstream/platform/export/release consumers.
 
 ### Coordinated Media Runtime residual matrix — reconciled 2026-09-26
 
@@ -1814,10 +1851,11 @@ editable product before building its bounded prerequisites.
 
 Slice 5A is **IMPLEMENTED / CLOSED** only for native Windows runtime and
 `h264_mf` feasibility evidence. K5 remains **PARTIAL**, Slice 5B remains **NOT
-STARTED**, and Windows product support remains unclaimed. The next canonical
-decision gate is to choose whether 5B is now dependency-optimal versus another
-remaining coordinated Media Runtime prerequisite. Editorial transcript /
-analysis remains **NOT STARTED** and was not advanced by this closeout.
+STARTED**, and Windows product support remains unclaimed. Slice 5B and the
+remaining coordinated Media Runtime requirements continue under their actual
+consumer/platform dependencies in parallel. They do not serially block the
+active Editorial Transcript Projection V1. Semantic editorial analysis remains
+**NOT STARTED**.
 
 ---
 
@@ -1930,11 +1968,12 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete the still-active coordinated Media Runtime adjustment gate.
-2. Then begin the next planned step, editorial transcript/analysis, followed by strategy/takes/cut planning, typed execution/QA, UX Surface Contract, preview/shared timeline, captions/audio/composition, integrations and release hardening in organogram order. Editorial transcript/analysis is **NOT STARTED**.
-3. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
-4. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
-5. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
+1. Complete Editorial Transcript Projection V1 through focused independent review and its later PR/closeout gates; it is **IN DEVELOPMENT** on `feat/editorial-transcript-projection-v1`.
+2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for transcript projection.
+3. After the projection is accepted, delimit semantic editorial analysis before strategy/takes/cut planning; none of those semantic stages has started.
+4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
+5. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
+6. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
 
 ---
 

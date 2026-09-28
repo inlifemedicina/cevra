@@ -14,16 +14,17 @@ CEVRA VIDS
 │   ├─ forced alignment
 │   └─ ProjectHistory Scalability V2
 │
-├─ 2. CURRENT RECONCILIATION / CORRECTNESS GATES
-│   ├─ small cross-platform/runtime correctness prerequisites [CLOSED]
-│   ├─ approved coordinated Media Runtime adjustment gate [CURRENT ACTIVE GATE]
+├─ 2. CORRECTNESS / PARALLEL RUNTIME GATES
+│   ├─ pre-editorial correctness prerequisites [CLOSED]
+│   ├─ approved coordinated Media Runtime adjustment gate [ACTIVE IN PARALLEL]
 │   │   ├─ MR-V01 Durable Source Technical Descriptor V1 [IMPLEMENTED / CLOSED]
 │   │   ├─ Slice 5A Native Windows Media Runtime / h264_mf feasibility [IMPLEMENTED / CLOSED]
 │   │   └─ Slice 5B Windows H.264 product enablement [NOT STARTED / DECISION GATE]
 │   └─ Transcript Cache V1 [IMPLEMENTED / CLOSED]
 │
-├─ 3. EDITORIAL INTELLIGENCE
-│   ├─ editorial transcript / analysis
+├─ 3. EDITORIAL INTELLIGENCE [CURRENT WORK]
+│   ├─ Editorial Transcript Projection V1 [IN DEVELOPMENT]
+│   ├─ semantic editorial analysis [NOT STARTED]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -116,10 +117,12 @@ Runtime `36456056825` passed. Windows product enablement remains a separate 5B
 decision because typed allow-lists,
 publication identity/lifecycle, Application/Desktop integration and
 representative hardware acceptance are not delivered by 5A.
-Slice 5B is **NOT STARTED**. The next gate is to decide whether it is the
-dependency-optimal next implementation versus another remaining coordinated
-Media Runtime prerequisite; this closeout does not make that choice.
-Editorial transcript / analysis remains **NOT STARTED** and begins only after
-the remaining coordinated Media Runtime dependency gate is resolved.
+Slice 5B is **NOT STARTED**. The coordinated Media Runtime gate remains active
+for downstream audio policy, Windows/HDR export, assembled-plan QA,
+Composition/preview and release closure, but those residual consumers are not a
+serial prerequisite for read-only transcript reasoning. The pre-editorial
+correctness prerequisites are closed. **Editorial Transcript Projection V1 is
+the current work / next canonical implementation**; semantic editorial
+analysis, strategy, take selection and cut planning remain not started.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.
