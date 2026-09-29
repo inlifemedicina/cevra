@@ -188,15 +188,19 @@ The first official-provider attempts do not alter the accepted boundary:
   `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1` remains **BLOCKED —
   CONTAINMENT**, with zero threads and zero turns. It is not a demonstrated
   escape or a universal rejection of Codex;
-- Claude Code CLI is the next bounded private proof candidate, but its initial
-  branch is **BLOCKED — VERSION** before authentication or inference. Claude
-  Desktop exposes only an internal Linux/aarch64 payload labelled 2.1.270 on
-  this macOS host; no host-executable `claude` command exists to verify help,
+- Claude Code CLI is the next bounded private proof candidate; its initial
+  preflight was **BLOCKED — VERSION** before authentication or inference. Claude
+  Desktop exposed only an internal Linux/aarch64 payload labelled 2.1.270 on
+  this macOS host; no host-executable `claude` command existed to verify help,
   auth, model/effort, containment or stream transport;
-- the exact next prerequisite is an official macOS arm64 Claude Code CLI
-  2.1.270 or later. Only after exact installed-version preflight passes may a
-  provider adapter be implemented and the fixed real matrix consume account
-  quota.
+- the explicitly authorized continuation installed official **2.1.280 /
+  darwin-arm64** outside the repo. Signed manifest, exact SHA-256, native
+  publisher signature/notarization and version/help passed, without global
+  configuration changes. The executable prerequisite is resolved;
+- current status is **BLOCKED — AUTH**: official sanitized status reports no
+  login. Human subscription login is required before effective managed-policy/
+  containment and model/effort gates. Only after those gates pass may an
+  adapter be implemented and the fixed real matrix consume account quota.
 
 No adapter scaffold was added under an unverified transport. No API key, extra
 usage, semantic input, retry/fallback, Project IR/History mutation, or product

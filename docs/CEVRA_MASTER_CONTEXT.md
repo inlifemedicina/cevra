@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Slice A is closed; the Codex attempt remains blocked on containment and the bounded Claude CLI attempt is blocked before inference because no host-executable CLI is installed
+**Last decision reconciliation:** 2026-09-29, Slice A is closed; Codex remains blocked on containment; official Claude Code 2.1.280 is installed/verified locally and the bounded PoC now awaits human subscription login
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — VERSION]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — AUTH]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1487,10 +1487,11 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Latest code-bearing canonical `main`, after feature PR #51 and before the
-documentation-only closeout of Editorial Transcript Projection V1:
-
-`56161b2af44c9e2de008bb33bc1706d4e2beaf7e`
+Verified canonical baseline for the Claude PoC after Slice A docs closeout
+PR #54: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
+Latest code-bearing merge: PR #53,
+`0cde0d29cfe3f3d417955e20e5ad672b3e02ceba`.
+The Claude PoC is isolated and unmerged; it does not advance canonical main.
 
 The older `360bf60d4ed4b0a985c0c254a109fac2d6bc0d64` value remains historical:
 it was the canonical main after PR #50 and the feature base for PR #51.
@@ -1523,6 +1524,7 @@ it was the canonical main after PR #50 and the feature base for PR #51.
 | Transcript Cache V1 | #24 | `86c1f88d19f04c1fb919eafed0b9409e2fe726eb` | IMPLEMENTED / CLOSED |
 | Native Windows Media Runtime / `h264_mf` feasibility — Slice 5A | #49 | `660f8cd13f11729d5663e1ff373e9eb91a4bffbb` | IMPLEMENTED / CLOSED |
 | Editorial Transcript Projection V1 | #51 | `56161b2af44c9e2de008bb33bc1706d4e2beaf7e` | IMPLEMENTED / CLOSED |
+| Semantic Editorial Analysis Boundary V1 — Slice A only | #53 | `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1676,13 +1678,21 @@ escape or a universal provider verdict. The next bounded private candidate is
 the official Claude Code CLI under
 `feat/semantic-claude-roundtrip-poc-v1`. Its first preflight stopped **BLOCKED
 — VERSION** before auth, adapter implementation, semantic payload, or model
-inference: this macOS host has Claude Desktop 2.16120.0 and an internal
+inference: this macOS host had Claude Desktop 2.16120.0 and an internal
 Linux/aarch64 Claude Code payload labelled 2.1.270, but no host-executable
-`claude` CLI. The exact prerequisite is an official macOS arm64 Claude Code CLI
-2.1.270 or later whose own `--help`, auth status, model/effort options and
-isolation controls can be verified. No installation/update, API key, extra
-usage, model fallback, real execution, adapter scaffold or audiovisual mutation
-was performed. See
+`claude` CLI. That historical executable blocker is now resolved by an
+explicitly authorized, version-fixed local installation of official
+**Claude Code 2.1.280 / darwin-arm64** in the CEVRA DeveloperTools directory,
+outside the repo. Signed-manifest verification (including a negative control),
+exact binary hash, native publisher signature, notarization assessment and
+native version/help passed. No global install, PATH/profile change, personal
+config edit or Gatekeeper bypass occurred. Official sanitized auth status
+returned `loggedIn: false`, `authMethod: none`, `apiProvider: firstParty`:
+the current stage is **BLOCKED — AUTH**, pending human `auth login --claudeai`
+with the installed binary. Effective containment/managed policy, Opus/Medium,
+adapter, transport and real semantic matrix remain unverified/not run.
+Real harness executions remain **0 / 8**; no API key, extra usage, model
+fallback, adapter scaffold or audiovisual mutation was introduced. See
 [the Claude attempt evidence](CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md).
 The Claude choice is only the next private proof candidate; it neither replaces
 the historical Codex preference nor approves commercial integration. Complete
@@ -2059,7 +2069,8 @@ delivered by scripted fixtures.
 
 - **PRESERVED DIAGNOSTIC:** the Codex App Server PoC remains **BLOCKED — CONTAINMENT** at `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1`, with zero threads and zero turns. It is not reclassified as a demonstrated escape or universal impossibility.
 - **BOUNDED CANDIDATE DECISION:** official Claude Code CLI is the next private proof candidate under the same provider-neutral Application port. This does not replace the historical Codex preference or approve product/commercial integration.
-- **BLOCKED — VERSION:** the macOS host has no executable `claude` CLI; only Claude Desktop and an internal Linux/aarch64 payload labelled 2.1.270 were observed. No auth, model, effort, isolation, adapter, inference or semantic quality claim was made. Next action is to provide an official macOS arm64 Claude Code CLI 2.1.270 or later and re-run preflight before semantic input.
+- **HISTORICAL / RESOLVED — VERSION:** the first preflight found only Claude Desktop and its internal Linux/aarch64 2.1.270 payload. The subsequent explicitly authorized installation verified official macOS arm64 Claude Code 2.1.280 with signed manifest, binary checksum, native publisher signature and notarization. No global configuration was changed.
+- **CURRENT — BLOCKED / AUTH:** the installed CLI reports no login. Human subscription login is the only immediate action; managed-policy/containment and Opus/Medium gates still precede adapter implementation and inference. Zero of eight real harness executions used. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
 
 ---
 
@@ -2105,7 +2116,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Resume the **NEXT REQUIRED GATE** for Semantic Editorial Analysis only after an official macOS arm64 Claude Code CLI 2.1.270 or later is available at an explicit executable path. Revalidate its own version/help, sanitized subscription auth, Opus identifier/Medium effort, effective no-tools/no-MCP/no-unmanaged-context isolation and managed policy before implementing the adapter or sending semantic input. Do not install/update automatically, assume consumer entitlement, enable API/extra usage, or begin strategy, take selection or cut planning implicitly.
+1. Resume the **NEXT REQUIRED GATE** after human subscription login through the already verified Claude Code 2.1.280 binary; the exact command is in the existing Claude evidence record. Recheck its hash and sanitized auth, then Opus identifier/Medium effort, effective no-tools/no-MCP/no-unmanaged-context isolation and managed policy before implementing the adapter or sending semantic input. The one local installation was explicitly authorized; no automatic update, inferred entitlement, API/extra usage, strategy, take selection or cut planning is authorized implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
