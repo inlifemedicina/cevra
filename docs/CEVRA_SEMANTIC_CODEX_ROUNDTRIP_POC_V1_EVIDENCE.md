@@ -134,7 +134,7 @@ final hardened discovery reported 39,061 stdout bytes, zero stderr bytes and
 two known notifications. These are metadata transport bytes, not semantic
 payload, tokens, latency or cost measurements. No provider reasoning was saved.
 
-Local and remote regression results are recorded below after execution; normal
+Local and remote regression results are recorded below; normal
 CI runs the fake tests without Codex, auth or inference. No manual FFmpeg build
 or ML model download is part of this branch.
 
@@ -150,6 +150,16 @@ i18n 2, Project IR 53, Store 11, Transcript Cache 12, Alignment 33, Media Node
 91 and Transcription 50. `npm audit --omit=dev` reported zero vulnerabilities.
 Local Rust/Python unit suites and native catalogs were not rerun for this
 metadata-script-only change; applicable normal CI is recorded separately.
+
+| Remote workflow | Run / event | Exact tested SHA | Result |
+|---|---|---|---|
+| CI: Monorepo, Tauri, Media reproducibility, Transcription, Alignment | [36612481003](https://github.com/inlifemedicina/cevra/actions/runs/36612481003) / push | `f4f9380651cfd6ec792893de3cdc75bff855c6dc` | SUCCESS 5/5 |
+| Audio Sequence Exact Runtime | no run | same push | NOT TRIGGERED: branch is outside workflow push allow-list |
+
+This run validates the diagnostic/test checkpoint plus its documentation,
+not model inference. The final evidence-only commit records this completed
+run; its own exact HEAD and naturally triggered CI are reported in the task
+handoff without attempting a self-referential commit SHA in this file.
 
 ## Real matrix — NOT RUN
 
