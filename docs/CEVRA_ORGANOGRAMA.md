@@ -2,7 +2,7 @@
 
 **Updated:** 2026-09-28
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
-**Current global weighted roadmap progress:** 54%.
+**Current global weighted roadmap progress:** 55%.
 
 ```text
 CEVRA VIDS
@@ -26,7 +26,7 @@ CEVRA VIDS
 ├─ 3. EDITORIAL INTELLIGENCE [ACTIVE]
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
-│   │   ├─ Slice A validated analysis boundary [IN DEVELOPMENT / REVIEW PENDING]
+│   │   ├─ Slice A validated analysis boundary [IN DEVELOPMENT / REMEDIATED / FOCUSED RE-REVIEW PENDING]
 │   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE]
 │   ├─ strategy
 │   ├─ take selection
@@ -131,11 +131,15 @@ tracks known speaker transitions through partial attribution and removes
 quadratic prefix fitting while preserving the approved projection contract.
 PR CI `36487114791`, PR Exact Runtime `36487114771`, post-merge CI
 `36487922851` and post-merge Exact Runtime `36487922834` passed. **Semantic
-Editorial Analysis Boundary V1 is implemented on its feature branch with
-focused review pending.** It exchanges bounded text-only projection evidence
-through a provider-neutral Application port, validates untrusted structured
-responses and returns no project mutation. Its scripted test analyzers are not
-a production AI capability. A real-agent round-trip is the next required gate;
+Editorial Analysis Boundary V1 is remediated on its feature branch with focused
+re-review pending.** Independent review required F-1–F-6 changes; the bounded
+delta now uses exact enum/ID validation, one entry-to-return deadline,
+per-source on-demand collection, distributed initial evidence and a cumulative
+transmitted-envelope budget. It still exchanges only bounded text projection
+evidence through a provider-neutral Application port, validates untrusted
+structured responses and returns no project mutation. Its scripted test
+analyzers are not a production AI capability. A real-agent round-trip is the
+next required gate;
 complete Semantic Editorial Analysis V1, strategy, take selection and cut
 planning remain not delivered.
 Before future timeline/Cut Compiler workflows create many commits, remeasure

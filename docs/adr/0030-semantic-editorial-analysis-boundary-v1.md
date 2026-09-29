@@ -29,7 +29,8 @@ parallel provider authority.
 
 The Application service:
 
-1. captures and validates a closed request once;
+1. captures and validates a closed request once, using one non-coercive rule
+   for execution/context identifiers and closed enum values;
 2. derives evidence exclusively through `EditorialTranscriptProjectionService`;
 3. replaces native source/evidence identities with execution-local aliases;
 4. measures the complete UTF-8 JSON payload actually delivered;
@@ -65,10 +66,27 @@ ranking, cut range, edit command, code, shell or filtergraph.
 
 ## Bounded evidence exchange
 
-The default initial message is at most 64 KiB; accumulated evidence/context is
-at most 256 KiB. Analyzer output is byte-bounded before JSON parsing. Lists,
-references and strings have explicit limits. At most two analyzer invocations
-occur per execution: the initial request and one authorized text continuation.
+The default initial message is at most 64 KiB. The 256 KiB total is a hard cap
+on the sum of complete UTF-8 JSON envelopes actually delivered to the analyzer,
+including task metadata, brief, coverage, references and any context resent in
+the second invocation. Prepared but unsent fragments are not considered
+supplied. Analyzer output is byte-bounded by Application before JSON parsing.
+Lists, references and strings have explicit limits. At most two analyzer
+invocations occur per execution: the initial request and one authorized text
+continuation. A future provider adapter must additionally bound transport
+receipt before constructing the `Promise<string>` response; this in-process
+limit does not claim to bound bytes already received by such a transport.
+
+Initial disclosure is deterministic and breadth-first across requested sources:
+when the budget permits, one projection fragment from each available source is
+offered before progressive filling from an earlier source. Projection remains
+the only text grouping authority. Each source retains an ephemeral cursor, so
+an authorized request for `S2` can collect `S2` without exhausting `S1`.
+Sources not yet collected remain pending evidence; they are not relabelled as
+no-speech or unavailable. An indivisible oversized unit in one source does not
+prevent considering another source. Budget/collection barriers return explicit
+partial `context-limit`; `NO_PROGRESS` is reserved for requests that can add no
+new evidence.
 
 The analyzer may request more text only from selected source aliases and may
 anchor the request only to evidence already supplied for that source. It cannot
@@ -90,11 +108,18 @@ the first analyzer call. It revalidates before additional evidence, after every
 response and immediately before publishing a result. Journal count detects
 commit→undo even when the visible snapshot returns to the prior value.
 
-Cancellation and one total timeout reject late responses. One execution may be
-active per service instance. If an adapter ignores cancellation, the result is
-never accepted and the instance remains busy until the external promise
-settles; the service does not claim the external work was stopped. There are no
-automatic retries or analyzer switches.
+Cancellation and one monotonic deadline, measured from entry to `analyze()`,
+reject expired preparation, continuation, parsing and late responses. Explicit
+guards run before and after projection/analyzer work and synchronously before
+returning any accepted result; the deadline is never restarted between stages.
+Cooperative event-loop yields between projection pages allow timers and aborts
+to run. JavaScript already executing synchronously is not preemptible, but work
+that finishes after the deadline cannot authorize a subsequent call or result.
+Cancellation has precedence when cancellation and timeout are both observable.
+One execution may be active per service instance. If an adapter ignores
+cancellation, the result is never accepted and the instance remains busy until
+the external promise settles; the service does not claim the external work was
+stopped. There are no automatic retries or analyzer switches.
 
 ## Authority and persistence
 
@@ -125,3 +150,15 @@ Provider selection and integration are outside this slice.
 Until that gate and independent review complete, this ADR remains
 **ACCEPTED DIRECTION / IN DEVELOPMENT** and Semantic Editorial Analysis V1 as a
 whole remains **NOT DELIVERED**.
+
+## Review remediation — 2026-09-28
+
+Independent review of reviewed head
+`05462c442f40414299dc6d7c78a2fce53ad948ff` returned **CHANGES REQUIRED BEFORE
+PR**. The bounded remediation at code/test checkpoint
+`cc61dc3e205a88a08f2700f6d82ab5cd9d2ba74a` addresses F-1 through F-6 without
+changing the provider-neutral architecture: exact runtime enum validation, one
+identifier rule, an entry-to-return deadline, per-source on-demand collection,
+breadth-first initial disclosure, cumulative transmitted-envelope accounting
+and analyzer-availability checks before transcript projection. Focused
+independent re-review of this delta remains pending.
