@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Slice A is closed; Claude CLI installation/auth are verified, but its first canary failed the initialization containment gate (1/8 attempts); Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-29, Slice A is closed; Claude CLI installation/auth are verified, and canary #2 identified `INIT_PLUGINS_NONEMPTY` (2/8 attempts, no accepted response); Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — INITIALIZATION GATE]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — INIT PLUGINS]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1690,12 +1690,15 @@ config edit or Gatekeeper bypass occurred. The historical AUTH blocker was
 resolved by the user's official subscription login: sanitized status now reports
 logged-in Claude.ai / first-party / Pro. Documented controls and local policy
 preflight permitted a minimal canary after deterministic adapter tests.
-Current stage: **BLOCKED — INITIALIZATION CONTAINMENT GATE**. Its first event
-failed a control assertion; the process was terminated/reaped and no final
-response accepted. Real harness attempts: **1 / 8**. The failing field was not
-retained; this is not proof of tool execution or a provider escape. Narrow
-non-content diagnostics were added without relaxing controls or rerunning.
-Effective model/effort, real transport success and editorial quality remain
+Current stage: **BLOCKED — REAL CAPABILITY REPORTED IN INITIALIZATION**.
+Canary #1 failed generically on the first `system/init` event (1/8); its exact
+field was not retained. After closed, non-content diagnostic tests, exactly one
+additional canary with the same controls identified `INIT_PLUGINS_NONEMPTY`:
+the event reports two plugins, while tools/MCP/skills are empty and bypass is
+false. Both processes were reaped; no final answer was accepted. The shared
+ledger is now **2 / 8**, six remaining. No tool execution or escape was
+observed, and the plugins' identities/function are not inferred from a count.
+Effective effort, real transport success and editorial quality remain
 unproven. The adapter/test harness is private infrastructure, not Desktop
 integration. No API key, extra usage, fallback or audiovisual mutation was
 introduced; remote consumption of the failed attempt is unknown. See
@@ -2076,7 +2079,7 @@ delivered by scripted fixtures.
 - **PRESERVED DIAGNOSTIC:** the Codex App Server PoC remains **BLOCKED — CONTAINMENT** at `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1`, with zero threads and zero turns. It is not reclassified as a demonstrated escape or universal impossibility.
 - **BOUNDED CANDIDATE DECISION:** official Claude Code CLI is the next private proof candidate under the same provider-neutral Application port. This does not replace the historical Codex preference or approve product/commercial integration.
 - **HISTORICAL / RESOLVED — VERSION:** the first preflight found only Claude Desktop and its internal Linux/aarch64 2.1.270 payload. The subsequent explicitly authorized installation verified official macOS arm64 Claude Code 2.1.280 with signed manifest, binary checksum, native publisher signature and notarization. No global configuration was changed.
-- **CURRENT — BLOCKED / INITIALIZATION GATE:** official subscription login is verified. The isolated adapter's first real canary failed the initial event containment assertion; 1/8 attempts used, zero accepted results. No tool execution/escape is established; the exact field was not retained. Review the added non-content diagnostic and initialization semantics before any continued canary; do not weaken controls or repeat login/install. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
+- **CURRENT — BLOCKED / INIT PLUGINS:** subscription login is verified. Canary #1 failed the init gate without a retained field; canary #2 reports `INIT_PLUGINS_NONEMPTY` with plugins count 2, tools/MCP/skills count 0 and no bypass. Ledger 2/8, zero accepted results. The count does not prove plugin execution or an escape. Assess whether the CLI's reported plugins are effective under the fixed controls before any further process; do not loosen containment or repeat login/install. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
 
 ---
 
@@ -2122,7 +2125,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Resolve the **NEXT REQUIRED GATE** at the Claude 2.1.280 initialization event: review the bounded adapter/diagnostic, then identify the exact failed control field in an explicitly continued canary (seven of eight attempts remain). Installation and subscription auth already pass; do not repeat them as blockers. No accepted real semantic result exists. Do not weaken no-tools/no-MCP/no-unmanaged-context controls, silently substitute model/billing, or proceed to the editorial matrix before containment is established. No strategy, take selection or cut planning is authorized implicitly.
+1. Resolve the **NEXT REQUIRED GATE** by assessing Claude 2.1.280's `system/init.plugins` semantics under the existing controls: canary #2 reports two plugins and fails closed. Six of eight authorized attempts remain, but this diagnostic task is finished and authorizes no next call. Installation/auth already pass; no accepted semantic result exists. Do not loosen no-tools/no-MCP/no-unmanaged-context controls, silently substitute model/billing, or proceed to the editorial matrix before containment is established. No strategy, take selection or cut planning is authorized implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

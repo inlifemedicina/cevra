@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE BLOCKED-INITIALIZATION]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE BLOCKED-INIT-PLUGINS]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -149,10 +149,12 @@ now has official macOS arm64 Claude Code 2.1.280 installed and verified in a
 versioned CEVRA-owned developer-tools directory outside the repo. The earlier
 executable blocker is resolved and official subscription authentication now
 passes (Claude.ai / first-party / Pro). The isolated adapter passed deterministic
-fake-process tests but the first real canary failed an initialization containment
-assertion: 1/8 attempts, no accepted response. No tool execution/escape is proven;
-the failing field was not retained. Review the narrow non-content diagnostic
-and initialization semantics before another canary, without relaxing controls.
+fake-process tests. The first real canary failed an initialization containment
+assertion without a retained field; the sole diagnostic follow-up identified
+`INIT_PLUGINS_NONEMPTY`: two plugins reported, no tools/MCP/skills and no
+bypass. Ledger 2/8, no accepted response. No plugin/tool execution or escape
+is proven. Resolve the CLI init-field semantics before any further run;
+containment remains closed.
 Effective Opus/Medium, real transport and editorial matrix remain unproven.
 Claude remains the next private proof candidate, not a replacement of the
 provider-neutral core or an approved commercial integration. Complete Semantic

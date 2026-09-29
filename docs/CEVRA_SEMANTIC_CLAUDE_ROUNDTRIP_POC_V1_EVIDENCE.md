@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-29 — AUTH VERIFIED; BLOCKED — INITIALIZATION CONTAINMENT GATE.**
+**2026-09-29 — BLOCKED — CONTAINMENT REAL CAPABILITY (`INIT_PLUGINS_NONEMPTY`).**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -15,15 +15,17 @@ After the user's official subscription login, sanitized auth reports
 publisher signature and notarization assessment still pass. Installation and
 authentication are no longer blockers.
 
-The isolated developer-only adapter and deterministic tests were implemented
-after the documentation/configuration preflight. The first real canary was
-rejected at its first initialization event by a containment assertion; its
-owned process was terminated and reaped. **1 / 8** real process attempts used;
-no second attempt, retry or fallback. No final model response was accepted or
-retained, and no semantic-quality evaluation could run. This is not evidence
-of an actual tool invocation, a containment escape, or generalized Claude
-incompatibility. Which initialization field failed was not captured by that
-checkpoint; the exact diagnostic limitation and follow-up are recorded below.
+The isolated adapter's first real canary was rejected at its first
+initialization event; that checkpoint did not retain the failing field. A
+focused diagnostic change preserved every pass/fail decision, and a second
+canary with the same synthetic input and controls identified
+`INIT_PLUGINS_NONEMPTY`: the `system/init` event reported **two plugins**.
+`tools`, `mcp_servers` and `skills` were present as empty arrays, and bypass
+was false. Both owned processes were terminated and reaped. **2 / 8** real
+process attempts used, **6 remain**. No final model response was accepted.
+The reported plugin list is a failed capability gate, not evidence that a
+plugin/tool ran, accessed data or escaped containment. Do not infer plugin
+names, function, provenance or administrative origin from the count alone.
 
 ## Historical installation continuation — authentication then missing
 
@@ -423,3 +425,67 @@ with no binary change. The private matrix ledger and bounded failed-canary
 receipt are retained outside the repository for quota/audit continuity; the
 canonical facts are transcribed here, not a raw provider dump. No new login,
 purchase, provider switch or broader project implementation is requested.
+
+## Focused `system/init` diagnosis and canary #2 — 2026-09-29
+
+The prior branch HEAD was `334e3c63a655ae48bb3520970a8852f250d0590b`
+(normal CI [36639702121](https://github.com/inlifemedicina/cevra/actions/runs/36639702121),
+SUCCESS 5/5). Diagnostic code/test checkpoint:
+`b48f560581a01e2b8a67c990704b52417388c3ec`.
+Only the init gate's failure diagnostics changed. The existing harness gained
+the minimum bookkeeping needed to retain `canary.json` and write a distinct
+`canary-2.json` in the **same** private ledger. It prevents a second child in
+one canary operation and retains only bounded structural/result counts for the
+canary, never its final text or raw events. Argv, flags, playbook, synthetic
+sentence, model alias, effort, budgets and Application code were unchanged.
+
+The failure reasons are a closed vocabulary. Each init list records only
+presence, primitive structural type and count; model records a class, and
+permission mode records a bypass boolean. No tool, plugin, skill or MCP name,
+prompt, credential, path, provider error text, instructions or model supplied
+free text is retained. The tests assert that arbitrary fixture names cannot
+appear in errors or metrics. Missing required lists still fail; optional
+plugin/skill lists have the same baseline acceptance rules. The patch does not
+interpret a missing field as an empty list.
+
+Tests **before** canary #2: `npm run test:claude-poc` **32/32 PASS**; directly
+related `@cevra/application` **210/210 PASS**; harness syntax and
+`git diff --check` PASS. Cases cover required list absent/wrong type/empty/
+nonempty, optional list absent/empty/wrong type/nonempty, normal/bypass mode,
+valid/invalid/drifting model, and preservation of prior rejection behavior.
+All tests are deterministic fake-process tests; there was no inference in CI.
+The binary SHA-256 immediately before the run still matched the pinned
+`387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d`.
+
+| Field | Canary #2 `system/init` observation |
+|---|---|
+| type / subtype | `system` / `init` |
+| reason | `INIT_PLUGINS_NONEMPTY` (`CONTAINMENT`) |
+| `tools` | present; array; count 0 |
+| `mcp_servers` | present; array; count 0 |
+| `plugins` | present; array; count **2** |
+| `skills` | present; array; count 0 |
+| permission mode | present string; bypass **false**; value not retained |
+| model | present string; permitted Opus class; exact ID not retained in this failed init |
+| process | one child, one event, 889 stdout bytes, 0 stderr bytes, closed/reaped; 738 ms observed client latency |
+| Application | `SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE`; no accepted result; ProjectHistory archive and redo preserved |
+
+Before this run the original ledger held exactly **1** `canary` attempt and
+the second receipt did not exist. Afterwards the same ledger held exactly
+**2** `canary` attempts and both receipts remained separate. No process #3
+was started. The first attempt remains historically `CONTAINMENT` with unknown
+failing field; its 890 stdout bytes cannot be used to infer plugin counts.
+The second attempt gives the precise reason above. Thus the result is
+**BLOCKED — CONTAINMENT REAL CAPABILITY REPORTED** rather than an absent-field
+or wrong-type schema mismatch. A nonempty plugin list is a real initialization
+signal; this record does not claim any plugin actually executed or had access
+to a tool. No final response, editorial judgment or real cancellation was
+tested. Provider-side usage or cost before termination is unobserved; no
+API key, Console/API route, purchase or extra-usage setting was activated.
+
+Next action: focused assessment of why version 2.1.280 reports two plugins
+despite the fixed restricted/safe-mode configuration, and whether that init
+field represents effective capabilities in this mode. Keep the gate closed
+until the semantics are established. This task authorizes no further harness
+attempt and makes no provider substitution. Semantic Editorial Analysis V1
+remains NOT DELIVERED; global progress stays **55%**.

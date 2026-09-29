@@ -201,15 +201,17 @@ The first official-provider attempts do not alter the accepted boundary:
   sanitized status reports Claude.ai / first-party / Pro. Documentation/configuration
   preflight and absent local managed policy permitted the bounded adapter and
   deterministic tests, then one minimal real canary;
-- current status is **BLOCKED — INITIALIZATION CONTAINMENT GATE**: the canary's
-  first event failed a control assertion and the owned child was terminated/reaped.
-  One of eight attempts used, no final response accepted. The failed field was
-  not retained; neither a tool invocation nor an escape is proven. Added
-  allowlisted non-content diagnostics do not relax controls or retrospectively
-  explain that event. Review/identify the mismatch before any continued canary.
+- the first canary failed the `system/init` containment gate without a retained
+  failing field. A focused closed diagnostic, tested before the one authorized
+  follow-up canary, identified `INIT_PLUGINS_NONEMPTY`: the second init reports
+  two plugins, zero tools/MCP/skills and no permission bypass. Both owned children
+  closed; 2/8 attempts used, no final response accepted. This is a reported
+  capability that keeps containment blocked; neither actual tool execution nor
+  an escape is proven. Determine the 2.1.280 init-field semantics before another
+  run. No flag, prompt, model, effort or acceptance rule was relaxed.
 
 The private adapter is deterministically tested, not real-transport validated.
-One harmless synthetic text envelope was written to the CLI; remote inference
+Two harmless synthetic canary envelopes were written to the CLI; remote inference
 or consumption before termination is unknown. No API key, extra usage, retry/
 fallback, Project IR/History mutation or product integration was introduced.
 Effective model/effort and editorial quality remain unproven.
