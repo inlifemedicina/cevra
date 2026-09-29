@@ -50,6 +50,12 @@ test('complete-looking result is not accepted before child settlement/cancellati
  try{await assert.rejects(run('late-close',{signal:c.signal}),e=>e.code==='CANCELLED'&&e.metrics.childClosed);}finally{clearTimeout(timer);}
 });
 test('process death fails without retry',async()=>{await assert.rejects(run('death'),e=>e.code==='PROCESS_EXIT');});
+test('rejected initialization retains only non-content shape diagnostics',async()=>{
+ await assert.rejects(run('tools'),e=>{
+  assert.deepEqual(e.metrics.lastEventSummary,{type:'system',subtype:'init',toolsCount:1,mcp_serversCount:0,pluginsCount:0,skillsCount:0,permissionsBypassed:false});
+  assert(!JSON.stringify(e.metrics).includes('Café'));assert.equal(e.metrics.stdinBytes,Buffer.byteLength(payload));return e.code==='CONTAINMENT';
+ });
+});
 test('large stdin uses stream buffering/backpressure without truncating input',async()=>{
  const large=JSON.stringify({context:{contextId:'test',evidence:[{reference:'E1',text:'ç'.repeat(60000)}]}});
  const result=await run('utf8',{payload:large});assert.equal(result.metrics.stdinBytes,Buffer.byteLength(large));

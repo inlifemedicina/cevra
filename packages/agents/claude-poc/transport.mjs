@@ -12,6 +12,16 @@ export class ClaudePocError extends Error {
   constructor(code) { super(code); this.name = 'ClaudePocError'; this.code = code; }
 }
 const fail = code => { throw new ClaudePocError(code); };
+// Non-content diagnostic vocabulary: never retain arbitrary event fields/text.
+function eventSummary(event) {
+  const label=value=>typeof value==='string'&&/^[a-z_]{1,48}$/.test(value)?value:'other';
+  const summary={type:label(event.type),subtype:label(event.subtype)};
+  for(const field of ['tools','mcp_servers','plugins','skills']) {
+    summary[`${field}Count`]=Array.isArray(event[field])?event[field].length:null;
+  }
+  summary.permissionsBypassed=event.permissionMode==='bypassPermissions';
+  return Object.freeze(summary);
+}
 export function childEnvironment(home) {
   if (!isAbsolute(home)) fail('INVALID_HOME');
   return { HOME: home, PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', DISABLE_AUTOUPDATER: '1' };
@@ -59,6 +69,7 @@ export class ClaudeStreamReader {
     if(++this.events>this.limits.events) fail('EVENT_LIMIT');
     let e; try {e=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));} catch {fail('INVALID_EVENT');}
     if (!e || typeof e!=='object' || Array.isArray(e)) fail('INVALID_EVENT');
+    this.lastEventSummary=eventSummary(e);
     if(this.result!==undefined) fail('LATE_EVENT');
     if(e.type==='rate_limit_event') {
       // Provider advisory only; never turns a refused/error result into success.
@@ -146,7 +157,10 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
       if(code!==0||terminationSignal)error??=new ClaudePocError('PROCESS_EXIT');
       // Never return before process close/reap. No transcript/stderr in errors.
       tail=Buffer.alloc(0);
-      if(error){error.metrics={stdoutBytes:reader.bytes,stderrBytes,events:reader.events,latencyMs:performance.now()-started,childClosed:true};reject(error);return;}
+      if(error){error.metrics={stdoutBytes:reader.bytes,stderrBytes,events:reader.events,
+        lastEventSummary:reader.lastEventSummary,envelopeBytes:Buffer.byteLength(payload),
+        systemPromptBytes:Buffer.byteLength(PLAYBOOK),stdinBytes:Buffer.byteLength(payload),
+        latencyMs:performance.now()-started,childClosed:true};reject(error);return;}
       try {
         const result=reader.finish();
         resolve({result,metrics:{model:reader.model,requestedAlias:'opus',requestedEffort:'medium',
