@@ -153,7 +153,10 @@ fake-process tests. The first real canary failed an initialization containment
 assertion without a retained field; the sole diagnostic follow-up identified
 `INIT_PLUGINS_NONEMPTY`: two plugins reported, no tools/MCP/skills and no
 bypass. Ledger 2/8, no accepted response. No plugin/tool execution or escape
-is proven. Resolve the CLI init-field semantics before any further run;
+is proven. Read-only CLI inventory under the same environment reports zero
+installed plugins, so the two init entries have no proven local ID/origin and
+cannot yet be safely disabled by a session-only override. No third canary ran.
+Resolve the CLI init-field provenance before any further run;
 containment remains closed.
 Effective Opus/Medium, real transport and editorial matrix remain unproven.
 Claude remains the next private proof candidate, not a replacement of the

@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-29 — BLOCKED — CONTAINMENT REAL CAPABILITY (`INIT_PLUGINS_NONEMPTY`).**
+**2026-09-29 — BLOCKED — PLUGIN ORIGIN (`INIT_PLUGINS_NONEMPTY` remains fail-closed).**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -489,3 +489,54 @@ field represents effective capabilities in this mode. Keep the gate closed
 until the semantics are established. This task authorizes no further harness
 attempt and makes no provider substitution. Semantic Editorial Analysis V1
 remains NOT DELIVERED; global progress stays **55%**.
+
+## Local plugin-origin investigation — 2026-09-29
+
+No inference process was started. The same verified 2.1.280 binary and explicit
+HOME/system-PATH environment were used for the official read-only
+`claude plugin list --json` command, both from the branch worktree and from the
+private matrix directory. Both returned a valid empty array (exit 0, no stderr).
+The documented user plugin and skills directories, including the documented
+installed-plugin inventory, are absent. The user settings file exists but has
+no `enabledPlugins`, `extraKnownMarketplaces`, or `syncClaudeAiPlugins` key.
+The documented macOS managed settings file/drop-in directory and managed
+preference domain are absent. The fixed harness argv has no `--plugin-dir`,
+`--plugin-url`, or inherited plugin-directory environment variable; it retains
+`--restricted`, `--safe-mode`, empty `--setting-sources`, and no tools/MCP.
+
+Official [CLI](https://code.claude.com/docs/en/cli-reference),
+[plugin inventory](https://code.claude.com/docs/en/plugins/cli-reference),
+[loading](https://code.claude.com/docs/en/plugins/loading),
+[settings](https://code.claude.com/docs/en/settings),
+[environment](https://code.claude.com/docs/en/env-vars), and
+[Agent SDK plugin](https://code.claude.com/docs/en/agent-sdk/plugins)
+references were consulted. They describe `system/init.plugins` as loaded
+plugins and `--settings`/`enabledPlugins` as a per-session override keyed by
+**full plugin ID**. Current documentation does not establish why this exact
+2.1.280 invocation emitted two plugin entries despite its safe/restricted
+controls and an empty official inventory. A declaration in `system/init` does
+not prove a hook ran, a tool was available/executed, or an instruction reached
+the model. Conversely, empty tools/MCP/skills do not prove absence of plugin
+hooks or instructions. The two init entries cannot be correlated to local
+inventory entries, so their origins, component counts, required status, and
+effective powers remain **unknown**; no private IDs or manifests were copied.
+
+The preferred per-process `--settings` override cannot be built safely from
+this evidence: there are no verified full IDs to set explicitly to `false`.
+An empty `enabledPlugins` object would not override inherited entries, and
+`syncClaudeAiPlugins=false` can move synchronized plugins on the shared disk.
+No global disable, alternate HOME, managed-policy bypass, or init-gate
+exception was attempted. Therefore the conditional gate for canary #3 was not
+met. The original ledger remains **2/8**, with both immutable canary receipts;
+six attempts remain, and no semantic response has been accepted. This is
+**BLOCKED — PLUGIN ORIGIN**, not a verified CLI escape or plugin execution.
+
+Deterministic regression after the investigation: Claude PoC fake-process
+tests **32/32 PASS**, including nonempty-plugin rejection and clean-init
+acceptance; directly related Application tests **210/210 PASS**. These tests
+do not identify or control the native loader. The next minimum action is a
+documented, non-inferential way to map the two init entries to exact plugin
+IDs/origins, or an official explanation of the 2.1.280 init contract. Only
+then can a narrow session override be reviewed and one authorized canary
+considered. No editorial matrix, provider switch, product integration, or
+additional billing path was started.
