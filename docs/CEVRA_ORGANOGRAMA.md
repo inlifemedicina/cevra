@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-09-28
+**Updated:** 2026-09-29
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 **Current global weighted roadmap progress:** 55%.
 
@@ -26,8 +26,8 @@ CEVRA VIDS
 ├─ 3. EDITORIAL INTELLIGENCE [ACTIVE]
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
-│   │   ├─ Slice A validated analysis boundary [IN DEVELOPMENT / REMEDIATED / FOCUSED RE-REVIEW PENDING]
-│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE]
+│   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
+│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT STARTED]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -131,15 +131,19 @@ tracks known speaker transitions through partial attribution and removes
 quadratic prefix fitting while preserving the approved projection contract.
 PR CI `36487114791`, PR Exact Runtime `36487114771`, post-merge CI
 `36487922851` and post-merge Exact Runtime `36487922834` passed. **Semantic
-Editorial Analysis Boundary V1 is remediated on its feature branch with focused
-re-review pending.** Independent review required F-1–F-6 changes; the bounded
-delta now uses exact enum/ID validation, one entry-to-return deadline,
-per-source on-demand collection, distributed initial evidence and a cumulative
-transmitted-envelope budget. It still exchanges only bounded text projection
-evidence through a provider-neutral Application port, validates untrusted
-structured responses and returns no project mutation. Its scripted test
-analyzers are not a production AI capability. A real-agent round-trip is the
-next required gate;
+Editorial Analysis Boundary V1 — Slice A is IMPLEMENTED / CLOSED** by PR #53
+and normal merge commit `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba`.
+Independent review required F-1–F-6 changes and then approved the remediated
+boundary with non-blocking notes. The closed slice uses exact enum/ID
+validation, one entry-to-return deadline, per-source on-demand collection,
+distributed initial evidence and a cumulative transmitted-envelope budget. It
+still exchanges only bounded text projection evidence through a
+provider-neutral Application port, validates untrusted structured responses
+and returns no project mutation. PR CI `36575808711` and Exact Runtime
+`36575808713` passed; post-merge CI `36576763557` and Exact Runtime
+`36576763666` passed. Its scripted test analyzers are not a production AI
+capability. A real-agent round-trip is the next required gate and is not
+started;
 complete Semantic Editorial Analysis V1, strategy, take selection and cut
 planning remain not delivered.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
