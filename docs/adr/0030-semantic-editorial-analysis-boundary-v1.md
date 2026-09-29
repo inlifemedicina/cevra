@@ -176,9 +176,9 @@ passed all five jobs and Exact Runtime `36576763666` passed.
 
 This closeout does not close the ADR as a whole. No real analyzer/provider,
 transport, upload, entitlement, billing or semantic-quality evaluation ran.
-The real-agent round-trip described above is the **NEXT REQUIRED GATE / NOT
-STARTED**, and complete Semantic Editorial Analysis V1 remains **NOT
-DELIVERED**.
+At closeout, the real-agent round-trip described above was the **NEXT REQUIRED
+GATE / NOT STARTED**. Complete Semantic Editorial Analysis V1 remains **NOT
+DELIVERED**; the later PoC preflight below does not change that conclusion.
 
 Non-blocking limits retained by the closeout are:
 
@@ -193,3 +193,29 @@ Non-blocking limits retained by the closeout are:
 - the future real adapter must bound transport receipt before constructing its
   `Promise<string>` response. The Application pre-parse limit does not replace
   that mandatory adapter boundary.
+
+## Authorized real-agent PoC preflight — 2026-09-29
+
+The Product Owner authorized a separate, synthetic-data-only PoC using the
+installed official Codex App Server over stdio and existing ChatGPT allowance,
+limited to eight real turns. This operational feasibility attempt does not
+replace the provider-neutral port, enable Desktop integration or authorize
+paid API fallback. It changes no CLOSED Application contract and introduces
+no new production adapter or architectural pattern requiring a separate ADR.
+
+Status: **PoC IN DEVELOPMENT / BLOCKED — CONTAINMENT**. Read-only official
+metadata discovery identified the preferred model and ChatGPT auth, but the
+required pre-thread removal of all native tools and unrelated instruction
+sources was not proved for the exact installed alpha build. No thread or
+`turn/start` was issued; semantic quality, real continuation and real
+cancellation are NOT RUN. Empty dynamic tools, read-only sandbox and denied
+approvals are not accepted as a substitute for this proof. Empty environment
+selection is a relevant documented protocol control, but not by itself an
+attestation of the full effective tool/instruction surface.
+
+The [PoC evidence](../CEVRA_SEMANTIC_CODEX_ROUNDTRIP_POC_V1_EVIDENCE.md)
+records the reproducible metadata-only diagnostic. The next action is an
+officially supported and verified containment configuration for the exact
+runtime, not further scaffolding, a different provider or weakening the gate.
+Slice A stays CLOSED; this ADR remains IN DEVELOPMENT. I1/I2/I5 are preserved,
+and no editorial acceptance ID is claimed complete.

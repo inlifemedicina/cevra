@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT STARTED]
+│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / PREFLIGHT BLOCKED — CONTAINMENT]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -142,8 +142,12 @@ provider-neutral Application port, validates untrusted structured responses
 and returns no project mutation. PR CI `36575808711` and Exact Runtime
 `36575808713` passed; post-merge CI `36576763557` and Exact Runtime
 `36576763666` passed. Its scripted test analyzers are not a production AI
-capability. A real-agent round-trip is the next required gate and is not
-started;
+capability. A real-agent round-trip is the next required gate. The authorized
+Codex stdio PoC is **IN DEVELOPMENT / PREFLIGHT BLOCKED — CONTAINMENT**: account
+and model metadata discovery succeeded, but no thread or inference was started
+because complete pre-thread tool/instruction isolation was not proved for the
+installed build. The metadata diagnostic is not an analyzer implementation.
+See [PoC evidence](CEVRA_SEMANTIC_CODEX_ROUNDTRIP_POC_V1_EVIDENCE.md);
 complete Semantic Editorial Analysis V1, strategy, take selection and cut
 planning remain not delivered.
 Before future timeline/Cut Compiler workflows create many commits, remeasure

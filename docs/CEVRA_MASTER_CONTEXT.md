@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Semantic Editorial Analysis Boundary V1 Slice A merged and closed in its bounded technical scope; real-agent round-trip remains the next required gate
+**Last decision reconciliation:** 2026-09-29, Slice A remains CLOSED; the authorized Codex stdio round-trip PoC reached BLOCKED — CONTAINMENT during metadata-only preflight, before any thread or inference
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT STARTED]
+→ real-agent semantic round-trip [NEXT REQUIRED GATE / PoC PREFLIGHT BLOCKED — CONTAINMENT]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1487,10 +1487,18 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Latest code-bearing canonical `main`, after feature PR #51 and before the
-documentation-only closeout of Editorial Transcript Projection V1:
+Latest code-bearing canonical `main`, after feature PR #53 (Semantic Editorial
+Analysis Boundary V1 — Slice A):
 
-`56161b2af44c9e2de008bb33bc1706d4e2beaf7e`
+`0cde0d29cfe3f3d417955e20e5ad672b3e02ceba`
+
+Verified baseline after documentation-only closeout PR #54 and before
+`feat/semantic-codex-roundtrip-poc-v1`:
+
+`a58ca419c2a0db2c416db83d84c432fcae23d830`
+
+PR #51 merge `56161b2af44c9e2de008bb33bc1706d4e2beaf7e` remains the historical
+Editorial Transcript Projection milestone, not the latest code-bearing main.
 
 The older `360bf60d4ed4b0a985c0c254a109fac2d6bc0d64` value remains historical:
 it was the canonical main after PR #50 and the feature base for PR #51.
@@ -1523,6 +1531,7 @@ it was the canonical main after PR #50 and the feature base for PR #51.
 | Transcript Cache V1 | #24 | `86c1f88d19f04c1fb919eafed0b9409e2fe726eb` | IMPLEMENTED / CLOSED |
 | Native Windows Media Runtime / `h264_mf` feasibility — Slice 5A | #49 | `660f8cd13f11729d5663e1ff373e9eb91a4bffbb` | IMPLEMENTED / CLOSED |
 | Editorial Transcript Projection V1 | #51 | `56161b2af44c9e2de008bb33bc1706d4e2beaf7e` | IMPLEMENTED / CLOSED |
+| Semantic Editorial Analysis Boundary V1 — Slice A only | #53 | `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1661,11 +1670,36 @@ adapter must also bound transport receipt. Global weighted roadmap progress is
 
 ADR 0030 remains **ACCEPTED DIRECTION / IN DEVELOPMENT** because complete
 Semantic Editorial Analysis V1 is not delivered. The next required gate is an
-official and authorized real-agent round-trip; it is **NOT STARTED**. Retained
+official and authorized real-agent round-trip; inference is **NOT RUN** and
+its authorized PoC preflight is **BLOCKED — CONTAINMENT** (see below). Retained
 non-blocking notes are the potential dominance of `history.current` or one
 projector call at extreme scale, deterministic but not quantitatively balanced
 initial disclosure, incidental ID-before-busy/`AbortError` behavior, and the
 mandatory future adapter receipt limit before `Promise<string>` materialization.
+
+**Semantic Editorial Analysis — Codex Round-trip PoC V1 — IN DEVELOPMENT /
+BLOCKED — CONTAINMENT.** The approved bounded PoC uses the already installed
+official App Server over stdio, not an API-key fallback. Metadata discovery on
+2026-09-29 confirmed `codex-cli 0.155.0-alpha.16`, ChatGPT authentication and
+`gpt-5.6-sol` with `medium` support. No model was executed. The exact binary's
+generated protocol and effective configuration did not establish the required
+pre-thread denial of every native tool and unrelated instruction source.
+Feature flags and individual MCP overrides are not an effective tools-deny-all
+attestation; neither `dynamicTools=[]` nor `environments=[]` alone establishes
+the full required boundary. This is a failure to prove containment, not a
+reproduced unauthorized tool call or proof that every App Server version is
+incapable of isolation. **0 threads / 0 of 8 permitted inference turns**.
+
+The branch contains only a metadata-only diagnostic and deterministic tests,
+not an analyzer adapter, production fallback or substitute semantic proof.
+[PoC preflight evidence](CEVRA_SEMANTIC_CODEX_ROUNDTRIP_POC_V1_EVIDENCE.md)
+records exact controls, sanitized observations and the minimum next gate:
+verify an official deny-all-tools/instruction-source mechanism for the exact
+runtime before creating a thread. No new runtime or alternate provider was
+installed. Director impact is compatible with I1/I2/I5: provider-specific
+discovery remains outside Application; the three CLOSED projection/service/
+port contracts are unchanged. Complete semantic analysis remains NOT DELIVERED,
+and progress remains **55%**.
 
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
@@ -1915,7 +1949,8 @@ Current dependency boundaries:
 2. Editorial Transcript Projection V1 and Semantic Editorial Analysis Boundary
    V1 — Slice A are **IMPLEMENTED / CLOSED**, while
    complete semantic analysis remains **NOT DELIVERED** and the real-agent
-   round-trip is the **NEXT REQUIRED GATE / NOT STARTED**;
+   round-trip is the **NEXT REQUIRED GATE**, currently **PoC PREFLIGHT BLOCKED —
+   CONTAINMENT / INFERENCE NOT RUN**;
 3. the coordinated Media Runtime gate remains **ACTIVE IN PARALLEL** for its
    named downstream/platform/export/release consumers.
 
@@ -2077,7 +2112,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Execute the **NEXT REQUIRED GATE** for Semantic Editorial Analysis: select an official and authorized mechanism for a real-agent round-trip, then measure quality, disclosure, PT-BR/EN-US behavior, latency, cost, cancellation and failures. Do not assume consumer entitlements authorize API access, and do not begin strategy, take selection or cut planning implicitly.
+1. Unblock the **NEXT REQUIRED GATE** for Semantic Editorial Analysis: the authorized official Codex stdio PoC is blocked before inference on containment proof. Verify a supported effective native-tools/instruction-source deny-all mechanism for the exact runtime, then execute the bounded real-agent matrix and measure quality, disclosure, PT-BR/EN-US behavior, latency, cost, cancellation and failures. Do not assume consumer entitlements authorize API access, and do not begin strategy, take selection or cut planning implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

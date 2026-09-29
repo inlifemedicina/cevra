@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis Boundary V1 — Evidence
 
-**Status:** SLICE A IMPLEMENTED / CLOSED — REAL-AGENT GATE NOT STARTED
+**Status:** SLICE A IMPLEMENTED / CLOSED — REAL-AGENT PoC PREFLIGHT BLOCKED / INFERENCE NOT RUN
 
 **Date:** 2026-09-29
 
@@ -21,6 +21,12 @@
 **Feature PR:** #53
 
 **Feature merge:** `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba`
+
+The later [Codex PoC preflight](CEVRA_SEMANTIC_CODEX_ROUNDTRIP_POC_V1_EVIDENCE.md)
+uses baseline `a58ca419c2a0db2c416db83d84c432fcae23d830` after PR #54. It
+confirmed account/model metadata but stopped on containment proof before any
+thread or inference. This is not new semantic evidence and does not modify or
+reopen the CLOSED Slice A implementation or its historical results below.
 
 Independent review of the reviewed head returned **CHANGES REQUIRED BEFORE PR**
 for F-1 through F-6. The checkpoint above is the consolidated remediation;
