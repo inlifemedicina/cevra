@@ -1,7 +1,7 @@
 # ADR 0030 — Semantic Editorial Analysis Boundary V1
 
 **Status:** ACCEPTED DIRECTION / IN DEVELOPMENT
-**Date:** 2026-09-28
+**Date:** 2026-09-29
 
 ## Context
 
@@ -147,7 +147,7 @@ That gate must measure fidelity, caveat preservation, relationships,
 uncertainty, citations, data disclosure, latency, cost and failure behavior.
 Provider selection and integration are outside this slice.
 
-Until that gate and independent review complete, this ADR remains
+Until that gate completes, this ADR remains
 **ACCEPTED DIRECTION / IN DEVELOPMENT** and Semantic Editorial Analysis V1 as a
 whole remains **NOT DELIVERED**.
 
@@ -161,4 +161,35 @@ changing the provider-neutral architecture: exact runtime enum validation, one
 identifier rule, an entry-to-return deadline, per-source on-demand collection,
 breadth-first initial disclosure, cumulative transmitted-envelope accounting
 and analyzer-availability checks before transcript projection. Focused
-independent re-review of this delta remains pending.
+independent re-review concluded **APPROVE WITH NON-BLOCKING NOTES — ANALYSIS
+BOUNDARY ONLY** at approved feature head
+`0e3d9fa10db076f920d084b6582faf576aa50687`.
+
+## Slice A implementation closeout — 2026-09-29
+
+**Semantic Editorial Analysis Boundary V1 — Slice A is IMPLEMENTED / CLOSED**
+for the technical boundary defined by this ADR. PR #53 merged the approved head
+by normal merge commit `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba` with no
+post-approval code change. Pull-request CI `36575808711` passed all five jobs
+and Exact Runtime `36575808713` passed. On the merge SHA, CI `36576763557`
+passed all five jobs and Exact Runtime `36576763666` passed.
+
+This closeout does not close the ADR as a whole. No real analyzer/provider,
+transport, upload, entitlement, billing or semantic-quality evaluation ran.
+The real-agent round-trip described above is the **NEXT REQUIRED GATE / NOT
+STARTED**, and complete Semantic Editorial Analysis V1 remains **NOT
+DELIVERED**.
+
+Non-blocking limits retained by the closeout are:
+
+- at extreme transcript scale, `history.current` materialization or an
+  individual projector call may dominate elapsed time; re-evaluate on material
+  latency or timeout in representative future real-integration fixtures;
+- initial disclosure first attempts one fragment per source when it fits, then
+  may favor earlier sources; it is neither quantitatively balanced nor a
+  ranking policy;
+- consuming an operational ID before a busy result and the current
+  `AbortError` classification do not justify a code change in this closeout;
+- the future real adapter must bound transport receipt before constructing its
+  `Promise<string>` response. The Application pre-parse limit does not replace
+  that mandatory adapter boundary.

@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-28, Semantic Editorial Analysis Boundary V1 review findings F-1–F-6 remediated on feature branch; focused re-review pending
+**Last decision reconciliation:** 2026-09-29, Semantic Editorial Analysis Boundary V1 Slice A merged and closed in its bounded technical scope; real-agent round-trip remains the next required gate
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1419,8 +1419,8 @@ Foundation / Media Runtime       [CLOSED]
 → coordinated Media Runtime adjustment gate [ACTIVE IN PARALLEL: DOWNSTREAM / PLATFORM / EXPORT / RELEASE]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
-→ Semantic Editorial Analysis V1 — Slice A analysis boundary [IN DEVELOPMENT / REMEDIATED / FOCUSED RE-REVIEW PENDING]
-→ real-agent semantic round-trip [NEXT REQUIRED GATE]
+→ Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
+→ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT STARTED]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1603,13 +1603,18 @@ remaining fragment once per page; no current product fixture reproduces a
 blocker. Global weighted roadmap progress at that projection closeout was
 **54%**; the current adopted tracking value is **55%**.
 
-**Semantic Editorial Analysis Boundary V1 — REMEDIATED ON FEATURE BRANCH /
-FOCUSED RE-REVIEW PENDING.** ADR 0030 records a provider-neutral Application
-service and specialized analyzer port on branch
-`feat/semantic-editorial-analysis-boundary-v1`, code checkpoint
-`cc61dc3e205a88a08f2700f6d82ab5cd9d2ba74a`. Independent review of head
+**Semantic Editorial Analysis Boundary V1 — Slice A — IMPLEMENTED / CLOSED.**
+ADR 0030 records a provider-neutral Application service and specialized
+analyzer port. Independent review of head
 `05462c442f40414299dc6d7c78a2fce53ad948ff` returned **CHANGES REQUIRED BEFORE
-PR**; this consolidated checkpoint remediates F-1 through F-6. The service consumes only the
+PR**; code/test checkpoint `cc61dc3e205a88a08f2700f6d82ab5cd9d2ba74a`
+remediated F-1 through F-6. Focused re-review then concluded **APPROVE WITH
+NON-BLOCKING NOTES — ANALYSIS BOUNDARY ONLY** at approved feature head
+`0e3d9fa10db076f920d084b6582faf576aa50687`. PR #53 merged that frozen head by
+normal merge commit `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba` on
+2026-09-29. PR CI `36575808711` passed 5/5 and Exact Runtime `36575808713`
+passed; post-merge CI `36576763557` passed 5/5 and Exact Runtime `36576763666`
+passed. The service consumes only the
 closed Editorial Transcript Projection V1, builds compact context-local source
 and fragment aliases, measures the complete UTF-8 JSON payload, and treats the
 analyzer response as untrusted. Application validates its closed schema,
@@ -1653,6 +1658,14 @@ analyzer, with quality, disclosure, latency, cost and failure evidence. The
 response bound begins after a `Promise<string>` reaches Application; a future
 adapter must also bound transport receipt. Global weighted roadmap progress is
 **55%**.
+
+ADR 0030 remains **ACCEPTED DIRECTION / IN DEVELOPMENT** because complete
+Semantic Editorial Analysis V1 is not delivered. The next required gate is an
+official and authorized real-agent round-trip; it is **NOT STARTED**. Retained
+non-blocking notes are the potential dominance of `history.current` or one
+projector call at extreme scale, deterministic but not quantitatively balanced
+initial disclosure, incidental ID-before-busy/`AbortError` behavior, and the
+mandatory future adapter receipt limit before `Promise<string>` materialization.
 
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
@@ -1899,11 +1912,10 @@ Exact Runtime `36245088427` passed on the feature merge SHA.
 Current dependency boundaries:
 
 1. pre-editorial correctness prerequisites are **CLOSED**;
-2. Editorial Transcript Projection V1 is **IMPLEMENTED / CLOSED**; Semantic
-   Editorial Analysis Boundary V1 is **IN DEVELOPMENT / REMEDIATED / FOCUSED
-   RE-REVIEW PENDING**, while
+2. Editorial Transcript Projection V1 and Semantic Editorial Analysis Boundary
+   V1 — Slice A are **IMPLEMENTED / CLOSED**, while
    complete semantic analysis remains **NOT DELIVERED** and the real-agent
-   round-trip is the **NEXT REQUIRED GATE**;
+   round-trip is the **NEXT REQUIRED GATE / NOT STARTED**;
 3. the coordinated Media Runtime gate remains **ACTIVE IN PARALLEL** for its
    named downstream/platform/export/release consumers.
 
@@ -1941,8 +1953,9 @@ STARTED**, and Windows product support remains unclaimed. Slice 5B and the
 remaining coordinated Media Runtime requirements continue under their actual
 consumer/platform dependencies in parallel. They do not serially block the
 closed Editorial Transcript Projection V1. The provider-neutral Semantic
-Editorial Analysis Boundary V1 is remediated on its feature branch after a
-review result of **CHANGES REQUIRED BEFORE PR**; focused re-review is pending.
+Editorial Analysis Boundary V1 — Slice A is implemented and closed after PR
+#53, remediation of F-1–F-6, focused approval, and green PR/post-merge CI plus
+Exact Runtime.
 Real-agent semantic analysis remains the next required gate and is not
 delivered by scripted fixtures.
 
@@ -2017,7 +2030,7 @@ delivered by scripted fixtures.
 
 - **CANONICAL:** CEVRA Vids progress is now the weighted execution of the complete currently planned roadmap, not only user-visible capability acceptance. The current Product Owner value is 55%; 54% remains the immediately preceding historical estimate, and commits, test counts, repeated work and corrections already represented in the estimate do not independently increase it.
 - **IMPLEMENTED/CLOSED:** Editorial Transcript Projection V1 merged through PR #51 at `56161b2af44c9e2de008bb33bc1706d4e2beaf7e`. Its approved read-only contract, last-known-speaker remediation and exact incremental UTF-8 fitting passed final independent review plus PR and post-merge CI.
-- **IN DEVELOPMENT / REMEDIATED / FOCUSED RE-REVIEW PENDING:** Semantic Editorial Analysis Boundary V1 is implemented on `feat/semantic-editorial-analysis-boundary-v1` at remediation code/test checkpoint `cc61dc3e205a88a08f2700f6d82ab5cd9d2ba74a`. Independent review of head `05462c442f40414299dc6d7c78a2fce53ad948ff` required F-1–F-6 changes; the consolidated remediation adds non-coercive enum parsing, one ID rule, one entry-to-return deadline, per-source on-demand projection, distributed initial evidence and cumulative transmitted-envelope budgeting without any project mutation. Scripted test analyzers are not a functional AI claim; a real-agent round-trip remains the next required gate after focused re-review.
+- **IMPLEMENTED / CLOSED — SLICE A ONLY:** Semantic Editorial Analysis Boundary V1 merged through PR #53 at `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba`. Independent review of head `05462c442f40414299dc6d7c78a2fce53ad948ff` required F-1–F-6 changes; code/test checkpoint `cc61dc3e205a88a08f2700f6d82ab5cd9d2ba74a` remediated them, and focused re-review approved feature head `0e3d9fa10db076f920d084b6582faf576aa50687` for the bounded analysis boundary. Scripted test analyzers remain non-functional-AI fixtures; ADR 0030 remains in development, complete Semantic Editorial Analysis is not delivered, and the real-agent round-trip is the next required gate.
 - **CEVRA NATIVE IMPROVEMENT:** partial speaker evidence separates different known speakers even when unattributed words occur between them. Unknown words remain unknown, and this is not a diarization claim.
 
 ---
@@ -2064,7 +2077,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete focused independent review of Semantic Editorial Analysis Boundary V1, then execute the **NEXT REQUIRED GATE**: an official real-agent round-trip with measured quality, disclosure, latency, cost and failures. Do not begin strategy, take selection or cut planning implicitly.
+1. Execute the **NEXT REQUIRED GATE** for Semantic Editorial Analysis: select an official and authorized mechanism for a real-agent round-trip, then measure quality, disclosure, PT-BR/EN-US behavior, latency, cost, cancellation and failures. Do not assume consumer entitlements authorize API access, and do not begin strategy, take selection or cut planning implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

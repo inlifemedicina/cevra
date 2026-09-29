@@ -1,8 +1,8 @@
 # Semantic Editorial Analysis Boundary V1 — Evidence
 
-**Status:** REMEDIATED ON FEATURE BRANCH / FOCUSED RE-REVIEW PENDING
+**Status:** SLICE A IMPLEMENTED / CLOSED — REAL-AGENT GATE NOT STARTED
 
-**Date:** 2026-09-28
+**Date:** 2026-09-29
 
 **Canonical base:** `394d959c43c1591b74aa5c1755ec2757a4dee045`
 
@@ -16,9 +16,32 @@
 
 **Remediation code/test checkpoint:** `cc61dc3e205a88a08f2700f6d82ab5cd9d2ba74a`
 
+**Approved feature head:** `0e3d9fa10db076f920d084b6582faf576aa50687`
+
+**Feature PR:** #53
+
+**Feature merge:** `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba`
+
 Independent review of the reviewed head returned **CHANGES REQUIRED BEFORE PR**
 for F-1 through F-6. The checkpoint above is the consolidated remediation;
-focused re-review of that delta remains pending.
+focused independent re-review concluded **APPROVE WITH NON-BLOCKING NOTES —
+ANALYSIS BOUNDARY ONLY** on the approved feature head. This preserves the
+review history instead of retroactively treating the first reviewed head as
+approved.
+
+## Remote integration evidence
+
+| Stage | Workflow | Run | Event | SHA | Result |
+|---|---|---:|---|---|---|
+| approved feature | CI | `36514742518` | `push` | `0e3d9fa10db076f920d084b6582faf576aa50687` | 5/5 SUCCESS |
+| feature PR | CI | `36575808711` | `pull_request` | `0e3d9fa10db076f920d084b6582faf576aa50687` | 5/5 SUCCESS |
+| feature PR | Audio Sequence Exact Runtime | `36575808713` | `pull_request` | `0e3d9fa10db076f920d084b6582faf576aa50687` | SUCCESS |
+| post-merge | CI | `36576763557` | `push` | `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba` | 5/5 SUCCESS |
+| post-merge | Audio Sequence Exact Runtime | `36576763666` | `push` | `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba` | SUCCESS |
+
+PR #53 merged the frozen approved head normally at `2026-09-29T13:39:51Z`.
+The Exact Runtime runs are regression evidence for affected Application paths;
+they are not execution of a real semantic analyzer.
 
 ## Delivered boundary
 
@@ -130,9 +153,10 @@ available explicit Python 3.12.14 test environment passed **74/74**, followed by
 Desktop **45/45** in the broad run. The complete production build passed. No
 native FFmpeg catalog, ML model download or real semantic analyzer was run.
 Historical CI `36495858520` applies only to reviewed head
-`05462c442f40414299dc6d7c78a2fce53ad948ff`; new remote CI must be recorded for
-the remediated final head. This document intentionally does not use a
-self-referential final documentation SHA.
+`05462c442f40414299dc6d7c78a2fce53ad948ff`; it is not evidence for the
+approved remediation. The remote table above records the final feature and
+post-merge runs. This document intentionally does not use a self-referential
+final documentation SHA.
 
 ## Honest scope
 
@@ -164,3 +188,18 @@ For each prepared PT-BR/EN-US fixture, record separately:
 
 No token or cost estimate may be inferred from bytes when the future adapter
 does not report it.
+
+## Closeout notes retained
+
+- **Extreme scale:** the implementer measurements above retain their stated
+  environment and origin. Independent reviewer measurements are separate
+  evidence and do not establish universal performance. Re-evaluate if future
+  representative real-agent fixtures show material latency or timeout.
+- **Disclosure distribution:** the first pass attempts one fragment per source
+  when it fits, then may favor earlier sources. It is deterministic disclosure,
+  not quantitative balancing, semantic selection or ranking.
+- **Incidental behavior:** operational-ID consumption before a busy result and
+  the existing `AbortError` classification remain non-blocking notes.
+- **Future adapter requirement:** receipt/transport must be bounded before a
+  `Promise<string>` is materialized. The current Application bound begins after
+  receipt and is not an optional substitute for that adapter guarantee.
