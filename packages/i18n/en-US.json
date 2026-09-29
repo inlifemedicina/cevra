@@ -253,5 +253,14 @@
   "alignment.error.resultInvalid": "The alignment result is invalid and was not applied.",
   "alignment.error.projectConflict": "The project or transcript changed while alignment was running. Alignment was not applied.",
   "alignment.error.commitFailed": "The aligned transcript could not be added to the project.",
-  "alignment.error.cancelled": "The alignment operation was cancelled."
+  "alignment.error.cancelled": "The alignment operation was cancelled.",
+  "semanticAnalysis.error.invalidRequest": "The semantic analysis request is invalid.",
+  "semanticAnalysis.error.invalidOutput": "The analyzer returned an invalid response.",
+  "semanticAnalysis.error.invalidEvidence": "The analyzer response references evidence that was not authorized or supplied.",
+  "semanticAnalysis.error.stale": "The project or transcript changed while semantic analysis was running.",
+  "semanticAnalysis.error.cancelled": "The semantic analysis operation was cancelled.",
+  "semanticAnalysis.error.timeout": "The semantic analysis operation timed out.",
+  "semanticAnalysis.error.analyzerUnavailable": "No semantic analyzer is currently available.",
+  "semanticAnalysis.error.contextLimit": "The semantic analysis context limit was reached. Select a smaller scope.",
+  "semanticAnalysis.error.noProgress": "The analyzer requested evidence that cannot add new authorized context."
 }
