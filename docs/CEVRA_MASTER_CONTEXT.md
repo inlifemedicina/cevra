@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Slice A is closed; Codex remains blocked on containment; official Claude Code 2.1.280 is installed/verified locally and the bounded PoC now awaits human subscription login
+**Last decision reconciliation:** 2026-09-29, Slice A is closed; Claude CLI installation/auth are verified, but its first canary failed the initialization containment gate (1/8 attempts); Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — AUTH]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — INITIALIZATION GATE]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1663,13 +1663,13 @@ adapter must also bound transport receipt. Global weighted roadmap progress is
 
 ADR 0030 remains **ACCEPTED DIRECTION / IN DEVELOPMENT** because complete
 Semantic Editorial Analysis V1 is not delivered. The next required gate is an
-official and authorized real-agent round-trip; it is **NOT STARTED**. Retained
+official and authorized real-agent round-trip; it is **ATTEMPTED / NOT DEMONSTRATED**. Retained
 non-blocking notes are the potential dominance of `history.current` or one
 projector call at extreme scale, deterministic but not quantitatively balanced
 initial disclosure, incidental ID-before-busy/`AbortError` behavior, and the
 mandatory future adapter receipt limit before `Promise<string>` materialization.
 
-**Real-agent gate attempts — ACTIVE / BLOCKED BEFORE INFERENCE.** The preserved
+**Real-agent gate attempts — ACTIVE / BLOCKED BEFORE ACCEPTED RESULT.** The preserved
 Codex App Server diagnostic branch
 `feat/semantic-codex-roundtrip-poc-v1` at
 `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1` remains **BLOCKED —
@@ -1686,13 +1686,19 @@ explicitly authorized, version-fixed local installation of official
 outside the repo. Signed-manifest verification (including a negative control),
 exact binary hash, native publisher signature, notarization assessment and
 native version/help passed. No global install, PATH/profile change, personal
-config edit or Gatekeeper bypass occurred. Official sanitized auth status
-returned `loggedIn: false`, `authMethod: none`, `apiProvider: firstParty`:
-the current stage is **BLOCKED — AUTH**, pending human `auth login --claudeai`
-with the installed binary. Effective containment/managed policy, Opus/Medium,
-adapter, transport and real semantic matrix remain unverified/not run.
-Real harness executions remain **0 / 8**; no API key, extra usage, model
-fallback, adapter scaffold or audiovisual mutation was introduced. See
+config edit or Gatekeeper bypass occurred. The historical AUTH blocker was
+resolved by the user's official subscription login: sanitized status now reports
+logged-in Claude.ai / first-party / Pro. Documented controls and local policy
+preflight permitted a minimal canary after deterministic adapter tests.
+Current stage: **BLOCKED — INITIALIZATION CONTAINMENT GATE**. Its first event
+failed a control assertion; the process was terminated/reaped and no final
+response accepted. Real harness attempts: **1 / 8**. The failing field was not
+retained; this is not proof of tool execution or a provider escape. Narrow
+non-content diagnostics were added without relaxing controls or rerunning.
+Effective model/effort, real transport success and editorial quality remain
+unproven. The adapter/test harness is private infrastructure, not Desktop
+integration. No API key, extra usage, fallback or audiovisual mutation was
+introduced; remote consumption of the failed attempt is unknown. See
 [the Claude attempt evidence](CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md).
 The Claude choice is only the next private proof candidate; it neither replaces
 the historical Codex preference nor approves commercial integration. Complete
@@ -1947,7 +1953,7 @@ Current dependency boundaries:
 2. Editorial Transcript Projection V1 and Semantic Editorial Analysis Boundary
    V1 — Slice A are **IMPLEMENTED / CLOSED**, while
    complete semantic analysis remains **NOT DELIVERED** and the real-agent
-   round-trip is the **NEXT REQUIRED GATE / NOT STARTED**;
+   round-trip is the **NEXT REQUIRED GATE / ATTEMPTED, NOT DEMONSTRATED**;
 3. the coordinated Media Runtime gate remains **ACTIVE IN PARALLEL** for its
    named downstream/platform/export/release consumers.
 
@@ -2070,7 +2076,7 @@ delivered by scripted fixtures.
 - **PRESERVED DIAGNOSTIC:** the Codex App Server PoC remains **BLOCKED — CONTAINMENT** at `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1`, with zero threads and zero turns. It is not reclassified as a demonstrated escape or universal impossibility.
 - **BOUNDED CANDIDATE DECISION:** official Claude Code CLI is the next private proof candidate under the same provider-neutral Application port. This does not replace the historical Codex preference or approve product/commercial integration.
 - **HISTORICAL / RESOLVED — VERSION:** the first preflight found only Claude Desktop and its internal Linux/aarch64 2.1.270 payload. The subsequent explicitly authorized installation verified official macOS arm64 Claude Code 2.1.280 with signed manifest, binary checksum, native publisher signature and notarization. No global configuration was changed.
-- **CURRENT — BLOCKED / AUTH:** the installed CLI reports no login. Human subscription login is the only immediate action; managed-policy/containment and Opus/Medium gates still precede adapter implementation and inference. Zero of eight real harness executions used. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
+- **CURRENT — BLOCKED / INITIALIZATION GATE:** official subscription login is verified. The isolated adapter's first real canary failed the initial event containment assertion; 1/8 attempts used, zero accepted results. No tool execution/escape is established; the exact field was not retained. Review the added non-content diagnostic and initialization semantics before any continued canary; do not weaken controls or repeat login/install. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
 
 ---
 
@@ -2116,7 +2122,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Resume the **NEXT REQUIRED GATE** after human subscription login through the already verified Claude Code 2.1.280 binary; the exact command is in the existing Claude evidence record. Recheck its hash and sanitized auth, then Opus identifier/Medium effort, effective no-tools/no-MCP/no-unmanaged-context isolation and managed policy before implementing the adapter or sending semantic input. The one local installation was explicitly authorized; no automatic update, inferred entitlement, API/extra usage, strategy, take selection or cut planning is authorized implicitly.
+1. Resolve the **NEXT REQUIRED GATE** at the Claude 2.1.280 initialization event: review the bounded adapter/diagnostic, then identify the exact failed control field in an explicitly continued canary (seven of eight attempts remain). Installation and subscription auth already pass; do not repeat them as blockers. No accepted real semantic result exists. Do not weaken no-tools/no-MCP/no-unmanaged-context controls, silently substitute model/billing, or proceed to the editorial matrix before containment is established. No strategy, take selection or cut planning is authorized implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

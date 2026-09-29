@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-29 — CLI INSTALLED / VERIFIED; BLOCKED — AUTH (human login required).**
+**2026-09-29 — AUTH VERIFIED; BLOCKED — INITIALIZATION CONTAINMENT GATE.**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -8,6 +8,24 @@ Slice A remains CLOSED; ADR 0030 remains IN DEVELOPMENT.
 Global roadmap tracking remains **55%**.
 
 ## Current result
+
+After the user's official subscription login, sanitized auth reports
+`loggedIn: true`, `authMethod: claude.ai`, `apiProvider: firstParty`,
+`subscriptionType: pro`, exit 0. The binary's pinned hash, architecture,
+publisher signature and notarization assessment still pass. Installation and
+authentication are no longer blockers.
+
+The isolated developer-only adapter and deterministic tests were implemented
+after the documentation/configuration preflight. The first real canary was
+rejected at its first initialization event by a containment assertion; its
+owned process was terminated and reaped. **1 / 8** real process attempts used;
+no second attempt, retry or fallback. No final model response was accepted or
+retained, and no semantic-quality evaluation could run. This is not evidence
+of an actual tool invocation, a containment escape, or generalized Claude
+incompatibility. Which initialization field failed was not captured by that
+checkpoint; the exact diagnostic limitation and follow-up are recorded below.
+
+## Historical installation continuation — authentication then missing
 
 The explicitly authorized continuation from
 `9e9370f4f98d02d777cea004d8aac703a0a20b2a` installed and verified official
@@ -236,7 +254,7 @@ every flag combination. The original eight-execution quota is unconsumed.
 No synthetic prompt, real media, repository context or chat was transmitted
 to an analyzer. Installation/status traffic is not a semantic round-trip.
 
-### Only required human action
+### Historical required human action — now completed by the user
 
 Run the following from Terminal and finish the official browser login using
 the existing Claude subscription. Do not select Console/API, enable extra
@@ -255,7 +273,7 @@ No credentials, account identifiers or login URLs are retained here. The
 programming model/effort are not independently observable in this preflight;
 the requested GPT-5.6 Sol/High are not asserted as effective configuration.
 
-## Scope and confirmations (current)
+## Scope and confirmations at the installation-only checkpoint (historical)
 
 - no real or private data was sent;
 - no synthetic transcript, canary contents, repository, chat, media, or patient
@@ -273,3 +291,135 @@ the requested GPT-5.6 Sol/High are not asserted as effective configuration.
 
 Verdict: **BLOCKED — AUTH; INSTALLATION VERIFIED**. Slice A remains CLOSED;
 complete semantic analysis and commercial integration remain NOT DELIVERED.
+
+## Authenticated continuation and first real canary — 2026-09-29
+
+Initial branch HEAD: `c972d023f0127ae95ace6ae752a9ffc8a36b45db`.
+The native canary tested code/harness/rubric checkpoint
+`3ead64bc6699c887ea28110651b94146c3ae16b8`. Its sole sentence was
+“A caixa tem uma etiqueta de rastreamento.”, projected from a synthetic source.
+Only the bounded text envelope and first-party playbook were written to stdin;
+no repository, programmer chat, source paths, private data or credentials were
+supplied as prompt context. Remote receipt/inference before termination is not
+proven either way; a failed early client attempt is not reported as zero remote
+consumption. It conservatively consumes one of the eight authorized attempts.
+
+### Preflight: configuration proof versus observed execution
+
+- Original HOME retained for official auth; child environment is an explicit
+  allowlist of HOME, system PATH, LANG and `DISABLE_AUTOUPDATER=1`. No inherited
+  API/cloud/gateway credentials or endpoints. No auth file/Keychain extraction.
+- The local system managed-settings directory and managed preference domain
+  were absent. Official `doctor` reported remote managed settings “not fetched”
+  because that mechanism requires Enterprise/Team; this account reports Pro.
+  No administrative policy was bypassed. Custom-install PATH/launcher warnings
+  were not “fixed” by editing personal/global configuration.
+- Official current [CLI controls](https://code.claude.com/docs/en/cli-reference),
+  [permissions](https://code.claude.com/docs/en/permissions),
+  [settings](https://code.claude.com/docs/en/settings) and
+  [model configuration](https://code.claude.com/docs/en/model-config) were checked
+  against native 2.1.280 help. Restricted/safe mode do not supersede managed
+  policy. System-prompt replacement avoids default programmer context.
+- Spawn uses an absolute verified executable, `shell: false`, a fresh external
+  private cwd, fresh session, stdin and explicit argv: restricted, safe-mode,
+  `--tools` with a real empty string, strict empty MCP configuration,
+  `--disallowedTools mcp__*`, permission-prompts none, empty setting-sources,
+  disabled slash commands/Chrome/session persistence, max-turns 1, stream-json
+  with verbose, requested `opus` / `medium`. No bare/bypass/resume/continue.
+- These documented/versioned controls supported starting a minimal canary;
+  the real initialization then failed the additional event gate. They are not
+  relabelled as a successful effective-isolation demonstration.
+- Neither the effective model ID nor effective effort was established by this
+  failed attempt. Requested Opus/Medium are not substituted for observed values.
+  Auth is subscription Pro, but status does not attest every account billing
+  setting. No extra usage/purchase/API mode was enabled by CEVRA.
+
+### Exact first-attempt result
+
+| Item | Observed result |
+|---|---|
+| Real harness/process attempts | 1/8; 7 remain, not automatically consumed |
+| Application result | `SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE` |
+| Transport result | `CONTAINMENT` on event 1 |
+| stdout / stderr | 890 / 0 bytes |
+| Process latency / total harness latency | 757.189 / 875.823 ms, this macOS arm64 host only |
+| Child settlement | closed/reaped before adapter settlement |
+| History / redo | archive byte-equivalent / redo preserved |
+| Final semantic response, model, usage, charged cost | unavailable; not invented |
+| PT-BR/EN-US editorial, continuation, hostile/visual, real cancellation | NOT RUN after gate failure |
+
+At this code checkpoint, event 1 + `CONTAINMENT` narrows the rejection to a
+`system/init` control assertion (tool/MCP/plugin/skill list or bypass mode).
+That is a **code-path inference**, not a retained listing of the failing
+field. The original reader deliberately discarded raw events and did not
+retain sufficient sanitized shape diagnostics. No tool execution was observed.
+Do not infer which list was nonempty, whether a field was missing, or whether
+the client actually exposed a capability. The failed run cannot be retrospectively
+reconstructed from invented metadata.
+
+**FIX NOW for diagnosability, without another inference:** the final code adds
+only allowlisted event type/subtype, list counts, bypass boolean and payload
+byte counts to rejected-event receipts. No event text, thinking, paths or
+arbitrary objects are retained. Deterministic tests cover that narrow addition.
+It does not relax a containment assertion or make the failed canary pass.
+The first run predates this diagnostic addition; its payload byte counts were
+not recorded and are not replaced by a later fixture measurement.
+
+The next concrete step is a focused review of initialization control semantics
+and the non-content diagnostic, followed by at most one explicitly continued
+canary under the remaining quota. It must identify the rejected field and
+distinguish an unsupported/missing field from an enabled capability **before**
+any gate adjustment or editorial matrix. No provider/model/billing substitution
+is authorized by this blocker. There is no request to repeat login/install.
+
+### Implemented/tested infrastructure, not a functional AI claim
+
+The [private adapter and reproduction guide](../packages/agents/claude-poc/README.md)
+define the pre-response rubric and six planned cases. Playbook instructions
+are separate from the grading rubric, which is never sent to Claude.
+The adapter satisfies the unchanged Application port through Node spawn;
+it validates correlation, no-tool initialization/events, a single successful
+turn/final result, exact observed Opus consistency, close/reap, and bounded
+JSONL/stdout/stderr/events/final text. It performs no JSON repair, retry or
+fallback and retains no thinking. The default Application 64 KiB first /
+256 KiB cumulative / two-invocation limits remain unchanged.
+
+Deterministic tests use a controlled Node child explicitly labelled **fake CLI**,
+plus real ProjectHistory, projection, Application validation and two independent
+continuation processes. They exercise fragmented UTF-8, authentication failure,
+unexpected tools/control events, limits, process death, cancellation, delayed
+settlement, stdin buffering, malformed/duplicate/partial results, citation rejection,
+stale commit→undo, immutability, PT-BR/EN-US and unchanged history/redo.
+They do not establish real CLI transport compatibility or semantic quality.
+
+No CLOSED Application/projection/Project IR/history code changed. No SDK,
+dependency, runtime pin, schema or product authority was added. Director impact:
+compatible I1/I3/I5 **blocked feasibility work**, not Director implementation.
+Slice A stays CLOSED; full semantic analysis and commercial integration are
+NOT DELIVERED. Global progress remains **55%**.
+
+### Validation and checkpoint ledger
+
+| Layer | Checkpoint / result |
+|---|---|
+| Historical installation documentation | `c972d023f0127ae95ace6ae752a9ffc8a36b45db`; push CI [36627274406](https://github.com/inlifemedicina/cevra/actions/runs/36627274406) SUCCESS; not evidence for the new adapter |
+| Real canary / first adapter | `3ead64bc6699c887ea28110651b94146c3ae16b8`; 30 deterministic tests PASS before the sole real attempt; real attempt BLOCKED as above |
+| Final code/test checkpoint | `a534e9b17b71cadf94e3a65ccb981f802bed9370`; sanitized rejection diagnostics added, 31 deterministic tests PASS; no additional real attempt |
+| Full local build/regression | `npm run ci`, Node 24.19.0, Python 3.12.14 available for Desktop checks; exit 0, 633 tests total including the 31 adapter tests |
+| Local groups | Desktop UI 45; Desktop Host 74; Application 210; contracts 21; i18n 2; Project IR 53; Store 11; Transcript Cache 12; Alignment Node 33; Media Node 91; Transcription Node 50; PoC 31 — all PASS |
+| Dependency audit | `npm audit --json`: zero vulnerabilities; no new dependency or lockfile change |
+| Native ML / local Rust / FFmpeg rebuild | NOT RUN in this continuation; unrelated to this bounded transport change |
+| New push CI | Required on the final pushed SHA; exact run/SHA/result belongs to the delivery report, not the historical run above |
+| Exact managed Media Runtime | Branch excluded from the existing push allowlist; no manual dispatch or workflow change authorized/needed |
+
+The rubric remains fixed and **editorial evaluation NOT RUN**. Installation,
+auth, fake-process tests and normal CI cannot be used as a real-semantic PASS.
+Programming model/effort are not independently observable here; requested
+GPT-5.6 Sol/High are not reported as verified configuration. Claude's requested
+Opus/Medium likewise remains distinct from the unavailable effective result.
+
+The local official CLI installation is retained at the versioned path above,
+with no binary change. The private matrix ledger and bounded failed-canary
+receipt are retained outside the repository for quota/audit continuity; the
+canonical facts are transcribed here, not a raw provider dump. No new login,
+purchase, provider switch or broader project implementation is requested.

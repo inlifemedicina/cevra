@@ -197,14 +197,23 @@ The first official-provider attempts do not alter the accepted boundary:
   darwin-arm64** outside the repo. Signed manifest, exact SHA-256, native
   publisher signature/notarization and version/help passed, without global
   configuration changes. The executable prerequisite is resolved;
-- current status is **BLOCKED — AUTH**: official sanitized status reports no
-  login. Human subscription login is required before effective managed-policy/
-  containment and model/effort gates. Only after those gates pass may an
-  adapter be implemented and the fixed real matrix consume account quota.
+- the historical AUTH blocker was resolved by official human subscription login;
+  sanitized status reports Claude.ai / first-party / Pro. Documentation/configuration
+  preflight and absent local managed policy permitted the bounded adapter and
+  deterministic tests, then one minimal real canary;
+- current status is **BLOCKED — INITIALIZATION CONTAINMENT GATE**: the canary's
+  first event failed a control assertion and the owned child was terminated/reaped.
+  One of eight attempts used, no final response accepted. The failed field was
+  not retained; neither a tool invocation nor an escape is proven. Added
+  allowlisted non-content diagnostics do not relax controls or retrospectively
+  explain that event. Review/identify the mismatch before any continued canary.
 
-No adapter scaffold was added under an unverified transport. No API key, extra
-usage, semantic input, retry/fallback, Project IR/History mutation, or product
-integration occurred. Claude is a candidate for this proof, not a replacement
+The private adapter is deterministically tested, not real-transport validated.
+One harmless synthetic text envelope was written to the CLI; remote inference
+or consumption before termination is unknown. No API key, extra usage, retry/
+fallback, Project IR/History mutation or product integration was introduced.
+Effective model/effort and editorial quality remain unproven.
+Claude is a candidate for this proof, not a replacement
 for the historical Codex preference or an approval for commercial use. The
 [attempt evidence](../CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md)
 records the official mechanism, installed-state facts and exact prerequisite.
