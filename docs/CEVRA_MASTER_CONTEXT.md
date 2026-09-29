@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Semantic Editorial Analysis Boundary V1 Slice A merged and closed in its bounded technical scope; real-agent round-trip remains the next required gate
+**Last decision reconciliation:** 2026-09-29, Slice A is closed; the Codex attempt remains blocked on containment and the bounded Claude CLI attempt is blocked before inference because no host-executable CLI is installed
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT STARTED]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — VERSION]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1666,6 +1666,28 @@ non-blocking notes are the potential dominance of `history.current` or one
 projector call at extreme scale, deterministic but not quantitatively balanced
 initial disclosure, incidental ID-before-busy/`AbortError` behavior, and the
 mandatory future adapter receipt limit before `Promise<string>` materialization.
+
+**Real-agent gate attempts — ACTIVE / BLOCKED BEFORE INFERENCE.** The preserved
+Codex App Server diagnostic branch
+`feat/semantic-codex-roundtrip-poc-v1` at
+`788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1` remains **BLOCKED —
+CONTAINMENT**, with zero threads and zero turns. That result is not a reproduced
+escape or a universal provider verdict. The next bounded private candidate is
+the official Claude Code CLI under
+`feat/semantic-claude-roundtrip-poc-v1`. Its first preflight stopped **BLOCKED
+— VERSION** before auth, adapter implementation, semantic payload, or model
+inference: this macOS host has Claude Desktop 2.16120.0 and an internal
+Linux/aarch64 Claude Code payload labelled 2.1.270, but no host-executable
+`claude` CLI. The exact prerequisite is an official macOS arm64 Claude Code CLI
+2.1.270 or later whose own `--help`, auth status, model/effort options and
+isolation controls can be verified. No installation/update, API key, extra
+usage, model fallback, real execution, adapter scaffold or audiovisual mutation
+was performed. See
+[the Claude attempt evidence](CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md).
+The Claude choice is only the next private proof candidate; it neither replaces
+the historical Codex preference nor approves commercial integration. Complete
+Semantic Editorial Analysis remains not delivered and global progress remains
+**55%**.
 
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
@@ -2033,6 +2055,12 @@ delivered by scripted fixtures.
 - **IMPLEMENTED / CLOSED — SLICE A ONLY:** Semantic Editorial Analysis Boundary V1 merged through PR #53 at `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba`. Independent review of head `05462c442f40414299dc6d7c78a2fce53ad948ff` required F-1–F-6 changes; code/test checkpoint `cc61dc3e205a88a08f2700f6d82ab5cd9d2ba74a` remediated them, and focused re-review approved feature head `0e3d9fa10db076f920d084b6582faf576aa50687` for the bounded analysis boundary. Scripted test analyzers remain non-functional-AI fixtures; ADR 0030 remains in development, complete Semantic Editorial Analysis is not delivered, and the real-agent round-trip is the next required gate.
 - **CEVRA NATIVE IMPROVEMENT:** partial speaker evidence separates different known speakers even when unattributed words occur between them. Unknown words remain unknown, and this is not a diarization claim.
 
+## 2026-09-29 — real-agent gate attempts
+
+- **PRESERVED DIAGNOSTIC:** the Codex App Server PoC remains **BLOCKED — CONTAINMENT** at `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1`, with zero threads and zero turns. It is not reclassified as a demonstrated escape or universal impossibility.
+- **BOUNDED CANDIDATE DECISION:** official Claude Code CLI is the next private proof candidate under the same provider-neutral Application port. This does not replace the historical Codex preference or approve product/commercial integration.
+- **BLOCKED — VERSION:** the macOS host has no executable `claude` CLI; only Claude Desktop and an internal Linux/aarch64 payload labelled 2.1.270 were observed. No auth, model, effort, isolation, adapter, inference or semantic quality claim was made. Next action is to provide an official macOS arm64 Claude Code CLI 2.1.270 or later and re-run preflight before semantic input.
+
 ---
 
 # 26. Explicitly unresolved decisions
@@ -2077,7 +2105,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Execute the **NEXT REQUIRED GATE** for Semantic Editorial Analysis: select an official and authorized mechanism for a real-agent round-trip, then measure quality, disclosure, PT-BR/EN-US behavior, latency, cost, cancellation and failures. Do not assume consumer entitlements authorize API access, and do not begin strategy, take selection or cut planning implicitly.
+1. Resume the **NEXT REQUIRED GATE** for Semantic Editorial Analysis only after an official macOS arm64 Claude Code CLI 2.1.270 or later is available at an explicit executable path. Revalidate its own version/help, sanitized subscription auth, Opus identifier/Medium effort, effective no-tools/no-MCP/no-unmanaged-context isolation and managed policy before implementing the adapter or sending semantic input. Do not install/update automatically, assume consumer entitlement, enable API/extra usage, or begin strategy, take selection or cut planning implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

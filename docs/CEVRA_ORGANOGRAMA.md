@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT STARTED]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE BLOCKED-VERSION]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -142,9 +142,13 @@ provider-neutral Application port, validates untrusted structured responses
 and returns no project mutation. PR CI `36575808711` and Exact Runtime
 `36575808713` passed; post-merge CI `36576763557` and Exact Runtime
 `36576763666` passed. Its scripted test analyzers are not a production AI
-capability. A real-agent round-trip is the next required gate and is not
-started;
-complete Semantic Editorial Analysis V1, strategy, take selection and cut
-planning remain not delivered.
+capability. A real-agent round-trip remains the next required gate and is not
+delivered by these scripted fixtures. The preserved Codex App Server attempt is
+blocked on containment with zero turns; the bounded Claude CLI attempt is
+blocked before auth/inference because no host-executable macOS CLI is installed.
+Claude remains the next private proof candidate, not a replacement of the
+provider-neutral core or an approved commercial integration. Complete Semantic
+Editorial Analysis V1, strategy, take selection and cut planning remain not
+delivered. Progress remains 55%.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.

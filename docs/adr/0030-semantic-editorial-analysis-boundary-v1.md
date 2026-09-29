@@ -180,6 +180,33 @@ The real-agent round-trip described above is the **NEXT REQUIRED GATE / NOT
 STARTED**, and complete Semantic Editorial Analysis V1 remains **NOT
 DELIVERED**.
 
+## Real-agent gate attempts — 2026-09-29
+
+The first official-provider attempts do not alter the accepted boundary:
+
+- the preserved Codex App Server diagnostic at
+  `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1` remains **BLOCKED —
+  CONTAINMENT**, with zero threads and zero turns. It is not a demonstrated
+  escape or a universal rejection of Codex;
+- Claude Code CLI is the next bounded private proof candidate, but its initial
+  branch is **BLOCKED — VERSION** before authentication or inference. Claude
+  Desktop exposes only an internal Linux/aarch64 payload labelled 2.1.270 on
+  this macOS host; no host-executable `claude` command exists to verify help,
+  auth, model/effort, containment or stream transport;
+- the exact next prerequisite is an official macOS arm64 Claude Code CLI
+  2.1.270 or later. Only after exact installed-version preflight passes may a
+  provider adapter be implemented and the fixed real matrix consume account
+  quota.
+
+No adapter scaffold was added under an unverified transport. No API key, extra
+usage, semantic input, retry/fallback, Project IR/History mutation, or product
+integration occurred. Claude is a candidate for this proof, not a replacement
+for the historical Codex preference or an approval for commercial use. The
+[attempt evidence](../CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md)
+records the official mechanism, installed-state facts and exact prerequisite.
+Complete Semantic Editorial Analysis remains **NOT DELIVERED** and progress
+remains **55%**.
+
 Non-blocking limits retained by the closeout are:
 
 - at extreme transcript scale, `history.current` materialization or an

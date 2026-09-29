@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis Boundary V1 — Evidence
 
-**Status:** SLICE A IMPLEMENTED / CLOSED — REAL-AGENT GATE NOT STARTED
+**Status:** SLICE A IMPLEMENTED / CLOSED — REAL-AGENT GATE ACTIVE, BLOCKED BEFORE INFERENCE
 
 **Date:** 2026-09-29
 
@@ -170,6 +170,16 @@ The objective contract evidence relates to D2-T1/D2-T3, D3-T2, D4-T2,
 D5-T1/D5-T2 and I1/I5, but it does not mark those editorial or provider
 acceptance cases executed. The real-agent round-trip remains the next required
 gate.
+
+Two provider-specific attempts are tracked without changing this closed Slice A
+evidence. The preserved Codex App Server branch at
+`788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1` is **BLOCKED — CONTAINMENT**
+with zero threads and zero turns. The Claude CLI candidate is **BLOCKED —
+VERSION** before authentication or inference because no host-executable macOS
+Claude Code CLI is installed; only an internal Linux/aarch64 Desktop payload
+was observed. Neither attempt proves semantic quality or changes the boundary.
+See
+[Claude attempt evidence](CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md).
 
 ## Future real-agent evaluation rubric — NOT EXECUTED
 
