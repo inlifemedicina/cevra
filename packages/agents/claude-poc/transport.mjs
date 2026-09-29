@@ -11,14 +11,24 @@ export const LIMITS = Object.freeze({ line: 1024*1024, stdout: 8*1024*1024, stde
 export class ClaudePocError extends Error {
   constructor(code) { super(code); this.name = 'ClaudePocError'; this.code = code; }
 }
-const fail = code => { throw new ClaudePocError(code); };
+const fail = (code, reason) => { const error=new ClaudePocError(code); if(reason)error.reason=reason; throw error; };
 // Non-content diagnostic vocabulary: never retain arbitrary event fields/text.
 function eventSummary(event) {
-  const label=value=>typeof value==='string'&&/^[a-z_]{1,48}$/.test(value)?value:'other';
-  const summary={type:label(event.type),subtype:label(event.subtype)};
+  const label=(value,allowed)=>allowed.includes(value)?value:'other';
+  const summary={type:label(event.type,['system','assistant','result','rate_limit_event']),
+    subtype:label(event.subtype,['init','success','error_max_turns'])};
   for(const field of ['tools','mcp_servers','plugins','skills']) {
-    summary[`${field}Count`]=Array.isArray(event[field])?event[field].length:null;
+    const present=Object.hasOwn(event,field);
+    const value=event[field];
+    const kind=!present?'missing':Array.isArray(value)?'array':value===null?'null':typeof value;
+    summary[field]=Object.freeze({present,kind,count:Array.isArray(value)?value.length:null});
   }
+  const model=event.model;
+  summary.model=Object.freeze({present:Object.hasOwn(event,'model'),
+    kind:!Object.hasOwn(event,'model')?'missing':model===null?'null':typeof model,
+    class:typeof model==='string'&&/^claude-opus-[a-z0-9.-]+$/.test(model)?'allowed-opus':'unproven'});
+  summary.permissionMode=Object.freeze({present:Object.hasOwn(event,'permissionMode'),
+    kind:!Object.hasOwn(event,'permissionMode')?'missing':event.permissionMode===null?'null':typeof event.permissionMode});
   summary.permissionsBypassed=event.permissionMode==='bypassPermissions';
   return Object.freeze(summary);
 }
@@ -80,10 +90,17 @@ export class ClaudeStreamReader {
     if(e.session_id!==this.sessionId) fail('CORRELATION');
     if(e.type==='system' && e.subtype==='init') {
       if(this.initialized) fail('DUPLICATE_INIT');
-      for(const field of ['tools','mcp_servers']) if(!Array.isArray(e[field])||e[field].length) fail('CONTAINMENT');
-      for(const field of ['plugins','skills']) if(e[field]!==undefined && (!Array.isArray(e[field])||e[field].length)) fail('CONTAINMENT');
-      if(e.permissionMode==='bypassPermissions') fail('CONTAINMENT');
-      this.checkModel(e.model); this.model=e.model; this.initialized=true; return;
+      for(const [field,prefix] of [['tools','INIT_TOOLS'],['mcp_servers','INIT_MCP']]) {
+        if(!Object.hasOwn(e,field)) fail('CONTAINMENT',`${prefix}_MISSING`);
+        if(!Array.isArray(e[field])) fail('CONTAINMENT',`${prefix}_WRONG_TYPE`);
+        if(e[field].length) fail('CONTAINMENT',`${prefix}_NONEMPTY`);
+      }
+      for(const [field,prefix] of [['plugins','INIT_PLUGINS'],['skills','INIT_SKILLS']]) {
+        if(e[field]!==undefined && !Array.isArray(e[field])) fail('CONTAINMENT',`${prefix}_WRONG_TYPE`);
+        if(Array.isArray(e[field]) && e[field].length) fail('CONTAINMENT',`${prefix}_NONEMPTY`);
+      }
+      if(e.permissionMode==='bypassPermissions') fail('CONTAINMENT','INIT_PERMISSION_BYPASS');
+      this.checkModel(e.model,'init'); this.model=e.model; this.initialized=true; return;
     }
     if(!this.initialized) fail('MISSING_INIT');
     if(e.type==='assistant') {
@@ -112,9 +129,9 @@ export class ClaudeStreamReader {
     }
     if(Number.isFinite(e.total_cost_usd)&&e.total_cost_usd>=0) this.estimate=e.total_cost_usd;
   }
-  checkModel(model) {
-    if(typeof model!=='string'||!/^claude-opus-[a-z0-9.-]+$/.test(model)) fail('MODEL_UNAVAILABLE');
-    if(this.model && this.model!==model) fail('MODEL_DRIFT');
+  checkModel(model,origin) {
+    if(typeof model!=='string'||!/^claude-opus-[a-z0-9.-]+$/.test(model)) fail('MODEL_UNAVAILABLE',origin==='init'?'INIT_MODEL_INVALID':undefined);
+    if(this.model && this.model!==model) fail('MODEL_DRIFT',origin==='init'?'INIT_MODEL_DRIFT':undefined);
   }
   finish() {
     if(this.pending.length) fail('PARTIAL_EOF');
@@ -131,8 +148,9 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
   const child=spawnProcess(binary,childArguments(sessionId),{cwd,env:childEnvironment(home),shell:false,stdio:['pipe','pipe','pipe']});
   return await new Promise((resolve,reject)=>{
     let error, killTimer, stderrBytes=0, tail=Buffer.alloc(0), closed=false;
-    const stop=(code)=>{
+    const stop=(code,reason)=>{
       error??=new ClaudePocError(code);
+      if(reason && error.code===code) error.reason??=reason;
       if(!closed && killTimer===undefined) {
         child.kill('SIGTERM');
         killTimer=setTimeout(()=>{if(!closed)child.kill('SIGKILL');},1000);
@@ -142,7 +160,7 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
     const timer=setTimeout(()=>stop('TIMEOUT'),timeoutMs);
     signal?.addEventListener('abort',abort,{once:true});
     if(signal?.aborted)abort();
-    child.stdout.on('data',chunk=>{if(error)return;try{reader.push(chunk);}catch(e){stop(e.code??'INVALID_EVENT');}});
+    child.stdout.on('data',chunk=>{if(error)return;try{reader.push(chunk);}catch(e){stop(e.code??'INVALID_EVENT',e.reason);}});
     child.stderr.on('data',chunk=>{
       stderrBytes+=chunk.length;
       tail=Buffer.concat([tail,chunk.subarray(-limits.stderrTail)]).subarray(-limits.stderrTail);
@@ -158,6 +176,7 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
       // Never return before process close/reap. No transcript/stderr in errors.
       tail=Buffer.alloc(0);
       if(error){error.metrics={stdoutBytes:reader.bytes,stderrBytes,events:reader.events,
+        ...(error.reason?{initFailureReason:error.reason}:{}),
         lastEventSummary:reader.lastEventSummary,envelopeBytes:Buffer.byteLength(payload),
         systemPromptBytes:Buffer.byteLength(PLAYBOOK),stdinBytes:Buffer.byteLength(payload),
         latencyMs:performance.now()-started,childClosed:true};reject(error);return;}

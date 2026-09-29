@@ -52,9 +52,62 @@ test('complete-looking result is not accepted before child settlement/cancellati
 test('process death fails without retry',async()=>{await assert.rejects(run('death'),e=>e.code==='PROCESS_EXIT');});
 test('rejected initialization retains only non-content shape diagnostics',async()=>{
  await assert.rejects(run('tools'),e=>{
-  assert.deepEqual(e.metrics.lastEventSummary,{type:'system',subtype:'init',toolsCount:1,mcp_serversCount:0,pluginsCount:0,skillsCount:0,permissionsBypassed:false});
+  assert.equal(e.metrics.initFailureReason,'INIT_TOOLS_NONEMPTY');
+  assert.deepEqual(e.metrics.lastEventSummary.tools,{present:true,kind:'array',count:1});
+  assert.deepEqual(e.metrics.lastEventSummary.mcp_servers,{present:true,kind:'array',count:0});
   assert(!JSON.stringify(e.metrics).includes('Café'));assert.equal(e.metrics.stdinBytes,Buffer.byteLength(payload));return e.code==='CONTAINMENT';
  });
+});
+test('every init field reports a closed reason without changing pass/fail semantics',()=>{
+ const base={type:'system',subtype:'init',session_id:'fixture-session',
+  tools:[],mcp_servers:[],plugins:[],skills:[],permissionMode:'default',model:'claude-opus-fixture'};
+ const reader=event=>{const r=new ClaudeStreamReader('fixture-session');
+  try{r.push(Buffer.from(JSON.stringify(event)+'\n'));return {reader:r};}
+  catch(error){return {reader:r,error};}
+ };
+ const mutation=(field,change)=>{const e=structuredClone(base);change(e);const {reader:r,error}=reader(e);
+  return {r,error,summary:r.lastEventSummary?.[field]};};
+ const privateName='PRIVATE_TOKEN_SHOULD_NEVER_LEAK';
+ for(const [field,prefix] of [['tools','INIT_TOOLS'],['mcp_servers','INIT_MCP']]){
+  let result=mutation(field,e=>{delete e[field];});
+  assert.equal(result.error?.code,'CONTAINMENT');assert.equal(result.error?.reason,`${prefix}_MISSING`);
+  assert.deepEqual(result.summary,{present:false,kind:'missing',count:null});
+  result=mutation(field,e=>{e[field]={secret:privateName};});
+  assert.equal(result.error?.reason,`${prefix}_WRONG_TYPE`);
+  assert.deepEqual(result.summary,{present:true,kind:'object',count:null});
+  result=mutation(field,e=>{e[field]=[privateName];});
+  assert.equal(result.error?.reason,`${prefix}_NONEMPTY`);
+  assert.deepEqual(result.summary,{present:true,kind:'array',count:1});
+  assert(!JSON.stringify({error:result.error.message,reason:result.error.reason,metrics:result.r.lastEventSummary}).includes(privateName));
+  result=mutation(field,e=>{e[field]=[];});
+  assert.equal(result.error,undefined);assert.equal(result.r.initialized,true);
+ }
+ for(const [field,prefix] of [['plugins','INIT_PLUGINS'],['skills','INIT_SKILLS']]){
+  let result=mutation(field,e=>{delete e[field];});
+  assert.equal(result.error,undefined);assert.deepEqual(result.summary,{present:false,kind:'missing',count:null});
+  result=mutation(field,e=>{e[field]=[];});
+  assert.equal(result.error,undefined);assert.deepEqual(result.summary,{present:true,kind:'array',count:0});
+  result=mutation(field,e=>{e[field]={secret:privateName};});
+  assert.equal(result.error?.reason,`${prefix}_WRONG_TYPE`);
+  assert.deepEqual(result.summary,{present:true,kind:'object',count:null});
+  result=mutation(field,e=>{e[field]=[privateName];});
+  assert.equal(result.error?.reason,`${prefix}_NONEMPTY`);
+  assert.deepEqual(result.summary,{present:true,kind:'array',count:1});
+  assert(!JSON.stringify({error:result.error.message,reason:result.error.reason,metrics:result.r.lastEventSummary}).includes(privateName));
+ }
+ let result=mutation('permissionMode',e=>{e.permissionMode='default';});
+ assert.equal(result.error,undefined);assert.equal(result.r.lastEventSummary.permissionsBypassed,false);
+ result=mutation('permissionMode',e=>{e.permissionMode='bypassPermissions';});
+ assert.equal(result.error?.reason,'INIT_PERMISSION_BYPASS');assert.equal(result.r.lastEventSummary.permissionsBypassed,true);
+ result=mutation('model',e=>{e.model='claude-opus-fixture';});
+ assert.equal(result.error,undefined);assert.equal(result.r.lastEventSummary.model.class,'allowed-opus');
+ result=mutation('model',e=>{e.model=privateName;});
+ assert.equal(result.error?.code,'MODEL_UNAVAILABLE');assert.equal(result.error?.reason,'INIT_MODEL_INVALID');
+ assert.equal(result.r.lastEventSummary.model.class,'unproven');
+ assert(!JSON.stringify(result.r.lastEventSummary).includes(privateName));
+ const driftReader=new ClaudeStreamReader('fixture-session');driftReader.model='claude-opus-previous';
+ assert.throws(()=>driftReader.push(Buffer.from(JSON.stringify(base)+'\n')),
+  e=>e.code==='MODEL_DRIFT'&&e.reason==='INIT_MODEL_DRIFT');
 });
 test('large stdin uses stream buffering/backpressure without truncating input',async()=>{
  const large=JSON.stringify({context:{contextId:'test',evidence:[{reference:'E1',text:'ç'.repeat(60000)}]}});
