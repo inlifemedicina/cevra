@@ -8,7 +8,9 @@ import type {
 } from "@cevra/project-ir";
 import {
   EDITORIAL_TRANSCRIPT_PROJECTION_PROFILE,
+  EditorialTranscriptProjectionError,
   EditorialTranscriptProjectionService,
+  type EditorialTranscriptProjectionV1,
   type EditorialTranscriptProjectionSource,
   type EditorialTranscriptReasoningUnit
 } from "./editorial-transcript-projection.js";
@@ -22,6 +24,7 @@ import {
   SEMANTIC_EDITORIAL_CONTEXT_PROFILE,
   SemanticEditorialAnalysisError,
   parseSemanticEditorialAnalyzerOutput,
+  validateSemanticEditorialIdentifier,
   type AnalysisContextV1,
   type AnalyzerAnalysisCandidateV1,
   type AnalyzerEvidenceRequestV1,
@@ -62,6 +65,7 @@ export interface SemanticEditorialAnalysisServiceOptions {
   timeoutMs?: number;
   idGenerator?: () => string;
   monotonicClock?: () => number;
+  projectionService?: Pick<EditorialTranscriptProjectionService, "project">;
 }
 
 interface CapturedRequest {
@@ -70,6 +74,10 @@ interface CapturedRequest {
   locale: CevraLocale;
   brief?: string;
   focus: SemanticEditorialAnalysisFocus[];
+}
+
+interface CapturedRequestInput extends Omit<CapturedRequest, "locale"> {
+  locale?: CevraLocale;
 }
 
 interface InternalBinding {
@@ -90,12 +98,16 @@ interface SourcePlan {
   transcriptDigest?: TranscriptDigest;
   timingBasis?: TranscriptWordTiming;
   fragments: EvidenceFragment[];
-  truncated: boolean;
+  cursor?: string;
+  blockedAtPageBytes?: number;
+  exhausted: boolean;
 }
 
 interface EvidencePlan {
   sources: SourcePlan[];
   orderedFragments: EvidenceFragment[];
+  nextEvidenceNumber: number;
+  projectionCalls: number;
 }
 
 interface InvocationEvidence {
@@ -118,6 +130,7 @@ export class SemanticEditorialAnalysisService {
   private readonly timeoutMs: number;
   private readonly idGenerator: () => string;
   private readonly monotonicClock: () => number;
+  private readonly projectionService: Pick<EditorialTranscriptProjectionService, "project">;
   private active = false;
   private activeAdapterCall: ActiveAdapterCall | undefined;
 
@@ -148,28 +161,39 @@ export class SemanticEditorialAnalysisService {
     this.timeoutMs = boundedInteger(options.timeoutMs ?? DEFAULT_TIMEOUT_MS, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS, "timeoutMs");
     this.idGenerator = options.idGenerator ?? defaultId;
     this.monotonicClock = options.monotonicClock ?? (() => performance.now());
+    this.projectionService = options.projectionService ?? new EditorialTranscriptProjectionService(options.history);
   }
 
   async analyze(
     request: SemanticEditorialAnalysisRequest,
     signal?: AbortSignal
   ): Promise<SemanticEditorialAnalysisResultV1> {
-    const before = this.history.current;
-    const locale = before.project.defaultLocale;
-    let captured: CapturedRequest;
+    const startedAt = this.monotonicClock();
+    const deadline = startedAt + this.timeoutMs;
+    let capturedInput: CapturedRequestInput;
     let executionId = "semantic-analysis-unassigned";
+    let contextId = "semantic-context-unassigned";
+    let errorLocale: CevraLocale = "en-US";
     try {
-      captured = captureRequest(request, before.project.defaultLocale);
-      executionId = captured.id ?? this.idGenerator();
-      if (!isId(executionId)) throw new Error("execution id is invalid.");
+      capturedInput = captureRequest(request);
+      errorLocale = capturedInput.locale ?? errorLocale;
+      executionId = capturedInput.id ?? validateSemanticEditorialIdentifier(this.idGenerator(), "executionId");
+      validateSemanticEditorialIdentifier(executionId, "executionId");
+      contextId = validateSemanticEditorialIdentifier(this.idGenerator(), "contextId");
     } catch (cause) {
-      throw semanticError("SEMANTIC_ANALYSIS_INVALID_REQUEST", locale, executionId, cause);
+      throw semanticError("SEMANTIC_ANALYSIS_INVALID_REQUEST", errorLocale, executionId, cause);
     }
-    if (this.active) throw semanticError("SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE", captured.locale, executionId, new Error("Analyzer instance is busy."));
-    assertNotCancelled(signal, captured.locale, executionId);
+    if (this.active) throw semanticError("SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE", errorLocale, executionId, new Error("Analyzer instance is busy."));
+    assertOperationLive(signal, deadline, this.monotonicClock, errorLocale, executionId);
+    const before = this.history.current;
+    const captured: CapturedRequest = {
+      ...capturedInput,
+      locale: capturedInput.locale ?? before.project.defaultLocale
+    };
+    assertOperationLive(signal, deadline, this.monotonicClock, captured.locale, executionId);
     this.active = true;
     try {
-      return await this.run(before, captured, executionId, signal);
+      return await this.run(before, captured, executionId, contextId, deadline, signal);
     } finally {
       const pending = this.activeAdapterCall;
       if (pending !== undefined && !pending.settled) {
@@ -188,27 +212,25 @@ export class SemanticEditorialAnalysisService {
     before: ProjectIR,
     request: CapturedRequest,
     executionId: string,
+    contextId: string,
+    deadline: number,
     signal?: AbortSignal
   ): Promise<SemanticEditorialAnalysisResultV1> {
+    const guard = (): void => assertOperationLive(signal, deadline, this.monotonicClock, request.locale, executionId);
+    guard();
     validateSelectedSources(before, request.sourceIds, request.locale, executionId);
     const binding = captureBinding(before, this.history.entries.length, request);
-    const contextId = this.idGenerator();
-    if (!isId(contextId)) throw semanticError("SEMANTIC_ANALYSIS_INVALID_REQUEST", request.locale, executionId, new Error("context id is invalid."));
-    const plan = buildEvidencePlan(
-      this.history,
-      request.sourceIds,
-      Math.min(PROJECTION_PAGE_BYTES, Math.max(4 * 1024, Math.floor(this.initialContextMaxBytes * 0.65)))
-    );
-    const provided = new Set<string>();
+    const plan = createEvidencePlan(before, request.sourceIds);
+    let provided = new Set<string>();
     const metrics: InvocationEvidence = { inputBytes: [], responseBytes: [] };
-    const deadline = this.monotonicClock() + this.timeoutMs;
+    guard();
 
-    if (plan.orderedFragments.length === 0) {
+    if (!plan.sources.some((source) => source.public.evidenceStatus === "available")) {
       assertBindingCurrent(this.history, binding, request.locale, executionId);
       const reason: SemanticEditorialNeedsEvidenceReason = plan.sources.some((source) => source.public.evidenceStatus === "transcript-unavailable")
         ? "transcript-unavailable"
         : "no-speech";
-      return deepFreeze(needsEvidenceResult(
+      const result = deepFreeze(needsEvidenceResult(
         executionId,
         contextId,
         reason,
@@ -218,51 +240,82 @@ export class SemanticEditorialAnalysisService {
         metrics,
         this.analyzerIdentity
       ));
+      guard();
+      return result;
     }
     if (this.analyzer === undefined) {
       throw semanticError("SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE", request.locale, executionId);
     }
 
-    seedInitialEvidence(plan, provided, (candidate) => {
+    const projectionPageBytes = Math.min(PROJECTION_PAGE_BYTES, Math.max(4 * 1024, Math.floor(this.initialContextMaxBytes * 0.65)));
+    let pendingProvided = await prepareInitialEvidence(
+      plan,
+      this.projectionService,
+      projectionPageBytes,
+      guard,
+      (candidate) => {
       const envelope = buildEnvelope(executionId, contextId, 1, request, buildContext(contextId, plan, candidate));
       return utf8Length(JSON.stringify(envelope)) <= this.initialContextMaxBytes;
-    });
-    if (provided.size === 0) {
+      }
+    );
+    guard();
+    if (pendingProvided.size === 0) {
       throw semanticError("SEMANTIC_ANALYSIS_CONTEXT_LIMIT", request.locale, executionId);
     }
 
     for (let invocationIndex = 1; invocationIndex <= MAX_SEMANTIC_ANALYSIS_INVOCATIONS; invocationIndex += 1) {
       const invocation = invocationIndex as 1 | 2;
-      assertNotCancelled(signal, request.locale, executionId);
+      guard();
       assertBindingCurrent(this.history, binding, request.locale, executionId);
-      const context = buildContext(contextId, plan, provided);
+      const context = buildContext(contextId, plan, pendingProvided);
       const envelope = buildEnvelope(executionId, contextId, invocation, request, context);
       const payload = JSON.stringify(envelope);
       const payloadBytes = utf8Length(payload);
-      const allowedBytes = invocation === 1 ? this.initialContextMaxBytes : this.totalEvidenceMaxBytes;
-      if (payloadBytes > allowedBytes) throw semanticError("SEMANTIC_ANALYSIS_CONTEXT_LIMIT", request.locale, executionId);
-      metrics.inputBytes.push(payloadBytes);
-      const raw = await this.invokeAnalyzer(payload, payloadBytes, executionId, contextId, invocation, request.locale, deadline, signal);
+      const sentBytes = metrics.inputBytes.reduce((total, value) => total + value, 0);
+      const remainingBytes = this.totalEvidenceMaxBytes - sentBytes;
+      if ((invocation === 1 && payloadBytes > this.initialContextMaxBytes) || payloadBytes > remainingBytes) {
+        const result = deepFreeze(needsEvidenceResult(
+          executionId, contextId, "context-limit", binding.public,
+          buildCoverage(plan, provided), canonicalEvidence(plan, provided), metrics,
+          this.analyzerIdentity
+        ));
+        guard();
+        return result;
+      }
+      guard();
+      const raw = await this.invokeAnalyzer(
+        payload, payloadBytes, executionId, contextId, invocation, request.locale, deadline, signal,
+        () => {
+          metrics.inputBytes.push(payloadBytes);
+          provided = new Set(pendingProvided);
+        }
+      );
+      guard();
+      if (raw.length > this.responseMaxBytes) {
+        throw semanticError("SEMANTIC_ANALYSIS_INVALID_OUTPUT", request.locale, executionId, new Error("Analyzer response exceeds the configured byte limit."));
+      }
       const responseBytes = utf8Length(raw);
       metrics.responseBytes.push(responseBytes);
       if (responseBytes > this.responseMaxBytes) {
         throw semanticError("SEMANTIC_ANALYSIS_INVALID_OUTPUT", request.locale, executionId, new Error("Analyzer response exceeds the configured byte limit."));
       }
       assertBindingCurrent(this.history, binding, request.locale, executionId);
+      guard();
       let output;
       try {
         output = parseSemanticEditorialAnalyzerOutput(raw);
       } catch (cause) {
         throw semanticError("SEMANTIC_ANALYSIS_INVALID_OUTPUT", request.locale, executionId, cause);
       }
+      guard();
       if (output.contextId !== contextId) {
         throw semanticError("SEMANTIC_ANALYSIS_INVALID_EVIDENCE", request.locale, executionId, new Error("Analyzer output belongs to another context."));
       }
       if (output.kind === "analysis-candidate") {
         validateCandidateEvidence(output, provided, plan, request.locale, executionId);
         assertBindingCurrent(this.history, binding, request.locale, executionId);
-        assertNotCancelled(signal, request.locale, executionId);
-        return deepFreeze({
+        guard();
+        const result = deepFreeze({
           version: SEMANTIC_EDITORIAL_ANALYSIS_VERSION,
           profile: SEMANTIC_EDITORIAL_ANALYSIS_PROFILE,
           kind: "analysis-candidate",
@@ -274,12 +327,14 @@ export class SemanticEditorialAnalysisService {
           candidate: clone(output),
           provenance: provenance(metrics, this.analyzerIdentity)
         } satisfies SemanticEditorialAnalysisCandidateV1);
+        guard();
+        return result;
       }
 
       validateEvidenceRequest(output.request, plan, provided, request.locale, executionId);
       if (output.request.type === "visual" || output.request.type === "acoustic") {
         assertBindingCurrent(this.history, binding, request.locale, executionId);
-        return deepFreeze(needsEvidenceResult(
+        const result = deepFreeze(needsEvidenceResult(
           executionId,
           contextId,
           "unsupported-evidence",
@@ -290,10 +345,12 @@ export class SemanticEditorialAnalysisService {
           this.analyzerIdentity,
           output.request
         ));
+        guard();
+        return result;
       }
       if (invocation === MAX_SEMANTIC_ANALYSIS_INVOCATIONS) {
         assertBindingCurrent(this.history, binding, request.locale, executionId);
-        return deepFreeze(needsEvidenceResult(
+        const result = deepFreeze(needsEvidenceResult(
           executionId,
           contextId,
           "invocation-limit",
@@ -304,16 +361,25 @@ export class SemanticEditorialAnalysisService {
           this.analyzerIdentity,
           output.request
         ));
+        guard();
+        return result;
       }
       if (output.request.type !== "text-context") {
         throw semanticError("SEMANTIC_ANALYSIS_INVALID_EVIDENCE", request.locale, executionId);
       }
-      const addition = addRequestedEvidence(output.request, plan, provided, executionId, contextId, request, this.totalEvidenceMaxBytes);
+      guard();
+      assertBindingCurrent(this.history, binding, request.locale, executionId);
+      const continuationRemainingBytes = this.totalEvidenceMaxBytes - metrics.inputBytes.reduce((total, value) => total + value, 0);
+      const addition = await addRequestedEvidence(
+        output.request, plan, provided, executionId, contextId, request,
+        this.projectionService, projectionPageBytes, continuationRemainingBytes, guard
+      );
+      guard();
       if (addition.added === 0) {
         const hasRemaining = buildCoverage(plan, provided).sourcesWithRemainingEvidence.length > 0;
         if (hasRemaining && addition.limitReached) {
           assertBindingCurrent(this.history, binding, request.locale, executionId);
-          return deepFreeze(needsEvidenceResult(
+          const result = deepFreeze(needsEvidenceResult(
             executionId,
             contextId,
             "context-limit",
@@ -324,11 +390,14 @@ export class SemanticEditorialAnalysisService {
             this.analyzerIdentity,
             output.request
           ));
+          guard();
+          return result;
         }
         throw semanticError("SEMANTIC_ANALYSIS_NO_PROGRESS", request.locale, executionId);
       }
+      pendingProvided = addition.provided;
       assertBindingCurrent(this.history, binding, request.locale, executionId);
-      assertNotCancelled(signal, request.locale, executionId);
+      guard();
     }
     throw semanticError("SEMANTIC_ANALYSIS_NO_PROGRESS", request.locale, executionId);
   }
@@ -341,10 +410,11 @@ export class SemanticEditorialAnalysisService {
     invocation: 1 | 2,
     locale: CevraLocale,
     deadline: number,
-    signal?: AbortSignal
+    signal: AbortSignal | undefined,
+    onStarted: () => void
   ): Promise<string> {
+    assertOperationLive(signal, deadline, this.monotonicClock, locale, executionId);
     const remaining = Math.max(0, deadline - this.monotonicClock());
-    if (remaining <= 0) throw semanticError("SEMANTIC_ANALYSIS_TIMEOUT", locale, executionId);
     const controller = new AbortController();
     const onAbort = (): void => controller.abort(signal?.reason);
     signal?.addEventListener("abort", onAbort, { once: true });
@@ -352,10 +422,20 @@ export class SemanticEditorialAnalysisService {
     const onCancellation = (): void => rejectCancellation?.(semanticError("SEMANTIC_ANALYSIS_CANCELLED", locale, executionId, signal?.reason));
     let timer: ReturnType<typeof setTimeout> | undefined;
     let settled = false;
-    const raw = Promise.resolve().then(() => this.analyzer!.analyze(
-      deepFreeze({ version: 1, contentType: "application/json", payload, payloadBytes }),
-      Object.freeze({ jobId: executionId, locale, signal: controller.signal, invocation, contextId })
-    ));
+    const raw = new Promise<string>((resolve, reject) => {
+      setTimeout(() => {
+        try {
+          assertOperationLive(signal, deadline, this.monotonicClock, locale, executionId);
+          onStarted();
+          Promise.resolve(this.analyzer!.analyze(
+            deepFreeze({ version: 1, contentType: "application/json", payload, payloadBytes }),
+            Object.freeze({ jobId: executionId, locale, signal: controller.signal, invocation, contextId })
+          )).then(resolve, reject);
+        } catch (cause) {
+          reject(cause);
+        }
+      }, 0);
+    });
     const completion = raw.then(() => undefined, () => undefined).finally(() => { settled = true; });
     const activeCall: ActiveAdapterCall = { get settled() { return settled; }, completion };
     this.activeAdapterCall = activeCall;
@@ -372,14 +452,14 @@ export class SemanticEditorialAnalysisService {
     });
     try {
       const result = await Promise.race([raw, timeout, cancellation]);
-      if (signal?.aborted) throw semanticError("SEMANTIC_ANALYSIS_CANCELLED", locale, executionId, signal.reason);
+      assertOperationLive(signal, deadline, this.monotonicClock, locale, executionId);
       if (typeof result !== "string") throw semanticError("SEMANTIC_ANALYSIS_INVALID_OUTPUT", locale, executionId, new Error("Analyzer response must be a JSON string."));
       return result;
     } catch (cause) {
-      if (cause instanceof SemanticEditorialAnalysisError) throw cause;
       if (signal?.aborted || (cause instanceof Error && cause.name === "AbortError")) {
         throw semanticError("SEMANTIC_ANALYSIS_CANCELLED", locale, executionId, cause);
       }
+      if (cause instanceof SemanticEditorialAnalysisError) throw cause;
       throw semanticError("SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE", locale, executionId, cause);
     } finally {
       if (timer !== undefined) clearTimeout(timer);
@@ -390,8 +470,7 @@ export class SemanticEditorialAnalysisService {
   }
 }
 
-function buildEvidencePlan(history: ProjectHistory, requestedSourceIds: readonly string[], projectionPageBytes: number): EvidencePlan {
-  const project = history.current;
+function createEvidencePlan(project: ProjectIR, requestedSourceIds: readonly string[]): EvidencePlan {
   const transcriptBySource = new Map(project.sourceTranscripts.map((item) => [item.sourceId, item]));
   const plans = requestedSourceIds.map((sourceId, index): SourcePlan => {
     const transcript = transcriptBySource.get(sourceId);
@@ -407,45 +486,10 @@ function buildEvidencePlan(history: ProjectHistory, requestedSourceIds: readonly
       sourceId,
       ...(transcript === undefined ? {} : { transcriptDigest: transcript.transcriptDigest, timingBasis: transcript.wordTiming }),
       fragments: [],
-      truncated: false
+      exhausted: transcript === undefined || (transcript.transcript.words.length === 0 && transcript.transcript.segments.length === 0)
     };
   });
-  const selectedWithTranscript = plans.filter((plan) => plan.transcriptDigest !== undefined).map((plan) => plan.sourceId);
-  if (selectedWithTranscript.length === 0) return { sources: plans, orderedFragments: [] };
-  const projection = new EditorialTranscriptProjectionService(history);
-  const sourceById = new Map(plans.map((plan) => [plan.sourceId, plan]));
-  const orderedFragments: EvidenceFragment[] = [];
-  let cursor: string | undefined;
-  let pageCount = 0;
-  let reachedCollectionLimit = false;
-  do {
-    const page = projection.project({
-      sourceIds: selectedWithTranscript,
-      maxBytes: projectionPageBytes,
-      ...(cursor === undefined ? {} : { cursor })
-    });
-    for (const source of page.sources) updateSourceStatus(sourceById.get(source.sourceId), source);
-    for (const unit of page.reasoningUnits) {
-      const source = sourceById.get(unit.sourceId)!;
-      const reference = `E${orderedFragments.length + 1}`;
-      const fragment = toEvidenceFragment(reference, source.public.reference, source.timingBasis!, unit);
-      source.fragments.push(fragment);
-      orderedFragments.push(fragment);
-    }
-    cursor = page.page.nextCursor;
-    pageCount += 1;
-    reachedCollectionLimit = utf8Length(JSON.stringify(orderedFragments.map((item) => item.public))) > MAX_SEMANTIC_ANALYSIS_TOTAL_EVIDENCE_BYTES * 2
-      || pageCount >= MAX_PROJECTION_PAGES;
-  } while (cursor !== undefined && !reachedCollectionLimit);
-  if (cursor !== undefined) {
-    const lastSourceId = orderedFragments.at(-1)?.canonical.sourceId;
-    let started = false;
-    for (const source of plans) {
-      if (source.sourceId === lastSourceId) started = true;
-      if (started && source.public.evidenceStatus === "available") source.truncated = true;
-    }
-  }
-  return { sources: plans, orderedFragments };
+  return { sources: plans, orderedFragments: [], nextEvidenceNumber: 1, projectionCalls: 0 };
 }
 
 function updateSourceStatus(plan: SourcePlan | undefined, source: EditorialTranscriptProjectionSource): void {
@@ -492,52 +536,151 @@ function toEvidenceFragment(
   };
 }
 
-function seedInitialEvidence(
+async function prepareInitialEvidence(
   plan: EvidencePlan,
-  provided: Set<string>,
+  projection: Pick<EditorialTranscriptProjectionService, "project">,
+  projectionPageBytes: number,
+  guard: () => void,
   fits: (candidate: ReadonlySet<string>) => boolean
-): void {
-  for (const fragment of plan.orderedFragments) {
-    const candidate = new Set(provided).add(fragment.public.reference);
-    if (!fits(candidate)) break;
-    provided.add(fragment.public.reference);
+): Promise<Set<string>> {
+  const selected = new Set<string>();
+
+  // Deterministic breadth-first disclosure: offer one admissible fragment per
+  // available source before filling the remaining initial budget.
+  for (const source of plan.sources) {
+    if (source.public.evidenceStatus !== "available") continue;
+    guard();
+    if (source.fragments.length === 0 && !source.exhausted) {
+      await collectNextSourcePage(plan, source, projection, projectionPageBytes, guard);
+    }
+    const first = source.fragments.find((fragment) => !selected.has(fragment.public.reference));
+    if (first === undefined) continue;
+    const candidate = new Set(selected).add(first.public.reference);
+    if (fits(candidate)) selected.add(first.public.reference);
   }
+
+  for (const source of plan.sources) {
+    if (source.public.evidenceStatus !== "available") continue;
+    while (true) {
+      guard();
+      const next = source.fragments.find((fragment) => !selected.has(fragment.public.reference));
+      if (next !== undefined) {
+        const candidate = new Set(selected).add(next.public.reference);
+        if (!fits(candidate)) break;
+        selected.add(next.public.reference);
+        continue;
+      }
+      if (source.exhausted || plan.projectionCalls >= MAX_PROJECTION_PAGES) break;
+      const added = await collectNextSourcePage(plan, source, projection, projectionPageBytes, guard);
+      if (added === 0) break;
+    }
+  }
+  return selected;
 }
 
-function addRequestedEvidence(
+async function addRequestedEvidence(
   request: Extract<AnalyzerEvidenceRequestV1, { type: "text-context" }>,
   plan: EvidencePlan,
   provided: Set<string>,
   executionId: string,
   contextId: string,
   captured: CapturedRequest,
-  totalEvidenceMaxBytes: number
-): { added: number; limitReached: boolean } {
+  projection: Pick<EditorialTranscriptProjectionService, "project">,
+  projectionPageBytes: number,
+  remainingTransmissionBytes: number,
+  guard: () => void
+): Promise<{ added: number; limitReached: boolean; provided: Set<string> }> {
   const source = plan.sources.find((item) => item.public.reference === request.sourceReference)!;
-  const afterIndex = request.afterEvidenceReference === undefined
+  const candidateProvided = new Set(provided);
+  const anchorIndex = request.afterEvidenceReference === undefined
     ? -1
     : source.fragments.findIndex((item) => item.public.reference === request.afterEvidenceReference);
   let added = 0;
   let addedBytes = 0;
   let limitReached = false;
-  for (const fragment of source.fragments.slice(afterIndex + 1)) {
-    if (provided.has(fragment.public.reference)) continue;
+  while (true) {
+    guard();
+    const fragment = source.fragments
+      .slice(anchorIndex + 1)
+      .find((item) => !candidateProvided.has(item.public.reference));
+    if (fragment === undefined) {
+      if (source.exhausted) break;
+      if (plan.projectionCalls >= MAX_PROJECTION_PAGES) {
+        limitReached = true;
+        break;
+      }
+      const requestedPageBytes = Math.max(projectionPageBytes, Math.min(request.maxAdditionalBytes, 256 * 1024));
+      const collected = await collectNextSourcePage(plan, source, projection, requestedPageBytes, guard);
+      if (collected === 0) {
+        if (!source.exhausted) limitReached = true;
+        break;
+      }
+      continue;
+    }
     const fragmentBytes = utf8Length(JSON.stringify(fragment.public));
     if (addedBytes + fragmentBytes > request.maxAdditionalBytes) {
       limitReached = true;
       break;
     }
-    const candidate = new Set(provided).add(fragment.public.reference);
+    const candidate = new Set(candidateProvided).add(fragment.public.reference);
     const envelope = buildEnvelope(executionId, contextId, 2, captured, buildContext(contextId, plan, candidate));
-    if (utf8Length(JSON.stringify(envelope)) > totalEvidenceMaxBytes) {
+    if (utf8Length(JSON.stringify(envelope)) > remainingTransmissionBytes) {
       limitReached = true;
       break;
     }
-    provided.add(fragment.public.reference);
+    candidateProvided.add(fragment.public.reference);
     added += 1;
     addedBytes += fragmentBytes;
   }
-  return { added, limitReached };
+  return { added, limitReached, provided: candidateProvided };
+}
+
+async function collectNextSourcePage(
+  plan: EvidencePlan,
+  source: SourcePlan,
+  projection: Pick<EditorialTranscriptProjectionService, "project">,
+  projectionPageBytes: number,
+  guard: () => void
+): Promise<number> {
+  guard();
+  if (source.exhausted || plan.projectionCalls >= MAX_PROJECTION_PAGES) return 0;
+  if (source.blockedAtPageBytes !== undefined && projectionPageBytes <= source.blockedAtPageBytes) return 0;
+  plan.projectionCalls += 1;
+  let page: EditorialTranscriptProjectionV1;
+  try {
+    page = projection.project({
+      sourceIds: [source.sourceId],
+      maxBytes: projectionPageBytes,
+      ...(source.cursor === undefined ? {} : { cursor: source.cursor })
+    });
+  } catch (cause) {
+    if (cause instanceof EditorialTranscriptProjectionError && cause.code === "EDITORIAL_TRANSCRIPT_UNIT_TOO_LARGE") {
+      source.blockedAtPageBytes = projectionPageBytes;
+      await yieldToEventLoop();
+      guard();
+      return 0;
+    }
+    throw cause;
+  }
+  delete source.blockedAtPageBytes;
+  guard();
+  const before = source.fragments.length;
+  for (const projectedSource of page.sources) updateSourceStatus(source, projectedSource);
+  for (const unit of page.reasoningUnits) {
+    const reference = `E${plan.nextEvidenceNumber++}`;
+    const fragment = toEvidenceFragment(reference, source.public.reference, source.timingBasis!, unit);
+    source.fragments.push(fragment);
+    plan.orderedFragments.push(fragment);
+  }
+  if (page.page.nextCursor === undefined) {
+    delete source.cursor;
+    source.exhausted = true;
+  } else {
+    source.cursor = page.page.nextCursor;
+  }
+  await yieldToEventLoop();
+  guard();
+  return source.fragments.length - before;
 }
 
 function buildContext(contextId: string, plan: EvidencePlan, provided: ReadonlySet<string>): AnalysisContextV1 {
@@ -558,7 +701,8 @@ function buildContext(contextId: string, plan: EvidencePlan, provided: ReadonlyS
 }
 
 function buildCoverage(plan: EvidencePlan, provided: ReadonlySet<string>): SemanticEditorialCoverageV1 {
-  const remaining = plan.sources.filter((source) => source.truncated || source.fragments.some((fragment) => !provided.has(fragment.public.reference)));
+  const remaining = plan.sources.filter((source) => source.public.evidenceStatus === "available"
+    && (!source.exhausted || source.fragments.some((fragment) => !provided.has(fragment.public.reference))));
   const unavailable = plan.sources.filter((source) => source.public.evidenceStatus === "transcript-unavailable");
   const noSpeech = plan.sources.filter((source) => source.public.evidenceStatus === "no-speech");
   return {
@@ -640,7 +784,7 @@ function validateEvidenceRequest(
   }
 }
 
-function captureRequest(value: unknown, defaultLocale: CevraLocale): CapturedRequest {
+function captureRequest(value: unknown): CapturedRequestInput {
   if (!isRecord(value)) throw new Error("request must be an object.");
   const allowed = new Set(["id", "sourceIds", "locale", "brief", "focus"]);
   const optional = new Set(["id", "locale", "brief", "focus"]);
@@ -659,16 +803,15 @@ function captureRequest(value: unknown, defaultLocale: CevraLocale): CapturedReq
     return item;
   });
   if (new Set(sourceIds).size !== sourceIds.length) throw new Error("sourceIds contains duplicates.");
-  const locale = captured.locale === undefined ? defaultLocale : captured.locale;
-  if (locale !== "pt-BR" && locale !== "en-US") throw new Error("locale is unsupported.");
+  const locale = captured.locale;
+  if (locale !== undefined && locale !== "pt-BR" && locale !== "en-US") throw new Error("locale is unsupported.");
   const brief = captured.brief === undefined ? undefined : validateBrief(captured.brief);
   const focus = captured.focus === undefined ? [...ALL_FOCUS] : validateFocus(captured.focus);
-  const id = captured.id === undefined ? undefined : captured.id;
-  if (id !== undefined && !isId(id)) throw new Error("id is invalid.");
+  const id = captured.id === undefined ? undefined : validateSemanticEditorialIdentifier(captured.id, "request.id");
   return {
     ...(id === undefined ? {} : { id }),
     sourceIds,
-    locale,
+    ...(locale === undefined ? {} : { locale }),
     ...(brief === undefined ? {} : { brief }),
     focus
   };
@@ -814,8 +957,20 @@ function utf8Length(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }
 
-function assertNotCancelled(signal: AbortSignal | undefined, locale: CevraLocale, executionId: string): void {
+function assertOperationLive(
+  signal: AbortSignal | undefined,
+  deadline: number,
+  monotonicClock: () => number,
+  locale: CevraLocale,
+  executionId: string
+): void {
+  // Cancellation has stable precedence when both conditions are observable.
   if (signal?.aborted) throw semanticError("SEMANTIC_ANALYSIS_CANCELLED", locale, executionId, signal.reason);
+  if (monotonicClock() >= deadline) throw semanticError("SEMANTIC_ANALYSIS_TIMEOUT", locale, executionId);
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function semanticError(

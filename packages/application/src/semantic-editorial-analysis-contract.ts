@@ -355,15 +355,13 @@ function validateCandidate(
 function validateObservation(value: unknown, limits: SemanticEditorialResponseValidationLimits): AnalyzerObservationV1 {
   if (!isRecord(value)) throw new Error("Observation must be an object.");
   rejectUnexpected(value, ["id", "kind", "statement", "uncertainty", "justification", "evidenceReferences", "quote"], "observation");
-  if (!["theme", "idea", "caveat", "possible-false-start", "possible-repetition"].includes(String(value.kind))) {
-    throw new Error("Observation kind is unsupported.");
-  }
+  const kind = observationKind(value.kind);
   const evidenceReferences = referenceArray(value.evidenceReferences, limits.maxReferencesPerItem, "observation evidenceReferences");
   if (evidenceReferences.length === 0) throw new Error("Every observation requires evidence.");
   const quote = value.quote === undefined ? undefined : boundedText(value.quote, 1, 2_000, "observation quote");
   return {
     id: boundedId(value.id, "observation id"),
-    kind: value.kind as SemanticEditorialObservationKind,
+    kind,
     statement: boundedText(value.statement, 1, 4_000, "observation statement"),
     uncertainty: uncertainty(value.uncertainty),
     justification: boundedText(value.justification, 1, 4_000, "observation justification"),
@@ -375,9 +373,7 @@ function validateObservation(value: unknown, limits: SemanticEditorialResponseVa
 function validateRelation(value: unknown, limits: SemanticEditorialResponseValidationLimits): AnalyzerRelationV1 {
   if (!isRecord(value)) throw new Error("Relation must be an object.");
   rejectUnexpected(value, ["id", "kind", "statement", "uncertainty", "justification", "leftEvidenceReferences", "rightEvidenceReferences"], "relation");
-  if (!["possible-equivalence", "complement", "possible-contradiction"].includes(String(value.kind))) {
-    throw new Error("Relation kind is unsupported.");
-  }
+  const kind = relationKind(value.kind);
   const leftEvidenceReferences = referenceArray(value.leftEvidenceReferences, limits.maxReferencesPerItem, "relation leftEvidenceReferences");
   const rightEvidenceReferences = referenceArray(value.rightEvidenceReferences, limits.maxReferencesPerItem, "relation rightEvidenceReferences");
   if (leftEvidenceReferences.length === 0 || rightEvidenceReferences.length === 0) {
@@ -388,7 +384,7 @@ function validateRelation(value: unknown, limits: SemanticEditorialResponseValid
   }
   return {
     id: boundedId(value.id, "relation id"),
-    kind: value.kind as SemanticEditorialRelationKind,
+    kind,
     statement: boundedText(value.statement, 1, 4_000, "relation statement"),
     uncertainty: uncertainty(value.uncertainty),
     justification: boundedText(value.justification, 1, 4_000, "relation justification"),
@@ -466,9 +462,31 @@ function boundedReference(value: unknown, field: string): string {
 }
 
 function boundedId(value: unknown, field: string): string {
+  return validateSemanticEditorialIdentifier(value, field);
+}
+
+/** Shared execution/context identifier rule for request and analyzer parsing. */
+export function validateSemanticEditorialIdentifier(value: unknown, field: string): string {
   const id = boundedText(value, 1, 128, field);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(id)) throw new Error(`${field} is invalid.`);
   return id;
+}
+
+function observationKind(value: unknown): SemanticEditorialObservationKind {
+  if (typeof value !== "string") throw new Error("Observation kind is unsupported.");
+  if (value !== "theme" && value !== "idea" && value !== "caveat"
+    && value !== "possible-false-start" && value !== "possible-repetition") {
+    throw new Error("Observation kind is unsupported.");
+  }
+  return value;
+}
+
+function relationKind(value: unknown): SemanticEditorialRelationKind {
+  if (typeof value !== "string") throw new Error("Relation kind is unsupported.");
+  if (value !== "possible-equivalence" && value !== "complement" && value !== "possible-contradiction") {
+    throw new Error("Relation kind is unsupported.");
+  }
+  return value;
 }
 
 function boundedText(value: unknown, min: number, max: number, field: string): string {
