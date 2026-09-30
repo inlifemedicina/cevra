@@ -1,13 +1,19 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-30 — OFFLINE REMEDIATION INDEPENDENTLY APPROVED / N-1 VERIFIED / PR GATE NEXT.**
+**2026-09-30 — IMPLEMENTED / CLOSED — BOUNDED OFFLINE TRANSPORT/EVIDENCE POC ONLY.**
 
-Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
-Branch: `feat/semantic-claude-roundtrip-poc-v1`.
+Historical feature base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
+Merged feature branch (still preserved): `feat/semantic-claude-roundtrip-poc-v1`.
+Verified main / docs-only closeout baseline:
+`862e33f9e687579059d51269abdb4195b86bbd79` (PR #57).
 Slice A remains CLOSED; ADR 0030 remains IN DEVELOPMENT.
 Global roadmap tracking remains **55%**.
 
 ## Current result
+
+Claude CLI transport/evidence PoC V1 is **IMPLEMENTED / CLOSED** only in its
+bounded offline transport, containment, validation and evidence scope.
+The implementation merge and exact post-merge checks are recorded below.
 
 The historical `semantic-claude-roundtrip-poc-v1` experiment is **CLOSED by code
 policy: 8/8 used, zero balance**, regardless of local-file availability. This
@@ -1090,3 +1096,41 @@ read/write occurred. Only synthetic records/controlled processes were used;
 the real ledger remains untouched and the old experiment remains CLOSED,
 8/8 consumed, zero balance. Director impact: no new authority or architectural
 impact within this bounded diagnostic correction. Progress remains **55%**.
+
+## PR #57 merge and post-merge validation — 2026-09-30
+
+Approved feature HEAD: `79327e8d951e31962af2c5d7915a38abcb0c8a4c`.
+[PR #57](https://github.com/inlifemedicina/cevra/pull/57) is CLOSED / MERGED
+by normal merge commit `862e33f9e687579059d51269abdb4195b86bbd79`,
+at `2026-09-30T20:46:13Z`.
+The two verified parents are, in order:
+`a58ca419c2a0db2c416db83d84c432fcae23d830` and the approved feature HEAD.
+The feature head is an ancestor of verified `origin/main`; its branch remains
+preserved pending documentary closeout and later authorized cleanup.
+
+| Evidence | Run / event | Exact SHA | Result |
+|---|---|---|---|
+| Pre-merge push CI | [36768036440](https://github.com/inlifemedicina/cevra/actions/runs/36768036440) / push | `79327e8d951e31962af2c5d7915a38abcb0c8a4c` | COMPLETED / SUCCESS, 5/5 |
+| Pre-merge PR CI | [36768204068](https://github.com/inlifemedicina/cevra/actions/runs/36768204068) / pull_request | `79327e8d951e31962af2c5d7915a38abcb0c8a4c` | COMPLETED / SUCCESS, 5/5 |
+| Pre-merge Exact Runtime | [36768204132](https://github.com/inlifemedicina/cevra/actions/runs/36768204132) / pull_request | `79327e8d951e31962af2c5d7915a38abcb0c8a4c` | COMPLETED / SUCCESS |
+| Post-merge main CI | [36774947802](https://github.com/inlifemedicina/cevra/actions/runs/36774947802) / push | `862e33f9e687579059d51269abdb4195b86bbd79` | COMPLETED / SUCCESS, 5/5 |
+| Post-merge Exact Runtime | [36774947781](https://github.com/inlifemedicina/cevra/actions/runs/36774947781) / push | `862e33f9e687579059d51269abdb4195b86bbd79` | COMPLETED / SUCCESS |
+
+Both normal CIs and post-merge CI passed Monorepo, Tauri, Media Runtime
+reproducibility, Transcription and Alignment. Exact Runtime is managed macOS
+audio-runtime regression evidence, not a Claude semantic round-trip.
+Implementer tests, independent offline review and CI remain separate evidence.
+F-1–F-5 remain independently approved offline; N-1 remains VERIFIED / FIXED;
+the N-2–N-4 table above remains DEFERRED, unchanged.
+
+This docs-only closeout proposes the canonical closure of **only** the bounded
+offline PoC. Slice A remains IMPLEMENTED / CLOSED; ADR 0030 remains ACCEPTED
+DIRECTION / IN DEVELOPMENT; complete Semantic Editorial Analysis is NOT
+DELIVERED; real-agent semantic round-trip is NOT DEMONSTRATED and still required
+before strategy. Strategy/take selection/cut planning remain NOT STARTED and
+not implicitly authorized. The old experiment stays CLOSED, 8/8, zero balance;
+five original receipts remain unavailable; zero semantic round-trips were
+accepted. No Claude/auth/inference or DeveloperEvidence access occurred during
+this post-merge validation/documentary closeout. Director impact: no new
+authority. PR #56 is left OPEN / DRAFT / UNMERGED for separate reconciliation.
+Progress remains **55%**.
