@@ -11,7 +11,8 @@ const AUTH_CATEGORIES=new Set(['NO_CREDENTIAL_AVAILABLE','LOGIN_EXPIRED_OR_REVOK
 const AUTH_EVIDENCE=new Set(['NO_CLASSIFIABLE_AUTH_EVIDENCE','EXPLICIT_AUTH_ERROR_ONLY','ERROR_TEXT_PATTERN']);
 const TRACE_KEYS=new Set(['phase','type','typeKind','typeHash','subtype','subtypeKind','subtypeHash',
   'attempt','attemptKind','max_retries','max_retriesKind','retry_delay_ms','retry_delay_msKind',
-  'error_status','error_statusKind','status','state','error','modelClass','isError','decision','reason']);
+  'error_status','error_statusKind','estimated_tokens','estimated_tokensKind','estimated_tokens_delta',
+  'estimated_tokens_deltaKind','status','state','error','modelClass','isError','decision','reason']);
 function invalid(){const error=new Error('INVALID_EVENT_DIAGNOSTIC');error.code='INVALID_EVENT_DIAGNOSTIC';throw error;}
 
 export async function writePrivateEventReceipt(directory,name,input){
@@ -42,8 +43,8 @@ export async function writePrivateEventReceipt(directory,name,input){
       if(value===undefined||key==='phase')continue;
       if(value===null){if(!['error_status','status'].includes(key))invalid();continue;}
       if(key==='isError'){if(typeof value!=='boolean')invalid();continue;}
-      if(['attempt','max_retries','retry_delay_ms','error_status'].includes(key)){
-        if(!Number.isSafeInteger(value)||value<0||value>3600000)invalid();continue;
+      if(['attempt','max_retries','retry_delay_ms','error_status','estimated_tokens','estimated_tokens_delta'].includes(key)){
+        if(!Number.isSafeInteger(value)||value<0||value>(key.startsWith('estimated_')?100_000_000:3600000))invalid();continue;
       }
       if(typeof value!=='string'||value.length>128||/[\x00-\x1f\x7f]/.test(value))invalid();
       if(key.endsWith('Hash')){if(!/^[a-f0-9]{64}$/.test(value))invalid();continue;}

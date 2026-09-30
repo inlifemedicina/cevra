@@ -26,7 +26,7 @@ const RETRY_ERRORS=new Set([...Object.keys(ASSISTANT_ERRORS),'verification_requi
 const FORBIDDEN_SYSTEM=new Set(['compact_boundary','hook_started','hook_progress','hook_response',
   'plugin_install','task_started','task_updated','task_progress','task_notification',
   'background_tasks_changed','permission_denied','memory_recall','local_command_output',
-  'informational','commands_changed','thinking_tokens','notification','conversation_reset']);
+  'informational','commands_changed','notification','conversation_reset']);
 const FORBIDDEN_TYPES=new Set(['control_request','control_response','control_cancel_request',
   'stream_event','user','tool_progress','tool_use_summary','permission_denied',
   'task_notification','task_started','task_progress','task_updated','plugin_install',
@@ -38,9 +38,9 @@ const boundedInteger=(value,max=1_000_000)=>Number.isSafeInteger(value)&&value>=
 function protocolTraceEntry(event,phase){
   const entry={phase,type:safeProtocolValue(event.type),typeKind:kind(event.type),
     subtype:safeProtocolValue(event.subtype),subtypeKind:kind(event.subtype)};
-  for(const field of ['attempt','max_retries','retry_delay_ms','error_status']){
+  for(const field of ['attempt','max_retries','retry_delay_ms','error_status','estimated_tokens','estimated_tokens_delta']){
     if(Object.hasOwn(event,field))entry[field]=field==='error_status'&&event[field]===null?null:
-      boundedInteger(event[field])?event[field]:undefined;
+      boundedInteger(event[field],field.startsWith('estimated_')?100_000_000:1_000_000)?event[field]:undefined;
     entry[`${field}Kind`]=kind(event[field]);
   }
   if(event.type==='system'&&event.subtype==='status')entry.status=event.status===null?null:
@@ -65,7 +65,7 @@ function providerError(value,status) {
 function eventSummary(event) {
   const label=(value,allowed)=>allowed.includes(value)?value:'other';
   const summary={type:label(event.type,['system','assistant','result','rate_limit_event']),
-    subtype:label(event.subtype,['init','status','session_state_changed','api_retry','success',
+    subtype:label(event.subtype,['init','status','session_state_changed','api_retry','thinking_tokens','success',
       'error_during_execution','error_max_turns','error_max_budget_usd','error_max_structured_output_retries'])};
   for(const field of ['tools','mcp_servers','plugins','skills']) {
     const present=Object.hasOwn(event,field);
@@ -242,6 +242,13 @@ export class ClaudeStreamReader {
         if(e.state==='requires_action')fail('CONTAINMENT','SESSION_REQUIRES_ACTION');
         if(e.state!=='running'&&e.state!=='idle')fail('PROTOCOL_EVENT_INVALID','SESSION_STATE_SHAPE');
         return;
+      }
+      if(e.subtype==='thinking_tokens'){
+        if(!boundedInteger(e.estimated_tokens,100_000_000)||
+          !boundedInteger(e.estimated_tokens_delta,100_000_000)||
+          e.estimated_tokens_delta>e.estimated_tokens)
+          fail('PROTOCOL_EVENT_INVALID','THINKING_TOKENS_SHAPE');
+        return; // Approximate operational progress, never retained as model reasoning or result.
       }
       if(FORBIDDEN_SYSTEM.has(e.subtype))fail('CONTAINMENT','FORBIDDEN_SYSTEM_EVENT');
       fail('PROTOCOL_EVENT_UNSUPPORTED','UNKNOWN_SYSTEM_SUBTYPE');

@@ -24,6 +24,8 @@ if(mode==='slow'||mode==='ignore-term'){
  if(mode==='status-invalid')send({type:'system',subtype:'status',session_id,status:'unverified'});
  if(mode==='requires-action')send({type:'system',subtype:'session_state_changed',session_id,state:'requires_action'});
  if(mode==='auth-status')send({type:'auth_status',session_id,isAuthenticating:true,output:['PRIVATE LOGIN LINK']});
+ if(mode==='thinking-tokens')send({type:'system',subtype:'thinking_tokens',session_id,estimated_tokens:7,estimated_tokens_delta:3});
+ if(mode==='thinking-tokens-invalid')send({type:'system',subtype:'thinking_tokens',session_id,estimated_tokens:'7',estimated_tokens_delta:3});
  if(mode==='hook-event')send({type:'system',subtype:'hook_started',session_id,hook_id:'fixture',hook_name:'private',hook_event:'PreToolUse'});
  if(mode==='plugin-install')send({type:'system',subtype:'plugin_install',session_id,status:'started',name:'private'});
  if(mode==='unknown-system')send({type:'system',subtype:'surprise_subtype',session_id,content:'PRIVATE DO NOT LOG'});

@@ -119,12 +119,17 @@ test('versioned block-wise assistant and bounded operational metadata complete o
  const status=await run('status-after-result');
  assert.deepEqual(status.protocolTrace.map(e=>e.subtype),['init','session_state_changed','status','status',undefined,'success','session_state_changed']);
  assert.equal(status.metrics.childClosed,true);
+ const thinking=await run('thinking-tokens');
+ assert.deepEqual(thinking.protocolTrace.map(e=>e.subtype),['init','thinking_tokens',undefined,'success']);
+ assert.equal(thinking.protocolTrace[1].estimated_tokens,7);
+ assert(!JSON.stringify(thinking.protocolTrace).includes('PRIVATE THOUGHT'));
 });
 for(const [mode,code] of [
  ['api-retry-401','PROVIDER_RETRY_NOT_ALLOWED'],['api-retry-429','PROVIDER_RETRY_NOT_ALLOWED'],
  ['api-retry-529','PROVIDER_RETRY_NOT_ALLOWED'],['api-retry-null','PROVIDER_RETRY_NOT_ALLOWED'],
  ['api-retry-invalid','PROTOCOL_EVENT_INVALID'],['status-compacting','CONTAINMENT'],
  ['status-invalid','PROTOCOL_EVENT_INVALID'],['requires-action','CONTAINMENT'],
+ ['thinking-tokens-invalid','PROTOCOL_EVENT_INVALID'],
  ['auth-status','PROVIDER_AUTH_ERROR'],
  ['hook-event','CONTAINMENT'],['plugin-install','CONTAINMENT'],
  ['unknown-system','PROTOCOL_EVENT_UNSUPPORTED'],['malicious-system','PROTOCOL_EVENT_UNSUPPORTED'],
