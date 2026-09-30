@@ -175,6 +175,7 @@ export class ClaudeStreamReader {
     if (this.bytes > this.limits.stdout) fail('STDOUT_LIMIT');
     let start=0;
     for (;;) {
+      if(this.primaryError)throw this.primaryError;
       const end=chunk.indexOf(10,start);
       const piece=chunk.subarray(start,end===-1?chunk.length:end);
       if (this.pending.length+piece.length>this.limits.line) fail('LINE_LIMIT');

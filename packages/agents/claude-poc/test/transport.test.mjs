@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
+import {EventEmitter} from 'node:events';
 import {userInfo} from 'node:os';
 import {mkdtemp,rmdir,readFile,lstat,symlink,unlink,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
@@ -160,6 +161,60 @@ test('reader preserves result provider error even with late events in the same s
   {type:'system',subtype:'notification',session_id:'fixture'}];
  assert.throws(()=>r.push(Buffer.from(events.map(e=>JSON.stringify(e)).join('\n')+'\n')),e=>e.code==='PROVIDER_RATE_LIMIT');
  assert.throws(()=>r.finish(),e=>e.code==='PROVIDER_RATE_LIMIT');
+});
+const sameChunkLineLimit=512;
+function errorAndOversizedTail(sessionId,withError=true){
+ const init={type:'system',subtype:'init',session_id:sessionId,tools:[],mcp_servers:[],plugins:[],model:'claude-opus-fixture'};
+ const result={type:'result',subtype:'success',session_id:sessionId,is_error:true,permission_denials:[],api_error_status:429};
+ return Buffer.from(JSON.stringify(init)+'\n'+(withError?JSON.stringify(result)+'\n':'')+'x'.repeat(sameChunkLineLimit+1));
+}
+test('reader preserves recognized provider error before oversized tail in one Buffer',()=>{
+ const reader=new ClaudeStreamReader('fixture',{...LIMITS,line:sameChunkLineLimit});
+ assert.throws(()=>reader.push(errorAndOversizedTail('fixture')),e=>e.code==='PROVIDER_RATE_LIMIT');
+ assert.equal(reader.events,2);
+ assert.equal(reader.pending.length,0);
+ assert.throws(()=>reader.finish(),e=>e.code==='PROVIDER_RATE_LIMIT');
+});
+test('reader still rejects oversized tail without an earlier recognized error',()=>{
+ const reader=new ClaudeStreamReader('fixture',{...LIMITS,line:sameChunkLineLimit});
+ assert.throws(()=>reader.push(errorAndOversizedTail('fixture',false)),e=>e.code==='LINE_LIMIT');
+ assert.equal(reader.primaryError,undefined);
+});
+for(const withError of [true,false])test(`one controlled data event ${withError?'preserves provider error':'retains line limit'}`,async()=>{
+ let dataEvents=0,spawns=0,closed=false,accepted=false;
+ const signals=[];
+ const spawnControlled=()=>{
+  spawns++;
+  const child=new EventEmitter();
+  child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();
+  child.stdin.destroy=()=>{};
+  child.stdin.end=()=>queueMicrotask(()=>{
+   dataEvents++;
+   child.stdout.emit('data',errorAndOversizedTail('fixture',withError));
+  });
+  child.kill=signal=>{
+   signals.push(signal);
+   queueMicrotask(()=>{closed=true;child.emit('close',null,signal);});
+   return true;
+  };
+  return child;
+ };
+ const promise=runClaudeProcess({binary:'/fixture-only',home:'/fixture-home',cwd:'/fixture-cwd',payload,
+  sessionId:'fixture',timeoutMs:3000,limits:{...LIMITS,line:sameChunkLineLimit}},spawnControlled);
+ const expected=withError?'PROVIDER_RATE_LIMIT':'LINE_LIMIT';
+ await assert.rejects(promise.then(value=>{accepted=true;return value;}),error=>{
+  assert.equal(error.code,expected);
+  assert.equal(error.metrics.childClosed,true);
+  assert.equal(error.protocolTrace.at(-1).decision,expected);
+  if(withError){
+   assert.deepEqual(error.protocolTrace.map(e=>e.type),['system','result']);
+   assert.equal(error.protocolTrace.at(-1).isError,true);
+   assert.equal(error.metrics.lastEventSummary.result.apiErrorStatus,429);
+  }
+  return true;
+ });
+ assert.equal(dataEvents,1);assert.equal(spawns,1);assert.equal(closed,true);assert.equal(accepted,false);
+ assert.deepEqual(signals,['SIGTERM']);
 });
 for(const [mode,code,reason] of [
  ['plugins-missing','CONTAINMENT','INIT_PLUGINS_MISSING'],
