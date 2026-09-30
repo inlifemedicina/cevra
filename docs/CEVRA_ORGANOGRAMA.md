@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE EXPERIMENT CLOSED, OFFLINE F-1–F-5 REVIEW PENDING]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE EXPERIMENT CLOSED, OFFLINE N-1 VERIFICATION PENDING]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -212,7 +212,11 @@ closes this experiment ID in code independently of ledger availability and
 corrects result completion/error precedence, required empty plugins and system
 event classifications. PoC 115/115, semantic Application 26/26, full Application
 210/210 and Node/TS build passed with controlled fixtures only. No real Claude
-or private-ledger change occurred. Micro-review is pending; a new real proof
+or private-ledger change occurred. Independent review approved `de0aee7` with
+non-blocking notes; the minimal N-1 oversized-tail correction at `1aa4324`
+passed four directed regressions, PoC 119/119, semantic Application 26/26 and
+Node/TS build. Only this new delta awaits focused verification; remaining
+notes are in the existing evidence record. A new real proof
 requires explicit authorization of a new ID, budget and scope. Slice A stays
 CLOSED; full semantic analysis is NOT DELIVERED; progress remains 55%.
 Before future timeline/Cut Compiler workflows create many commits, remeasure

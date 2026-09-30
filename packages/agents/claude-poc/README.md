@@ -16,8 +16,10 @@ status or spawn. There is no override, environment variable or recovery mode
 that reopens this ID. The five original private receipts remain unavailable;
 historical records are retained without reconstruction. No semantic round-trip
 was accepted. Attempt #8 stopped at `system/thinking_tokens`; subsequent reader
-corrections, including F-1–F-5, have **offline validation only** and await
-independent micro-review. A new real proof requires explicit authorization of
+corrections, including F-1–F-5, have **offline validation only**. Independent
+review approved `de0aee7` with non-blocking notes; only the later N-1
+same-chunk oversized-tail correction awaits focused verification.
+A new real proof requires explicit authorization of
 a new experiment ID, budget and scope; none is implemented here.
 
 Historical binary/auth/containment requirements are recorded in the canonical

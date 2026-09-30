@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-30 — OFFLINE F-1–F-5 REMEDIATED / INDEPENDENT MICRO-REVIEW PENDING.**
+**2026-09-30 — PREVIOUS OFFLINE REMEDIATION APPROVED WITH NOTES / N-1 DELTA AWAITS FOCUSED VERIFICATION.**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -960,13 +960,15 @@ Baseline `128ff55c098849a149d01506c6f8f6b85bfbd18b`; code/test checkpoint
 `0fd4fba8e4b0f595c3abfadbb9743aeb7e2de13e`. This is a bounded correction of the
 existing no-tools transport and historical experiment control, not a change to
 Application, Project IR, History, projection, product schemas or provider choice.
-Independent micro-review of this delta is **PENDING**.
+Independent micro-review was pending at this checkpoint. The later approval
+and its N-1 follow-up are recorded below; approval does not automatically extend
+to the new follow-up HEAD.
 
 | Finding | Correction | Deterministic evidence |
 |---|---|---|
 | F-5 | The old ID is terminal in code. `recoverExperiment`, `reserveAttempt` and former write/setup helpers always fail `EXPERIMENT_CLOSED` before I/O. Harness has only read-only status; all operational modes fail before binary verification, auth or spawn. Inspection separates closed policy (8/8, zero) from the count/availability of historical records. Orphan receipts, number/attemptId/purpose mismatches and gaps are inconsistencies; an unresolved reservation is never refunded. | Synthetic present/absent/checkpoint-less/corrupt directories, deleted reservation with surviving receipt and later reservation, missing receipt, mismatches/symlink, repeated closure and operational entry-point tests; no operator evidence touched. |
 | F-1 | Successful final `result.stop_reason` is exactly `end_turn`, `stop_sequence` or null. Arrays/coercion, absent/unknown values, `max_tokens`, `refusal`, `pause_turn` fail; `tool_use` remains containment. Assistant block null is still intermediate. | Full init→assistant→result→close success/failure sequences. |
-| F-2 | Result provider error becomes primary immediately and stops/reaps the owned process. The reader preserves it against subsequent lines (including the same stdout chunk), timeout or cancellation; bounded TERM/KILL cleanup is retained. | Fake late event, TERM-ignoring timeout/cancellation and same-chunk sequence; all retain `PROVIDER_RATE_LIMIT`, child closed. |
+| F-2 | Result provider error becomes primary and stops/reaps the owned process. This checkpoint tested a normal late event in the same stdout chunk plus timeout/cancellation. The earlier blanket same-chunk claim did not cover an oversized trailing line; review N-1 below identifies and resolves that edge case. Bounded TERM/KILL cleanup is retained. | Fake late event, TERM-ignoring timeout/cancellation and normal same-chunk sequence retained `PROVIDER_RATE_LIMIT`, child closed. |
 | F-3 | Normal init requires plugins to be present, array, empty. Skills remain optional and shape/emptiness checked when supplied. Diagnostic capture never grants semantic success or a way to reopen the closed harness. | Missing/wrong-type/nonempty plugins rejected; empty accepted; existing skills/diagnostic/containment regressions retained. |
 | F-4 | `system/informational` and `notification` explicitly fail unsupported protocol, not automatic activity attribution. Model refusal notices are system subtypes and terminate as `PROVIDER_MODEL_REFUSAL`, with no fallback. `system/elicitation_complete` is forbidden MCP activity. | Full fake sequences assert exact policy codes/reasons; two distinct Opus keys in modelUsage still reject as drift. |
 
@@ -1000,3 +1002,61 @@ policy prevents accidental reopening, not deliberate modification by the machine
 owner. Director I1/I3/I5 impact remains a **compatible bounded correction** with
 no added coordination, tool or mutation authority. Slice A stays CLOSED, ADR
 0030 stays IN DEVELOPMENT, full analysis remains NOT DELIVERED; progress **55%**.
+
+## Independent micro-review and offline N-1 follow-up — 2026-09-30
+
+The received independent verdict is **APPROVE OFFLINE REMEDIATION WITH
+NON-BLOCKING NOTES**, valid specifically for
+`de0aee79b0ed66b16b5434efad953da855ce0df0`. F-1–F-5 were considered FIXED,
+with diagnostic N-1 in F-2. **Reviewer evidence**, not execution by the
+implementer in this follow-up: PoC 115/115, semantic Application 26/26,
+independent synthetic transport/record probes and `git diff --check` passed.
+Separately, GitHub push CI [36752754455](https://github.com/inlifemedicina/cevra/actions/runs/36752754455)
+was verified SUCCESS 5/5 on that exact previous HEAD. Neither evidence set
+approves the new HEAD or demonstrates semantic inference.
+
+N-1 code/test checkpoint: `1aa4324d9bcb4e404919d0af17c3b4d072abdbd5`.
+The only reader change is a `primaryError` guard at each `push()` loop iteration,
+before processing the next part. A provider error already received and validated
+therefore remains primary over an oversized tail in the same Buffer. Bounds,
+model/event/containment policy, TERM/KILL, cancellation/timeout and close-before-
+acceptance are unchanged. No precedence is granted to a provider error not yet
+validated; the existing whole-chunk stdout cap still precedes parsing.
+
+Deterministic reproduction used a 512-byte **test-only** line limit and a
+513-byte tail. The unchanged production reader at the previous HEAD, with new
+tests added but before its fix, failed both positive regressions as `LINE_LIMIT`;
+the two negative controls passed. After the one-line fix, all four passed:
+
+- Reader: one Buffer containing init → error result (429) → oversized tail
+  preserves `PROVIDER_RATE_LIMIT` and never accepts a result.
+- Full transport: the injected controlled child emits exactly **one `data`
+  event**, not an assumed pipe-write boundary. It rejects with
+  `PROVIDER_RATE_LIMIT`; the final result trace/summary retains that decision
+  and status, exactly one SIGTERM is issued, and rejection waits for child close.
+- Reader and transport controls without a preceding error still reject the
+  same oversized tail as `LINE_LIMIT`.
+
+**Implementer evidence for this delta:** directed 4/4, complete
+`npm run test:claude-poc` 119/119, semantic Application 26/26,
+`npm run build` PASS (existing Node/TS workspaces and frontend), and
+`git diff --check` PASS. The build completed before the suite runs, avoiding
+stale dist. Bundled Node 24.19.0 / existing npm 10.9.4 were used. No full
+Application rerun or manual Media/ML/Exact Runtime run was necessary for this
+one-line transport correction; the prior 210/210 remains historical evidence.
+New naturally triggered CI must be identified by its new SHA, not by the old run.
+
+**New delta: focused verification PENDING**, restricted to N-1; F-1–F-5 are not
+reopened. Remaining notes are recorded, **not fixed**:
+
+| Note | Remaining limitation / revisit condition |
+|---|---|
+| N-2 | Unexpected `attempt-9-*` files are not flagged by inspection, but cannot reopen balance. Revisit on the next necessary inspection change. |
+| N-3 | `conversation_reset` is in an inappropriate event list but remains rejected. Revisit when the event map must change. |
+| N-4 | A descendant inheriting stdout may delay close. Real `num_turns`/`modelUsage` compatibility and any auxiliary model remain unproved. |
+
+No real Claude, auth, harness/provider inference or private DeveloperEvidence
+read/write occurred. Only synthetic records/controlled processes were used;
+the real ledger remains untouched and the old experiment remains CLOSED,
+8/8 consumed, zero balance. Director impact: no new authority or architectural
+impact within this bounded diagnostic correction. Progress remains **55%**.
