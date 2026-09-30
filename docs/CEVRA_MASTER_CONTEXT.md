@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Slice A is closed; a restrictive session-only override cleared the Claude CLI canary #4 init gate, but its assistant event failed `MODEL_UNAVAILABLE` (4/8 attempts, no accepted response); Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-29, Slice A is closed; Claude CLI canary #5 passed the unchanged init gate but declared `authentication_failed` and ended with `is_error=true` (5/8 attempts, no accepted semantic response); Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — ASSISTANT MODEL GATE]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — EXPLICIT AUTH ERROR]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1721,10 +1721,26 @@ the unchanged `system/init` gate, but its next assistant event failed
 and redo were unchanged, and neither the pinned binary nor personal settings
 changed. The assistant's exact model-field shape was not retained, so the
 failure cannot yet be attributed to a specific alias/ID. The ledger is now
-**4/8**, with **4** remaining; PT-BR, EN-US and real cancellation were not run.
+**4/8** at that checkpoint, with **4** remaining; PT-BR, EN-US and real cancellation were not run.
 This is not proof of plugin execution, escape, universal isolation or a real
 semantic round-trip. The next decision is focused on the assistant-event model
 contract; no retry or gate relaxation is authorized by this finding.
+Subsequent directed study of the official Agent SDK contracts and pinned public
+Python parser showed that `assistant.error` is distinct from
+`assistant.message.model`, and `result.subtype=success` may still report
+`is_error=true`. A focused reader/test change preserves capability checks,
+requires proven Opus generation for semantic success, classifies explicit
+provider errors first, and retains only bounded private wire metadata outside
+Git. Deterministic PoC tests passed **60/60**, Application **210/210**. Under
+the same pinned CLI, Opus/Medium request and restrictive per-process settings,
+real canary #5 again passed the unchanged init gate; its `assistant` declared
+`authentication_failed` with `<synthetic>` as message model, and its final
+`result` reported `is_error=true`, `terminal_reason=api_error`. CEVRA rejected
+it as `PROVIDER_AUTH_ERROR`; no Opus response or semantic result was accepted.
+The exact cause of #4 remains unproven because its fields were not retained.
+Ledger **5/8**, with **3** remaining; PT-BR, EN-US and cancellation are NOT RUN.
+The next gate is a separately authorized, official-client authentication
+investigation/decision, not a model bypass, retry or editorial matrix run.
 Effective effort, real transport success and editorial quality remain
 unproven. The adapter/test harness is private infrastructure, not Desktop
 integration. No API key, extra usage, fallback or audiovisual mutation was
@@ -2107,7 +2123,8 @@ delivered by scripted fixtures.
 - **BOUNDED CANDIDATE DECISION:** official Claude Code CLI is the next private proof candidate under the same provider-neutral Application port. This does not replace the historical Codex preference or approve product/commercial integration.
 - **HISTORICAL / RESOLVED — VERSION:** the first preflight found only Claude Desktop and its internal Linux/aarch64 2.1.270 payload. The subsequent explicitly authorized installation verified official macOS arm64 Claude Code 2.1.280 with signed manifest, binary checksum, native publisher signature and notarization. No global configuration was changed.
 - **HISTORICAL — BUILT-IN INIT METADATA:** subscription login is verified. Canaries #1/#2 failed the init gate; #2 identified two plugin entries and zero tools/MCP/skills, no bypass. Official installed-plugin inventory was empty. Authorized diagnostic attempt #3 captured only bounded metadata and stopped at its first init: both entries are virtual `builtin` with `<name>@builtin` source identifiers, not paths to personal plugin directories. No components, hooks, instructions or execution were proven. At that checkpoint, no effective session disablement was known and the ledger was **3/8**.
-- **CURRENT — BLOCKED / ASSISTANT MODEL GATE:** an explicitly authorized session-only `--settings` file set the two private built-in IDs to `false`. Corrective canary #4 passed the unchanged init gate but its next assistant event failed `MODEL_UNAVAILABLE`; no final result was accepted. The child closed, history/redo and personal settings remained unchanged. The exact assistant model-field value was not retained. Ledger **4/8**; PT-BR, EN-US and cancellation were not run. Next decision needs a focused assistant-event model-contract diagnosis without relaxing the containment/model gate. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
+- **HISTORICAL — ASSISTANT MODEL GATE:** an explicitly authorized session-only `--settings` file set the two private built-in IDs to `false`. Corrective canary #4 passed the unchanged init gate but its next assistant event failed `MODEL_UNAVAILABLE`; no final result was accepted. The exact assistant model-field value was not retained, so #4's provider cause remains unproven. The ledger then stood at **4/8**.
+- **CURRENT — BLOCKED / EXPLICIT AUTH ERROR:** the reader now separates `assistant.error` from generated-model evidence, without relaxing containment or model requirements. Canary #5 used the same settings and passed init, then received `authentication_failed` with synthetic message model; final result had `is_error=true` and `terminal_reason=api_error`. No final semantic result was accepted. History/redo, pinned binary and personal settings were unchanged. Ledger **5/8**; PT-BR, EN-US and cancellation were not run. Next decision needs an official-client authentication investigation/decision, not an automatic retry or change of billing/model. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
 
 ---
 
@@ -2153,7 +2170,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Resolve the **NEXT REQUIRED GATE** with a focused diagnosis of the assistant-event `MODEL_UNAVAILABLE` produced after corrective canary #4 passed the unchanged init gate under a restrictive session override. The observed clean init does not establish universal isolation; no final semantic result was accepted. Four of eight historical attempts remain, but no next call is authorized by this record. Do not loosen no-tools/no-MCP/no-unmanaged-context or model controls, silently substitute model/billing, or proceed to the editorial matrix before a complete validated canary. No strategy, take selection or cut planning is authorized implicitly.
+1. Resolve the **NEXT REQUIRED GATE** with a separately authorized official-client authentication investigation/decision: canary #5 passed the unchanged init gate but explicitly declared `authentication_failed`, followed by `is_error=true`/`api_error`; no semantic result was accepted. The prior #4 model classification is not retroactively a proven auth failure. Three of eight historical attempts remain, but no next call is authorized by this record. Do not loosen no-tools/no-MCP/no-unmanaged-context or model controls, silently substitute model/billing, or proceed to the editorial matrix before a complete validated canary. No strategy, take selection or cut planning is authorized implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

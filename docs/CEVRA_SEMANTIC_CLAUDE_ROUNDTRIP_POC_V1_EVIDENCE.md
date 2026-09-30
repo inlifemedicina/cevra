@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-29 — BLOCKED — ASSISTANT MODEL GATE AFTER CLEAN SESSION INIT.**
+**2026-09-29 — BLOCKED — EXPLICIT PROVIDER AUTHENTICATION ERROR AFTER CLEAN SESSION INIT.**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -673,3 +673,71 @@ model contract, using the already captured closed error and, if separately
 authorized, a new bounded diagnostic; no additional real process is authorized
 here. Slice A remains CLOSED, ADR 0030 remains IN DEVELOPMENT, and global
 progress remains **55%**.
+
+## Assistant/result contract correction and canary #5 — 2026-09-29
+
+The previous #4 receipt did not retain `assistant.message.model` or the
+assistant error field. Its `MODEL_UNAVAILABLE` remains a **historical CEVRA
+classification with unproven provider cause**, not retroactively reclassified
+as authentication failure. The new work consulted the official
+[Python Agent SDK reference](https://code.claude.com/docs/en/agent-sdk/python),
+[streaming-output reference](https://code.claude.com/docs/en/agent-sdk/streaming-output),
+[troubleshooting reference](https://code.claude.com/docs/en/agent-sdk/troubleshooting),
+and the public Python SDK parser at
+[`f2204bb956bab02907aaf3cb88eb9dead28eaa35`](https://github.com/anthropics/claude-agent-sdk-python/blob/f2204bb956bab02907aaf3cb88eb9dead28eaa35/src/claude_agent_sdk/_internal/message_parser.py),
+plus the official TypeScript SDK types. These references distinguish
+`assistant.message.model` from envelope `assistant.error`, and document that a
+`result` with subtype `success` may still have `is_error=true`. They guide the
+CEVRA reader but do not prove every behavior of pinned Claude Code 2.1.280.
+
+Code/test checkpoint `8cbb2556d5244826a05e55755cc76c361a7066bb` now
+checks session/capability containment first, classifies explicit assistant
+errors before treating the message as generated-model evidence, and requires a
+real allowed-Opus assistant plus a successful final result before returning
+content to Application. A prior assistant error remains primary even if a
+later result appears successful or the child exits nonzero. Unknown errors,
+synthetic/operational messages without proven semantics, partial output,
+foreign sessions, tools and non-Opus generation remain fail-closed. Public
+event summaries now locate the model correctly (`system.model`,
+`assistant.message.model`, or result `modelUsage`) and expose only closed
+shape/category/status fields. An owner-only, exclusive 0600 local receipt in
+the existing private 0700 ledger directory retains at most 16 KiB of selected
+assistant/result metadata; error text is represented by presence/hash, not
+copied. No raw event, reasoning, transcript, credential or private plugin ID
+is included. The original two-ID `enabledPlugins=false` session override and
+unchanged init gate remain in force.
+
+Deterministic PoC transport tests passed **60/60** and directly related
+Application tests passed **210/210** before the new real process. Fixtures
+characterize explicit auth/rate-limit/billing/request/server/unknown errors,
+`<synthetic>` model, wrong/missing model, capability priority, `success` plus
+`is_error=true`, prior-error stickiness, process exit, receipt safety, and
+Application history/redo; they are not real AI evidence.
+
+Exactly one further real process, **canary #5**, used the same synthetic
+minimal text, pinned Claude 2.1.280 binary, requested Opus/Medium, private
+plugin override and unchanged containment controls. The unchanged init gate
+accepted `system/init`. The next `assistant` event explicitly declared
+`error: authentication_failed` with `message.model: <synthetic>`; this is a
+client/provider error message, **not evidence of Opus generation**. The final
+`result` had `subtype: success` but `is_error: true` and
+`terminal_reason: api_error`; no HTTP status was present. CEVRA correctly
+returned `PROVIDER_AUTH_ERROR` at transport level. Application surfaced
+analyzer unavailable, accepted no semantic result and left ProjectHistory and
+redo intact. No tool event occurred in the three observed events; the child
+closed. The bounded local metrics were 2,842 stdout bytes, zero stderr bytes,
+1,237 envelope bytes, 2,141 playbook bytes and about 728 ms transport latency.
+`modelUsage` reported no model entry in this error result. Effective generated
+model, effort, token use, provider-side work and actual charge remain unknown.
+
+The private `canary-5-private.json` receipt is regular, 0600 and outside Git;
+older receipts remain unchanged. The pinned binary SHA-256 and the personal
+settings file's size/mtime/SHA-256 were unchanged before and after. The
+immutable historical ledger is **5/8 used, 3 remaining**. PT-BR, EN-US,
+continuation and real cancellation are **NOT RUN**, because the canary failed.
+No login, installation, payment-mode change, retry, model/provider switch or
+gate relaxation was attempted. The specific next action is a separately
+authorized authentication investigation/decision using the official client,
+without assuming that the prior login status guarantees this headless run.
+Slice A remains CLOSED; the complete semantic analysis and real round-trip
+remain NOT DELIVERED; ADR 0030 remains IN DEVELOPMENT; progress stays **55%**.

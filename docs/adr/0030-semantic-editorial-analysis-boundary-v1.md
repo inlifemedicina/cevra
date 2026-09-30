@@ -215,11 +215,23 @@ The first official-provider attempts do not alter the accepted boundary:
   `false` in a temporary `--settings` file for corrective canary #4. The
   original gate accepted that `system/init`, but the following assistant event
   failed `MODEL_UNAVAILABLE`; no final semantic response was accepted. The
-  precise assistant model-field value was not retained. Ledger is 4/8; no
+  precise assistant model-field value was not retained. Ledger was 4/8 at that checkpoint; no
   PT-BR, EN-US or real cancellation matrix was run. This is an observed
   version-specific init result, not universal isolation or real-agent success.
+- official Agent SDK contracts and the pinned public Python parser distinguish
+  an `assistant.error` from `assistant.message.model`; final `result` subtype
+  `success` is not acceptance when `is_error=true`. The focused reader now
+  preserves this distinction while requiring actual allowed-Opus generation,
+  unchanged capability checks and Application validation. Canary #5 passed the
+  same init gate, then explicitly declared `authentication_failed` with a
+  synthetic message model; its final result reported `is_error=true` and
+  `terminal_reason=api_error`. The transport returned `PROVIDER_AUTH_ERROR`,
+  and Application accepted no analysis. #4's provider cause remains unproven.
+  Ledger is 5/8; the editorial/cancellation matrix remains NOT RUN. An
+  official-client authentication investigation/decision is the next bounded
+  gate, not a retry, billing change or parser exception.
 
-The private adapter is deterministically tested; the four bounded real processes
+The private adapter is deterministically tested; the five bounded real processes
 have not yielded an accepted transport/Application round-trip. Synthetic canary envelopes were written to the CLI; remote inference
 or consumption before termination is unknown. No API key, extra usage, retry/
 fallback, Project IR/History mutation or product integration was introduced.

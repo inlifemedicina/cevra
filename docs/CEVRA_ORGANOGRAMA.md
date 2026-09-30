@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE BLOCKED-ASSISTANT-MODEL]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE BLOCKED-EXPLICIT-AUTH]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -161,10 +161,21 @@ explicitly authorized empirical attempt then applied a private, restrictive
 `--settings` override with both exact built-in source IDs set to `false` only
 for the child. Corrective canary #4 passed the original `system/init` gate but
 failed `MODEL_UNAVAILABLE` at the following assistant event; the child closed,
-no answer was accepted and history/redo were intact. Ledger is **4/8**. The
+no answer was accepted and history/redo were intact. Ledger was **4/8** at
+that checkpoint. The
 validator still fails closed on any nonempty plugin list. PT-BR, EN-US and
 real cancellation are **NOT RUN**. The next focused decision concerns the
 assistant-event model contract, not a containment exception.
+Directed official-contract review then separated `assistant.error` from
+generated-model evidence without weakening the init or Opus requirements.
+Canary #5 passed the same init gate but declared `authentication_failed` with
+synthetic message model; its final result had `is_error=true` and
+`terminal_reason=api_error`. The child closed, no semantic result was accepted,
+and ProjectHistory/redo were unchanged. Ledger **5/8**. The cause of #4 remains
+unproven; #5 establishes a current explicit authentication failure. PT-BR,
+EN-US and cancellation remain **NOT RUN**. The next action is a separately
+authorized official-client authentication investigation/decision, not a retry
+or change of provider, model, billing or containment.
 Effective end-to-end Opus/Medium, real transport success and editorial matrix remain unproven.
 Claude remains the next private proof candidate, not a replacement of the
 provider-neutral core or an approved commercial integration. Complete Semantic
