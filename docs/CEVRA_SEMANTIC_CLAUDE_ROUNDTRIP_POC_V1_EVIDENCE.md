@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-29 — BLOCKED — BUILT-IN INIT METADATA / NO PROVEN SESSION DISABLE (`INIT_PLUGINS_NONEMPTY` remains fail-closed).**
+**2026-09-29 — BLOCKED — ASSISTANT MODEL GATE AFTER CLEAN SESSION INIT.**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -599,10 +599,10 @@ nevertheless the pinned 2.1.280 init reported both built-in entries with
 safe/restricted mode already active. Whether these entries register components
 or are metadata-only is not established by empty tools/MCP/skills alone.
 
-No documented, demonstrably effective per-process control for these built-in
-entries was established. An unverified `enabledPlugins` key or an exception to
-the init gate would not meet the corrective-canary prerequisite. **Attempt #4
-was not run.** The immutable ledger now holds **3/8** attempts, leaving **5**;
+At this diagnostic checkpoint, no demonstrably effective per-process control
+for these built-in entries had been established. An unverified `enabledPlugins`
+key or an exception to the init gate would not meet that task's corrective-canary
+prerequisite. **Attempt #4 had not yet run.** The immutable ledger then held **3/8** attempts, leaving **5**;
 the original two receipts and the private third receipt remain separate. No
 plugin name, path, manifest or raw event was committed, logged or supplied to
 the analyzer. No personal/global settings, plugin installation, authentication
@@ -611,3 +611,65 @@ question: obtain an official 2.1.280 account of built-in init entries and a
 supported session-only disablement, or explicitly reconsider the containment
 contract with separate evidence and authorization. This task does neither and
 does not proceed to the editorial matrix.
+
+## Restrictive session override and corrective canary — 2026-09-29
+
+The Product Owner subsequently authorized one empirical test of the official
+`--settings` session override, without relaxing the original containment gate.
+The existing private #3 receipt was verified as an owned 0600 regular file in
+the existing 0700 ledger directory. It contains exactly two distinct entries
+with virtual `path: builtin` and `source` exactly `<name>@builtin`. Their exact
+private source strings were used solely as the two keys of a 0600 temporary
+JSON file, each explicitly `false` under `enabledPlugins`; no plugin name was
+placed in argv, output, Git, or the semantic payload. The file remained until
+child settlement, then was removed with inode/owner checking. The original
+`--restricted`, `--safe-mode`, empty `--tools`, strict empty MCP, permission,
+session, model, effort, and transport controls were retained. The init validator
+still rejects every nonempty plugin array; no `@builtin` exception was made.
+
+The official [memory](https://code.claude.com/docs/en/memory),
+[plugin loading](https://code.claude.com/docs/en/plugins/loading), and
+[CLI](https://code.claude.com/docs/en/cli-reference) references support the
+general settings mechanism and describe a built-in disable example, but do not
+by themselves prove that these two entries can be disabled in 2.1.280. This
+run is the empirical evidence for this exact version and receipt, not a general
+claim about all built-ins or hidden runtime behavior.
+
+Code/test checkpoint: `60a03e50178156604e386c0d0644ed6577aeee21`. Deterministic
+Claude transport tests passed **38/38**; directly related Application tests
+passed **210/210**. The fake process characterizes private file creation,
+exclusive ownership, exact false keys, argv, unchanged nonempty-plugin
+rejection, Application citation/history behavior and cleanup; it does not
+certify the native loader. The first focused test run had one test-harness
+cleanup failure caused by a symlink-open error being returned as `ELOOP` rather
+than a closed validation error. That path was corrected, its own orphaned
+synthetic symlink removed after exact-target inspection, and the full focused
+run passed. No real attempt was consumed by that test failure.
+
+Exactly one real corrective process, **attempt #4**, used the same synthetic
+minimal canary, pinned binary and requested Opus/Medium. The transport accepted
+`system/init` under the unchanged gate, which implies required tools/MCP arrays
+were empty, optional plugins/skills were absent or empty, no bypass was
+observed, and the init model passed the allowed-Opus check. The next event was
+an assistant event rejected as `MODEL_UNAVAILABLE`; the retained non-content
+metrics do not distinguish missing from non-Opus `message.model`, so no exact
+assistant model ID is asserted. There was **no accepted final result** and no
+semantic analysis. The child was reaped after two events, 1,669 stdout bytes,
+zero stderr bytes and about 729 ms local transport latency. The serialized
+Application envelope was 1,237 bytes and the versioned playbook 2,141 bytes.
+No output-token count or actual charge was established. History/archive and
+redo remained unchanged. The same pinned binary SHA-256 was observed before
+and after; the personal settings file's size, mtime and SHA-256 were unchanged.
+The local receipt is `canary-4.json` in the existing private ledger; older
+receipts remain separate. Ledger: **4/8 used, 4 remaining**. PT-BR, EN-US,
+continuation, hostile and cancellation real scenarios are **NOT RUN**.
+
+Classification: **SESSION INIT CONTROL OBSERVED / REAL ROUND-TRIP BLOCKED AT
+ASSISTANT MODEL GATE**. This is not proof that the built-ins executed, nor proof
+of universal isolation, effective Medium effort, editorial quality or product
+integration. Do not retry or loosen model/containment checks under this task.
+The next decision is a focused examination of this version's assistant-event
+model contract, using the already captured closed error and, if separately
+authorized, a new bounded diagnostic; no additional real process is authorized
+here. Slice A remains CLOSED, ADR 0030 remains IN DEVELOPMENT, and global
+progress remains **55%**.

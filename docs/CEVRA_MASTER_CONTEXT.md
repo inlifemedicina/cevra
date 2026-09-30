@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Slice A is closed; Claude CLI diagnostic attempt #3 identified two virtual `@builtin` init entries (3/8 attempts, no accepted response), but no proven session-only disablement; Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-29, Slice A is closed; a restrictive session-only override cleared the Claude CLI canary #4 init gate, but its assistant event failed `MODEL_UNAVAILABLE` (4/8 attempts, no accepted response); Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — BUILT-IN INIT METADATA]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — ASSISTANT MODEL GATE]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1690,7 +1690,7 @@ config edit or Gatekeeper bypass occurred. The historical AUTH blocker was
 resolved by the user's official subscription login: sanitized status now reports
 logged-in Claude.ai / first-party / Pro. Documented controls and local policy
 preflight permitted a minimal canary after deterministic adapter tests.
-Current stage: **BLOCKED — BUILT-IN INIT METADATA / NO PROVEN SESSION DISABLE**.
+The earlier stage was **BLOCKED — BUILT-IN INIT METADATA / NO PROVEN SESSION DISABLE**.
 Canary #1 failed generically on the first `system/init` event (1/8); its exact
 field was not retained. After closed, non-content diagnostic tests, exactly one
 additional canary with the same controls identified `INIT_PLUGINS_NONEMPTY`:
@@ -1709,9 +1709,22 @@ The private identifiers remain outside Git/normal metrics. The apparent
 inventory/init mismatch is now attributable to different observed categories,
 not to a demonstrated third-party installation. Exact component activation
 and this version's loader semantics remain unproven. No documented session-only
-disablement for built-ins was established; the conditional fourth attempt was
-not run. Ledger is **3/8**, with **5** remaining. This is not proof of plugin
-execution or escape, and the init gate still fails closed.
+disablement for built-ins was established at that checkpoint; the conditional
+fourth attempt had not yet run. The ledger then stood at **3/8**. Subsequently,
+the Product Owner authorized a restrictive empirical override: the two exact
+private `@builtin` source IDs from the existing receipt were set to `false` in
+an owned, temporary `--settings` file used only by the child process. The
+original containment validator was unchanged. Deterministic Claude tests
+passed **38/38** and Application **210/210**. Real corrective canary #4 passed
+the unchanged `system/init` gate, but its next assistant event failed
+`MODEL_UNAVAILABLE`; no final response was accepted. The child closed, history
+and redo were unchanged, and neither the pinned binary nor personal settings
+changed. The assistant's exact model-field shape was not retained, so the
+failure cannot yet be attributed to a specific alias/ID. The ledger is now
+**4/8**, with **4** remaining; PT-BR, EN-US and real cancellation were not run.
+This is not proof of plugin execution, escape, universal isolation or a real
+semantic round-trip. The next decision is focused on the assistant-event model
+contract; no retry or gate relaxation is authorized by this finding.
 Effective effort, real transport success and editorial quality remain
 unproven. The adapter/test harness is private infrastructure, not Desktop
 integration. No API key, extra usage, fallback or audiovisual mutation was
@@ -2093,7 +2106,8 @@ delivered by scripted fixtures.
 - **PRESERVED DIAGNOSTIC:** the Codex App Server PoC remains **BLOCKED — CONTAINMENT** at `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1`, with zero threads and zero turns. It is not reclassified as a demonstrated escape or universal impossibility.
 - **BOUNDED CANDIDATE DECISION:** official Claude Code CLI is the next private proof candidate under the same provider-neutral Application port. This does not replace the historical Codex preference or approve product/commercial integration.
 - **HISTORICAL / RESOLVED — VERSION:** the first preflight found only Claude Desktop and its internal Linux/aarch64 2.1.270 payload. The subsequent explicitly authorized installation verified official macOS arm64 Claude Code 2.1.280 with signed manifest, binary checksum, native publisher signature and notarization. No global configuration was changed.
-- **CURRENT — BLOCKED / BUILT-IN INIT METADATA:** subscription login is verified. Canaries #1/#2 failed the init gate; #2 identified two plugin entries and zero tools/MCP/skills, no bypass. Official installed-plugin inventory was empty. Authorized diagnostic attempt #3 captured only bounded metadata and stopped at its first init: both entries are virtual `builtin` with `<name>@builtin` source identifiers, not paths to personal plugin directories. No components, hooks, instructions or execution were proven. The official documented per-session plugin controls do not establish a way to disable built-ins in pinned 2.1.280, so attempt #4 was not spent. Ledger **3/8**, zero accepted results; gate unchanged. Next decision needs an official built-in init/disablement contract or separately authorized containment-contract review. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
+- **HISTORICAL — BUILT-IN INIT METADATA:** subscription login is verified. Canaries #1/#2 failed the init gate; #2 identified two plugin entries and zero tools/MCP/skills, no bypass. Official installed-plugin inventory was empty. Authorized diagnostic attempt #3 captured only bounded metadata and stopped at its first init: both entries are virtual `builtin` with `<name>@builtin` source identifiers, not paths to personal plugin directories. No components, hooks, instructions or execution were proven. At that checkpoint, no effective session disablement was known and the ledger was **3/8**.
+- **CURRENT — BLOCKED / ASSISTANT MODEL GATE:** an explicitly authorized session-only `--settings` file set the two private built-in IDs to `false`. Corrective canary #4 passed the unchanged init gate but its next assistant event failed `MODEL_UNAVAILABLE`; no final result was accepted. The child closed, history/redo and personal settings remained unchanged. The exact assistant model-field value was not retained. Ledger **4/8**; PT-BR, EN-US and cancellation were not run. Next decision needs a focused assistant-event model-contract diagnosis without relaxing the containment/model gate. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
 
 ---
 
@@ -2139,7 +2153,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Resolve the **NEXT REQUIRED GATE** by obtaining an official 2.1.280 explanation of its two virtual `@builtin` init entries and a supported session-only disablement, or by making a separate explicit containment-contract decision with evidence. The CLI installed-plugin inventory returned zero; diagnostic attempt #3 established built-in source labels but not effective components or a safe override. Five of eight authorized attempts remain; attempt #4 was not run and no next call is authorized by this record. Installation/auth pass, but no semantic result was accepted. Do not loosen no-tools/no-MCP/no-unmanaged-context controls, silently substitute model/billing, or proceed to the editorial matrix before containment is established. No strategy, take selection or cut planning is authorized implicitly.
+1. Resolve the **NEXT REQUIRED GATE** with a focused diagnosis of the assistant-event `MODEL_UNAVAILABLE` produced after corrective canary #4 passed the unchanged init gate under a restrictive session override. The observed clean init does not establish universal isolation; no final semantic result was accepted. Four of eight historical attempts remain, but no next call is authorized by this record. Do not loosen no-tools/no-MCP/no-unmanaged-context or model controls, silently substitute model/billing, or proceed to the editorial matrix before a complete validated canary. No strategy, take selection or cut planning is authorized implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

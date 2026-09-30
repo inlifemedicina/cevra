@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE BLOCKED-BUILTIN-INIT]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE BLOCKED-ASSISTANT-MODEL]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -155,12 +155,17 @@ assertion without a retained field; the sole diagnostic follow-up identified
 bypass. Read-only CLI inventory under the same environment reports zero
 installed plugins. A separately authorized diagnostic process #3 stopped at
 its first init and identified two virtual built-in source labels, not local
-plugin paths. Components and execution remain unproven; no documented
-session-only disablement for these built-ins was established. Ledger 3/8,
-no accepted response; corrective attempt #4 was not run. Resolve the pinned
-CLI built-in init/disablement contract before any further run; containment
-remains closed.
-Effective Opus/Medium, real transport and editorial matrix remain unproven.
+plugin paths. Components and execution remain unproven; at that point no
+documented session-only disablement had been established (ledger 3/8). An
+explicitly authorized empirical attempt then applied a private, restrictive
+`--settings` override with both exact built-in source IDs set to `false` only
+for the child. Corrective canary #4 passed the original `system/init` gate but
+failed `MODEL_UNAVAILABLE` at the following assistant event; the child closed,
+no answer was accepted and history/redo were intact. Ledger is **4/8**. The
+validator still fails closed on any nonempty plugin list. PT-BR, EN-US and
+real cancellation are **NOT RUN**. The next focused decision concerns the
+assistant-event model contract, not a containment exception.
+Effective end-to-end Opus/Medium, real transport success and editorial matrix remain unproven.
 Claude remains the next private proof candidate, not a replacement of the
 provider-neutral core or an approved commercial integration. Complete Semantic
 Editorial Analysis V1, strategy, take selection and cut planning remain not

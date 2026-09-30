@@ -209,9 +209,18 @@ The first official-provider attempts do not alter the accepted boundary:
   capability that keeps containment blocked; neither actual tool execution nor
   an escape is proven. Determine the 2.1.280 init-field semantics before another
   run. No flag, prompt, model, effort or acceptance rule was relaxed.
+- later, operator-only diagnostic attempt #3 identified two distinct virtual
+  `@builtin` source labels, with no evidence of plugin execution. A specifically
+  authorized restrictive session override set those two exact private IDs to
+  `false` in a temporary `--settings` file for corrective canary #4. The
+  original gate accepted that `system/init`, but the following assistant event
+  failed `MODEL_UNAVAILABLE`; no final semantic response was accepted. The
+  precise assistant model-field value was not retained. Ledger is 4/8; no
+  PT-BR, EN-US or real cancellation matrix was run. This is an observed
+  version-specific init result, not universal isolation or real-agent success.
 
-The private adapter is deterministically tested, not real-transport validated.
-Two harmless synthetic canary envelopes were written to the CLI; remote inference
+The private adapter is deterministically tested; the four bounded real processes
+have not yielded an accepted transport/Application round-trip. Synthetic canary envelopes were written to the CLI; remote inference
 or consumption before termination is unknown. No API key, extra usage, retry/
 fallback, Project IR/History mutation or product integration was introduced.
 Effective model/effort and editorial quality remain unproven.
