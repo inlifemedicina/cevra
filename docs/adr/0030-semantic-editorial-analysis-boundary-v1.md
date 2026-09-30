@@ -284,6 +284,20 @@ records the official mechanism, installed-state facts and exact prerequisite.
 Complete Semantic Editorial Analysis remains **NOT DELIVERED** and progress
 remains **55%**.
 
+The subsequent 2026-09-30 Claude PoC F-1–F-5 remediation is **offline only**,
+at code/test checkpoint `0fd4fba8e4b0f595c3abfadbb9743aeb7e2de13e`.
+Its historical experiment is terminal in code (8/8, zero balance), independently
+of local-record availability; operational harness modes cannot invoke Claude
+or auth, and historical inspection detects orphan/mismatched receipts without
+refunding reservations. Result terminal reasons, primary provider-error
+preservation, explicit empty-plugin init and system-event classifications were
+corrected with 115/115 PoC, 26/26 semantic Application, 210/210 full Application
+tests and a passing Node/TS build. No Application/History/projection contract,
+private ledger or provider authority changed. Micro-review remains pending;
+there is still no accepted semantic round-trip. A new real proof requires
+explicit authorization of a new ID, budget and scope. This is a compatible
+Director correction and does not close this ADR or deliver complete analysis.
+
 Non-blocking limits retained by the closeout are:
 
 - at extreme transcript scale, `history.current` materialization or an

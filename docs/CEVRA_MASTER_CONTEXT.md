@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-30, Slice A is closed; Claude attempt #8 identified a documented `system/thinking_tokens` progress event rejected by the pre-correction CEVRA reader after clean init (8/8 used; no accepted semantic response); Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-30, Slice A is closed; Claude PoC F-1–F-5 are remediated offline pending micro-review, and its historical experiment is terminal in code (8/8 used, zero balance; no accepted semantic response); Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1806,6 +1806,24 @@ Further real execution requires a separate decision, not an automatic ninth
 attempt. Slice A remains CLOSED, ADR 0030 remains IN DEVELOPMENT, complete
 Semantic Editorial Analysis is NOT DELIVERED and progress remains **55%**.
 
+**2026-09-30 offline F-1–F-5 remediation:** code/test checkpoint
+`0fd4fba8e4b0f595c3abfadbb9743aeb7e2de13e` makes the old Claude experiment
+terminal independently of local files: recovery/reservation/write setup return
+`EXPERIMENT_CLOSED`, and operational harness modes fail before Claude or auth
+invocation. Read-only inspection distinguishes file integrity from the closed
+8/8 policy, detects orphan/mismatched receipts and never refunds unresolved
+reservations. The reader requires explicit empty plugins at normal init,
+exact allowed final stop reasons, immediate preservation of a result provider
+error through late events/timeout/cancel, and correct unsupported/refusal/MCP
+classification for the versioned system event families. PoC tests passed
+115/115, semantic Application 26/26, full Application 210/210 and Node/TS build.
+All validation is **offline**, using synthetic records/processes; the real
+private ledger was unchanged. Independent micro-review remains pending.
+Additional real proof requires explicit authorization of a **new ID, budget
+and scope**, not recovery of this terminal experiment. Director impact is a
+compatible correction; no product/provider authority changed. There remains
+no accepted round-trip, and progress remains **55%**.
+
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
 `35762551155` passed all five required jobs, and exact managed macOS arm64
@@ -2184,6 +2202,10 @@ delivered by scripted fixtures.
 
 ## 2026-09-30 — authorized experiment recovery
 
+The entry below records the checkpoint before attempt #8; its balance and
+"CURRENT" wording apply to that historical moment. The terminal 8/8 state and
+offline remediation are recorded in §24.3 and the immediate next action below.
+
 - **CURRENT — 7/8 USED / POST-INIT CONTAINMENT:** the Product Owner authorized a private persistent recovery checkpoint, explicitly debiting the five historical attempts without fabricating their lost receipts. The checkpoint and new pre-spawn reservations are owner-only and survive process restart. Attempt #6 recaptured current private builtin identifiers at the first init and stopped without analysis. PT-BR attempt #7 applied their session-only restrictive override; the original init gate passed, but the next event was `system` with an unretained subtype outside the closed reader contract. The reader failed `CONTAINMENT`, the child closed, and Application accepted no semantic result or mutation. One of eight slots remains; it was not spent on EN-US/continuation/cancellation after the material containment failure. Review the precise post-init event semantics before another authorized process; do not call this tool execution or a proven escape.
 
 ---
@@ -2230,7 +2252,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Review the closed Claude Code 2.1.280 no-tools transport correction and attempt #8 evidence. The version-matched SDK identifies `system/thinking_tokens` as operational progress; #8 was stopped by CEVRA's earlier policy after a clean init and before any assistant/result. The corrected reader has offline tests but no remaining authorized real slot. **8/8 attempts are consumed; no semantic round-trip is demonstrated.** Any additional real process requires a separate Product Owner budget/risk decision. Do not loosen capability/model controls, substitute billing/provider, or advance the editorial matrix without a validated real result. No strategy, take selection or cut planning is authorized implicitly.
+1. Independently micro-review the offline Claude PoC F-1–F-5 remediation, including terminal experiment control, final stop reasons, error precedence, empty-plugin init and system-event policy. **The old ID is CLOSED, 8/8 consumed, zero balance; no semantic round-trip is demonstrated.** A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or advance dependent editorial work from offline tests alone.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

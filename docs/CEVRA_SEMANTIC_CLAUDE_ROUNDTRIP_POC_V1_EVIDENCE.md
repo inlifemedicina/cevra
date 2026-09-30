@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-29 — BLOCKED — EXPLICIT PROVIDER AUTHENTICATION ERROR AFTER CLEAN SESSION INIT.**
+**2026-09-30 — OFFLINE F-1–F-5 REMEDIATED / INDEPENDENT MICRO-REVIEW PENDING.**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -8,6 +8,19 @@ Slice A remains CLOSED; ADR 0030 remains IN DEVELOPMENT.
 Global roadmap tracking remains **55%**.
 
 ## Current result
+
+The historical `semantic-claude-roundtrip-poc-v1` experiment is **CLOSED by code
+policy: 8/8 used, zero balance**, regardless of local-file availability. This
+remediation ran exclusively offline; no Claude/auth/provider invocation ran,
+no private ledger was modified, and no new budget was created. There remains
+**no accepted semantic round-trip**. Attempt #8 stopped at
+`system/thinking_tokens`; its subsequent fix and this package have no new real
+execution evidence. EN-US, continuation and real cancellation remain NOT RUN.
+Further real proof requires explicit authorization of a **new experiment ID,
+budget and scope**. No such experiment is implemented here. The detailed
+remediation and deterministic validation are recorded at the end of this file.
+
+## Historical authentication and first canary checkpoints
 
 After the user's official subscription login, sanitized auth reports
 `loggedIn: true`, `authMethod: claude.ai`, `apiProvider: firstParty`,
@@ -940,3 +953,50 @@ automatically. Private receipts remain owner-only outside Git; the five
 historical raw receipts remain unavailable. The next gate is focused review
 of the versioned no-tools reader policy, diagnostics and this precise failure,
 followed by a separate Product Owner decision about any further real proof.
+
+## Offline F-1–F-5 remediation — 2026-09-30
+
+Baseline `128ff55c098849a149d01506c6f8f6b85bfbd18b`; code/test checkpoint
+`0fd4fba8e4b0f595c3abfadbb9743aeb7e2de13e`. This is a bounded correction of the
+existing no-tools transport and historical experiment control, not a change to
+Application, Project IR, History, projection, product schemas or provider choice.
+Independent micro-review of this delta is **PENDING**.
+
+| Finding | Correction | Deterministic evidence |
+|---|---|---|
+| F-5 | The old ID is terminal in code. `recoverExperiment`, `reserveAttempt` and former write/setup helpers always fail `EXPERIMENT_CLOSED` before I/O. Harness has only read-only status; all operational modes fail before binary verification, auth or spawn. Inspection separates closed policy (8/8, zero) from the count/availability of historical records. Orphan receipts, number/attemptId/purpose mismatches and gaps are inconsistencies; an unresolved reservation is never refunded. | Synthetic present/absent/checkpoint-less/corrupt directories, deleted reservation with surviving receipt and later reservation, missing receipt, mismatches/symlink, repeated closure and operational entry-point tests; no operator evidence touched. |
+| F-1 | Successful final `result.stop_reason` is exactly `end_turn`, `stop_sequence` or null. Arrays/coercion, absent/unknown values, `max_tokens`, `refusal`, `pause_turn` fail; `tool_use` remains containment. Assistant block null is still intermediate. | Full init→assistant→result→close success/failure sequences. |
+| F-2 | Result provider error becomes primary immediately and stops/reaps the owned process. The reader preserves it against subsequent lines (including the same stdout chunk), timeout or cancellation; bounded TERM/KILL cleanup is retained. | Fake late event, TERM-ignoring timeout/cancellation and same-chunk sequence; all retain `PROVIDER_RATE_LIMIT`, child closed. |
+| F-3 | Normal init requires plugins to be present, array, empty. Skills remain optional and shape/emptiness checked when supplied. Diagnostic capture never grants semantic success or a way to reopen the closed harness. | Missing/wrong-type/nonempty plugins rejected; empty accepted; existing skills/diagnostic/containment regressions retained. |
+| F-4 | `system/informational` and `notification` explicitly fail unsupported protocol, not automatic activity attribution. Model refusal notices are system subtypes and terminate as `PROVIDER_MODEL_REFUSAL`, with no fallback. `system/elicitation_complete` is forbidden MCP activity. | Full fake sequences assert exact policy codes/reasons; two distinct Opus keys in modelUsage still reject as drift. |
+
+The exact official `@anthropic-ai/claude-agent-sdk@0.3.280` tarball was read
+again without installing/executing it; SHA-512 matched the reference recorded
+above. Its declarations place informational/notification/refusal/elicitation
+messages under `system`. Informational text may include hook feedback; being
+an official type does not authorize it. The adapter still declines that family
+as unsupported and never executes text. No CLI/SDK/dependency/pin update occurred.
+
+Local validation on the code/test checkpoint:
+
+- `npm run test:claude-poc`: **115/115 PASS**, controlled fake processes only;
+- semantic Application suite: **26/26 PASS**, scripted analyzers only;
+- full Application suite: **210/210 PASS**;
+- `npm run build`: **PASS** across existing Node/TypeScript workspaces and frontend;
+- `git diff --check`: **PASS**.
+
+The local toolchain was the bundled Node **24.19.0** and existing npm **10.9.4**;
+a task-local npm launcher only resolved the missing shell PATH, without global
+installation/configuration or repository dependencies. No real harness, auth
+status, CLI, login, inference, API/extra usage, Media/ML native suite or manual
+Exact Runtime run was performed. New CI must be associated with its new SHA;
+old CI is historical evidence only. The private ledger/checkpoint/receipts were
+neither read for these tests nor changed. Tests construct synthetic records only.
+
+Residual risk is version-specific runtime compatibility and unproved semantic
+quality; offline transport tests cannot demonstrate those. Local evidence loss
+still limits reverification of the five original attempts. The terminal code
+policy prevents accidental reopening, not deliberate modification by the machine
+owner. Director I1/I3/I5 impact remains a **compatible bounded correction** with
+no added coordination, tool or mutation authority. Slice A stays CLOSED, ADR
+0030 stays IN DEVELOPMENT, full analysis remains NOT DELIVERED; progress **55%**.

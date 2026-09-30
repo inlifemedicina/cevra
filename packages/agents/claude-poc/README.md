@@ -2,34 +2,48 @@
 
 This is a developer-only infrastructure adapter, not a Desktop provider or a
 commercial integration. Application/projection/ProjectHistory remain unchanged.
-The only current callers are deterministic tests and the synthetic harness.
+The only executable analyzer callers are deterministic tests with controlled
+processes. The historical harness now supports inspection only.
 The executable is installed separately; no Claude binary or SDK is distributed.
 
-## Gates and reproduction
+## Experiment closed — offline reproduction only
 
-Before inference, verify the pinned binary, official subscription authentication,
-and effective containment as recorded in the canonical
+The `semantic-claude-roundtrip-poc-v1` experiment is terminal: **8/8 consumed,
+zero authorized balance**. Recovery and reservation always return
+`EXPERIMENT_CLOSED`, including when the local directory/checkpoint is absent.
+Every operational harness mode is rejected before binary verification, auth
+status or spawn. There is no override, environment variable or recovery mode
+that reopens this ID. The five original private receipts remain unavailable;
+historical records are retained without reconstruction. No semantic round-trip
+was accepted. Attempt #8 stopped at `system/thinking_tokens`; subsequent reader
+corrections, including F-1–F-5, have **offline validation only** and await
+independent micro-review. A new real proof requires explicit authorization of
+a new experiment ID, budget and scope; none is implemented here.
+
+Historical binary/auth/containment requirements are recorded in the canonical
 [evidence](../../../docs/CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md).
 `auth status` alone is not a containment or billing attestation. Do not enable
 extra usage or substitute API credentials. The adapter uses the original HOME
-for official authentication, but ignores user/project settings, disables custom
-instructions/plugins/skills/memory and tools using the documented CLI controls.
+for official authentication and requests exclusion of user/project settings,
+custom instructions/plugins/skills/memory and tools through the recorded CLI
+controls; effective containment still requires the stream gates.
 Managed policy still takes precedence: an incompatible policy is a blocker.
 
 Build the existing TS workspaces, then run `npm run test:claude-poc`.
 Tests spawn a **fake CLI**, not Claude, and require no login or network.
-The real harness is deliberately not part of CI:
+Historical inspection is read-only (and is not needed to run the tests):
 
 ```sh
-node packages/agents/claude-poc/harness.mjs canary /absolute/private/evidence-directory
+node packages/agents/claude-poc/harness.mjs status
 ```
 
-The directory must be created privately by the operator. The harness locks it,
-records each attempted real spawn *before* execution, and refuses a ninth call.
-Do not reset/replace the ledger to evade the eight-call task budget. Run cases
-individually, inspect each result, and stop at a material gate failure.
-Calls after the canary require its validated result. No automatic retry/fallback.
-Every process has a fresh session/cwd and receives only the cumulative envelope
+Inspection distinguishes the terminal policy from available-record integrity.
+An orphan receipt or mismatched number/attempt ID is an inconsistency; missing
+receipt data never refunds a reservation. File loss cannot change the closed
+policy. Do not edit or reconstruct the private records to manufacture integrity.
+
+The adapter's controlled-process tests preserve fresh session/cwd and only the
+cumulative envelope
 provided by Application, plus the versioned playbook. No programmer conversation
 is reused. Payload goes over stdin; no payload, credentials or grading key is in
 argv. No stderr/thinking/raw event dump is retained.
@@ -54,7 +68,7 @@ NOT RUN is not PASS. This rubric is **not sent to the analyzer**.
 10. Structural validation is separate from preliminary editorial judgment;
     human editorial acceptance remains pending even if these probes pass.
 
-## Planned real matrix (maximum eight processes)
+## Historical planned matrix — not authorization to execute
 
 1. `canary`: one harmless sentence, minimal contract and no-tool event controls.
 2. `pt`: two-source PT-BR fixture with conditions, reformulation and complement.
@@ -64,8 +78,12 @@ NOT RUN is not PASS. This rubric is **not sent to the analyzer**.
 6. `hostile`: instruction-like synthetic transcript and unsupported visual need.
 7. `cancel`: local cancellation of a live owned CLI process; remote consumption
    may already have started. Completion before cancellation is not a cancellation PASS.
-8. Reserve only for an explicitly diagnosed, authorized remaining case; never
-   a best-of retry. Failures and cancellation consume the same quota.
+8. Historical reserve only for an explicitly diagnosed, authorized remaining case; never
+   a best-of retry. Failures and cancellation consumed the same quota.
+
+The eight attempts ended without an accepted semantic result. EN-US,
+continuation and real cancellation remain NOT RUN. The list above preserves
+the original evaluation plan, not runnable harness modes.
 
 ## Limits
 
@@ -80,3 +98,11 @@ Provider-reported USD estimates are not proof of actual subscription billing.
 Requested Opus/Medium is recorded separately from fields actually observable in
 the stream. Any non-Opus/model drift, tools, unexpected control event or malformed
 completion is rejected. No JSON repair or forced semantic PASS.
+
+Final `result.stop_reason` must be exactly `end_turn`, `stop_sequence` or null;
+an intermediate assistant block's null stop reason does not prove completion.
+The first provider error remains primary through later events, cancellation
+and bounded process reaping. Normal init requires a present empty plugins
+array; optional skills are validated when supplied. Known informational and
+notification events remain unsupported protocol; refusal notices terminate
+without fallback and MCP elicitation remains a containment failure.
