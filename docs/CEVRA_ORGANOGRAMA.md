@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE POST-INIT SYSTEM EVENT, 7/8 USED]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE DOCUMENTED PROGRESS EVENT, 8/8 USED]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -192,6 +192,17 @@ ProjectHistory/redo were unchanged. **7/8** attempts are used, with one slot
 unspent. EN-US, continuation and cancellation remain NOT RUN. The next focused
 decision is the exact post-init event contract, not automatic use of #8.
 Effective end-to-end Opus/Medium, real transport success and editorial matrix remain unproven.
+The version-matched official TypeScript SDK `v0.3.280` identifies
+`system/thinking_tokens` as approximate progress. A closed no-tools transport
+policy and bounded private event trace were added; real PT-BR attempt #8 ran
+from pre-correction code `793d634` and passed init, then stopped on that
+documented event under the earlier `CONTAINMENT` rule, before assistant/result.
+This is a CEVRA transport-policy mismatch, not observed tool use or escape.
+The subsequent shape-validated correction has offline tests only. History/redo
+remain unchanged; **8/8** attempts are consumed, with no accepted semantic
+round-trip and no automatic ninth execution. Focused review and a separate
+decision on any further real proof are required. EN-US, continuation and real
+cancellation remain NOT RUN.
 Claude remains the next private proof candidate, not a replacement of the
 provider-neutral core or an approved commercial integration. Complete Semantic
 Editorial Analysis V1, strategy, take selection and cut planning remain not

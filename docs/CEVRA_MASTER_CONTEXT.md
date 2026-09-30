@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-30, Slice A is closed; authorized recovery preserves five unavailable historical receipts as debited, diagnostic #6 recaptured current private built-in IDs, and PT-BR attempt #7 passed init but stopped at an unclassified post-init `system` event (7/8 used; no accepted semantic response); Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-30, Slice A is closed; Claude attempt #8 identified a documented `system/thinking_tokens` progress event rejected by the pre-correction CEVRA reader after clean init (8/8 used; no accepted semantic response); Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — POST-INIT SYSTEM EVENT AFTER EVIDENCE RECOVERY]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — DOCUMENTED PROGRESS EVENT, EXPERIMENT 8/8]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1786,6 +1786,25 @@ The Claude choice is only the next private proof candidate; it neither replaces
 the historical Codex preference nor approves commercial integration. Complete
 Semantic Editorial Analysis remains not delivered and global progress remains
 **55%**.
+
+**2026-09-30 transport-contract follow-up:** official TypeScript Agent SDK
+`v0.3.280` (tag `58d2e4b81bdca2c6ce10e6e5db22ad7acdc1d58c`) declares parity with
+Claude Code 2.1.280 and distinguishes block-wise assistant output, final result,
+`api_retry`, bounded status and `thinking_tokens` progress. The no-tools reader
+now has a closed event policy and bounded private exact-subtype trace; it stops
+on retry, rejects tools/hooks/context-changing events and does not promote
+operational metadata to analysis. Attempt #8 ran from pre-correction code
+`793d634` with the same isolated CLI and synthetic PT-BR Application path:
+init passed, but `system/thinking_tokens` was rejected as
+`CONTAINMENT / FORBIDDEN_SYSTEM_EVENT` before any assistant/result. The process
+closed, history/redo were unchanged, and no semantic output was accepted.
+The versioned contract classifies this as approximate progress, so the later
+bounded parser correction is offline-tested only; it is **not** a demonstrated
+real round-trip. The durable ledger is **8/8 consumed, zero remaining**; #7's
+actual subtype remains unknown and five older raw receipts remain unavailable.
+Further real execution requires a separate decision, not an automatic ninth
+attempt. Slice A remains CLOSED, ADR 0030 remains IN DEVELOPMENT, complete
+Semantic Editorial Analysis is NOT DELIVERED and progress remains **55%**.
 
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
@@ -2211,7 +2230,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Resolve the **NEXT REQUIRED GATE** by reviewing the exact post-init `system` event contract behind Claude attempt #7. Authorized recovery now supplies durable control and current private override metadata, but it does not restore the five historical raw receipts. The #7 init passed and the next unknown `system` event failed closed before any Opus answer; no semantic result has been accepted. **7/8 historical slots are used; #8 is not automatically authorized as a retry.** Do not loosen no-tools/no-MCP/no-unmanaged-context or model controls, silently substitute model/billing, or proceed to the editorial matrix before a complete validated real result. No strategy, take selection or cut planning is authorized implicitly.
+1. Review the closed Claude Code 2.1.280 no-tools transport correction and attempt #8 evidence. The version-matched SDK identifies `system/thinking_tokens` as operational progress; #8 was stopped by CEVRA's earlier policy after a clean init and before any assistant/result. The corrected reader has offline tests but no remaining authorized real slot. **8/8 attempts are consumed; no semantic round-trip is demonstrated.** Any additional real process requires a separate Product Owner budget/risk decision. Do not loosen capability/model controls, substitute billing/provider, or advance the editorial matrix without a validated real result. No strategy, take selection or cut planning is authorized implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

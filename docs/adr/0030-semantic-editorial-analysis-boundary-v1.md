@@ -258,8 +258,22 @@ Exact post-init event semantics require a focused decision before any further
 real process. This changes neither the accepted Slice A boundary nor the ADR's
 IN DEVELOPMENT status; the real-agent gate remains unproved.
 
-The private adapter is deterministically tested; the five bounded real processes
-have not yielded an accepted transport/Application round-trip. Synthetic canary envelopes were written to the CLI; remote inference
+Subsequent version-matched review used official TypeScript Agent SDK
+`v0.3.280` (declared Claude Code 2.1.280 parity) and a closed no-tools event
+policy. Real attempt #8 used pre-correction code `793d634`: the original init
+gate passed, then a documented `system/thinking_tokens` progress event was
+rejected as `CONTAINMENT / FORBIDDEN_SYSTEM_EVENT`, before any assistant/result.
+The SDK defines this event as approximate progress during redacted thinking,
+not a tool, hook or semantic answer. The later reader correction validates
+its bounded numeric shape and grants no result authority; it is tested offline
+but has **not** had a subsequent real run. The durable ledger is **8/8 used**,
+zero slots remain; #7's subtype is still unknown. This PoC therefore still
+has no accepted Application round-trip. Any additional inference requires a
+separate Product Owner decision, not an automatic retry. Slice A remains
+CLOSED and this ADR remains ACCEPTED DIRECTION / IN DEVELOPMENT.
+
+The private adapter is deterministically tested; the eight historically debited
+processes have not yielded an accepted transport/Application round-trip. Synthetic canary envelopes were written to the CLI; remote inference
 or consumption before termination is unknown. No API key, extra usage, retry/
 fallback, Project IR/History mutation or product integration was introduced.
 Effective model/effort and editorial quality remain unproven.

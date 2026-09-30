@@ -886,6 +886,7 @@ they do not establish the exact event that occurred in attempt #7.
 | `system/init` | One matching session; before turn events; closed empty tools/MCP/plugins/skills, no bypass, allowed Opus | Establish session only | Existing containment/model/correlation error |
 | `system/status` | Matching session after init; `status=requesting` or `null`; no compact result/error or permission-mode drift | Operational observation; no result authority | Protocol error; `compacting` is rejected context change |
 | `system/session_state_changed` | Matching session after init; `state=running` or `idle` | Operational observation only | `requires_action` is forbidden; malformed is protocol error |
+| `system/thinking_tokens` | Matching session after init; bounded nonnegative `estimated_tokens` and `estimated_tokens_delta` | Approximate progress only; no reasoning content retained or result authority | Malformed protocol error |
 | `system/api_retry` | Matching session after init; bounded integer `attempt`, `max_retries`, `retry_delay_ms`, integer-or-null `error_status`, closed error category, optional bounded `no_response` integers | Classify cause, stop own process; no CEVRA retry | Malformed protocol error; observed retry is terminal to this experiment |
 | `rate_limit_event` | Matching session after init; closed status and booleans, no overage | Advisory, or terminal quota/overage refusal | Invalid protocol or extra-usage rejection |
 | `auth_status` | Matching session after init; boolean authentication state and string-list output (not retained) | Terminal authentication condition in this headless proof | Malformed protocol error; never treated as generated content |
@@ -900,3 +901,42 @@ This is deliberately smaller than the SDK union. It does not convert post-init
 `api_retry` as a runtime retry notice, not evidence that #7 was a retry or that
 the first HTTP attempt was billed. Assistant block messages may legitimately
 carry `stop_reason=null`; the result remains authoritative.
+
+### Attempt #8 and final-slot result
+
+The policy table above was first committed as `793d634` with
+`system/thinking_tokens` incorrectly in the prohibited group. After official
+SDK type review and 91/91 offline PoC tests plus 210/210 Application tests,
+the sole authorized #8 process ran from that exact code SHA. It used a small
+synthetic PT-BR two-source fixture through real ProjectHistory, the closed
+projection, Application and the Claude adapter. The pinned Claude Code 2.1.280
+binary hash was unchanged before/after; official subscription status and the
+private plugin override passed preflight. Its first `system/init` passed the
+unchanged no-tools/no-MCP/no-plugin/no-bypass/Opus-class gate. Its second event
+was **`system/thinking_tokens`**, classified by the pre-correction reader as
+`CONTAINMENT / FORBIDDEN_SYSTEM_EVENT`. The CLI was terminated and reaped;
+there was no assistant/result event and no accepted semantic response. The
+durable private receipt records only bounded event metadata and the ordered
+trace; the original #7 subtype remains unknown and is not backfilled.
+
+The version-matched SDK declaration defines `thinking_tokens` as an approximate
+progress estimate from a redacted-thinking phase, not reasoning text, tool
+use, context mutation or proof of billed output tokens. Thus #8 exposed a
+CEVRA protocol-policy mismatch, **not observed tool execution or an escape**.
+The integrated correction at code/test head
+`8b3aaa6` now validates its numeric shape as non-authoritative operational
+metadata; this *post-#8 code is offline-tested only*, not validated
+against a second real execution. It does not loosen init capability checks,
+permit hooks/tools or accept analysis without authorized assistant generation,
+successful result, close and Application validation.
+
+Attempt #8: 2 events, 951 stdout bytes, 0 stderr bytes, 2,459 CEVRA envelope
+bytes, approximately 3,548 ms transport latency; child closed; ProjectHistory
+and redo unchanged. Generation model/effort, provider usage, actual charge,
+semantic quality and full round-trip remain unknown. The immutable ledger now
+shows **8/8 consumed, zero remaining**. EN-US, continuation and real
+cancellation are NOT RUN. No ninth process is authorized or proposed
+automatically. Private receipts remain owner-only outside Git; the five
+historical raw receipts remain unavailable. The next gate is focused review
+of the versioned no-tools reader policy, diagnostics and this precise failure,
+followed by a separate Product Owner decision about any further real proof.
