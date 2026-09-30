@@ -27,12 +27,13 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT STARTED]
+│   │   ├─ bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
+│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT DEMONSTRATED]
 │   │       ├─ INT-CLOUD-01 official ChatGPT eligibility/capability review [RESEARCH / SCHEDULED]
-│   │       └─ INT-CLOUD-02 authorized transport PoC [CONDITIONAL / NOT IMPLEMENTED]
-│   ├─ strategy
-│   ├─ take selection
-│   └─ cut planning
+│   │       └─ INT-CLOUD-02 authorized official transport PoC [CONDITIONAL / NOT IMPLEMENTED]
+│   ├─ strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
+│   ├─ take selection [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
+│   └─ cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │
 ├─ 4. DETERMINISTIC EDIT EXECUTION
 │   ├─ missing typed Project IR edit commands
@@ -147,10 +148,95 @@ provider-neutral Application port, validates untrusted structured responses
 and returns no project mutation. PR CI `36575808711` and Exact Runtime
 `36575808713` passed; post-merge CI `36576763557` and Exact Runtime
 `36576763666` passed. Its scripted test analyzers are not a production AI
-capability. A real-agent round-trip is the next required gate and is not
-started;
-complete Semantic Editorial Analysis V1, strategy, take selection and cut
-planning remain not delivered.
+capability. A real-agent round-trip remains the next required gate and is not
+delivered by these scripted fixtures. The preserved Codex App Server attempt is
+blocked on containment with zero turns; the bounded Claude CLI attempt
+now has official macOS arm64 Claude Code 2.1.280 installed and verified in a
+versioned CEVRA-owned developer-tools directory outside the repo. The earlier
+executable blocker is resolved and official subscription authentication now
+passes (Claude.ai / first-party / Pro). The isolated adapter passed deterministic
+fake-process tests. The first real canary failed an initialization containment
+assertion without a retained field; the sole diagnostic follow-up identified
+`INIT_PLUGINS_NONEMPTY`: two plugins reported, no tools/MCP/skills and no
+bypass. Read-only CLI inventory under the same environment reports zero
+installed plugins. A separately authorized diagnostic process #3 stopped at
+its first init and identified two virtual built-in source labels, not local
+plugin paths. Components and execution remain unproven; at that point no
+documented session-only disablement had been established (ledger 3/8). An
+explicitly authorized empirical attempt then applied a private, restrictive
+`--settings` override with both exact built-in source IDs set to `false` only
+for the child. Corrective canary #4 passed the original `system/init` gate but
+failed `MODEL_UNAVAILABLE` at the following assistant event; the child closed,
+no answer was accepted and history/redo were intact. Ledger was **4/8** at
+that checkpoint. The
+validator still fails closed on any nonempty plugin list. PT-BR, EN-US and
+real cancellation are **NOT RUN**. The next focused decision concerns the
+assistant-event model contract, not a containment exception.
+Directed official-contract review then separated `assistant.error` from
+generated-model evidence without weakening the init or Opus requirements.
+Canary #5 passed the same init gate but declared `authentication_failed` with
+synthetic message model; its final result had `is_error=true` and
+`terminal_reason=api_error`. The child closed, no semantic result was accepted,
+and ProjectHistory/redo were unchanged. Ledger **5/8**. The cause of #4 remains
+unproven; #5 establishes a current explicit authentication failure. PT-BR,
+EN-US and cancellation remain **NOT RUN**. The separately authorized
+official-client authentication investigation did not retry or change provider,
+model, billing or containment. It found
+the former child environment lacking `USER`/`LOGNAME`: official read-only
+status was logged out there, but logged in as Claude.ai/Pro both in the
+login-equivalent profile and after adding only the OS-derived user identity.
+This is not proof that inference now works. Canary #6 remains **NOT RUN**
+because the original private five-attempt ledger and plugin override receipt
+are absent from their recorded temporary location; they were not recreated.
+That was the historical 5/8 checkpoint. The Product Owner subsequently
+authorized recovery without fabricating the lost originals: five remain
+debited in a persistent private checkpoint. Diagnostic #6 recaptured current
+builtin IDs at init and stopped. PT-BR #7 used the restrictive session override;
+its init passed, but a subsequent `system` event of unknown subtype failed the
+unchanged containment gate. No final Opus or semantic result was accepted;
+ProjectHistory/redo were unchanged. **7/8** attempts are used, with one slot
+unspent. EN-US, continuation and cancellation remain NOT RUN. The next focused
+decision is the exact post-init event contract, not automatic use of #8.
+Effective end-to-end Opus/Medium, real transport success and editorial matrix remain unproven.
+The version-matched official TypeScript SDK `v0.3.280` identifies
+`system/thinking_tokens` as approximate progress. A closed no-tools transport
+policy and bounded private event trace were added; real PT-BR attempt #8 ran
+from pre-correction code `793d634` and passed init, then stopped on that
+documented event under the earlier `CONTAINMENT` rule, before assistant/result.
+This is a CEVRA transport-policy mismatch, not observed tool use or escape.
+The subsequent shape-validated correction has offline tests only. History/redo
+remain unchanged; **8/8** attempts are consumed, with no accepted semantic
+round-trip and no automatic ninth execution. Focused review and a separate
+decision on any further real proof are required. EN-US, continuation and real
+cancellation remain NOT RUN.
+Claude remains the next private proof candidate, not a replacement of the
+provider-neutral core or an approved commercial integration. Complete Semantic
+Editorial Analysis V1, strategy, take selection and cut planning remain not
+delivered. Progress remains 55%.
+Offline F-1–F-5 remediation at `0fd4fba8e4b0f595c3abfadbb9743aeb7e2de13e`
+closes this experiment ID in code independently of ledger availability and
+corrects result completion/error precedence, required empty plugins and system
+event classifications. PoC 115/115, semantic Application 26/26, full Application
+210/210 and Node/TS build passed with controlled fixtures only. No real Claude
+or private-ledger change occurred. Independent review approved `de0aee7` with
+non-blocking notes; the minimal N-1 oversized-tail correction at `1aa4324`
+passed four directed regressions, PoC 119/119, semantic Application 26/26 and
+Node/TS build. Final independent verification at `ea72f83` found N-1
+VERIFIED / FIXED and approved the bounded offline remediation. PR #57 subsequently
+merged frozen head `79327e8d951e31962af2c5d7915a38abcb0c8a4c` as
+`862e33f9e687579059d51269abdb4195b86bbd79`. Post-merge CI
+`36774947802` passed 5/5 and Exact Runtime `36774947781` passed on that SHA.
+**Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED only for its
+bounded offline transport, containment, validation and evidence scope.**
+Deferred N-2–N-4 and separate CI/review evidence remain in the existing record.
+A new real proof
+requires explicit authorization of a new ID, budget and scope. Slice A stays
+CLOSED; full semantic analysis is NOT DELIVERED; progress remains 55%.
+ADR 0030 remains ACCEPTED DIRECTION / IN DEVELOPMENT. The real semantic
+round-trip remains NOT DEMONSTRATED and required before strategy; no new
+Director authority or implicit strategy/take-selection/cut-planning
+authorization follows. The old experiment stays CLOSED at 8/8, zero balance,
+and five original receipts remain unavailable.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.
 
@@ -158,12 +244,20 @@ descriptor/source repetition and decide deduplication only if evidence warrants.
 
 Research and dependency scheduling were requested by the Product Owner. Detailed dated findings, official sources, unresolved questions and proposed experiment checks are tracked in [issue #55](https://github.com/inlifemedicina/cevra/issues/55). These planning IDs are not a second behavioral acceptance catalog; implementation must reuse or extend the canonical Product Owner acceptance catalog explicitly.
 
-- **INT-CLOUD-01 — now:** verify official commercial eligibility, authentication, capabilities, privacy/retention, quotas and allowed deployment. Research is not commercial approval; no external enrollment is authorized by this entry.
-- **INT-CLOUD-02 — next existing real-agent gate:** evaluate the official App Server/direct Responses options only where authorized. Preserve ADR 0030's read-only bounded textual evidence, validation, deadlines, invocation budget and no-mutation boundary. Transport must bound response receipt before materialization. An unavailable new route must not block a different officially authorized route or justify billing/access circumvention.
+- **INT-CLOUD-01 — planning within the next real-agent gate:** verify official commercial eligibility, authentication, capabilities, privacy/retention, quotas and allowed deployment. Issue #55 records dated research, not commercial approval; revalidate its findings when the experiment and release are authorized. No external enrollment is authorized by this entry.
+- **INT-CLOUD-02 — conditional transport evaluation within that next gate:** evaluate the official App Server/direct Responses options only where authorized. Preserve ADR 0030's read-only bounded textual evidence, validation, deadlines, invocation budget and no-mutation boundary. Transport must bound response receipt before materialization. An unavailable new route must not block a different officially authorized route or justify billing/access circumvention.
 - **INT-CLOUD-03 — isolated parallel feasibility:** after defining environment, test media and budget, assess cloud-hosted skills using a short synthetic/licensed fixture. Verify dependencies, CPU/RAM/disk, media transfer, transcription, render, mobile preview/download, quota and recovery. No core dependency installation or desktop delay is implied.
 - **INT-CLOUD-04 — after a usable editing vertical:** preserve I15's paired Desktop companion path for media/preset/request, progress/cancellation, review and result delivery. Being away from the computer is different from the computer being unavailable.
 - **INT-CLOUD-05 — later conditional decision:** evaluate a cloud/BYOC runner for computer-off use only after real technical, commercial, privacy and cost evidence. Any new execution/storage architecture requires its own approval/ADR. No mandatory cloud runtime, storage service or V1 mobile deadline is approved here.
 
 Identity sign-in, permission to consume a subscriber's AI allowance, an agent execution environment and audiovisual rendering are distinct capabilities. New provider features do not authorize widening end-user shell/MCP access, sending complete media by default, replacing Project IR/History or silently falling back to paid API billing. Preserve provider independence, original-source quality, the existing desktop release targets and the current **55%** progress value.
+
+Reconciled over canonical main `be1e0e99fd189a1c976b44ec3a72e66d5fa5608c`
+after PRs #57/#58: Slice A and the bounded offline Claude PoC stay CLOSED.
+The historical experiment stays CLOSED at 8/8 with zero balance; the accepted
+real semantic round-trip remains NOT DEMONSTRATED. INT-CLOUD-01/02 support,
+not replace, that next required gate. It requires separately authorized new
+experiment scope, ID and budget. None of INT-CLOUD-01–05 is implemented or
+authorizes inference, spending, commercial upload or deployment.
 
 **Director impact:** compatible provider/transport investigation only. The current typed boundaries and canonical project authority are unchanged. A commercial cloud runner remains a separate future decision.

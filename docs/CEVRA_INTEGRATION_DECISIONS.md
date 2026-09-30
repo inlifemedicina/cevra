@@ -124,6 +124,16 @@ Para cada provider/dependência, revalidar na data de implementação e release:
 
 A pesquisa datada e as questões abertas estão na [issue #55](https://github.com/inlifemedicina/cevra/issues/55). O sequenciamento INT-CLOUD-01–05 está em [CEVRA_ORGANOGRAMA.md](CEVRA_ORGANOGRAMA.md). Fontes e capabilities de provider devem ser verificadas novamente no experimento e no release; a aprovação do planejamento não certifica a elegibilidade comercial do CEVRA nem resultados ainda não testados.
 
+**Reconciliação após PRs #57/#58:** o bounded offline Claude CLI transport/evidence
+PoC é **IMPLEMENTED / CLOSED**, somente no escopo offline revisado. O experimento
+histórico está CLOSED, 8/8 consumidas e saldo zero; o real-agent semantic
+round-trip aceito continua **NOT DEMONSTRATED / NEXT REQUIRED GATE**. INT-CLOUD-01/02
+podem integrar esse NOVO gate se houver elegibilidade oficial e autorização
+explícita de escopo, ID e orçamento. Este adendo não reabre a cota antiga nem
+autoriza experimento, inferência ou gasto. Nenhuma rota Claude/ChatGPT/Codex está
+aprovada para integração comercial. ADR 0030 permanece **ACCEPTED DIRECTION /
+IN DEVELOPMENT**; a análise semântica completa continua **NOT DELIVERED**.
+
 Direção aprovada:
 
 - Priorizar a avaliação de identidade, autenticação, entitlement, transporte e uso autorizado da assinatura junto do próximo gate já previsto de **real-agent semantic round-trip**. Comparar mecanismos oficiais conforme elegibilidade e necessidade, sem escolher uma infraestrutura por pressuposto.
@@ -138,6 +148,6 @@ A hipótese de diferenciação é reduzir preparação e intervenção do usuár
 
 Antes da implementação, vincular os critérios ao catálogo único `CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md`; não criar uma segunda fonte de aceite. Se a nova modalidade não estiver disponível, avaliar outro mecanismo oficialmente autorizado ou registrar o bloqueio, sem contornar acesso, termos ou cobrança. Nenhum gasto, cadastro comercial, upload de mídia ou implantação é autorizado implicitamente pelo registro de planejamento.
 
-**Continuidade documental:** consolidar esta decisão e a referência à issue #55 no `CEVRA_MASTER_CONTEXT.md` antes do merge do PR #56, mantendo o organograma como referência de sequência e este documento como registro de direção. O PR documental segue revisão/merge normais; aprovação de produto não equivale a revisão independente já concluída.
+**Continuidade documental:** esta direção e a referência à issue #55 estão reconciliadas no `CEVRA_MASTER_CONTEXT.md` sobre o main pós-PR #58, mantendo o organograma como referência de sequência e este documento como registro de direção. O PR #56 permanece Draft, sujeito a revisão documental independente e merge normais; aprovação de produto não equivale a revisão independente já concluída.
 
 **Impacto no Director:** extensão compatível de planejamento de provider/transporte. O Director continua coordenando evidências, permissões e candidatos; operações tipadas e ProjectHistory mantêm execução e autoridade. Um executor remoto comercial permanece decisão separada.

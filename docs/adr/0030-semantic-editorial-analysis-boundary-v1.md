@@ -180,6 +180,153 @@ The real-agent round-trip described above is the **NEXT REQUIRED GATE / NOT
 STARTED**, and complete Semantic Editorial Analysis V1 remains **NOT
 DELIVERED**.
 
+## Real-agent gate attempts — 2026-09-29
+
+The first official-provider attempts do not alter the accepted boundary:
+
+- the preserved Codex App Server diagnostic at
+  `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1` remains **BLOCKED —
+  CONTAINMENT**, with zero threads and zero turns. It is not a demonstrated
+  escape or a universal rejection of Codex;
+- Claude Code CLI is the next bounded private proof candidate; its initial
+  preflight was **BLOCKED — VERSION** before authentication or inference. Claude
+  Desktop exposed only an internal Linux/aarch64 payload labelled 2.1.270 on
+  this macOS host; no host-executable `claude` command existed to verify help,
+  auth, model/effort, containment or stream transport;
+- the explicitly authorized continuation installed official **2.1.280 /
+  darwin-arm64** outside the repo. Signed manifest, exact SHA-256, native
+  publisher signature/notarization and version/help passed, without global
+  configuration changes. The executable prerequisite is resolved;
+- the historical AUTH blocker was resolved by official human subscription login;
+  sanitized status reports Claude.ai / first-party / Pro. Documentation/configuration
+  preflight and absent local managed policy permitted the bounded adapter and
+  deterministic tests, then one minimal real canary;
+- the first canary failed the `system/init` containment gate without a retained
+  failing field. A focused closed diagnostic, tested before the one authorized
+  follow-up canary, identified `INIT_PLUGINS_NONEMPTY`: the second init reports
+  two plugins, zero tools/MCP/skills and no permission bypass. Both owned children
+  closed; 2/8 attempts used, no final response accepted. This is a reported
+  capability that keeps containment blocked; neither actual tool execution nor
+  an escape is proven. Determine the 2.1.280 init-field semantics before another
+  run. No flag, prompt, model, effort or acceptance rule was relaxed.
+- later, operator-only diagnostic attempt #3 identified two distinct virtual
+  `@builtin` source labels, with no evidence of plugin execution. A specifically
+  authorized restrictive session override set those two exact private IDs to
+  `false` in a temporary `--settings` file for corrective canary #4. The
+  original gate accepted that `system/init`, but the following assistant event
+  failed `MODEL_UNAVAILABLE`; no final semantic response was accepted. The
+  precise assistant model-field value was not retained. Ledger was 4/8 at that checkpoint; no
+  PT-BR, EN-US or real cancellation matrix was run. This is an observed
+  version-specific init result, not universal isolation or real-agent success.
+- official Agent SDK contracts and the pinned public Python parser distinguish
+  an `assistant.error` from `assistant.message.model`; final `result` subtype
+  `success` is not acceptance when `is_error=true`. The focused reader now
+  preserves this distinction while requiring actual allowed-Opus generation,
+  unchanged capability checks and Application validation. Canary #5 passed the
+  same init gate, then explicitly declared `authentication_failed` with a
+  synthetic message model; its final result reported `is_error=true` and
+  `terminal_reason=api_error`. The transport returned `PROVIDER_AUTH_ERROR`,
+  and Application accepted no analysis. #4's provider cause remains unproven.
+  Ledger is 5/8; the editorial/cancellation matrix remains NOT RUN. An
+  official-client authentication investigation/decision is the next bounded
+  gate, not a retry, billing change or parser exception.
+- official read-only `auth status` subsequently identified a local environment
+  mismatch: the former child omitted `USER`/`LOGNAME` and appeared logged out,
+  while the login-equivalent environment and the child with only the effective
+  OS username restored both report Claude.ai/Pro under the same config
+  directory. That correction is not proof of model-call acceptance. Closed
+  error-explanation categories were added without raw-text retention or a
+  containment change. Canary #6 was NOT RUN because the original private
+  five-attempt ledger and diagnostic #3 override receipt had disappeared from
+  the recorded temporary location; they were not reconstructed. Historical
+  count remains 5/8. Recovery of those exact receipts or a separate explicit
+  evidence-control decision is required before any further real attempt.
+
+The 2026-09-30 Product Owner authorization supplied that evidence-control
+decision: a persistent, private experiment checkpoint counts the five original
+attempts as debited and their receipts as unavailable, without reconstructing
+them. New attempts reserve and sync a unique slot before spawning the client;
+an incomplete reservation is not refunded. Diagnostic #6 stopped at the first
+init after recapturing the two current virtual builtin identifiers, outside
+Git. Small synthetic PT-BR attempt #7 applied the session-only restrictive
+override and passed the unchanged init gate, but the next `system` event had a
+subtype not retained by the closed public summary and failed `CONTAINMENT`.
+There was no accepted model answer or Application result, and history/redo
+remained unchanged. The ledger is **7/8 used**; the final slot and EN-US,
+continuation and cancellation were not run after this material failure.
+Exact post-init event semantics require a focused decision before any further
+real process. This changes neither the accepted Slice A boundary nor the ADR's
+IN DEVELOPMENT status; the real-agent gate remains unproved.
+
+Subsequent version-matched review used official TypeScript Agent SDK
+`v0.3.280` (declared Claude Code 2.1.280 parity) and a closed no-tools event
+policy. Real attempt #8 used pre-correction code `793d634`: the original init
+gate passed, then a documented `system/thinking_tokens` progress event was
+rejected as `CONTAINMENT / FORBIDDEN_SYSTEM_EVENT`, before any assistant/result.
+The SDK defines this event as approximate progress during redacted thinking,
+not a tool, hook or semantic answer. The later reader correction validates
+its bounded numeric shape and grants no result authority; it is tested offline
+but has **not** had a subsequent real run. The durable ledger is **8/8 used**,
+zero slots remain; #7's subtype is still unknown. This PoC therefore still
+has no accepted Application round-trip. Any additional inference requires a
+separate Product Owner decision, not an automatic retry. Slice A remains
+CLOSED and this ADR remains ACCEPTED DIRECTION / IN DEVELOPMENT.
+
+The private adapter is deterministically tested; the eight historically debited
+processes have not yielded an accepted transport/Application round-trip. Synthetic canary envelopes were written to the CLI; remote inference
+or consumption before termination is unknown. No API key, extra usage, retry/
+fallback, Project IR/History mutation or product integration was introduced.
+Effective model/effort and editorial quality remain unproven.
+Claude is a candidate for this proof, not a replacement
+for the historical Codex preference or an approval for commercial use. The
+[attempt evidence](../CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md)
+records the official mechanism, installed-state facts and exact prerequisite.
+Complete Semantic Editorial Analysis remains **NOT DELIVERED** and progress
+remains **55%**.
+
+The subsequent 2026-09-30 Claude PoC F-1–F-5 remediation is **offline only**,
+at code/test checkpoint `0fd4fba8e4b0f595c3abfadbb9743aeb7e2de13e`.
+Its historical experiment is terminal in code (8/8, zero balance), independently
+of local-record availability; operational harness modes cannot invoke Claude
+or auth, and historical inspection detects orphan/mismatched receipts without
+refunding reservations. Result terminal reasons, primary provider-error
+preservation, explicit empty-plugin init and system-event classifications were
+corrected with 115/115 PoC, 26/26 semantic Application, 210/210 full Application
+tests and a passing Node/TS build. No Application/History/projection contract,
+private ledger or provider authority changed. Independent review subsequently
+approved `de0aee79b0ed66b16b5434efad953da855ce0df0` with non-blocking notes.
+Its N-1 follow-up (`1aa4324d9bcb4e404919d0af17c3b4d072abdbd5`, preserving
+recognized provider error before a same-chunk oversized tail) was independently
+VERIFIED / FIXED at `ea72f831c29aecc1e4017f6504d6f072a076ebcb`, with approval
+limited to the bounded offline remediation. Offline PoC 119/119 and semantic
+Application 26/26 pass; the subsequent PR and post-merge gates are recorded
+separately below.
+The existing evidence record retains reviewer/implementer separation and
+deferred N-2–N-4. There is still no accepted semantic round-trip. A new real proof requires
+explicit authorization of a new ID, budget and scope. This is a compatible
+Director correction and does not close this ADR or deliver complete analysis.
+
+## Bounded offline Claude transport/evidence PoC closeout — 2026-09-30
+
+**Claude CLI transport/evidence PoC V1: IMPLEMENTED / CLOSED**, only for the
+reviewed bounded offline transport, containment, validation and evidence scope.
+PR #57 merged frozen head `79327e8d951e31962af2c5d7915a38abcb0c8a4c`
+by normal merge commit `862e33f9e687579059d51269abdb4195b86bbd79`.
+Post-merge push CI `36774947802` passed 5/5 and Exact Runtime
+`36774947781` passed on that exact merge SHA. These are deterministic/runtime
+regression gates, not semantic inference evidence.
+
+F-1–F-5 retain their independent offline approval and N-1 is VERIFIED / FIXED;
+N-2–N-4 remain DEFERRED as specified in the existing PoC evidence record.
+The historical experiment remains CLOSED, 8/8 consumed, zero balance; five
+original receipts remain unavailable. Zero real semantic round-trips were
+accepted. Slice A remains IMPLEMENTED / CLOSED, but this ADR remains
+**ACCEPTED DIRECTION / IN DEVELOPMENT** and complete Semantic Editorial
+Analysis remains **NOT DELIVERED**. The real-agent semantic round-trip is
+**NOT DEMONSTRATED / still required before strategy**. Strategy, take selection
+and cut planning remain NOT STARTED and not implicitly authorized. Director
+impact: no new authority. Progress remains **55%**.
+
 Non-blocking limits retained by the closeout are:
 
 - at extreme transcript scale, `history.current` materialization or an
