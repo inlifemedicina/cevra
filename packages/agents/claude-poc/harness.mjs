@@ -5,11 +5,12 @@ import {spawn} from 'node:child_process';
 import {SemanticEditorialAnalysisService} from '@cevra/application';
 import {ClaudePocAnalyzer,verifyBinary,runClaudeProcess} from './transport.mjs';
 import {captureInitPlugins,publicInitShape,writePrivateInitReceipt} from './init-diagnostic.mjs';
+import {writePrivateEventReceipt} from './event-diagnostic.mjs';
 import {fixture,PHRASES} from './test/fixtures.mjs';
 import {PLAYBOOK_VERSION} from './playbook.mjs';
 
 const [name,directory]=process.argv.slice(2);
-if(!['canary','diagnostic','canary-4','pt','en','cancel'].includes(name)||!directory||!isAbsolute(directory))throw Error('CASE_AND_PRIVATE_DIRECTORY_REQUIRED');
+if(!['canary','diagnostic','canary-4','canary-5','pt','en','cancel'].includes(name)||!directory||!isAbsolute(directory))throw Error('CASE_AND_PRIVATE_DIRECTORY_REQUIRED');
 const stat=await lstat(directory);
 if(!stat.isDirectory()||stat.isSymbolicLink()||(stat.mode&0o077))throw Error('PRIVATE_DIRECTORY_REQUIRED');
 const lock=await open(join(directory,'execution.lock'),'wx',0o600);
@@ -21,8 +22,10 @@ if(ledger.version!==1||!Array.isArray(ledger.attempts))throw Error('INVALID_LEDG
 const secondCanary=name==='canary'&&ledger.attempts.length===1&&ledger.attempts[0].number===1&&ledger.attempts[0].case==='canary';
 const diagnostic=name==='diagnostic';
 const correctiveCanary=name==='canary-4';
+const contractCanary=name==='canary-5';
 if(diagnostic&&!(ledger.attempts.length===2&&ledger.attempts.every((a,i)=>a.number===i+1&&a.case==='canary')))throw Error('DIAGNOSTIC_LEDGER_GATE');
 if(correctiveCanary&&!(ledger.attempts.length===3&&ledger.attempts.every((a,i)=>a.number===i+1&&a.case===(i<2?'canary':'diagnostic'))))throw Error('CORRECTIVE_CANARY_LEDGER_GATE');
+if(contractCanary&&!(ledger.attempts.length===4&&ledger.attempts.every((a,i)=>a.number===i+1&&a.case===['canary','canary','diagnostic','canary-4'][i])))throw Error('CONTRACT_CANARY_LEDGER_GATE');
 if(ledger.attempts.some(a=>a.case===name)&&!secondCanary)throw Error('CASE_ALREADY_ATTEMPTED');
 if(secondCanary){
  const first=JSON.parse(await readFile(join(directory,'canary.json'),'utf8'));
@@ -41,16 +44,21 @@ if(correctiveCanary){
  const diagnosticReceipt=JSON.parse(await readFile(join(directory,'diagnostic-3.json'),'utf8'));
  if(diagnosticReceipt.responses?.[0]?.error!=='DIAGNOSTIC_STOP')throw Error('DIAGNOSTIC_GATE');
 }
-if(!['canary','diagnostic','canary-4'].includes(name)){
- const canary=JSON.parse(await readFile(join(directory,'canary-4.json'),'utf8'));
+if(contractCanary){
+ const prior=JSON.parse(await readFile(join(directory,'canary-4.json'),'utf8'));
+ if(prior.responses?.[0]?.error!=='MODEL_UNAVAILABLE'||prior.status!=='rejected')throw Error('FOURTH_CANARY_MISMATCH');
+}
+if(!['canary','diagnostic','canary-4','canary-5'].includes(name)){
+ const canary=JSON.parse(await readFile(join(directory,'canary-5.json'),'utf8'));
  if(canary.status!=='accepted'||canary.result.kind!=='analysis-candidate'||!canary.historyUnchanged||!canary.redoPreserved)throw Error('CANARY_GATE');
- if(name==='pt'&&ledger.attempts.length!==4)throw Error('MATRIX_ORDER');
- if(name==='en'&&!(ledger.attempts.length===5&&ledger.attempts.at(-1).case==='pt'&&ledger.attempts.filter(a=>a.case==='pt').length===1))throw Error('MATRIX_ORDER');
- if(name==='cancel'&&!(ledger.attempts.length===6&&ledger.attempts.at(-1).case==='en'))throw Error('MATRIX_ORDER');
+ if(name==='pt'&&ledger.attempts.length!==5)throw Error('MATRIX_ORDER');
+ if(name==='en'&&!(ledger.attempts.length===6&&ledger.attempts.at(-1).case==='pt'))throw Error('MATRIX_ORDER');
+ if(name==='cancel'&&!(ledger.attempts.length===7&&['pt','en'].includes(ledger.attempts.at(-1).case)))throw Error('MATRIX_ORDER');
+ if(['pt','en'].includes(name)&&ledger.attempts.length+2>8)throw Error('CONTINUATION_SLOT_REQUIRED');
 }
 const locale=name==='en'?'en-US':'pt-BR';
 const extra={};
-if(name==='canary'||diagnostic||correctiveCanary)PHRASES[locale][0]=['A caixa tem uma etiqueta de rastreamento.'];
+if(name==='canary'||diagnostic||correctiveCanary||contractCanary)PHRASES[locale][0]=['A caixa tem uma etiqueta de rastreamento.'];
 const {history,ids}=fixture(locale,extra);
 history.commit({type:'project.rename',name:'synthetic redo checkpoint'});history.undo();
 const before=JSON.stringify(history.toArchive());
@@ -58,39 +66,48 @@ const controller=new AbortController();let cancelTimer;
 const responses=[];
 let callsThisRun=0;
 let privateInit;
+let canaryNeedsEvidence=false;
 const overrideReceipt=join(directory,'diagnostic-3-private.json');
-const adapter=new ClaudePocAnalyzer({binary,home:process.env.HOME,...(correctiveCanary||['pt','en','cancel'].includes(name)?{pluginOverrideReceipt:overrideReceipt}:{})},{verifyBinary,runProcess:async options=>{
- if((name==='canary'||diagnostic||correctiveCanary)&&callsThisRun!==0)throw Error('CANARY_SINGLE_EXECUTION');
- if(ledger.attempts.length>=7)throw Error('REAL_EXECUTION_QUOTA'); // #8 is reserved, not automatically authorized.
- if(['pt','en'].includes(name)&&ledger.attempts.length+2>7)throw Error('CONTINUATION_SLOT_REQUIRED');
+const adapter=new ClaudePocAnalyzer({binary,home:process.env.HOME,...(correctiveCanary||contractCanary||['pt','en','cancel'].includes(name)?{pluginOverrideReceipt:overrideReceipt}:{})},{verifyBinary,runProcess:async options=>{
+ if((name==='canary'||diagnostic||correctiveCanary||contractCanary)&&callsThisRun!==0)throw Error('CANARY_SINGLE_EXECUTION');
+ if(ledger.attempts.length>=8)throw Error('REAL_EXECUTION_QUOTA');
  callsThisRun++;
- const attempt={number:ledger.attempts.length+1,case:name,attemptId:diagnostic?'init-metadata-3':correctiveCanary?'session-override-4':undefined,startedAt:new Date().toISOString()};
+ const attempt={number:ledger.attempts.length+1,case:name,attemptId:diagnostic?'init-metadata-3':correctiveCanary?'session-override-4':contractCanary?'assistant-contract-5':undefined,startedAt:new Date().toISOString()};
  ledger.attempts.push(attempt);await writeFile(ledgerPath,JSON.stringify(ledger,null,2),{mode:0o600});
+ const privateName=contractCanary?'canary-5-private.json':`${name}-${attempt.number}-private.json`;
  try{
   const result=await runClaudeProcess({...options,...(diagnostic?{diagnosticInit:event=>{privateInit=captureInitPlugins(event);}}:{})},(bin,args,opts)=>{
    const child=spawn(bin,args,opts);
    if(name==='cancel')child.once('spawn',()=>{cancelTimer=setTimeout(()=>controller.abort(),1500);});
    return child;
   });
-  responses.push({attempt:attempt.number,...(name==='canary'||correctiveCanary?{}:{finalText:result.result}),metrics:result.metrics});return result;
+  if(contractCanary){
+   try{canaryNeedsEvidence=JSON.parse(result.result)?.kind==='needs-evidence';}catch{/* Application remains the only output validator. */}
+  }
+  if(contractCanary||['pt','en','cancel'].includes(name))await writePrivateEventReceipt(directory,privateName,result.privateDiagnostic);
+  responses.push({attempt:attempt.number,...(name==='canary'||correctiveCanary||contractCanary?{}:{finalText:result.result}),metrics:result.metrics});return result;
  }catch(e){
   if(diagnostic&&privateInit)await writePrivateInitReceipt(directory,'diagnostic-3-private.json',privateInit);
+  if((contractCanary||['pt','en','cancel'].includes(name))&&e.privateDiagnostic){
+   try{await writePrivateEventReceipt(directory,privateName,e.privateDiagnostic);}
+   catch{e.metrics={...e.metrics,privateDiagnosticWriteFailed:true};}
+  }
   responses.push({attempt:attempt.number,error:e.code??'UNCLASSIFIED',metrics:e.metrics});throw e;
  }
  finally{clearTimeout(cancelTimer);}
 }});
 let brief='Identifique as ideias e relações sustentadas pelo texto, preservando condições e incertezas. Não escolha takes nem cortes. Analise o que for textual e registre limites do que dependeria de imagem.';
 if(name==='en')brief='Identify ideas and relations supported by the text, preserving conditions and uncertainty. Do not select takes or cuts. Analyze textual evidence and record the limits of any image-dependent passage.';
-if(name==='canary'||diagnostic||correctiveCanary)brief='Devolva uma observação textual mínima citada, no contrato fornecido, sem ferramentas.';
+if(name==='canary'||diagnostic||correctiveCanary||contractCanary)brief='Devolva uma observação textual mínima citada, no contrato fornecido, sem ferramentas.';
 const app=new SemanticEditorialAnalysisService({history,analyzer:adapter,timeoutMs:120000});
 const started=performance.now();const record={version:1,case:name,playbook:PLAYBOOK_VERSION,requestedModel:'opus',requestedEffort:'medium'};
 try{
- const result=await app.analyze({sourceIds:name==='canary'||diagnostic||correctiveCanary?[ids[0]]:ids,locale,brief},controller.signal);
- record.result=name==='canary'||correctiveCanary?{kind:result.kind,observationCount:result.kind==='analysis-candidate'?result.candidate.observations.length:0,
+ const result=await app.analyze({sourceIds:name==='canary'||diagnostic||correctiveCanary||contractCanary?[ids[0]]:ids,locale,brief},controller.signal);
+ record.result=name==='canary'||correctiveCanary||contractCanary?{kind:result.kind,observationCount:result.kind==='analysis-candidate'?result.candidate.observations.length:0,
    evidenceCount:result.evidence?.length??0}:result;
  record.status='accepted';
 }
-catch(e){record.status='rejected';record.error=e.code??'UNCLASSIFIED';}
+catch(e){record.status=canaryNeedsEvidence?'needs-evidence-not-continued':'rejected';record.error=e.code??'UNCLASSIFIED';}
 finally{
  clearTimeout(cancelTimer);
  // Wait for transport settlement after Application's cancellation race.

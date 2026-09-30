@@ -5,6 +5,7 @@ import {mkdtemp,rmdir,readFile,lstat,symlink,unlink,writeFile} from 'node:fs/pro
 import {fileURLToPath} from 'node:url';
 import {childArguments,childEnvironment,ClaudeStreamReader,runClaudeProcess,ClaudePocAnalyzer,LIMITS} from '../transport.mjs';
 import {captureInitPlugins,publicInitShape,writePrivateInitReceipt} from '../init-diagnostic.mjs';
+import {writePrivateEventReceipt} from '../event-diagnostic.mjs';
 import {pluginDisableSettings,loadPluginDisableSettings,createSessionPluginSettings} from '../session-plugin-override.mjs';
 const fake=fileURLToPath(new URL('./fake-cli.mjs',import.meta.url));
 const payload=JSON.stringify({context:{contextId:'test',evidence:[{reference:'E1',text:'Café'}]}});
@@ -70,9 +71,72 @@ test('real child uses pipes/stdin/external temp cwd and no shell; Unicode surviv
  const result=await run('utf8');assert.match(result.result,/Café — ação 🎬/);assert.equal(result.metrics.childClosed,true);
  assert.equal(result.metrics.stdinBytes,Buffer.byteLength(payload));
 });
-for(const [mode,code] of [['auth','PROCESS_EXIT'],['tools','CONTAINMENT'],['tool','CONTAINMENT'],['permission','CONTAINMENT'],['stderr','STDERR_LIMIT'],['line','LINE_LIMIT'],['events','EVENT_LIMIT'],['duplicate','LATE_EVENT'],['partial','PARTIAL_EOF'],['model','MODEL_UNAVAILABLE'],['correlation','CORRELATION'],['error','PROVIDER_RESULT_ERROR'],['response','RESPONSE_LIMIT']]){
+for(const [mode,code] of [['auth','PROCESS_EXIT'],['tools','CONTAINMENT'],['tool','CONTAINMENT'],['permission','CONTAINMENT'],['stderr','STDERR_LIMIT'],['line','LINE_LIMIT'],['events','EVENT_LIMIT'],['duplicate','LATE_EVENT'],['partial','PARTIAL_EOF'],['model','MODEL_UNAVAILABLE'],['correlation','CORRELATION'],['error','PROVIDER_ERROR_UNKNOWN'],['response','RESPONSE_LIMIT']]){
  test(`reject ${mode}; no retry`,async()=>{await assert.rejects(run(mode),e=>e.code===code);});
 }
+for(const [mode,code] of [
+ ['assistant-error-authentication_failed','PROVIDER_AUTH_ERROR'],
+ ['assistant-error-rate_limit','PROVIDER_RATE_LIMIT'],
+ ['assistant-error-billing_error','PROVIDER_BILLING_ERROR'],
+ ['assistant-error-invalid_request','PROVIDER_INVALID_REQUEST'],
+ ['assistant-error-server_error','PROVIDER_SERVER_ERROR'],
+ ['assistant-error-unknown','PROVIDER_ERROR_UNKNOWN'],
+ ['assistant-error-then-success','PROVIDER_RATE_LIMIT'],
+ ['assistant-error-then-exit','PROVIDER_RATE_LIMIT'],
+ ['assistant-error-model_not_found','PROVIDER_MODEL_ERROR'],
+ ['assistant-missing-model','MODEL_UNAVAILABLE'],['assistant-other-model','MODEL_UNAVAILABLE'],
+ ['assistant-top-model','MODEL_UNAVAILABLE'],['synthetic','MODEL_UNAVAILABLE'],
+ ['assistant-aborted','PARTIAL_ASSISTANT'],['assistant-tool-error','CONTAINMENT'],
+ ['result-is-error','PROVIDER_ERROR_UNKNOWN'],['result-status-429','PROVIDER_RATE_LIMIT'],
+ ['result-terminal-aborted','PROVIDER_ERROR_UNKNOWN'],['result-origin-other','CORRELATION'],
+ ['no-assistant','MODEL_UNPROVEN'],
+ ])test(`wire protocol ${mode} fails closed as ${code}`,async()=>{
+  await assert.rejects(run(mode),e=>{
+   assert.equal(e.code,code);assert.equal(e.metrics.childClosed,true);
+   assert(!JSON.stringify(e.metrics).includes('synthetic provider error detail'));
+   return true;
+  });
+ });
+test('assistant and result diagnostics use their actual locations without exposing error text',async()=>{
+ await assert.rejects(run('assistant-error-rate_limit'),e=>{
+  assert.equal(e.code,'PROVIDER_RATE_LIMIT');
+  assert.equal(e.metrics.lastEventSummary.type,'result');
+  assert.equal(e.privateDiagnostic[0].type,'assistant');
+  assert.equal(e.privateDiagnostic[0].model,'<synthetic>');
+  assert.equal(e.privateDiagnostic[0].error,'rate_limit');
+  assert.equal(e.privateDiagnostic[0].errorTextPresent,true);
+  assert.match(e.privateDiagnostic[0].errorTextHash,/^[a-f0-9]{64}$/);
+  assert(!JSON.stringify(e.privateDiagnostic).includes('synthetic provider error detail'));
+  assert.equal(e.privateDiagnostic[1].type,'result');
+  assert(!JSON.stringify(e.metrics).includes('<synthetic>'));
+  return true;
+ });
+ await assert.rejects(run('assistant-top-model'),e=>{
+  assert.equal(e.metrics.lastEventSummary.model.location,'message.model');
+  assert.equal(e.metrics.lastEventSummary.model.kind,'missing');
+  return true;
+ });
+ const success=await run('utf8');
+ assert.equal(success.metrics.model,'claude-opus-fixture');
+ assert.equal(success.privateDiagnostic[0].model,'claude-opus-fixture');
+ assert.equal(success.privateDiagnostic[1].type,'result');
+});
+test('private event receipt is bounded, exclusive and never follows symlinks',async()=>{
+ const dir=await mkdtemp('/tmp/cevra-event-diagnostic-test-');
+ try{
+  const events=[{type:'assistant',model:'claude-opus-fixture',errorKind:'missing'},
+    {type:'result',isError:false,apiErrorStatus:undefined}];
+  await writePrivateEventReceipt(dir,'canary-5-private.json',events);
+  assert.equal((await lstat(`${dir}/canary-5-private.json`)).mode&0o777,0o600);
+  assert.deepEqual(JSON.parse(await readFile(`${dir}/canary-5-private.json`,'utf8')).events[0],events[0]);
+  await assert.rejects(writePrivateEventReceipt(dir,'canary-5-private.json',events),e=>e.code==='EEXIST');
+  await symlink(`${dir}/canary-5-private.json`,`${dir}/pt-6-private.json`);
+  await assert.rejects(writePrivateEventReceipt(dir,'pt-6-private.json',events),e=>e.code==='EEXIST');
+  await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',[{type:'assistant',content:'private'}]),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
+  await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',Array(9).fill({type:'assistant'})),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
+  await unlink(`${dir}/pt-6-private.json`);await unlink(`${dir}/canary-5-private.json`);
+ }finally{await rmdir(dir);}
+});
 test('bounded timeout reaps child that ignores TERM',async()=>{
  const start=performance.now();await assert.rejects(run('ignore-term',{timeoutMs:200}),e=>e.code==='TIMEOUT'&&e.metrics.childClosed);assert(performance.now()-start<4000);
 });

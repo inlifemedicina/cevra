@@ -13,6 +13,22 @@ export class ClaudePocError extends Error {
   constructor(code) { super(code); this.name = 'ClaudePocError'; this.code = code; }
 }
 const fail = (code, reason) => { const error=new ClaudePocError(code); if(reason)error.reason=reason; throw error; };
+const OPUS=/^claude-opus-[a-z0-9.-]+$/;
+const ASSISTANT_ERRORS=Object.freeze({authentication_failed:'PROVIDER_AUTH_ERROR',oauth_org_not_allowed:'PROVIDER_AUTH_ERROR',
+  cloud_credential_error:'PROVIDER_AUTH_ERROR',billing_error:'PROVIDER_BILLING_ERROR',
+  rate_limit:'PROVIDER_RATE_LIMIT',invalid_request:'PROVIDER_INVALID_REQUEST',server_error:'PROVIDER_SERVER_ERROR',
+  model_not_found:'PROVIDER_MODEL_ERROR',overloaded:'PROVIDER_SERVER_ERROR',account_on_hold:'PROVIDER_BILLING_ERROR'});
+const TERMINAL_REASONS=['completed','api_error','model_error','max_turns','aborted_streaming','aborted_tools'];
+const STOP_REASONS=['end_turn','stop_sequence','tool_use','max_tokens','pause_turn','refusal'];
+const kind=value=>value===undefined?'missing':value===null?'null':Array.isArray(value)?'array':typeof value;
+const modelClass=value=>typeof value==='string'&&OPUS.test(value)?'allowed-opus':value==='<synthetic>'?'synthetic':'unproven';
+function providerError(value,status) {
+  const code=typeof value==='string'&&Object.hasOwn(ASSISTANT_ERRORS,value)?ASSISTANT_ERRORS[value]:
+    status===401||status===403?'PROVIDER_AUTH_ERROR':status===402?'PROVIDER_BILLING_ERROR':
+    status===429?'PROVIDER_RATE_LIMIT':status===400?'PROVIDER_INVALID_REQUEST':
+    Number.isInteger(status)&&status>=500&&status<=599?'PROVIDER_SERVER_ERROR':'PROVIDER_ERROR_UNKNOWN';
+  return new ClaudePocError(code);
+}
 // Non-content diagnostic vocabulary: never retain arbitrary event fields/text.
 function eventSummary(event) {
   const label=(value,allowed)=>allowed.includes(value)?value:'other';
@@ -24,14 +40,48 @@ function eventSummary(event) {
     const kind=!present?'missing':Array.isArray(value)?'array':value===null?'null':typeof value;
     summary[field]=Object.freeze({present,kind,count:Array.isArray(value)?value.length:null});
   }
-  const model=event.model;
-  summary.model=Object.freeze({present:Object.hasOwn(event,'model'),
-    kind:!Object.hasOwn(event,'model')?'missing':model===null?'null':typeof model,
-    class:typeof model==='string'&&/^claude-opus-[a-z0-9.-]+$/.test(model)?'allowed-opus':'unproven'});
+  const location=event.type==='assistant'?'message.model':event.type==='result'?'modelUsage':'model';
+  const model=event.type==='assistant'?event.message?.model:event.type==='result'?event.modelUsage:event.model;
+  summary.model=Object.freeze({location,present:model!==undefined,kind:kind(model),
+    class:event.type==='result'&&model&&typeof model==='object'&&!Array.isArray(model)?
+      Object.keys(model).length===1?modelClass(Object.keys(model)[0]):'unproven':modelClass(model)});
+  if(event.type==='assistant'){
+    const blocks=event.message?.content;
+    summary.assistant=Object.freeze({errorCategory:event.error===undefined?'none':providerError(event.error).code,
+      errorKind:kind(event.error),aborted:event.aborted===true,stopReason:label(event.message?.stop_reason,STOP_REASONS),
+      blocksKind:kind(blocks),blockCount:Array.isArray(blocks)?blocks.length:null,
+      textBlocks:Array.isArray(blocks)?blocks.filter(b=>b?.type==='text').length:null,
+      prohibitedBlocks:Array.isArray(blocks)?blocks.filter(b=>!['text','thinking','redacted_thinking'].includes(b?.type)).length:null});
+  }
+  if(event.type==='result') summary.result=Object.freeze({isError:event.is_error===true,isErrorKind:kind(event.is_error),
+    apiErrorStatus:Number.isInteger(event.api_error_status)&&event.api_error_status>=100&&event.api_error_status<=599?event.api_error_status:null,
+    stopReason:label(event.stop_reason,STOP_REASONS),terminalReason:label(event.terminal_reason,TERMINAL_REASONS),
+    errorCount:Array.isArray(event.errors)?event.errors.length:null});
   summary.permissionMode=Object.freeze({present:Object.hasOwn(event,'permissionMode'),
     kind:!Object.hasOwn(event,'permissionMode')?'missing':event.permissionMode===null?'null':typeof event.permissionMode});
   summary.permissionsBypassed=event.permissionMode==='bypassPermissions';
   return Object.freeze(summary);
+}
+function privateEventSummary(event){
+  if(!['assistant','result'].includes(event.type))return undefined;
+  const usageModels=event.type==='result'&&event.modelUsage&&typeof event.modelUsage==='object'&&!Array.isArray(event.modelUsage)?
+    Object.keys(event.modelUsage):[];
+  const model=event.type==='assistant'?event.message?.model:usageModels.length===1?usageModels[0]:undefined;
+  const safeModel=typeof model==='string'&&model.length<=128&&(/^[a-z0-9.-]*claude-[a-z0-9.-]+$/.test(model)||model==='<synthetic>')?model:undefined;
+  const errorText=event.type==='assistant'&&event.error!==undefined&&Array.isArray(event.message?.content)?
+    event.message.content.filter(b=>b?.type==='text'&&typeof b.text==='string').map(b=>b.text).join('\n'):undefined;
+  return Object.freeze({type:event.type,model:safeModel,modelKind:kind(model),modelHash:model!==undefined&&safeModel===undefined?
+    createHash('sha256').update(String(model).slice(0,128)).digest('hex'):undefined,
+    error:typeof event.error==='string'&&
+      (Object.hasOwn(ASSISTANT_ERRORS,event.error)||['unknown','max_output_tokens','oauth_org_not_allowed','cloud_credential_error'].includes(event.error))?event.error:undefined,
+    errorKind:kind(event.error),errorHash:typeof event.error==='string'&&
+      !Object.hasOwn(ASSISTANT_ERRORS,event.error)?createHash('sha256').update(event.error.slice(0,256)).digest('hex'):undefined,
+    apiErrorStatus:Number.isInteger(event.api_error_status)&&event.api_error_status>=100&&event.api_error_status<=599?event.api_error_status:undefined,
+    stopReason:STOP_REASONS.includes(event.type==='assistant'?event.message?.stop_reason:event.stop_reason)?
+      event.type==='assistant'?event.message.stop_reason:event.stop_reason:undefined,
+    terminalReason:TERMINAL_REASONS.includes(event.terminal_reason)?event.terminal_reason:undefined,
+    usageModelCount:usageModels.length,isError:event.is_error===true,errorTextPresent:errorText!==undefined&&errorText.length>0,
+    errorTextHash:errorText?createHash('sha256').update(errorText).digest('hex'):undefined});
 }
 export function childEnvironment(home) {
   if (!isAbsolute(home)) fail('INVALID_HOME');
@@ -63,7 +113,8 @@ export class ClaudeStreamReader {
     this.sessionId=sessionId; this.limits=limits; this.pending=Buffer.alloc(0);
     this.diagnosticInit=diagnosticInit;
     this.bytes=0; this.events=0; this.initialized=false; this.result=undefined;
-    this.model=undefined; this.usage=undefined; this.estimate=undefined;
+    this.model=undefined; this.generatedModel=undefined; this.usage=undefined; this.estimate=undefined;
+    this.primaryError=undefined; this.terminal=false;this.privateEvents=[];
   }
   push(chunk) {
     this.bytes += chunk.length;
@@ -84,7 +135,9 @@ export class ClaudeStreamReader {
     let e; try {e=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));} catch {fail('INVALID_EVENT');}
     if (!e || typeof e!=='object' || Array.isArray(e)) fail('INVALID_EVENT');
     this.lastEventSummary=eventSummary(e);
-    if(this.result!==undefined) fail('LATE_EVENT');
+    const privateSummary=privateEventSummary(e);
+    if(privateSummary && this.privateEvents.length<8)this.privateEvents.push(privateSummary);
+    if(this.terminal) fail('LATE_EVENT');
     if(e.type==='rate_limit_event') {
       // Provider advisory only; never turns a refused/error result into success.
       if(e.session_id!==this.sessionId || !e.rate_limit_info) fail('CORRELATION');
@@ -113,17 +166,36 @@ export class ClaudeStreamReader {
     if(!this.initialized) fail('MISSING_INIT');
     if(e.type==='assistant') {
       if(e.parent_tool_use_id!=null) fail('CONTAINMENT');
-      this.checkModel(e.message?.model);
-      if(!Array.isArray(e.message?.content)) fail('INVALID_EVENT');
+      if(!e.message||typeof e.message!=='object'||Array.isArray(e.message)||!Array.isArray(e.message.content))fail('INVALID_EVENT');
       for(const block of e.message.content) {
-        if(!['text','thinking','redacted_thinking'].includes(block.type)) fail('CONTAINMENT');
+        if(!block||typeof block!=='object'||!['text','thinking','redacted_thinking'].includes(block.type)) fail('CONTAINMENT');
       }
+      if(e.message.stop_reason==='tool_use')fail('CONTAINMENT');
+      if(e.error!==undefined){
+        if(typeof e.error!=='string')fail('INVALID_EVENT');
+        this.primaryError??=providerError(e.error);return;
+      }
+      if(e.aborted===true){this.primaryError??=new ClaudePocError('PARTIAL_ASSISTANT');return;}
+      this.checkModel(e.message.model,'assistant');
+      if(!['end_turn','stop_sequence'].includes(e.message.stop_reason))fail('PARTIAL_ASSISTANT');
+      if(!e.message.content.some(block=>block.type==='text'&&typeof block.text==='string'&&block.text.length))fail('MODEL_UNPROVEN','NO_GENERATED_TEXT');
+      this.generatedModel=e.message.model;
       return; // final result is authoritative; do not concatenate assistant text/deltas.
     }
     if(e.type!=='result') fail('CONTAINMENT');
-    if(e.subtype!=='success'||e.is_error!==false) fail('PROVIDER_RESULT_ERROR');
-    if(e.num_turns!==1) fail('TURN_LIMIT');
     if(!Array.isArray(e.permission_denials)||e.permission_denials.length) fail('CONTAINMENT');
+    if(e.deferred_tool_use!=null)fail('CONTAINMENT');
+    if(e.stop_reason==='tool_use')fail('CONTAINMENT');
+    if(e.origin!=null && e.origin.kind!=='human')fail('CORRELATION');
+    if(e.errors!=null&&!Array.isArray(e.errors))fail('INVALID_EVENT');
+    this.terminal=true;
+    if(e.subtype!=='success'||e.is_error!==false||e.api_error_status!=null||Array.isArray(e.errors)&&e.errors.length||
+      e.terminal_reason!==undefined&&e.terminal_reason!==null&&e.terminal_reason!=='completed'){
+      this.primaryError??=providerError(undefined,e.api_error_status);return;
+    }
+    if(this.primaryError)return; // An apparently successful result cannot erase a prior assistant error.
+    if(e.num_turns!==1) fail('TURN_LIMIT');
+    if(!this.generatedModel)fail('MODEL_UNPROVEN','NO_GENERATED_ASSISTANT');
     if(typeof e.result!=='string'||Buffer.byteLength(e.result)>this.limits.response) fail('RESPONSE_LIMIT');
     if(!e.modelUsage || !Object.keys(e.modelUsage).length) fail('MODEL_UNPROVEN');
     for(const model of Object.keys(e.modelUsage)) this.checkModel(model);
@@ -138,10 +210,12 @@ export class ClaudeStreamReader {
     if(Number.isFinite(e.total_cost_usd)&&e.total_cost_usd>=0) this.estimate=e.total_cost_usd;
   }
   checkModel(model,origin) {
-    if(typeof model!=='string'||!/^claude-opus-[a-z0-9.-]+$/.test(model)) fail('MODEL_UNAVAILABLE',origin==='init'?'INIT_MODEL_INVALID':undefined);
-    if(this.model && this.model!==model) fail('MODEL_DRIFT',origin==='init'?'INIT_MODEL_DRIFT':undefined);
+    if(typeof model!=='string'||!OPUS.test(model)) fail('MODEL_UNAVAILABLE',origin==='init'?'INIT_MODEL_INVALID':
+      origin==='assistant'&&model==='<synthetic>'?'ASSISTANT_SYNTHETIC_UNPROVEN':'MODEL_INVALID');
+    if(this.model && this.model!==model) fail('MODEL_DRIFT',origin==='init'?'INIT_MODEL_DRIFT':'MODEL_MISMATCH');
   }
   finish() {
+    if(this.primaryError)throw this.primaryError;
     if(this.pending.length) fail('PARTIAL_EOF');
     if(this.result===undefined) fail('MISSING_RESULT');
     return this.result;
@@ -180,20 +254,26 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
       closed=true; clearTimeout(timer);clearTimeout(killTimer);signal?.removeEventListener('abort',abort);
       if(signal?.aborted) error??=new ClaudePocError('CANCELLED');
       if(performance.now()-started>=timeoutMs)error??=new ClaudePocError('TIMEOUT');
+      error??=reader.primaryError;
       if(code!==0||terminationSignal)error??=new ClaudePocError('PROCESS_EXIT');
       // Never return before process close/reap. No transcript/stderr in errors.
       tail=Buffer.alloc(0);
+      if(!error){try{reader.finish();}catch(e){error=e;}}
       if(error){error.metrics={stdoutBytes:reader.bytes,stderrBytes,events:reader.events,
         ...(error.reason?{initFailureReason:error.reason}:{}),
         lastEventSummary:reader.lastEventSummary,envelopeBytes:Buffer.byteLength(payload),
         systemPromptBytes:Buffer.byteLength(PLAYBOOK),stdinBytes:Buffer.byteLength(payload),
-        latencyMs:performance.now()-started,childClosed:true};reject(error);return;}
+        latencyMs:performance.now()-started,childClosed:true};
+        Object.defineProperty(error,'privateDiagnostic',{value:Object.freeze([...reader.privateEvents])});
+        reject(error);return;}
       try {
-        const result=reader.finish();
-        resolve({result,metrics:{model:reader.model,requestedAlias:'opus',requestedEffort:'medium',
+        const result=reader.result;
+        const accepted={result,metrics:{model:reader.model,requestedAlias:'opus',requestedEffort:'medium',
           envelopeBytes:Buffer.byteLength(payload),systemPromptBytes:Buffer.byteLength(PLAYBOOK),stdinBytes:Buffer.byteLength(payload),
           responseBytes:Buffer.byteLength(result),stdoutBytes:reader.bytes,stderrBytes,events:reader.events,
-          latencyMs:performance.now()-started,usage:reader.usage,estimatedUsd:reader.estimate,childClosed:true}});
+          latencyMs:performance.now()-started,usage:reader.usage,estimatedUsd:reader.estimate,childClosed:true}};
+        Object.defineProperty(accepted,'privateDiagnostic',{value:Object.freeze([...reader.privateEvents])});
+        resolve(accepted);
       }catch(e){reject(e);}
     });
     if(!error)child.stdin.end(payload);else child.stdin.destroy();

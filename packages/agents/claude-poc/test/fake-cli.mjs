@@ -15,6 +15,19 @@ if(mode==='slow'||mode==='ignore-term'){
  if(mode==='tools')init.tools=['Read'];
  if(mode==='diagnostic-plugins')init.plugins=[{id:'private-one@fixture',path:'/private/one',version:'1.0',secretInstructions:'DO NOT COPY'},'private-two@fixture'];
  send(init);
+ const assistantError=mode.startsWith('assistant-error-')?mode.slice('assistant-error-'.length):undefined;
+ const assistant={type:'assistant',session_id,message:{model:assistantError||mode==='synthetic' ? '<synthetic>' : model,
+  content:[{type:'text',text:assistantError?'synthetic provider error detail':'fixture response'}],stop_reason:'end_turn'}};
+ if(assistantError)assistant.error=assistantError;
+ if(mode==='assistant-missing-model')delete assistant.message.model;
+ if(mode==='assistant-other-model')assistant.message.model='claude-sonnet-fixture';
+ if(mode==='assistant-top-model'){assistant.model=model;delete assistant.message.model;}
+ if(mode==='assistant-tool-error'){assistant.error='authentication_failed';assistant.message.content.push({type:'tool_use',name:'Read'});}
+ if(mode==='assistant-error-then-success')assistant.error='rate_limit';
+ if(mode==='assistant-error-then-exit')assistant.error='rate_limit';
+ if(mode==='assistant-aborted')assistant.aborted=true;
+ if(mode==='assistant-error-then-success')assistant.message.model='<synthetic>';
+ if(mode!=='no-assistant')send(assistant);
  if(mode==='tool')send({type:'assistant',session_id,message:{model,content:[{type:'tool_use',name:'Read'}]}});
  if(mode==='permission')send({type:'control_request',session_id,request:{subtype:'can_use_tool'}});
  if(mode==='stderr')process.stderr.write('x'.repeat(300*1024));
@@ -29,11 +42,17 @@ if(mode==='slow'||mode==='ignore-term'){
  if(mode==='model')result.modelUsage={'claude-sonnet-fixture':{}};
  if(mode==='correlation')result.session_id='wrong';
  if(mode==='error')result.subtype='error_max_turns';
+ if(mode==='result-is-error')result.is_error=true;
+ if(mode==='assistant-error-then-success')result.is_error=false;
+ if(mode==='result-status-429'){result.is_error=true;result.api_error_status=429;}
+ if(mode==='result-terminal-aborted')result.terminal_reason='aborted_streaming';
+ if(mode==='result-origin-other')result.origin={kind:'task-notification'};
  if(mode==='response')result.result='x'.repeat(65537);
  if(mode==='partial'){process.stdout.write('{"type":');}
  else if(mode==='utf8'){
   const bytes=Buffer.from(JSON.stringify(result)+'\n');
   for(const byte of bytes)process.stdout.write(Buffer.from([byte]));
  }else{send(result);if(mode==='duplicate')send(result);}
+ if(mode==='assistant-error-then-exit')process.exitCode=1;
  if(mode==='late-close'){process.on('SIGTERM',()=>{});setTimeout(()=>process.exit(0),10000);}
 }
