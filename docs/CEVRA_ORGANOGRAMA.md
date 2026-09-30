@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-09-29
+**Updated:** 2026-09-30
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 **Current global weighted roadmap progress:** 55%.
 
@@ -27,10 +27,11 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE EXPERIMENT CLOSED, OFFLINE REMEDIATION APPROVED / PR GATE]
-│   ├─ strategy
-│   ├─ take selection
-│   └─ cut planning
+│   │   ├─ bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
+│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT DEMONSTRATED]
+│   ├─ strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
+│   ├─ take selection [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
+│   └─ cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │
 ├─ 4. DETERMINISTIC EDIT EXECUTION
 │   ├─ missing typed Project IR edit commands
@@ -216,10 +217,20 @@ or private-ledger change occurred. Independent review approved `de0aee7` with
 non-blocking notes; the minimal N-1 oversized-tail correction at `1aa4324`
 passed four directed regressions, PoC 119/119, semantic Application 26/26 and
 Node/TS build. Final independent verification at `ea72f83` found N-1
-VERIFIED / FIXED and approved the bounded offline remediation; PR gate is next.
+VERIFIED / FIXED and approved the bounded offline remediation. PR #57 subsequently
+merged frozen head `79327e8d951e31962af2c5d7915a38abcb0c8a4c` as
+`862e33f9e687579059d51269abdb4195b86bbd79`. Post-merge CI
+`36774947802` passed 5/5 and Exact Runtime `36774947781` passed on that SHA.
+**Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED only for its
+bounded offline transport, containment, validation and evidence scope.**
 Deferred N-2–N-4 and separate CI/review evidence remain in the existing record.
 A new real proof
 requires explicit authorization of a new ID, budget and scope. Slice A stays
 CLOSED; full semantic analysis is NOT DELIVERED; progress remains 55%.
+ADR 0030 remains ACCEPTED DIRECTION / IN DEVELOPMENT. The real semantic
+round-trip remains NOT DEMONSTRATED and required before strategy; no new
+Director authority or implicit strategy/take-selection/cut-planning
+authorization follows. The old experiment stays CLOSED at 8/8, zero balance,
+and five original receipts remain unavailable.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.

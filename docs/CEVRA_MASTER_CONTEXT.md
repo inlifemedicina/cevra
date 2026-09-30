@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-30, Slice A is closed; Claude PoC F-1–F-5 are independently approved offline and N-1 is independently verified at ea72f83; PR gate is next, with the historical experiment terminal (8/8 used, zero balance; no accepted semantic response); Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-30, PR #57 merged and post-merge validated; bounded offline Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED. Slice A remains closed; real semantic round-trip is NOT DEMONSTRATED; the historical experiment remains terminal (8/8 used, zero balance). Codex diagnosis remains preserved and blocked.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,8 +1420,9 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — DOCUMENTED PROGRESS EVENT, EXPERIMENT 8/8]
-→ strategy / take selection / cut planning
+→ bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
+→ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT DEMONSTRATED; OLD EXPERIMENT CLOSED 8/8]
+→ strategy / take selection / cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 → missing typed Project IR edit commands
 → cut compiler
 → numeric QA
@@ -1487,11 +1488,17 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Verified canonical baseline for the Claude PoC after Slice A docs closeout
-PR #54: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
-Latest code-bearing merge: PR #53,
-`0cde0d29cfe3f3d417955e20e5ad672b3e02ceba`.
-The Claude PoC is isolated and unmerged; it does not advance canonical main.
+Verified canonical main after PR #57:
+`862e33f9e687579059d51269abdb4195b86bbd79`, the baseline for this
+docs-only closeout branch. PR #57 merged approved head
+`79327e8d951e31962af2c5d7915a38abcb0c8a4c` by normal merge commit.
+Its first parent is the historical Claude PoC baseline after PR #54,
+`a58ca419c2a0db2c416db83d84c432fcae23d830`; its second parent is that
+approved feature head. Post-merge push CI `36774947802` passed 5/5 and
+Exact Runtime `36774947781` passed on the exact merge SHA.
+This closes only the bounded offline transport/evidence PoC, not real
+semantic analysis. Documentary closeout is proposed separately; no future
+closeout merge SHA is implied.
 
 The older `360bf60d4ed4b0a985c0c254a109fac2d6bc0d64` value remains historical:
 it was the canonical main after PR #50 and the feature base for PR #51.
@@ -1525,6 +1532,7 @@ it was the canonical main after PR #50 and the feature base for PR #51.
 | Native Windows Media Runtime / `h264_mf` feasibility — Slice 5A | #49 | `660f8cd13f11729d5663e1ff373e9eb91a4bffbb` | IMPLEMENTED / CLOSED |
 | Editorial Transcript Projection V1 | #51 | `56161b2af44c9e2de008bb33bc1706d4e2beaf7e` | IMPLEMENTED / CLOSED |
 | Semantic Editorial Analysis Boundary V1 — Slice A only | #53 | `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba` | IMPLEMENTED / CLOSED |
+| Claude CLI transport/evidence PoC V1 — bounded offline scope only | #57 | `862e33f9e687579059d51269abdb4195b86bbd79` | IMPLEMENTED / CLOSED |
 
 ## 24.3 Active work
 
@@ -1834,6 +1842,21 @@ Additional real proof requires explicit authorization of a **new ID, budget
 and scope**, not recovery of this terminal experiment. Director impact is a
 compatible correction; no product/provider authority changed. There remains
 no accepted round-trip, and progress remains **55%**.
+
+**2026-09-30 bounded offline PoC implementation closeout — IMPLEMENTED /
+CLOSED.** PR #57 merged the frozen feature head
+`79327e8d951e31962af2c5d7915a38abcb0c8a4c` as
+`862e33f9e687579059d51269abdb4195b86bbd79`; post-merge CI
+`36774947802` passed 5/5 and Exact Runtime `36774947781` passed.
+F-1–F-5 retain independent offline approval, N-1 is VERIFIED / FIXED, and
+N-2–N-4 remain DEFERRED in the existing evidence record. Closure covers only
+bounded offline transport, containment, validation and evidence. The old
+experiment remains CLOSED, 8/8, zero balance; five original receipts remain
+unavailable and zero real semantic round-trips were accepted. ADR 0030 remains
+ACCEPTED DIRECTION / IN DEVELOPMENT; complete analysis is NOT DELIVERED.
+The real-agent gate remains required before strategy; strategy/take selection/
+cut planning are NOT STARTED and not implicitly authorized. Director impact:
+no new authority. Progress remains **55%**.
 
 **Audio Sequence Runtime V1 — IMPLEMENTED / CLOSED.** PR #36 merged by normal
 merge commit `a18f19a06b33669c149c58f57bc74f385c0a02f2`. Post-merge normal CI run
@@ -2263,7 +2286,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Complete the PR gate for the bounded offline Claude PoC: F-1–F-5 received independent approval at `de0aee79b0ed66b16b5434efad953da855ce0df0`; N-1 is independently VERIFIED / FIXED at `ea72f831c29aecc1e4017f6504d6f072a076ebcb`. New PR checks must correspond to the documentary closeout HEAD; no automatic ready/merge or inference authorization follows. **The old ID is CLOSED, 8/8 consumed, zero balance; no semantic round-trip is demonstrated.** A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or advance dependent editorial work from offline tests alone.
+1. Review the docs-only closeout of PR #57 after its successful post-merge validation. The bounded offline Claude CLI transport/evidence PoC is IMPLEMENTED / CLOSED; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. PR #56 remains OPEN / DRAFT / UNMERGED and requires separate reconciliation over the new main; do not reconcile it within this closeout.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

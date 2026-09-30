@@ -299,11 +299,33 @@ Its N-1 follow-up (`1aa4324d9bcb4e404919d0af17c3b4d072abdbd5`, preserving
 recognized provider error before a same-chunk oversized tail) was independently
 VERIFIED / FIXED at `ea72f831c29aecc1e4017f6504d6f072a076ebcb`, with approval
 limited to the bounded offline remediation. Offline PoC 119/119 and semantic
-Application 26/26 pass; the PR gate remains distinct from that review.
+Application 26/26 pass; the subsequent PR and post-merge gates are recorded
+separately below.
 The existing evidence record retains reviewer/implementer separation and
 deferred N-2–N-4. There is still no accepted semantic round-trip. A new real proof requires
 explicit authorization of a new ID, budget and scope. This is a compatible
 Director correction and does not close this ADR or deliver complete analysis.
+
+## Bounded offline Claude transport/evidence PoC closeout — 2026-09-30
+
+**Claude CLI transport/evidence PoC V1: IMPLEMENTED / CLOSED**, only for the
+reviewed bounded offline transport, containment, validation and evidence scope.
+PR #57 merged frozen head `79327e8d951e31962af2c5d7915a38abcb0c8a4c`
+by normal merge commit `862e33f9e687579059d51269abdb4195b86bbd79`.
+Post-merge push CI `36774947802` passed 5/5 and Exact Runtime
+`36774947781` passed on that exact merge SHA. These are deterministic/runtime
+regression gates, not semantic inference evidence.
+
+F-1–F-5 retain their independent offline approval and N-1 is VERIFIED / FIXED;
+N-2–N-4 remain DEFERRED as specified in the existing PoC evidence record.
+The historical experiment remains CLOSED, 8/8 consumed, zero balance; five
+original receipts remain unavailable. Zero real semantic round-trips were
+accepted. Slice A remains IMPLEMENTED / CLOSED, but this ADR remains
+**ACCEPTED DIRECTION / IN DEVELOPMENT** and complete Semantic Editorial
+Analysis remains **NOT DELIVERED**. The real-agent semantic round-trip is
+**NOT DEMONSTRATED / still required before strategy**. Strategy, take selection
+and cut planning remain NOT STARTED and not implicitly authorized. Director
+impact: no new authority. Progress remains **55%**.
 
 Non-blocking limits retained by the closeout are:
 
