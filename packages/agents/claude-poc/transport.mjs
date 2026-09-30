@@ -26,11 +26,11 @@ const RETRY_ERRORS=new Set([...Object.keys(ASSISTANT_ERRORS),'verification_requi
 const FORBIDDEN_SYSTEM=new Set(['compact_boundary','hook_started','hook_progress','hook_response',
   'plugin_install','task_started','task_updated','task_progress','task_notification',
   'background_tasks_changed','permission_denied','memory_recall','local_command_output',
-  'informational','commands_changed','notification','conversation_reset']);
+  'commands_changed','conversation_reset','elicitation_complete']);
 const FORBIDDEN_TYPES=new Set(['control_request','control_response','control_cancel_request',
   'stream_event','user','tool_progress','tool_use_summary','permission_denied',
   'task_notification','task_started','task_progress','task_updated','plugin_install',
-  'model_refusal_fallback','model_refusal_no_fallback','memory_recall','local_command_output']);
+  'memory_recall','local_command_output']);
 const kind=value=>value===undefined?'missing':value===null?'null':Array.isArray(value)?'array':typeof value;
 const modelClass=value=>typeof value==='string'&&OPUS.test(value)?'allowed-opus':value==='<synthetic>'?'synthetic':'unproven';
 const safeProtocolValue=value=>typeof value==='string'&&value.length<=64&&/^[a-z][a-z0-9_]*$/.test(value)?value:undefined;
@@ -66,6 +66,7 @@ function eventSummary(event) {
   const label=(value,allowed)=>allowed.includes(value)?value:'other';
   const summary={type:label(event.type,['system','assistant','result','rate_limit_event']),
     subtype:label(event.subtype,['init','status','session_state_changed','api_retry','thinking_tokens','success',
+      'informational','notification','model_refusal_fallback','model_refusal_no_fallback','elicitation_complete',
       'error_during_execution','error_max_turns','error_max_budget_usd','error_max_structured_output_retries'])};
   for(const field of ['tools','mcp_servers','plugins','skills']) {
     const present=Object.hasOwn(event,field);
@@ -169,6 +170,7 @@ export class ClaudeStreamReader {
     this.protocolTrace.push(entry);
   }
   push(chunk) {
+    if(this.primaryError)throw this.primaryError;
     this.bytes += chunk.length;
     if (this.bytes > this.limits.stdout) fail('STDOUT_LIMIT');
     let start=0;
@@ -182,6 +184,7 @@ export class ClaudeStreamReader {
     }
   }
   line(bytes) {
+    if(this.primaryError)throw this.primaryError;
     if(!bytes.length) fail('EMPTY_EVENT');
     if(++this.events>this.limits.events) fail('EVENT_LIMIT');
     let e; try {e=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));} catch {fail('INVALID_EVENT');}
@@ -210,8 +213,9 @@ export class ClaudeStreamReader {
         this.diagnosticInit(e);
         fail('DIAGNOSTIC_STOP'); // Capture only after the other init gates; never accept analysis.
       }
+      if(!Object.hasOwn(e,'plugins'))fail('CONTAINMENT','INIT_PLUGINS_MISSING');
       for(const [field,prefix] of [['plugins','INIT_PLUGINS'],['skills','INIT_SKILLS']]) {
-        if(e[field]!==undefined && !Array.isArray(e[field])) fail('CONTAINMENT',`${prefix}_WRONG_TYPE`);
+        if((field==='plugins'||e[field]!==undefined) && !Array.isArray(e[field])) fail('CONTAINMENT',`${prefix}_WRONG_TYPE`);
         if(Array.isArray(e[field]) && e[field].length) fail('CONTAINMENT',`${prefix}_NONEMPTY`);
       }
       if(e.permissionMode==='bypassPermissions') fail('CONTAINMENT','INIT_PERMISSION_BYPASS');
@@ -219,6 +223,10 @@ export class ClaudeStreamReader {
     }
     if(!this.initialized) fail('MISSING_INIT');
     if(e.type==='system'){
+      if(e.subtype==='informational'||e.subtype==='notification')
+        fail('PROTOCOL_EVENT_UNSUPPORTED','UNSUPPORTED_SYSTEM_EVENT');
+      if(e.subtype==='model_refusal_fallback'||e.subtype==='model_refusal_no_fallback')
+        fail('PROVIDER_MODEL_REFUSAL',e.subtype==='model_refusal_fallback'?'REFUSAL_FALLBACK_NOT_ALLOWED':'REFUSAL_NO_FALLBACK');
       if(e.subtype==='api_retry'){
         if(!boundedInteger(e.attempt,100)||e.attempt<1||!boundedInteger(e.max_retries,100)||
           e.attempt>e.max_retries||!boundedInteger(e.retry_delay_ms,3600000)||
@@ -313,6 +321,8 @@ export class ClaudeStreamReader {
       this.primaryError??=providerError(undefined,e.api_error_status);return;
     }
     if(this.primaryError)return; // An apparently successful result cannot erase a prior assistant error.
+    if(e.stop_reason!==null&&e.stop_reason!=='end_turn'&&e.stop_reason!=='stop_sequence')
+      fail('PARTIAL_RESULT','RESULT_STOP_REASON');
     if(e.num_turns!==1) fail('TURN_LIMIT');
     if(!this.generatedModel||!this.generatedText)fail('MODEL_UNPROVEN','NO_GENERATED_TEXT');
     if(typeof e.result!=='string'||Buffer.byteLength(e.result)>this.limits.response) fail('RESPONSE_LIMIT');
@@ -361,7 +371,11 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
     const timer=setTimeout(()=>stop('TIMEOUT'),timeoutMs);
     signal?.addEventListener('abort',abort,{once:true});
     if(signal?.aborted)abort();
-    child.stdout.on('data',chunk=>{if(error)return;try{reader.push(chunk);}catch(e){reader.markDecision(e.code??'INVALID_EVENT',e.reason);stop(e.code??'INVALID_EVENT',e.reason);}});
+    child.stdout.on('data',chunk=>{if(error)return;try{
+      reader.push(chunk);
+      // Promote a wire result error immediately, before any late event or lifecycle signal.
+      if(reader.primaryError){reader.markDecision(reader.primaryError.code);stop(reader.primaryError.code);}
+    }catch(e){reader.markDecision(e.code??'INVALID_EVENT',e.reason);stop(e.code??'INVALID_EVENT',e.reason);}});
     child.stderr.on('data',chunk=>{
       stderrBytes+=chunk.length;
       tail=Buffer.concat([tail,chunk.subarray(-limits.stderrTail)]).subarray(-limits.stderrTail);

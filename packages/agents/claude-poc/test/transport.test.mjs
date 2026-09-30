@@ -124,6 +124,55 @@ test('versioned block-wise assistant and bounded operational metadata complete o
  assert.equal(thinking.protocolTrace[1].estimated_tokens,7);
  assert(!JSON.stringify(thinking.protocolTrace).includes('PRIVATE THOUGHT'));
 });
+for(const stop of ['end_turn','stop_sequence','null'])test(`result terminal stop_reason ${stop} accepted`,async()=>{
+ const mode=stop==='null'?'utf8':`result-stop-${stop}`;
+ assert.equal((await run(mode)).metrics.childClosed,true);
+});
+for(const stop of ['max_tokens','refusal','pause_turn','unknown','missing','array'])
+ test(`result terminal stop_reason ${stop} rejected without coercion`,async()=>{
+  await assert.rejects(run(`result-stop-${stop}`),e=>e.code==='PARTIAL_RESULT'&&e.reason==='RESULT_STOP_REASON');
+ });
+test('result tool_use stays containment and two distinct Opus usage models stay drift',async()=>{
+ await assert.rejects(run('result-stop-tool_use'),e=>e.code==='CONTAINMENT');
+ await assert.rejects(run('opus-drift'),e=>e.code==='MODEL_DRIFT');
+});
+for(const mode of ['result-error-late','result-error-timeout','result-error-cancel'])
+ test(`primary provider result error survives ${mode}`,async()=>{
+  const controller=new AbortController();
+  let timer;
+  // Trigger cancellation only after the wire result error has been consumed.
+  const cwd=await mkdtemp('/tmp/cevra-primary-error-test-');
+  try{
+   await assert.rejects(runClaudeProcess({binary:'/fixture-only',home:'/fixture-home',cwd,payload,
+    timeoutMs:mode==='result-error-timeout'?500:3000,signal:controller.signal},(bin,args,opts)=>{
+     const child=runner(mode)(bin,args,opts);
+     if(mode==='result-error-cancel')child.stdout.on('data',chunk=>{
+      if(chunk.toString().includes('api_error_status'))timer=setTimeout(()=>controller.abort(),10);
+     });
+     return child;
+    }),e=>e.code==='PROVIDER_RATE_LIMIT'&&e.metrics.childClosed===true);
+  }finally{clearTimeout(timer);await rmdir(cwd);}
+ });
+test('reader preserves result provider error even with late events in the same stdout chunk',()=>{
+ const r=new ClaudeStreamReader('fixture');
+ const events=[{type:'system',subtype:'init',session_id:'fixture',tools:[],mcp_servers:[],plugins:[],model:'claude-opus-fixture'},
+  {type:'result',subtype:'success',session_id:'fixture',is_error:true,permission_denials:[],api_error_status:429},
+  {type:'system',subtype:'notification',session_id:'fixture'}];
+ assert.throws(()=>r.push(Buffer.from(events.map(e=>JSON.stringify(e)).join('\n')+'\n')),e=>e.code==='PROVIDER_RATE_LIMIT');
+ assert.throws(()=>r.finish(),e=>e.code==='PROVIDER_RATE_LIMIT');
+});
+for(const [mode,code,reason] of [
+ ['plugins-missing','CONTAINMENT','INIT_PLUGINS_MISSING'],
+ ['plugins-invalid','CONTAINMENT','INIT_PLUGINS_WRONG_TYPE'],
+ ['plugins-nonempty','CONTAINMENT','INIT_PLUGINS_NONEMPTY'],
+ ['informational','PROTOCOL_EVENT_UNSUPPORTED','UNSUPPORTED_SYSTEM_EVENT'],
+ ['notification','PROTOCOL_EVENT_UNSUPPORTED','UNSUPPORTED_SYSTEM_EVENT'],
+ ['model_refusal_fallback','PROVIDER_MODEL_REFUSAL','REFUSAL_FALLBACK_NOT_ALLOWED'],
+ ['model_refusal_no_fallback','PROVIDER_MODEL_REFUSAL','REFUSAL_NO_FALLBACK'],
+ ['elicitation_complete','CONTAINMENT','FORBIDDEN_SYSTEM_EVENT'],
+])test(`offline complete sequence ${mode} has the intended policy classification`,async()=>{
+ await assert.rejects(run(mode),e=>e.code===code&&e.reason===reason&&e.metrics.childClosed);
+});
 for(const [mode,code] of [
  ['api-retry-401','PROVIDER_RETRY_NOT_ALLOWED'],['api-retry-429','PROVIDER_RETRY_NOT_ALLOWED'],
  ['api-retry-529','PROVIDER_RETRY_NOT_ALLOWED'],['api-retry-null','PROVIDER_RETRY_NOT_ALLOWED'],
@@ -332,7 +381,8 @@ test('every init field reports a closed reason without changing pass/fail semant
  }
  for(const [field,prefix] of [['plugins','INIT_PLUGINS'],['skills','INIT_SKILLS']]){
   let result=mutation(field,e=>{delete e[field];});
-  assert.equal(result.error,undefined);assert.deepEqual(result.summary,{present:false,kind:'missing',count:null});
+  assert.equal(result.error?.reason,field==='plugins'?'INIT_PLUGINS_MISSING':undefined);
+  assert.deepEqual(result.summary,{present:false,kind:'missing',count:null});
   result=mutation(field,e=>{e[field]=[];});
   assert.equal(result.error,undefined);assert.deepEqual(result.summary,{present:true,kind:'array',count:0});
   result=mutation(field,e=>{e[field]={secret:privateName};});

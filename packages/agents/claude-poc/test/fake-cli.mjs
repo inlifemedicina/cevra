@@ -13,6 +13,9 @@ if(mode==='slow'||mode==='ignore-term'){
 }else{
  const init={type:'system',subtype:'init',session_id,tools:[],mcp_servers:[],plugins:[],skills:[],model};
  if(mode==='tools')init.tools=['Read'];
+ if(mode==='plugins-missing')delete init.plugins;
+ if(mode==='plugins-invalid')init.plugins={};
+ if(mode==='plugins-nonempty')init.plugins=['fixture-plugin'];
  if(mode==='diagnostic-plugins')init.plugins=[{id:'private-one@fixture',path:'/private/one',version:'1.0',secretInstructions:'DO NOT COPY'},'private-two@fixture'];
  send(init);
  if(mode==='status'||mode==='status-after-result'){
@@ -30,6 +33,8 @@ if(mode==='slow'||mode==='ignore-term'){
  if(mode==='plugin-install')send({type:'system',subtype:'plugin_install',session_id,status:'started',name:'private'});
  if(mode==='unknown-system')send({type:'system',subtype:'surprise_subtype',session_id,content:'PRIVATE DO NOT LOG'});
  if(mode==='malicious-system')send({type:'system',subtype:'private\nsecret',session_id,content:'Bearer private-token'});
+ if(['informational','notification','model_refusal_fallback','model_refusal_no_fallback','elicitation_complete'].includes(mode))
+  send({type:'system',subtype:mode,session_id});
  if(mode.startsWith('api-retry-')&&mode!=='api-retry-invalid'){
   const status=mode.slice('api-retry-'.length);
   send({type:'system',subtype:'api_retry',session_id,attempt:1,max_retries:3,retry_delay_ms:100,
@@ -70,7 +75,14 @@ if(mode==='slow'||mode==='ignore-term'){
  let candidate={version:1,kind:'analysis-candidate',contextId:envelope.context.contextId,observations:[{id:'o1',kind:'idea',statement:'Café — ação 🎬',uncertainty:'material',justification:'Fixture only',evidenceReferences:[ref]}],relations:[],uncertainties:[],limitations:['Scripted fixture, not AI.']};
  if(mode==='citation')candidate.observations[0].evidenceReferences=['E999'];
  if(mode==='needs')candidate={version:1,kind:'needs-evidence',contextId:envelope.context.contextId,request:{type:'text-context',sourceReference:'S1',maxAdditionalBytes:4096,reason:'Fixture continuation'}};
- let result={type:'result',subtype:'success',is_error:false,num_turns:1,permission_denials:[],session_id,result:mode==='json'?'not json':JSON.stringify(candidate),modelUsage:{[model]:{inputTokens:1,outputTokens:2}},total_cost_usd:0};
+ let result={type:'result',subtype:'success',is_error:false,stop_reason:null,num_turns:1,permission_denials:[],session_id,result:mode==='json'?'not json':JSON.stringify(candidate),modelUsage:{[model]:{inputTokens:1,outputTokens:2}},total_cost_usd:0};
+ if(mode.startsWith('result-stop-')){
+  const stop=mode.slice('result-stop-'.length);
+  if(stop==='missing')delete result.stop_reason;
+  else result.stop_reason=stop==='array'?['end_turn']:stop;
+ }
+ if(mode==='opus-drift')result.modelUsage={[model]:{},'claude-opus-other-fixture':{}};
+ if(mode.startsWith('result-error-')){result.is_error=true;result.api_error_status=429;}
  if(mode==='model')result.modelUsage={'claude-sonnet-fixture':{}};
  if(mode==='correlation')result.session_id='wrong';
  if(mode==='error')result.subtype='error_max_turns';
@@ -86,6 +98,10 @@ if(mode==='slow'||mode==='ignore-term'){
   const bytes=Buffer.from(JSON.stringify(result)+'\n');
   for(const byte of bytes)process.stdout.write(Buffer.from([byte]));
  }else{send(result);if(mode==='duplicate')send(result);}
+ if(mode==='result-error-late')send({type:'system',subtype:'surprise_subtype',session_id});
+ if(mode==='result-error-timeout'||mode==='result-error-cancel'){
+  process.on('SIGTERM',()=>{});setTimeout(()=>process.exit(0),10000);
+ }
  if(mode==='status-after-result')send({type:'system',subtype:'session_state_changed',session_id,state:'idle'});
  if(mode==='assistant-error-then-exit')process.exitCode=1;
  if(mode==='late-close'){process.on('SIGTERM',()=>{});setTimeout(()=>process.exit(0),10000);}
