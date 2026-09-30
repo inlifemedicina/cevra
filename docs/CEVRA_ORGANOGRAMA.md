@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE BLOCKED-EXPLICIT-AUTH]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE AUTH STATUS FIXED, PRIVATE LEDGER MISSING]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -173,9 +173,17 @@ synthetic message model; its final result had `is_error=true` and
 `terminal_reason=api_error`. The child closed, no semantic result was accepted,
 and ProjectHistory/redo were unchanged. Ledger **5/8**. The cause of #4 remains
 unproven; #5 establishes a current explicit authentication failure. PT-BR,
-EN-US and cancellation remain **NOT RUN**. The next action is a separately
-authorized official-client authentication investigation/decision, not a retry
-or change of provider, model, billing or containment.
+EN-US and cancellation remain **NOT RUN**. The separately authorized
+official-client authentication investigation did not retry or change provider,
+model, billing or containment. It found
+the former child environment lacking `USER`/`LOGNAME`: official read-only
+status was logged out there, but logged in as Claude.ai/Pro both in the
+login-equivalent profile and after adding only the OS-derived user identity.
+This is not proof that inference now works. Canary #6 remains **NOT RUN**
+because the original private five-attempt ledger and plugin override receipt
+are absent from their recorded temporary location; they were not recreated.
+Recover the exact private evidence or make a separate evidence-control decision
+before any further real process. The historical count stays **5/8**.
 Effective end-to-end Opus/Medium, real transport success and editorial matrix remain unproven.
 Claude remains the next private proof candidate, not a replacement of the
 provider-neutral core or an approved commercial integration. Complete Semantic

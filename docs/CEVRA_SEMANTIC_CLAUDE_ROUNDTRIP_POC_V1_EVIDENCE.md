@@ -741,3 +741,68 @@ authorized authentication investigation/decision using the official client,
 without assuming that the prior login status guarantees this headless run.
 Slice A remains CLOSED; the complete semantic analysis and real round-trip
 remain NOT DELIVERED; ADR 0030 remains IN DEVELOPMENT; progress stays **55%**.
+
+## Child authentication environment comparison — 2026-09-29
+
+This task used the same pinned Claude Code 2.1.280/darwin-arm64 binary and
+verified SHA-256 as canary #5. The official `claude auth status --json` command
+is read-only in the pinned CLI. The current official
+[authentication reference](https://code.claude.com/docs/en/authentication)
+documents macOS Keychain/config-directory behavior and credential precedence;
+the [CLI reference](https://code.claude.com/docs/en/cli-reference) documents
+`auth status`, its exit code and `configDirectory`. The official
+[plan notice](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan)
+explicitly says its announced separate Agent SDK credit change was paused;
+this task did not infer a new billing mode. The CLI's `auth status --help`
+exposed `--json`/`--text`, not the full session isolation arguments, so a
+status probe with the temporary plugin override was **NOT RUN**.
+
+Sanitized read-only comparison (same effective UID, HOME, binary, system PATH,
+LANG and disabled auto-update):
+
+| Profile | USER/LOGNAME | Official status | Config directory |
+|---|---|---|---|
+| A, equivalent to the completed login | present, matching effective OS user | exit 0; logged in; Claude.ai / first-party / Pro | same as B |
+| B, original `childEnvironment()` | absent | exit 1; not logged in; first-party provider | same as A |
+| Corrected B, OS-reported user identity only | present | exit 0; logged in; Claude.ai / first-party / Pro | same as A |
+
+This is direct evidence of a **local child-environment authentication selection
+defect** in the status command, not proof that a model call will now succeed.
+The precise macOS credential-store operation is not observed. No credential,
+Keychain item, auth file, token or full personal configuration was read by
+CEVRA. `USER` and `LOGNAME` now come from the effective OS user rather than
+inheriting an unrestricted parent environment; forbidden API/cloud/provider
+credentials and proxy variables remain absent. The `--restricted`, `--safe-mode`,
+empty tools/MCP, private plugin override, Opus/Medium request and original init
+validator are unchanged. No global settings or login were changed.
+
+Code/test checkpoint `822262bce5f6b332d1dc656208a22b4ab43668c6`
+also adds closed auxiliary explanation categories for explicitly errored
+assistant/result events. An unknown/unclassifiable message remains unknown;
+`authentication_failed` alone never asserts HTTP 401 or proves remote
+rejection. Only category/evidence/presence/hash are retained in the exclusive,
+owner-only private receipt; raw error text, event, transcript, credentials and
+private plugin names are not persisted. The historical #4 and #5 conclusions
+above remain unchanged. Deterministic Claude transport tests passed **70/70**
+and directly related Application tests **210/210**. These are fake-process and
+Application contract tests, not real Opus execution.
+Push CI [run 36660806889](https://github.com/inlifemedicina/cevra/actions/runs/36660806889)
+completed **SUCCESS 5/5** on that code/test SHA (Monorepo, Tauri, Media Runtime
+reproducibility, Transcription and Alignment). It did not invoke Claude or
+prove real authentication/model execution.
+
+**Canary #6 NOT RUN — private-ledger loss.** Before any new model process, the
+previously recorded `/tmp` ledger directory was checked at its exact path and
+in the bounded own-prefix locations under `/private/tmp` and this process's
+`TMPDIR`; it is no longer present. The reason for disappearance is unknown.
+The five historical receipts and the private diagnostic #3 source IDs required
+for the restrictive plugin override therefore cannot be verified or supplied
+from this host. Tracked evidence preserves the historical **5/8** count, but it
+is not a replacement for those immutable private receipts. The harness was
+prepared to require the exact five-attempt sequence before #6; no replacement
+ledger was created, no extra diagnostic was run and no sixth inference process
+was started. Nominal historical balance: **3/8**, unavailable for safe execution
+until the original private evidence is restored or the Product Owner makes a
+separate, explicit evidence/attempt-control decision. PT-BR, EN-US,
+continuation and cancellation remain **NOT RUN**. Model generation, effective
+effort, provider-side usage and semantic quality remain unproved.

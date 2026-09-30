@@ -230,6 +230,17 @@ The first official-provider attempts do not alter the accepted boundary:
   Ledger is 5/8; the editorial/cancellation matrix remains NOT RUN. An
   official-client authentication investigation/decision is the next bounded
   gate, not a retry, billing change or parser exception.
+- official read-only `auth status` subsequently identified a local environment
+  mismatch: the former child omitted `USER`/`LOGNAME` and appeared logged out,
+  while the login-equivalent environment and the child with only the effective
+  OS username restored both report Claude.ai/Pro under the same config
+  directory. That correction is not proof of model-call acceptance. Closed
+  error-explanation categories were added without raw-text retention or a
+  containment change. Canary #6 was NOT RUN because the original private
+  five-attempt ledger and diagnostic #3 override receipt had disappeared from
+  the recorded temporary location; they were not reconstructed. Historical
+  count remains 5/8. Recovery of those exact receipts or a separate explicit
+  evidence-control decision is required before any further real attempt.
 
 The private adapter is deterministically tested; the five bounded real processes
 have not yielded an accepted transport/Application round-trip. Synthetic canary envelopes were written to the CLI; remote inference
