@@ -22,8 +22,38 @@ const ASSISTANT_ERRORS=Object.freeze({authentication_failed:'PROVIDER_AUTH_ERROR
   model_not_found:'PROVIDER_MODEL_ERROR',overloaded:'PROVIDER_SERVER_ERROR',account_on_hold:'PROVIDER_BILLING_ERROR'});
 const TERMINAL_REASONS=['completed','api_error','model_error','max_turns','aborted_streaming','aborted_tools'];
 const STOP_REASONS=['end_turn','stop_sequence','tool_use','max_tokens','pause_turn','refusal'];
+const RETRY_ERRORS=new Set([...Object.keys(ASSISTANT_ERRORS),'verification_required','unknown','max_output_tokens']);
+const FORBIDDEN_SYSTEM=new Set(['compact_boundary','hook_started','hook_progress','hook_response',
+  'plugin_install','task_started','task_updated','task_progress','task_notification',
+  'background_tasks_changed','permission_denied','memory_recall','local_command_output',
+  'informational','commands_changed','thinking_tokens','notification','conversation_reset']);
+const FORBIDDEN_TYPES=new Set(['control_request','control_response','control_cancel_request',
+  'stream_event','user','tool_progress','tool_use_summary','permission_denied',
+  'task_notification','task_started','task_progress','task_updated','plugin_install',
+  'model_refusal_fallback','model_refusal_no_fallback','memory_recall','local_command_output']);
 const kind=value=>value===undefined?'missing':value===null?'null':Array.isArray(value)?'array':typeof value;
 const modelClass=value=>typeof value==='string'&&OPUS.test(value)?'allowed-opus':value==='<synthetic>'?'synthetic':'unproven';
+const safeProtocolValue=value=>typeof value==='string'&&value.length<=64&&/^[a-z][a-z0-9_]*$/.test(value)?value:undefined;
+const boundedInteger=(value,max=1_000_000)=>Number.isSafeInteger(value)&&value>=0&&value<=max;
+function protocolTraceEntry(event,phase){
+  const entry={phase,type:safeProtocolValue(event.type),typeKind:kind(event.type),
+    subtype:safeProtocolValue(event.subtype),subtypeKind:kind(event.subtype)};
+  for(const field of ['attempt','max_retries','retry_delay_ms','error_status']){
+    if(Object.hasOwn(event,field))entry[field]=field==='error_status'&&event[field]===null?null:
+      boundedInteger(event[field])?event[field]:undefined;
+    entry[`${field}Kind`]=kind(event[field]);
+  }
+  if(event.type==='system'&&event.subtype==='status')entry.status=event.status===null?null:
+    ['requesting','compacting'].includes(event.status)?event.status:undefined;
+  if(event.type==='system'&&event.subtype==='session_state_changed')entry.state=
+    ['running','idle','requires_action'].includes(event.state)?event.state:undefined;
+  if(event.type==='system'&&event.subtype==='api_retry')entry.error=RETRY_ERRORS.has(event.error)?event.error:undefined;
+  if(event.type==='assistant')entry.modelClass=modelClass(event.message?.model);
+  if(event.type==='result')entry.isError=event.is_error===true;
+  if(!entry.type&&event.type!==undefined)entry.typeHash=createHash('sha256').update(String(event.type).slice(0,128)).digest('hex');
+  if(!entry.subtype&&event.subtype!==undefined)entry.subtypeHash=createHash('sha256').update(String(event.subtype).slice(0,128)).digest('hex');
+  return entry;
+}
 function providerError(value,status) {
   const code=typeof value==='string'&&Object.hasOwn(ASSISTANT_ERRORS,value)?ASSISTANT_ERRORS[value]:
     status===401||status===403?'PROVIDER_AUTH_ERROR':status===402?'PROVIDER_BILLING_ERROR':
@@ -35,7 +65,8 @@ function providerError(value,status) {
 function eventSummary(event) {
   const label=(value,allowed)=>allowed.includes(value)?value:'other';
   const summary={type:label(event.type,['system','assistant','result','rate_limit_event']),
-    subtype:label(event.subtype,['init','success','error_max_turns'])};
+    subtype:label(event.subtype,['init','status','session_state_changed','api_retry','success',
+      'error_during_execution','error_max_turns','error_max_budget_usd','error_max_structured_output_retries'])};
   for(const field of ['tools','mcp_servers','plugins','skills']) {
     const present=Object.hasOwn(event,field);
     const value=event[field];
@@ -126,7 +157,16 @@ export class ClaudeStreamReader {
     this.diagnosticInit=diagnosticInit;
     this.bytes=0; this.events=0; this.initialized=false; this.result=undefined;
     this.model=undefined; this.generatedModel=undefined; this.usage=undefined; this.estimate=undefined;
-    this.primaryError=undefined; this.terminal=false;this.privateEvents=[];
+    this.primaryError=undefined; this.terminal=false;this.privateEvents=[];this.protocolTrace=[];
+    this.generatedText=false;this.messageId=undefined;this.permissionMode=undefined;
+  }
+  markDecision(code,reason){
+    const last=this.protocolTrace.at(-1);
+    if(last&&last.decision===undefined){last.decision=code;if(reason)last.reason=reason;}
+  }
+  appendTrace(entry){
+    if(this.protocolTrace.length>=24)this.protocolTrace.splice(1,1);
+    this.protocolTrace.push(entry);
   }
   push(chunk) {
     this.bytes += chunk.length;
@@ -147,14 +187,12 @@ export class ClaudeStreamReader {
     let e; try {e=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));} catch {fail('INVALID_EVENT');}
     if (!e || typeof e!=='object' || Array.isArray(e)) fail('INVALID_EVENT');
     this.lastEventSummary=eventSummary(e);
+    this.appendTrace(protocolTraceEntry(e,this.terminal?'after-result':this.initialized?'session':'before-init'));
     const privateSummary=privateEventSummary(e);
     if(privateSummary && this.privateEvents.length<8)this.privateEvents.push(privateSummary);
-    if(this.terminal) fail('LATE_EVENT');
-    if(e.type==='rate_limit_event') {
-      // Provider advisory only; never turns a refused/error result into success.
-      if(e.session_id!==this.sessionId || !e.rate_limit_info) fail('CORRELATION');
-      if(e.rate_limit_info.isUsingOverage===true) fail('EXTRA_USAGE');
-      return;
+    if(this.terminal){
+      if(e.type==='system'&&e.subtype==='session_state_changed'&&e.session_id===this.sessionId&&e.state==='idle')return;
+      fail('LATE_EVENT');
     }
     if(e.session_id!==this.sessionId) fail('CORRELATION');
     if(e.type==='system' && e.subtype==='init') {
@@ -177,9 +215,54 @@ export class ClaudeStreamReader {
         if(Array.isArray(e[field]) && e[field].length) fail('CONTAINMENT',`${prefix}_NONEMPTY`);
       }
       if(e.permissionMode==='bypassPermissions') fail('CONTAINMENT','INIT_PERMISSION_BYPASS');
-      this.checkModel(e.model,'init'); this.model=e.model; this.initialized=true; return;
+      this.checkModel(e.model,'init'); this.model=e.model;this.permissionMode=e.permissionMode; this.initialized=true; return;
     }
     if(!this.initialized) fail('MISSING_INIT');
+    if(e.type==='system'){
+      if(e.subtype==='api_retry'){
+        if(!boundedInteger(e.attempt,100)||e.attempt<1||!boundedInteger(e.max_retries,100)||
+          e.attempt>e.max_retries||!boundedInteger(e.retry_delay_ms,3600000)||
+          !(e.error_status===null||Number.isInteger(e.error_status)&&e.error_status>=100&&e.error_status<=599)||
+          !RETRY_ERRORS.has(e.error)||
+          e.no_response!==undefined&&(!e.no_response||typeof e.no_response!=='object'||Array.isArray(e.no_response)||
+            !boundedInteger(e.no_response.waited_ms,3600000)||!boundedInteger(e.no_response.retry_wait_ms,3600000)))
+          fail('PROTOCOL_EVENT_INVALID','API_RETRY_SHAPE');
+        fail('PROVIDER_RETRY_NOT_ALLOWED',providerError(e.error,e.error_status).code);
+      }
+      if(e.subtype==='status'){
+        if(e.status==='compacting')fail('CONTAINMENT','STATUS_COMPACTING');
+        if(e.permissionMode==='bypassPermissions')fail('CONTAINMENT','STATUS_PERMISSION_BYPASS');
+        if(!Object.hasOwn(e,'status')||e.status!==null&&e.status!=='requesting'||
+          e.compact_result!==undefined||e.compact_error!==undefined||
+          e.permissionMode!==undefined&&e.permissionMode!==this.permissionMode)
+          fail('PROTOCOL_EVENT_INVALID','STATUS_SHAPE');
+        return;
+      }
+      if(e.subtype==='session_state_changed'){
+        if(e.state==='requires_action')fail('CONTAINMENT','SESSION_REQUIRES_ACTION');
+        if(e.state!=='running'&&e.state!=='idle')fail('PROTOCOL_EVENT_INVALID','SESSION_STATE_SHAPE');
+        return;
+      }
+      if(FORBIDDEN_SYSTEM.has(e.subtype))fail('CONTAINMENT','FORBIDDEN_SYSTEM_EVENT');
+      fail('PROTOCOL_EVENT_UNSUPPORTED','UNKNOWN_SYSTEM_SUBTYPE');
+    }
+    if(e.type==='rate_limit_event'){
+      const info=e.rate_limit_info;
+      if(!info||typeof info!=='object'||Array.isArray(info)||
+        !['allowed','allowed_warning','rejected'].includes(info.status)||
+        info.isUsingOverage!==undefined&&typeof info.isUsingOverage!=='boolean'||
+        info.overageInUse!==undefined&&typeof info.overageInUse!=='boolean')
+        fail('PROTOCOL_EVENT_INVALID','RATE_LIMIT_SHAPE');
+      if(info.isUsingOverage===true||info.overageInUse===true)fail('EXTRA_USAGE');
+      if(info.status==='rejected')fail('PROVIDER_RATE_LIMIT');
+      return;
+    }
+    if(e.type==='auth_status'){
+      if(typeof e.isAuthenticating!=='boolean'||!Array.isArray(e.output)||
+        e.output.some(item=>typeof item!=='string')||e.error!==undefined&&typeof e.error!=='string')
+        fail('PROTOCOL_EVENT_INVALID','AUTH_STATUS_SHAPE');
+      fail('PROVIDER_AUTH_ERROR','AUTH_STATUS_DURING_TURN');
+    }
     if(e.type==='assistant') {
       if(e.parent_tool_use_id!=null) fail('CONTAINMENT');
       if(!e.message||typeof e.message!=='object'||Array.isArray(e.message)||!Array.isArray(e.message.content))fail('INVALID_EVENT');
@@ -189,16 +272,29 @@ export class ClaudeStreamReader {
       if(e.message.stop_reason==='tool_use')fail('CONTAINMENT');
       if(e.error!==undefined){
         if(typeof e.error!=='string')fail('INVALID_EVENT');
-        this.primaryError??=providerError(e.error);return;
+        fail(providerError(e.error).code);
       }
-      if(e.aborted===true){this.primaryError??=new ClaudePocError('PARTIAL_ASSISTANT');return;}
+      if(e.aborted===true)fail('PARTIAL_ASSISTANT');
       this.checkModel(e.message.model,'assistant');
-      if(!['end_turn','stop_sequence'].includes(e.message.stop_reason))fail('PARTIAL_ASSISTANT');
-      if(!e.message.content.some(block=>block.type==='text'&&typeof block.text==='string'&&block.text.length))fail('MODEL_UNPROVEN','NO_GENERATED_TEXT');
+      if(e.message.stop_reason!==null&&!['end_turn','stop_sequence'].includes(e.message.stop_reason))fail('PARTIAL_ASSISTANT');
+      if(e.message.id!==undefined){
+        if(typeof e.message.id!=='string'||!e.message.id||e.message.id.length>128)fail('PROTOCOL_EVENT_INVALID','MESSAGE_ID_SHAPE');
+        if(this.messageId!==undefined&&this.messageId!==e.message.id)fail('CORRELATION');
+        this.messageId=e.message.id;
+      }
+      for(const block of e.message.content){
+        if(block.type==='text'){
+          if(typeof block.text!=='string')fail('PROTOCOL_EVENT_INVALID','TEXT_BLOCK_SHAPE');
+          if(block.text.length)this.generatedText=true;
+        }
+      }
       this.generatedModel=e.message.model;
       return; // final result is authoritative; do not concatenate assistant text/deltas.
     }
-    if(e.type!=='result') fail('CONTAINMENT');
+    if(e.type!=='result'){
+      if(FORBIDDEN_TYPES.has(e.type))fail('CONTAINMENT','FORBIDDEN_EVENT_TYPE');
+      fail('PROTOCOL_EVENT_UNSUPPORTED','UNKNOWN_TYPE');
+    }
     if(!Array.isArray(e.permission_denials)||e.permission_denials.length) fail('CONTAINMENT');
     if(e.deferred_tool_use!=null)fail('CONTAINMENT');
     if(e.stop_reason==='tool_use')fail('CONTAINMENT');
@@ -211,7 +307,7 @@ export class ClaudeStreamReader {
     }
     if(this.primaryError)return; // An apparently successful result cannot erase a prior assistant error.
     if(e.num_turns!==1) fail('TURN_LIMIT');
-    if(!this.generatedModel)fail('MODEL_UNPROVEN','NO_GENERATED_ASSISTANT');
+    if(!this.generatedModel||!this.generatedText)fail('MODEL_UNPROVEN','NO_GENERATED_TEXT');
     if(typeof e.result!=='string'||Buffer.byteLength(e.result)>this.limits.response) fail('RESPONSE_LIMIT');
     if(!e.modelUsage || !Object.keys(e.modelUsage).length) fail('MODEL_UNPROVEN');
     for(const model of Object.keys(e.modelUsage)) this.checkModel(model);
@@ -258,7 +354,7 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
     const timer=setTimeout(()=>stop('TIMEOUT'),timeoutMs);
     signal?.addEventListener('abort',abort,{once:true});
     if(signal?.aborted)abort();
-    child.stdout.on('data',chunk=>{if(error)return;try{reader.push(chunk);}catch(e){stop(e.code??'INVALID_EVENT',e.reason);}});
+    child.stdout.on('data',chunk=>{if(error)return;try{reader.push(chunk);}catch(e){reader.markDecision(e.code??'INVALID_EVENT',e.reason);stop(e.code??'INVALID_EVENT',e.reason);}});
     child.stderr.on('data',chunk=>{
       stderrBytes+=chunk.length;
       tail=Buffer.concat([tail,chunk.subarray(-limits.stderrTail)]).subarray(-limits.stderrTail);
@@ -280,7 +376,10 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
         lastEventSummary:reader.lastEventSummary,envelopeBytes:Buffer.byteLength(payload),
         systemPromptBytes:Buffer.byteLength(PLAYBOOK),stdinBytes:Buffer.byteLength(payload),
         latencyMs:performance.now()-started,childClosed:true};
+        if(reader.protocolTrace.at(-1)?.decision===undefined)reader.appendTrace({phase:reader.terminal?'after-result':reader.initialized?'session':'before-init',
+          type:'process',typeKind:'string',subtype:'close',subtypeKind:'string',decision:error.code});
         Object.defineProperty(error,'privateDiagnostic',{value:Object.freeze([...reader.privateEvents])});
+        Object.defineProperty(error,'protocolTrace',{value:Object.freeze(reader.protocolTrace.map(e=>Object.freeze({...e})))});
         reject(error);return;}
       try {
         const result=reader.result;
@@ -289,6 +388,7 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
           responseBytes:Buffer.byteLength(result),stdoutBytes:reader.bytes,stderrBytes,events:reader.events,
           latencyMs:performance.now()-started,usage:reader.usage,estimatedUsd:reader.estimate,childClosed:true}};
         Object.defineProperty(accepted,'privateDiagnostic',{value:Object.freeze([...reader.privateEvents])});
+        Object.defineProperty(accepted,'protocolTrace',{value:Object.freeze(reader.protocolTrace.map(e=>Object.freeze({...e})))});
         resolve(accepted);
       }catch(e){reject(e);}
     });

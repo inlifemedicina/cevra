@@ -15,6 +15,26 @@ if(mode==='slow'||mode==='ignore-term'){
  if(mode==='tools')init.tools=['Read'];
  if(mode==='diagnostic-plugins')init.plugins=[{id:'private-one@fixture',path:'/private/one',version:'1.0',secretInstructions:'DO NOT COPY'},'private-two@fixture'];
  send(init);
+ if(mode==='status'||mode==='status-after-result'){
+  send({type:'system',subtype:'session_state_changed',session_id,state:'running'});
+  send({type:'system',subtype:'status',session_id,status:'requesting'});
+  send({type:'system',subtype:'status',session_id,status:null});
+ }
+ if(mode==='status-compacting')send({type:'system',subtype:'status',session_id,status:'compacting'});
+ if(mode==='status-invalid')send({type:'system',subtype:'status',session_id,status:'unverified'});
+ if(mode==='requires-action')send({type:'system',subtype:'session_state_changed',session_id,state:'requires_action'});
+ if(mode==='auth-status')send({type:'auth_status',session_id,isAuthenticating:true,output:['PRIVATE LOGIN LINK']});
+ if(mode==='hook-event')send({type:'system',subtype:'hook_started',session_id,hook_id:'fixture',hook_name:'private',hook_event:'PreToolUse'});
+ if(mode==='plugin-install')send({type:'system',subtype:'plugin_install',session_id,status:'started',name:'private'});
+ if(mode==='unknown-system')send({type:'system',subtype:'surprise_subtype',session_id,content:'PRIVATE DO NOT LOG'});
+ if(mode==='malicious-system')send({type:'system',subtype:'private\nsecret',session_id,content:'Bearer private-token'});
+ if(mode.startsWith('api-retry-')&&mode!=='api-retry-invalid'){
+  const status=mode.slice('api-retry-'.length);
+  send({type:'system',subtype:'api_retry',session_id,attempt:1,max_retries:3,retry_delay_ms:100,
+    error_status:status==='null'?null:Number(status),error:status==='401'?'authentication_failed':
+      status==='429'?'rate_limit':status==='529'?'overloaded':'unknown'});
+ }
+ if(mode==='api-retry-invalid')send({type:'system',subtype:'api_retry',session_id,attempt:'1',max_retries:3,retry_delay_ms:100,error_status:429,error:'rate_limit'});
  const assistantError=mode.startsWith('assistant-error-')?mode.slice('assistant-error-'.length):undefined;
  const authDetail=mode==='assistant-error-auth-expired'?'Login expired. Please run /login':
   mode==='assistant-error-auth-keychain'?'Keychain access denied for credential store':
@@ -32,6 +52,10 @@ if(mode==='slow'||mode==='ignore-term'){
  if(mode==='assistant-error-then-success')assistant.error='rate_limit';
  if(mode==='assistant-error-then-exit')assistant.error='rate_limit';
  if(mode==='assistant-aborted')assistant.aborted=true;
+ if(mode==='blocks'){
+  send({...assistant,message:{id:'msg-fixture',model,content:[{type:'thinking',thinking:'PRIVATE THOUGHT'}],stop_reason:null}});
+  assistant.message={id:'msg-fixture',model,content:[{type:'text',text:'fixture response'}],stop_reason:null};
+ }
  if(mode==='assistant-error-then-success')assistant.message.model='<synthetic>';
  if(mode!=='no-assistant')send(assistant);
  if(mode==='tool')send({type:'assistant',session_id,message:{model,content:[{type:'tool_use',name:'Read'}]}});
@@ -60,6 +84,7 @@ if(mode==='slow'||mode==='ignore-term'){
   const bytes=Buffer.from(JSON.stringify(result)+'\n');
   for(const byte of bytes)process.stdout.write(Buffer.from([byte]));
  }else{send(result);if(mode==='duplicate')send(result);}
+ if(mode==='status-after-result')send({type:'system',subtype:'session_state_changed',session_id,state:'idle'});
  if(mode==='assistant-error-then-exit')process.exitCode=1;
  if(mode==='late-close'){process.on('SIGTERM',()=>{});setTimeout(()=>process.exit(0),10000);}
 }

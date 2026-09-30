@@ -16,7 +16,7 @@ import {PLAYBOOK_VERSION} from './playbook.mjs';
 
 const execFileAsync=promisify(execFile);
 const mode=process.argv[2];
-if(!['recover','status','diagnostic','pt','en'].includes(mode))throw Error('EXPERIMENT_MODE_REQUIRED');
+if(!['recover','status','diagnostic','pt','en','pt-final'].includes(mode))throw Error('EXPERIMENT_MODE_REQUIRED');
 const home=process.env.HOME;
 const directory=mode==='recover'?await ensureEvidenceDirectory(home):evidencePath(home);
 const binary=join(home,'Library/Application Support/CEVRA/DeveloperTools/claude-code/2.1.280/claude');
@@ -44,7 +44,8 @@ if(mode==='recover'){
   await withExperimentLock(directory,async()=>{
     await readCheckpoint(directory);
     const state=await inspectExperiment(directory);
-    if(mode==='diagnostic'&&state.used!==5||mode==='pt'&&state.used!==6||mode==='en'&&state.used!==7)
+    if(mode==='diagnostic'&&state.used!==5||mode==='pt'&&state.used!==6||mode==='en'&&state.used!==7||
+      mode==='pt-final'&&state.used!==7)
       throw Error('EXPERIMENT_SEQUENCE');
     if(state.remaining<1)throw Error('EXPERIMENT_BUDGET_EXHAUSTED');
     await verifyBinary(binary);
@@ -75,14 +76,16 @@ if(mode==='recover'){
     const analyzer=new ClaudePocAnalyzer({binary,home,pluginOverrideReceipt:overrideReceipt},{verifyBinary,
       runProcess:async options=>{
         if(mode==='diagnostic'&&responses.length)throw Error('DIAGNOSTIC_SINGLE_PROCESS');
+        if(mode==='pt-final'&&responses.length){budgetExhausted=true;throw Error('EXPERIMENT_BUDGET_EXHAUSTED');}
         let reservation;
         try{reservation=await reserveAttempt(directory,mode==='diagnostic'?'plugin-diagnostic':
-          mode==='pt'?'pt-analysis':'en-analysis');}
+          mode==='en'?'en-analysis':'pt-analysis');}
         catch(e){if(e.code==='EXPERIMENT_BUDGET_EXHAUSTED')budgetExhausted=true;throw e;}
         try{
           const result=await runClaudeProcess({...options,...(mode==='diagnostic'?{
             diagnosticInit:event=>{privateInit=captureInitPlugins(event);}}:{})});
-          if(mode!=='diagnostic')await writePrivateEventReceipt(directory,`${mode}-${reservation.number}-private.json`,result.privateDiagnostic);
+          if(mode!=='diagnostic')await writePrivateEventReceipt(directory,`${mode==='pt-final'?'pt':mode}-${reservation.number}-private.json`,
+            {events:result.privateDiagnostic,trace:result.protocolTrace});
           const receipt={status:'transport-complete',metrics:result.metrics};
           responses.push({number:reservation.number,...receipt});
           await writeAttemptReceipt(directory,reservation,receipt);
@@ -94,8 +97,11 @@ if(mode==='recover'){
             pluginDisableSettings(privateInit);
             await writePrivateInitReceipt(directory,'plugin-metadata-6.json',privateInit);
           }
-          if(mode!=='diagnostic'&&e.privateDiagnostic)
-            await writePrivateEventReceipt(directory,`${mode}-${reservation.number}-private.json`,e.privateDiagnostic);
+          if(mode!=='diagnostic'&&e.privateDiagnostic){
+            try{await writePrivateEventReceipt(directory,`${mode==='pt-final'?'pt':mode}-${reservation.number}-private.json`,
+              {events:e.privateDiagnostic,trace:e.protocolTrace??[]});}
+            catch{e.metrics={...e.metrics,privateDiagnosticWriteFailed:true};}
+          }
           const receipt={status:'rejected',error:e.code??'UNCLASSIFIED',metrics:e.metrics};
           responses.push({number:reservation.number,...receipt});
           await writeAttemptReceipt(directory,reservation,receipt);
@@ -103,7 +109,7 @@ if(mode==='recover'){
         }
       }});
     const brief=mode==='diagnostic'?'Devolva uma observação textual mínima citada, no contrato fornecido, sem ferramentas.':
-      mode==='pt'?'Identifique ideias e relações textuais, preservando condições e incertezas. Não escolha takes ou cortes.':
+      mode==='pt'||mode==='pt-final'?'Identifique ideias e relações textuais, preservando condições e incertezas. Não escolha takes ou cortes.':
         'Identify textual ideas and relations, preserving conditions and uncertainty. Do not select takes or cuts.';
     // Review rubric fixed before inference and not sent to the model:
     // condition = payment approved + stock; dispatch != arrival; after-noon complements before-noon;

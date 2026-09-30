@@ -869,3 +869,34 @@ must preserve the closed validator and the one remaining historical slot.
 This private PoC does not authorize Desktop/commercial integration. Slice A
 remains CLOSED, ADR 0030 remains IN DEVELOPMENT, complete Semantic Editorial
 Analysis remains NOT DELIVERED, and global weighted progress remains **55%**.
+
+## Transport event policy for the final bounded attempt — pre-implementation table
+
+Reference: official `@anthropic-ai/claude-agent-sdk@0.3.280` declaration
+`sdk.d.ts` (npm integrity SHA-512
+`6884124ca70225c3a08b5db918019068d654620c5b10143057601cf94b69d3e8065232045a34eacf807c917afd5e391c0936224543130ec5cf0147c87010e39f`),
+released from `anthropics/claude-agent-sdk-typescript` tag `v0.3.280` at
+`58d2e4b81bdca2c6ce10e6e5db22ad7acdc1d58c`, which declares parity with
+Claude Code 2.1.280. Current official headless/streaming docs corroborate
+the JSONL envelope, `api_retry`, block-wise assistant messages and final result;
+they do not establish the exact event that occurred in attempt #7.
+
+| Type/subtype | Minimum validated shape and phase | CEVRA effect | Invalid or forbidden outcome |
+|---|---|---|---|
+| `system/init` | One matching session; before turn events; closed empty tools/MCP/plugins/skills, no bypass, allowed Opus | Establish session only | Existing containment/model/correlation error |
+| `system/status` | Matching session after init; `status=requesting` or `null`; no compact result/error or permission-mode drift | Operational observation; no result authority | Protocol error; `compacting` is rejected context change |
+| `system/session_state_changed` | Matching session after init; `state=running` or `idle` | Operational observation only | `requires_action` is forbidden; malformed is protocol error |
+| `system/api_retry` | Matching session after init; bounded integer `attempt`, `max_retries`, `retry_delay_ms`, integer-or-null `error_status`, closed error category, optional bounded `no_response` integers | Classify cause, stop own process; no CEVRA retry | Malformed protocol error; observed retry is terminal to this experiment |
+| `rate_limit_event` | Matching session after init; closed status and booleans, no overage | Advisory, or terminal quota/overage refusal | Invalid protocol or extra-usage rejection |
+| `auth_status` | Matching session after init; boolean authentication state and string-list output (not retained) | Terminal authentication condition in this headless proof | Malformed protocol error; never treated as generated content |
+| `assistant` | Matching session, no parent tool, safe content blocks; explicit error first, otherwise allowed Opus; individual block may have null stop reason | Track authorized textual generation; thinking discarded; no completion until result | Tool/subagent containment, provider/model/partial error |
+| `result/success` | Matching session, one turn, `is_error=false`, no permission denials/deferred tool, completed terminal state, authorized generated Opus and matching model usage; followed by clean close | Only source of final text for Application validation | Error/partial/duplicate/correlation failure; prior error never cleared |
+| `result/error_*` | Matching session, typed error envelope | Terminal provider/turn failure, never semantic success | Malformed protocol error |
+| Tool, hook, task, plugin install, permission request, compaction, memory recall, local command, subagent or context-changing event | Any phase | None | Containment/policy failure; known SDK type is not CEVRA authorization |
+| Other type/subtype or unsupported shape | Any phase | None | `PROTOCOL_EVENT_UNSUPPORTED`/`PROTOCOL_EVENT_INVALID`, exact bounded type/subtype in private receipt only |
+
+This is deliberately smaller than the SDK union. It does not convert post-init
+`system` into a blanket pass. The official types/headless docs describe
+`api_retry` as a runtime retry notice, not evidence that #7 was a retry or that
+the first HTTP attempt was billed. Assistant block messages may legitimately
+carry `stop_reason=null`; the result remains authoritative.

@@ -111,6 +111,37 @@ test('real child uses pipes/stdin/external temp cwd and no shell; Unicode surviv
  const result=await run('utf8');assert.match(result.result,/Café — ação 🎬/);assert.equal(result.metrics.childClosed,true);
  assert.equal(result.metrics.stdinBytes,Buffer.byteLength(payload));
 });
+test('versioned block-wise assistant and bounded operational metadata complete only at result and close',async()=>{
+ const blocks=await run('blocks');
+ assert.equal(blocks.metrics.childClosed,true);
+ assert.deepEqual(blocks.protocolTrace.map(e=>e.type),['system','assistant','assistant','result']);
+ assert(!JSON.stringify(blocks.protocolTrace).includes('PRIVATE THOUGHT'));
+ const status=await run('status-after-result');
+ assert.deepEqual(status.protocolTrace.map(e=>e.subtype),['init','session_state_changed','status','status',undefined,'success','session_state_changed']);
+ assert.equal(status.metrics.childClosed,true);
+});
+for(const [mode,code] of [
+ ['api-retry-401','PROVIDER_RETRY_NOT_ALLOWED'],['api-retry-429','PROVIDER_RETRY_NOT_ALLOWED'],
+ ['api-retry-529','PROVIDER_RETRY_NOT_ALLOWED'],['api-retry-null','PROVIDER_RETRY_NOT_ALLOWED'],
+ ['api-retry-invalid','PROTOCOL_EVENT_INVALID'],['status-compacting','CONTAINMENT'],
+ ['status-invalid','PROTOCOL_EVENT_INVALID'],['requires-action','CONTAINMENT'],
+ ['auth-status','PROVIDER_AUTH_ERROR'],
+ ['hook-event','CONTAINMENT'],['plugin-install','CONTAINMENT'],
+ ['unknown-system','PROTOCOL_EVENT_UNSUPPORTED'],['malicious-system','PROTOCOL_EVENT_UNSUPPORTED'],
+ ])test(`complete sequence ${mode} fails closed`,async()=>{
+ await assert.rejects(run(mode),e=>{
+  assert.equal(e.code,code);assert.equal(e.metrics.childClosed,true);
+  assert(!JSON.stringify(e.metrics).includes('PRIVATE DO NOT LOG'));
+  assert(!JSON.stringify(e.protocolTrace).includes('Bearer private-token'));
+  if(mode==='unknown-system')assert.equal(e.protocolTrace.at(-1).subtype,'surprise_subtype');
+  if(mode==='malicious-system')assert.match(e.protocolTrace.at(-1).subtypeHash,/^[a-f0-9]{64}$/);
+  if(mode.startsWith('api-retry-')&&mode!=='api-retry-invalid'){
+   assert.equal(e.protocolTrace.at(-1).decision,'PROVIDER_RETRY_NOT_ALLOWED');
+   assert.equal(e.protocolTrace.at(-1).error_status,mode==='api-retry-null'?null:Number(mode.slice(-3)));
+  }
+  return true;
+ });
+});
 for(const [mode,code] of [['auth','PROCESS_EXIT'],['tools','CONTAINMENT'],['tool','CONTAINMENT'],['permission','CONTAINMENT'],['stderr','STDERR_LIMIT'],['line','LINE_LIMIT'],['events','EVENT_LIMIT'],['duplicate','LATE_EVENT'],['partial','PARTIAL_EOF'],['model','MODEL_UNAVAILABLE'],['correlation','CORRELATION'],['error','PROVIDER_ERROR_UNKNOWN'],['response','RESPONSE_LIMIT']]){
  test(`reject ${mode}; no retry`,async()=>{await assert.rejects(run(mode),e=>e.code===code);});
 }
@@ -141,14 +172,14 @@ for(const [mode,code] of [
 test('assistant and result diagnostics use their actual locations without exposing error text',async()=>{
  await assert.rejects(run('assistant-error-rate_limit'),e=>{
   assert.equal(e.code,'PROVIDER_RATE_LIMIT');
-  assert.equal(e.metrics.lastEventSummary.type,'result');
+  assert.equal(e.metrics.lastEventSummary.type,'assistant');
   assert.equal(e.privateDiagnostic[0].type,'assistant');
   assert.equal(e.privateDiagnostic[0].model,'<synthetic>');
   assert.equal(e.privateDiagnostic[0].error,'rate_limit');
   assert.equal(e.privateDiagnostic[0].errorTextPresent,true);
   assert.match(e.privateDiagnostic[0].errorTextHash,/^[a-f0-9]{64}$/);
   assert(!JSON.stringify(e.privateDiagnostic).includes('synthetic provider error detail'));
-  assert.equal(e.privateDiagnostic[1].type,'result');
+  assert.equal(e.privateDiagnostic.length,1);
   assert(!JSON.stringify(e.metrics).includes('<synthetic>'));
   return true;
  });
@@ -177,15 +208,20 @@ test('private event receipt is bounded, exclusive and never follows symlinks',as
  try{
   const events=[{type:'assistant',model:'claude-opus-fixture',errorKind:'missing'},
     {type:'result',isError:false,apiErrorStatus:undefined}];
-  await writePrivateEventReceipt(dir,'canary-5-private.json',events);
+  const trace=[{phase:'before-init',type:'system',subtype:'init',typeKind:'string',subtypeKind:'string'},
+    {phase:'session',type:'system',subtype:'surprise_subtype',typeKind:'string',subtypeKind:'string',
+      decision:'PROTOCOL_EVENT_UNSUPPORTED',reason:'UNKNOWN_SYSTEM_SUBTYPE'}];
+  await writePrivateEventReceipt(dir,'canary-5-private.json',{events,trace});
   assert.equal((await lstat(`${dir}/canary-5-private.json`)).mode&0o777,0o600);
   assert.deepEqual(JSON.parse(await readFile(`${dir}/canary-5-private.json`,'utf8')).events[0],events[0]);
+  assert.equal(JSON.parse(await readFile(`${dir}/canary-5-private.json`,'utf8')).trace[1].subtype,'surprise_subtype');
   await assert.rejects(writePrivateEventReceipt(dir,'canary-5-private.json',events),e=>e.code==='EEXIST');
   await symlink(`${dir}/canary-5-private.json`,`${dir}/pt-6-private.json`);
   await assert.rejects(writePrivateEventReceipt(dir,'pt-6-private.json',events),e=>e.code==='EEXIST');
   await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',[{type:'assistant',content:'private'}]),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
   await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',[{type:'assistant',authExplanationCategory:'private cause'}]),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
   await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',Array(9).fill({type:'assistant'})),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
+  await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',{events,trace:[{...trace[1],subtype:'private\nsecret'}]}),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
   await unlink(`${dir}/pt-6-private.json`);await unlink(`${dir}/canary-5-private.json`);
  }finally{await rmdir(dir);}
 });
