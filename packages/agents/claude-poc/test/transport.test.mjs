@@ -232,6 +232,24 @@ test('operator-only init capture stops and reaps before any answer; normal gate 
  await assert.rejects(run('utf8',{diagnosticInit:e=>{clean=captureInitPlugins(e);}}),e=>e.code==='DIAGNOSTIC_STOP');
  assert.equal(clean.plugins.length,0);
 });
+test('diagnostic capture still enforces other init controls before observing plugins',()=>{
+ const base={type:'system',subtype:'init',session_id:'fixture-session',tools:[],mcp_servers:[],plugins:[{name:'private'}],
+  skills:[],permissionMode:'default',model:'claude-opus-fixture'};
+ for(const [change,reason] of [
+  [e=>{e.tools=['fixture'];},'INIT_TOOLS_NONEMPTY'],
+  [e=>{e.mcp_servers=['fixture'];},'INIT_MCP_NONEMPTY'],
+  [e=>{e.skills=['fixture'];},'INIT_SKILLS_NONEMPTY'],
+  [e=>{e.permissionMode='bypassPermissions';},'INIT_PERMISSION_BYPASS'],
+ ]){
+  let captures=0;const reader=new ClaudeStreamReader('fixture-session',LIMITS,()=>captures++);
+  const event=structuredClone(base);change(event);
+  assert.throws(()=>reader.push(Buffer.from(JSON.stringify(event)+'\n')),e=>e.code==='CONTAINMENT'&&e.reason===reason);
+  assert.equal(captures,0);
+ }
+ let captures=0;const reader=new ClaudeStreamReader('fixture-session',LIMITS,()=>captures++);
+ assert.throws(()=>reader.push(Buffer.from(JSON.stringify({...base,session_id:'other'})+'\n')),e=>e.code==='CORRELATION');
+ assert.equal(captures,0);
+});
 test('private receipt is exclusive, mode-restricted and rejects symlink; metadata bounds are closed',async()=>{
  const dir=await mkdtemp('/tmp/cevra-init-diagnostic-test-');
  try{

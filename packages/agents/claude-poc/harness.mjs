@@ -1,128 +1,135 @@
-// Operator-only, synthetic, real-client harness. NEVER invoked by CI.
-import {readFile,writeFile,open,lstat} from 'node:fs/promises';
-import {isAbsolute,join} from 'node:path';
-import {spawn} from 'node:child_process';
+// Operator-only synthetic experiment. CI never invokes this file.
+import {constants} from 'node:fs';
+import {open} from 'node:fs/promises';
+import {join} from 'node:path';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {SemanticEditorialAnalysisService} from '@cevra/application';
-import {ClaudePocAnalyzer,verifyBinary,runClaudeProcess} from './transport.mjs';
+import {ClaudePocAnalyzer,childEnvironment,verifyBinary,runClaudeProcess} from './transport.mjs';
 import {captureInitPlugins,publicInitShape,writePrivateInitReceipt} from './init-diagnostic.mjs';
 import {writePrivateEventReceipt} from './event-diagnostic.mjs';
+import {loadPluginDisableSettings} from './session-plugin-override.mjs';
+import {ensureEvidenceDirectory,evidencePath,inspectExperiment,readCheckpoint,recoverExperiment,
+  reserveAttempt,withExperimentLock,writeAttemptReceipt} from './experiment-store.mjs';
 import {fixture,PHRASES} from './test/fixtures.mjs';
 import {PLAYBOOK_VERSION} from './playbook.mjs';
 
-const [name,directory]=process.argv.slice(2);
-if(!['canary','diagnostic','canary-4','canary-5','canary-6','pt','en','cancel'].includes(name)||!directory||!isAbsolute(directory))throw Error('CASE_AND_PRIVATE_DIRECTORY_REQUIRED');
-const stat=await lstat(directory);
-if(!stat.isDirectory()||stat.isSymbolicLink()||(stat.mode&0o077))throw Error('PRIVATE_DIRECTORY_REQUIRED');
-const lock=await open(join(directory,'execution.lock'),'wx',0o600);
-const binary=join(process.env.HOME,'Library/Application Support/CEVRA/DeveloperTools/claude-code/2.1.280/claude');
-const ledgerPath=join(directory,'ledger.json');
-let ledger;
-try{ledger=JSON.parse(await readFile(ledgerPath,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;ledger={version:1,attempts:[]};}
-if(ledger.version!==1||!Array.isArray(ledger.attempts))throw Error('INVALID_LEDGER');
-const secondCanary=name==='canary'&&ledger.attempts.length===1&&ledger.attempts[0].number===1&&ledger.attempts[0].case==='canary';
-const diagnostic=name==='diagnostic';
-const correctiveCanary=name==='canary-4';
-const contractCanary=name==='canary-5';
-const authCanary=name==='canary-6';
-if(diagnostic&&!(ledger.attempts.length===2&&ledger.attempts.every((a,i)=>a.number===i+1&&a.case==='canary')))throw Error('DIAGNOSTIC_LEDGER_GATE');
-if(correctiveCanary&&!(ledger.attempts.length===3&&ledger.attempts.every((a,i)=>a.number===i+1&&a.case===(i<2?'canary':'diagnostic'))))throw Error('CORRECTIVE_CANARY_LEDGER_GATE');
-if(contractCanary&&!(ledger.attempts.length===4&&ledger.attempts.every((a,i)=>a.number===i+1&&a.case===['canary','canary','diagnostic','canary-4'][i])))throw Error('CONTRACT_CANARY_LEDGER_GATE');
-if(authCanary&&!(ledger.attempts.length===5&&ledger.attempts.every((a,i)=>a.number===i+1&&a.case===['canary','canary','diagnostic','canary-4','canary-5'][i])))throw Error('AUTH_CANARY_LEDGER_GATE');
-if(ledger.attempts.some(a=>a.case===name)&&!secondCanary)throw Error('CASE_ALREADY_ATTEMPTED');
-if(secondCanary){
- const first=JSON.parse(await readFile(join(directory,'canary.json'),'utf8'));
- if(first.status!=='rejected'||first.responses?.[0]?.error!=='CONTAINMENT')throw Error('FIRST_CANARY_MISMATCH');
+const execFileAsync=promisify(execFile);
+const mode=process.argv[2];
+if(!['recover','status','diagnostic','pt','en'].includes(mode))throw Error('EXPERIMENT_MODE_REQUIRED');
+const home=process.env.HOME;
+const directory=mode==='recover'?await ensureEvidenceDirectory(home):evidencePath(home);
+const binary=join(home,'Library/Application Support/CEVRA/DeveloperTools/claude-code/2.1.280/claude');
+
+async function privateJson(path){
+  const h=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);
+  try{const s=await h.stat();if(!s.isFile()||s.uid!==process.getuid()||(s.mode&0o077)||s.size>256*1024)
+    throw Error('PRIVATE_EVIDENCE_INVALID');return JSON.parse(await h.readFile('utf8'));}
+  finally{await h.close();}
 }
-const receiptPath=join(directory,secondCanary?'canary-2.json':diagnostic?'diagnostic-3.json':`${name}.json`);
-try{await lstat(receiptPath);throw Error('CASE_RECEIPT_EXISTS');}catch(e){if(e.code!=='ENOENT')throw e;}
-if(diagnostic){
- for(const prior of ['canary.json','canary-2.json']){
-  const receipt=JSON.parse(await readFile(join(directory,prior),'utf8'));
-  if(receipt.status!=='rejected'||receipt.responses?.[0]?.error!=='CONTAINMENT')throw Error('PRIOR_CANARY_MISMATCH');
- }
- try{await lstat(join(directory,'diagnostic-3-private.json'));throw Error('PRIVATE_RECEIPT_EXISTS');}catch(e){if(e.code!=='ENOENT')throw e;}
+async function privateWrite(path,value){
+  const h=await open(path,'wx',0o600);
+  try{await h.writeFile(JSON.stringify(value,null,2));await h.sync();}finally{await h.close();}
 }
-if(correctiveCanary){
- const diagnosticReceipt=JSON.parse(await readFile(join(directory,'diagnostic-3.json'),'utf8'));
- if(diagnosticReceipt.responses?.[0]?.error!=='DIAGNOSTIC_STOP')throw Error('DIAGNOSTIC_GATE');
-}
-if(contractCanary){
- const prior=JSON.parse(await readFile(join(directory,'canary-4.json'),'utf8'));
- if(prior.responses?.[0]?.error!=='MODEL_UNAVAILABLE'||prior.status!=='rejected')throw Error('FOURTH_CANARY_MISMATCH');
-}
-if(authCanary){
- const prior=JSON.parse(await readFile(join(directory,'canary-5.json'),'utf8'));
- if(prior.responses?.[0]?.error!=='PROVIDER_AUTH_ERROR'||prior.status!=='rejected')throw Error('FIFTH_CANARY_MISMATCH');
-}
-if(!['canary','diagnostic','canary-4','canary-5','canary-6'].includes(name)){
- const canary=JSON.parse(await readFile(join(directory,'canary-6.json'),'utf8'));
- if(canary.status!=='accepted'||canary.result.kind!=='analysis-candidate'||!canary.historyUnchanged||!canary.redoPreserved)throw Error('CANARY_GATE');
- if(name==='pt'&&ledger.attempts.length!==6)throw Error('MATRIX_ORDER');
- if(name==='en'&&!(ledger.attempts.length===7&&ledger.attempts.at(-1).case==='pt'))throw Error('MATRIX_ORDER');
- if(name==='cancel')throw Error('CASE_NOT_AUTHORIZED_IN_THIS_MATRIX');
- if(['pt','en'].includes(name)&&ledger.attempts.length+2>8)throw Error('CONTINUATION_SLOT_REQUIRED');
-}
-const locale=name==='en'?'en-US':'pt-BR';
-const extra={};
-if(name==='canary'||diagnostic||correctiveCanary||contractCanary||authCanary)PHRASES[locale][0]=['A caixa tem uma etiqueta de rastreamento.'];
-const {history,ids}=fixture(locale,extra);
-history.commit({type:'project.rename',name:'synthetic redo checkpoint'});history.undo();
-const before=JSON.stringify(history.toArchive());
-const controller=new AbortController();let cancelTimer;
-const responses=[];
-let callsThisRun=0;
-let privateInit;
-let canaryNeedsEvidence=false;
-const overrideReceipt=join(directory,'diagnostic-3-private.json');
-const adapter=new ClaudePocAnalyzer({binary,home:process.env.HOME,...(correctiveCanary||contractCanary||authCanary||['pt','en','cancel'].includes(name)?{pluginOverrideReceipt:overrideReceipt}:{})},{verifyBinary,runProcess:async options=>{
- if((name==='canary'||diagnostic||correctiveCanary||contractCanary||authCanary)&&callsThisRun!==0)throw Error('CANARY_SINGLE_EXECUTION');
- if(ledger.attempts.length>=8)throw Error('REAL_EXECUTION_QUOTA');
- callsThisRun++;
- const attempt={number:ledger.attempts.length+1,case:name,attemptId:diagnostic?'init-metadata-3':correctiveCanary?'session-override-4':contractCanary?'assistant-contract-5':authCanary?'auth-environment-6':undefined,startedAt:new Date().toISOString()};
- ledger.attempts.push(attempt);await writeFile(ledgerPath,JSON.stringify(ledger,null,2),{mode:0o600});
- const privateName=contractCanary||authCanary?`${name}-private.json`:`${name}-${attempt.number}-private.json`;
- try{
-  const result=await runClaudeProcess({...options,...(diagnostic?{diagnosticInit:event=>{privateInit=captureInitPlugins(event);}}:{})},(bin,args,opts)=>{
-   const child=spawn(bin,args,opts);
-   if(name==='cancel')child.once('spawn',()=>{cancelTimer=setTimeout(()=>controller.abort(),1500);});
-   return child;
+if(mode==='recover'){
+  await recoverExperiment(directory);
+  const state=await inspectExperiment(directory);
+  console.log(JSON.stringify({origin:state.checkpoint.origin,historicalDebited:5,
+    originalReceipts:'unavailable',used:state.used,remaining:state.remaining},null,2));
+}else if(mode==='status'){
+  const state=await inspectExperiment(directory);
+  console.log(JSON.stringify({historicalDebited:5,used:state.used,remaining:state.remaining,
+    reservations:state.reservations.map(r=>({number:r.number,purpose:r.purpose}))},null,2));
+}else{
+  await withExperimentLock(directory,async()=>{
+    await readCheckpoint(directory);
+    const state=await inspectExperiment(directory);
+    if(mode==='diagnostic'&&state.used!==5||mode==='pt'&&state.used!==6||mode==='en'&&state.used!==7)
+      throw Error('EXPERIMENT_SEQUENCE');
+    if(state.remaining<1)throw Error('EXPERIMENT_BUDGET_EXHAUSTED');
+    await verifyBinary(binary);
+    const {stdout}=await execFileAsync(binary,['auth','status','--json'],{
+      env:childEnvironment(home),timeout:15000,maxBuffer:16384});
+    let auth;try{auth=JSON.parse(stdout);}catch{throw Error('AUTH_STATUS_INVALID');}
+    if(auth.loggedIn!==true||auth.authMethod!=='claude.ai'||auth.apiProvider!=='firstParty')
+      throw Error('AUTH_STATUS_NOT_SUBSCRIPTION');
+    let overrideReceipt;
+    if(mode!=='diagnostic'){
+      overrideReceipt=join(directory,'plugin-metadata-6.json');
+      await loadPluginDisableSettings(overrideReceipt);
+      const prior=await privateJson(join(directory,'attempt-6-receipt.json'));
+      if(prior.error!=='DIAGNOSTIC_STOP')throw Error('PLUGIN_DIAGNOSTIC_NOT_ACCEPTED');
+    }
+    if(mode==='en'){
+      const prior=await privateJson(join(directory,'analysis-pt.json'));
+      if(prior.status!=='accepted'||prior.result?.kind!=='analysis-candidate'||!prior.historyUnchanged||!prior.redoPreserved)
+        throw Error('PT_GATE_NOT_ACCEPTED');
+    }
+    const locale=mode==='en'?'en-US':'pt-BR';
+    if(mode==='diagnostic')PHRASES[locale][0]=['A caixa tem uma etiqueta de rastreamento.'];
+    else PHRASES[locale][1]=PHRASES[locale][1].slice(0,2); // No deliberately visual-only passage in this proof.
+    const {history,ids}=fixture(locale);
+    history.commit({type:'project.rename',name:'synthetic redo checkpoint'});history.undo();
+    const before=JSON.stringify(history.toArchive());
+    const responses=[];let privateInit;let budgetExhausted=false;
+    const analyzer=new ClaudePocAnalyzer({binary,home,pluginOverrideReceipt:overrideReceipt},{verifyBinary,
+      runProcess:async options=>{
+        if(mode==='diagnostic'&&responses.length)throw Error('DIAGNOSTIC_SINGLE_PROCESS');
+        let reservation;
+        try{reservation=await reserveAttempt(directory,mode==='diagnostic'?'plugin-diagnostic':
+          mode==='pt'?'pt-analysis':'en-analysis');}
+        catch(e){if(e.code==='EXPERIMENT_BUDGET_EXHAUSTED')budgetExhausted=true;throw e;}
+        try{
+          const result=await runClaudeProcess({...options,...(mode==='diagnostic'?{
+            diagnosticInit:event=>{privateInit=captureInitPlugins(event);}}:{})});
+          if(mode!=='diagnostic')await writePrivateEventReceipt(directory,`${mode}-${reservation.number}-private.json`,result.privateDiagnostic);
+          const receipt={status:'transport-complete',metrics:result.metrics};
+          responses.push({number:reservation.number,...receipt});
+          await writeAttemptReceipt(directory,reservation,receipt);
+          return result;
+        }catch(e){
+          if(mode==='diagnostic'&&privateInit){
+            // Validate before persisting, then keep exact current IDs private.
+            const {pluginDisableSettings}=await import('./session-plugin-override.mjs');
+            pluginDisableSettings(privateInit);
+            await writePrivateInitReceipt(directory,'plugin-metadata-6.json',privateInit);
+          }
+          if(mode!=='diagnostic'&&e.privateDiagnostic)
+            await writePrivateEventReceipt(directory,`${mode}-${reservation.number}-private.json`,e.privateDiagnostic);
+          const receipt={status:'rejected',error:e.code??'UNCLASSIFIED',metrics:e.metrics};
+          responses.push({number:reservation.number,...receipt});
+          await writeAttemptReceipt(directory,reservation,receipt);
+          throw e;
+        }
+      }});
+    const brief=mode==='diagnostic'?'Devolva uma observação textual mínima citada, no contrato fornecido, sem ferramentas.':
+      mode==='pt'?'Identifique ideias e relações textuais, preservando condições e incertezas. Não escolha takes ou cortes.':
+        'Identify textual ideas and relations, preserving conditions and uncertainty. Do not select takes or cuts.';
+    // Review rubric fixed before inference and not sent to the model:
+    // condition = payment approved + stock; dispatch != arrival; after-noon complements before-noon;
+    // citations must be relevant; no take selection/cuts; no visual claim.
+    const app=new SemanticEditorialAnalysisService({history,analyzer,timeoutMs:120000});
+    const started=performance.now();
+    const summary={version:1,mode,locale,playbook:PLAYBOOK_VERSION,requestedModel:'opus',requestedEffort:'medium'};
+    try{
+      const result=await app.analyze({sourceIds:mode==='diagnostic'?[ids[0]]:ids,locale,brief});
+      summary.status='accepted';summary.result=result;
+    }catch(e){summary.status=budgetExhausted?'needs-evidence-experiment-budget-exhausted':'rejected';
+      summary.error=e.code??'UNCLASSIFIED';}
+    finally{
+      while(analyzer.active)await new Promise(resolve=>setTimeout(resolve,25));
+      summary.latencyMs=performance.now()-started;summary.responses=responses;
+      summary.historyUnchanged=JSON.stringify(history.toArchive())===before;
+      summary.redoPreserved=history.canRedo;
+      await verifyBinary(binary);
+      await privateWrite(join(directory,mode==='diagnostic'?'diagnostic-6-summary.json':`analysis-${mode}.json`),summary);
+    }
+    const final=await inspectExperiment(directory);
+    console.log(JSON.stringify({mode,status:summary.status,error:summary.error,kind:summary.result?.kind,
+      attempts:responses.map(r=>({number:r.number,status:r.status,error:r.error,model:r.metrics?.model,
+        initFailureReason:r.metrics?.initFailureReason,childClosed:r.metrics?.childClosed,
+        envelopeBytes:r.metrics?.envelopeBytes,latencyMs:r.metrics?.latencyMs,usage:r.metrics?.usage})),
+      used:final.used,remaining:final.remaining,historyUnchanged:summary.historyUnchanged,
+      redoPreserved:summary.redoPreserved,...(privateInit?{privateInitShape:publicInitShape(privateInit)}:{})},null,2));
   });
-  if(contractCanary||authCanary){
-   try{canaryNeedsEvidence=JSON.parse(result.result)?.kind==='needs-evidence';}catch{/* Application remains the only output validator. */}
-  }
-  if(contractCanary||authCanary||['pt','en','cancel'].includes(name))await writePrivateEventReceipt(directory,privateName,result.privateDiagnostic);
-  responses.push({attempt:attempt.number,...(name==='canary'||correctiveCanary||contractCanary||authCanary?{}:{finalText:result.result}),metrics:result.metrics});return result;
- }catch(e){
-  if(diagnostic&&privateInit)await writePrivateInitReceipt(directory,'diagnostic-3-private.json',privateInit);
-  if((contractCanary||authCanary||['pt','en','cancel'].includes(name))&&e.privateDiagnostic){
-   try{await writePrivateEventReceipt(directory,privateName,e.privateDiagnostic);}
-   catch{e.metrics={...e.metrics,privateDiagnosticWriteFailed:true};}
-  }
-  responses.push({attempt:attempt.number,error:e.code??'UNCLASSIFIED',metrics:e.metrics});throw e;
- }
- finally{clearTimeout(cancelTimer);}
-}});
-let brief='Identifique as ideias e relações sustentadas pelo texto, preservando condições e incertezas. Não escolha takes nem cortes. Analise o que for textual e registre limites do que dependeria de imagem.';
-if(name==='en')brief='Identify ideas and relations supported by the text, preserving conditions and uncertainty. Do not select takes or cuts. Analyze textual evidence and record the limits of any image-dependent passage.';
-if(name==='canary'||diagnostic||correctiveCanary||contractCanary||authCanary)brief='Devolva uma observação textual mínima citada, no contrato fornecido, sem ferramentas.';
-const app=new SemanticEditorialAnalysisService({history,analyzer:adapter,timeoutMs:120000});
-const started=performance.now();const record={version:1,case:name,playbook:PLAYBOOK_VERSION,requestedModel:'opus',requestedEffort:'medium'};
-try{
- const result=await app.analyze({sourceIds:name==='canary'||diagnostic||correctiveCanary||contractCanary||authCanary?[ids[0]]:ids,locale,brief},controller.signal);
- record.result=name==='canary'||correctiveCanary||contractCanary||authCanary?{kind:result.kind,observationCount:result.kind==='analysis-candidate'?result.candidate.observations.length:0,
-   evidenceCount:result.evidence?.length??0}:result;
- record.status='accepted';
 }
-catch(e){record.status=canaryNeedsEvidence?'needs-evidence-not-continued':'rejected';record.error=e.code??'UNCLASSIFIED';}
-finally{
- clearTimeout(cancelTimer);
- // Wait for transport settlement after Application's cancellation race.
- while(adapter.active)await new Promise(resolve=>setTimeout(resolve,25));
- record.latencyMs=performance.now()-started;record.responses=responses;record.receipts=adapter.receipts;
- record.historyUnchanged=JSON.stringify(history.toArchive())===before;record.redoPreserved=history.canRedo;
- await verifyBinary(binary);
- await writeFile(receiptPath,JSON.stringify(record,null,2),{flag:'wx',mode:0o600});
- await lock.close();
- const {unlink}=await import('node:fs/promises');await unlink(join(directory,'execution.lock'));
-}
-console.log(JSON.stringify({case:name,status:record.status,error:record.error,kind:record.result?.kind,reason:record.result?.reason,calls:responses.length,totalCalls:ledger.attempts.length,historyUnchanged:record.historyUnchanged,redoPreserved:record.redoPreserved,receipts:record.receipts,...(diagnostic&&privateInit?{privateInitShape:publicInitShape(privateInit)}:{})},null,2));

@@ -159,14 +159,18 @@ export class ClaudeStreamReader {
     if(e.session_id!==this.sessionId) fail('CORRELATION');
     if(e.type==='system' && e.subtype==='init') {
       if(this.initialized) fail('DUPLICATE_INIT');
-      if(this.diagnosticInit) {
-        this.diagnosticInit(e);
-        fail('DIAGNOSTIC_STOP'); // Never validate or accept a semantic result in diagnostic mode.
-      }
       for(const [field,prefix] of [['tools','INIT_TOOLS'],['mcp_servers','INIT_MCP']]) {
         if(!Object.hasOwn(e,field)) fail('CONTAINMENT',`${prefix}_MISSING`);
         if(!Array.isArray(e[field])) fail('CONTAINMENT',`${prefix}_WRONG_TYPE`);
         if(e[field].length) fail('CONTAINMENT',`${prefix}_NONEMPTY`);
+      }
+      if(this.diagnosticInit){
+        if(e.skills!==undefined && !Array.isArray(e.skills))fail('CONTAINMENT','INIT_SKILLS_WRONG_TYPE');
+        if(Array.isArray(e.skills)&&e.skills.length)fail('CONTAINMENT','INIT_SKILLS_NONEMPTY');
+        if(e.permissionMode==='bypassPermissions')fail('CONTAINMENT','INIT_PERMISSION_BYPASS');
+        this.checkModel(e.model,'init');
+        this.diagnosticInit(e);
+        fail('DIAGNOSTIC_STOP'); // Capture only after the other init gates; never accept analysis.
       }
       for(const [field,prefix] of [['plugins','INIT_PLUGINS'],['skills','INIT_SKILLS']]) {
         if(e[field]!==undefined && !Array.isArray(e[field])) fail('CONTAINMENT',`${prefix}_WRONG_TYPE`);
