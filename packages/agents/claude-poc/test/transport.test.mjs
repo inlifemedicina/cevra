@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {mkdtemp,rmdir,readFile,lstat,symlink,unlink} from 'node:fs/promises';
+import {mkdtemp,rmdir,readFile,lstat,symlink,unlink,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {childArguments,childEnvironment,ClaudeStreamReader,runClaudeProcess,ClaudePocAnalyzer,LIMITS} from '../transport.mjs';
 import {captureInitPlugins,publicInitShape,writePrivateInitReceipt} from '../init-diagnostic.mjs';
+import {pluginDisableSettings,loadPluginDisableSettings,createSessionPluginSettings} from '../session-plugin-override.mjs';
 const fake=fileURLToPath(new URL('./fake-cli.mjs',import.meta.url));
 const payload=JSON.stringify({context:{contextId:'test',evidence:[{reference:'E1',text:'Café'}]}});
 const runner=mode=>(bin,args,opts)=>spawn(process.execPath,[fake,mode,...args],opts);
@@ -19,6 +20,46 @@ test('closed argv: true empty tools; no payload, shell, resume, fallback or perm
  assert.equal(args[args.indexOf('--effort')+1],'medium');
  assert.equal(args[args.indexOf('--setting-sources')+1],'');
  for(const value of ['--bare','--resume','--continue','--fallback-model','--dangerously-skip-permissions',payload])assert(!args.includes(value));
+});
+const syntheticPlugins={version:1,event:'system/init',plugins:[
+ {kind:'object',name:'fixture-one',source:'fixture-one@builtin',path:'builtin'},
+ {kind:'object',name:'fixture-two',source:'fixture-two@builtin',path:'builtin'}]};
+test('session override has only two exact false keys; argv carries path but no private identifiers',()=>{
+ const settings=pluginDisableSettings(syntheticPlugins);
+ assert.deepEqual(settings,{enabledPlugins:{'fixture-one@builtin':false,'fixture-two@builtin':false}});
+ const args=childArguments('fixture-session','/tmp/private/session-settings.json');
+ assert.equal(args[args.indexOf('--tools')+1],'');
+ assert.equal(args[args.indexOf('--settings')+1],'/tmp/private/session-settings.json');
+ assert(!JSON.stringify(args).includes('fixture-one'));
+ assert.throws(()=>childArguments('fixture-session','relative.json'),e=>e.code==='INVALID_SESSION_SETTINGS');
+});
+test('private builtin receipt validation rejects malformed, duplicate, wildcard and incoherent IDs',()=>{
+ const changed=mutate=>{const value=structuredClone(syntheticPlugins);mutate(value);return value;};
+ for(const candidate of [
+  changed(x=>{x.plugins.pop();}),changed(x=>{x.plugins[1].source=x.plugins[0].source;x.plugins[1].name=x.plugins[0].name;}),
+  changed(x=>{x.plugins[0].source='fixture-*@builtin';}),changed(x=>{x.plugins[0].source='fixture-one@other';}),
+  changed(x=>{x.plugins[0].path='/private/path';}),changed(x=>{x.plugins[0].name='bad\nname';}),
+ ])assert.throws(()=>pluginDisableSettings(candidate),e=>e.code==='INVALID_PRIVATE_PLUGIN_RECEIPT');
+});
+test('session settings are private, exclusive, owner-scoped and retained until explicit cleanup',async()=>{
+ const dir=await mkdtemp('/tmp/cevra-plugin-settings-test-');
+ const receipt=`${dir}/receipt.json`;
+ try{
+  await writeFile(receipt,JSON.stringify(syntheticPlugins),{flag:'wx',mode:0o600});
+  const settings=await createSessionPluginSettings(dir,receipt);
+  assert.equal((await lstat(settings.path)).mode&0o777,0o600);
+  assert.deepEqual(JSON.parse(await readFile(settings.path,'utf8')),pluginDisableSettings(syntheticPlugins));
+  await assert.rejects(createSessionPluginSettings(dir,receipt),e=>e.code==='EEXIST');
+  assert.deepEqual(await loadPluginDisableSettings(receipt),pluginDisableSettings(syntheticPlugins));
+  await settings.cleanup();
+  await assert.rejects(lstat(settings.path),e=>e.code==='ENOENT');
+  await symlink(receipt,settings.path);
+  await assert.rejects(createSessionPluginSettings(dir,receipt),e=>e.code==='EEXIST');
+  await unlink(settings.path);
+  await symlink(receipt,`${dir}/linked-receipt.json`);
+  await assert.rejects(loadPluginDisableSettings(`${dir}/linked-receipt.json`),e=>e.code==='INVALID_PRIVATE_PLUGIN_RECEIPT');
+  await unlink(`${dir}/linked-receipt.json`);
+ }finally{await unlink(receipt);await rmdir(dir);}
 });
 test('minimal environment excludes inherited credentials/endpoints',()=>{
  const env=childEnvironment('/fixture-home');
@@ -160,6 +201,33 @@ test('real Application/history/projection round-trip is immutable and preserves 
  const before=JSON.stringify(history.toArchive());const {app,calls}=service('utf8',history);
  const result=await app.analyze({sourceIds:ids});assert.equal(result.kind,'analysis-candidate');assert(result.evidence.length);assert(Object.isFrozen(result.candidate));
  assert.equal(JSON.stringify(history.toArchive()),before);assert(history.canRedo);assert.equal(calls(),1);
+});
+test('Application uses session-only override through child settlement; normal init gate remains unchanged',async()=>{
+ const privateDir=await mkdtemp('/tmp/cevra-plugin-adapter-test-');
+ const receipt=`${privateDir}/receipt.json`;
+ try{
+  await writeFile(receipt,JSON.stringify(syntheticPlugins),{flag:'wx',mode:0o600});
+  const {history,ids}=fixture();history.commit({type:'project.rename',name:'redo retained'});history.undo();
+  const before=JSON.stringify(history.toArchive());let calls=0,seenCwd;
+  const adapter=new ClaudePocAnalyzer({binary:'/fixture-only',home:'/fixture-home',pluginOverrideReceipt:receipt},
+   {verifyBinary:async()=>{},runProcess:async opts=>{
+    calls++;seenCwd=opts.cwd;
+    assert.equal(opts.settingsPath,`${opts.cwd}/session-settings.json`);
+    assert.deepEqual(JSON.parse(await readFile(opts.settingsPath,'utf8')),pluginDisableSettings(syntheticPlugins));
+    return runClaudeProcess(opts,runner('utf8'));
+   }});
+  const app=new SemanticEditorialAnalysisService({history,analyzer:adapter});
+  assert.equal((await app.analyze({sourceIds:ids})).kind,'analysis-candidate');
+  assert.equal(calls,1);assert.equal(JSON.stringify(history.toArchive()),before);assert(history.canRedo);
+  await assert.rejects(lstat(seenCwd),e=>e.code==='ENOENT');
+  const blocked=new ClaudePocAnalyzer({binary:'/fixture-only',home:'/fixture-home',pluginOverrideReceipt:receipt},
+   {verifyBinary:async()=>{},runProcess:opts=>runClaudeProcess(opts,runner('diagnostic-plugins'))});
+  const blockedApp=new SemanticEditorialAnalysisService({history,analyzer:blocked});
+  await assert.rejects(blockedApp.analyze({sourceIds:ids}),e=>e.code==='SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE');
+  assert.equal(blocked.receipts[0].initFailureReason,'INIT_PLUGINS_NONEMPTY');
+  assert(!JSON.stringify(blocked.receipts).includes('fixture-one'));
+  assert.equal(JSON.stringify(history.toArchive()),before);
+ }finally{await unlink(receipt);await rmdir(privateDir);}
 });
 for(const [mode,code] of [['citation','SEMANTIC_ANALYSIS_INVALID_EVIDENCE'],['json','SEMANTIC_ANALYSIS_INVALID_OUTPUT']])test(`Application rejects ${mode} without mutation`,async()=>{
  const {history,ids}=fixture();const before=JSON.stringify(history.toArchive());const {app}=service(mode,history);

@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { lstat, mkdtemp, rmdir } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { PLAYBOOK } from './playbook.mjs';
+import {createSessionPluginSettings} from './session-plugin-override.mjs';
 
 export const CLAUDE_VERSION = '2.1.280';
 export const CLAUDE_SHA256 = '387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d';
@@ -36,13 +37,15 @@ export function childEnvironment(home) {
   if (!isAbsolute(home)) fail('INVALID_HOME');
   return { HOME: home, PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', DISABLE_AUTOUPDATER: '1' };
 }
-export function childArguments(sessionId) {
+export function childArguments(sessionId,settingsPath) {
+  if(settingsPath!==undefined && !isAbsolute(settingsPath))fail('INVALID_SESSION_SETTINGS');
   return ['--print', '--restricted', '--safe-mode', '--tools', '',
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
     '--disallowedTools', 'mcp__*', '--permission-prompts', 'none',
     '--setting-sources', '', '--disable-slash-commands', '--no-chrome',
     '--no-session-persistence', '--max-turns', '1', '--model', 'opus',
     '--effort', 'medium', '--output-format', 'stream-json', '--verbose',
+    ...(settingsPath===undefined?[]:['--settings',settingsPath]),
     '--session-id', sessionId, '--system-prompt', PLAYBOOK];
 }
 export async function verifyBinary(path) {
@@ -146,11 +149,11 @@ export class ClaudeStreamReader {
 }
 
 // Internal process seam is only for deterministic tests; no caller/request callback.
-export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs=60000,sessionId=randomUUID(),limits=LIMITS,diagnosticInit}, spawnProcess=spawn) {
+export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs=60000,sessionId=randomUUID(),limits=LIMITS,diagnosticInit,settingsPath}, spawnProcess=spawn) {
   if(signal?.aborted) fail('CANCELLED');
   const started=performance.now();
   const reader=new ClaudeStreamReader(sessionId,limits,diagnosticInit);
-  const child=spawnProcess(binary,childArguments(sessionId),{cwd,env:childEnvironment(home),shell:false,stdio:['pipe','pipe','pipe']});
+  const child=spawnProcess(binary,childArguments(sessionId,settingsPath),{cwd,env:childEnvironment(home),shell:false,stdio:['pipe','pipe','pipe']});
   return await new Promise((resolve,reject)=>{
     let error, killTimer, stderrBytes=0, tail=Buffer.alloc(0), closed=false;
     const stop=(code,reason)=>{
@@ -199,19 +202,22 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
 
 /** @implements {import('@cevra/application').SemanticEditorialAnalyzerPort} */
 export class ClaudePocAnalyzer {
-  constructor({binary,home}, dependencies={verifyBinary,runProcess:runClaudeProcess}) {
-    this.binary=binary;this.home=home;this.receipts=[];this.active=false;this.dependencies=dependencies;
+  constructor({binary,home,pluginOverrideReceipt}, dependencies={verifyBinary,runProcess:runClaudeProcess}) {
+    this.binary=binary;this.home=home;this.pluginOverrideReceipt=pluginOverrideReceipt;
+    this.receipts=[];this.active=false;this.dependencies=dependencies;
   }
   async analyze(invocation,context) {
     if(this.active)fail('BUSY');
     this.active=true;
-    let cwd;
+    let cwd,sessionSettings;
     try {
       if(context.signal?.aborted)fail('CANCELLED');
       if(invocation.payloadBytes!==Buffer.byteLength(invocation.payload)||invocation.payloadBytes>256*1024)fail('INPUT_LIMIT');
       await this.dependencies.verifyBinary(this.binary);
       cwd=await mkdtemp('/tmp/cevra-claude-poc-');
-      const result=await this.dependencies.runProcess({binary:this.binary,home:this.home,cwd,payload:invocation.payload,signal:context.signal});
+      if(this.pluginOverrideReceipt)sessionSettings=await createSessionPluginSettings(cwd,this.pluginOverrideReceipt);
+      const result=await this.dependencies.runProcess({binary:this.binary,home:this.home,cwd,payload:invocation.payload,signal:context.signal,
+        ...(sessionSettings?{settingsPath:sessionSettings.path}:{})});
       await this.dependencies.verifyBinary(this.binary);
       this.receipts.push(Object.freeze(result.metrics));
       if(context.signal?.aborted)fail('CANCELLED');
@@ -220,8 +226,11 @@ export class ClaudePocAnalyzer {
       this.receipts.push(Object.freeze({error:error.code??'UNCLASSIFIED',...error.metrics}));
       throw error;
     } finally {
-      if(cwd) {try{await rmdir(cwd);}catch{/* Preserve unexpected client files; no recursive deletion. */}}
-      this.active=false;
+      try{if(sessionSettings)await sessionSettings.cleanup();}
+      finally{
+        if(cwd) {try{await rmdir(cwd);}catch{/* Preserve unexpected client files; no recursive deletion. */}}
+        this.active=false;
+      }
     }
   }
 }
