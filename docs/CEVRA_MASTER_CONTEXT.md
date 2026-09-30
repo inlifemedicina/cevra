@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Slice A is closed; Claude CLI child-auth status diverged when `USER`/`LOGNAME` were absent and now matches the completed login with an OS-derived identity; real canary #6 is NOT RUN because the private five-attempt ledger/override receipt is unavailable (5/8 historical, no accepted semantic response); Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-30, Slice A is closed; authorized recovery preserves five unavailable historical receipts as debited, diagnostic #6 recaptured current private built-in IDs, and PT-BR attempt #7 passed init but stopped at an unclassified post-init `system` event (7/8 used; no accepted semantic response); Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — PRIVATE LEDGER UNAVAILABLE AFTER AUTH-ENV FIX]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — POST-INIT SYSTEM EVENT AFTER EVIDENCE RECOVERY]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1764,6 +1764,24 @@ unproven. The adapter/test harness is private infrastructure, not Desktop
 integration. No API key, extra usage, fallback or audiovisual mutation was
 introduced; remote consumption of the failed attempt is unknown. See
 [the Claude attempt evidence](CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md).
+
+**2026-09-30 continuation:** explicit Product Owner authorization resolved the
+*operational* evidence-control impasse without pretending the original five
+private receipts were restored. A private persistent checkpoint records those
+five as debited and unavailable, with an eight-process ceiling, exclusive
+fsynced pre-spawn reservations and no automatic quota reset. Attempt #6
+recaptured the two current virtual builtin source IDs only at `system/init`,
+then stopped and reaped the child. The same session-only restrictive override
+made the normal #7 init pass, but a second `system` event of unknown subtype
+triggered the unchanged `CONTAINMENT` gate before any accepted Opus generation
+or semantic response. The bounded public diagnostic cannot identify its exact
+subtype or declare it harmless, tool use, or an escape. Application left
+ProjectHistory/redo intact. **7/8 processes are consumed; #8, EN-US,
+continuation and cancellation are NOT RUN.** The next decision concerns the
+specific 2.1.280 post-init event contract, not another ledger reconstruction
+or automatic model/provider switch. The five old receipts remain historically
+recorded but currently unverifiable in raw form. Director I1/I3/I5 impact is
+still a compatible feasibility investigation with no new execution authority.
 The Claude choice is only the next private proof candidate; it neither replaces
 the historical Codex preference nor approves commercial integration. Complete
 Semantic Editorial Analysis remains not delivered and global progress remains
@@ -2143,7 +2161,11 @@ delivered by scripted fixtures.
 - **HISTORICAL — BUILT-IN INIT METADATA:** subscription login is verified. Canaries #1/#2 failed the init gate; #2 identified two plugin entries and zero tools/MCP/skills, no bypass. Official installed-plugin inventory was empty. Authorized diagnostic attempt #3 captured only bounded metadata and stopped at its first init: both entries are virtual `builtin` with `<name>@builtin` source identifiers, not paths to personal plugin directories. No components, hooks, instructions or execution were proven. At that checkpoint, no effective session disablement was known and the ledger was **3/8**.
 - **HISTORICAL — ASSISTANT MODEL GATE:** an explicitly authorized session-only `--settings` file set the two private built-in IDs to `false`. Corrective canary #4 passed the unchanged init gate but its next assistant event failed `MODEL_UNAVAILABLE`; no final result was accepted. The exact assistant model-field value was not retained, so #4's provider cause remains unproven. The ledger then stood at **4/8**.
 - **HISTORICAL — EXPLICIT AUTH ERROR:** the reader now separates `assistant.error` from generated-model evidence, without relaxing containment or model requirements. Canary #5 used the same settings and passed init, then received `authentication_failed` with synthetic message model; final result had `is_error=true` and `terminal_reason=api_error`. No final semantic result was accepted. History/redo, pinned binary and personal settings were unchanged. Ledger **5/8**; PT-BR, EN-US and cancellation were not run.
-- **CURRENT — CHILD STATUS CORRECTED / REAL RETEST BLOCKED BY MISSING PRIVATE EVIDENCE:** official `auth status` was positive under the login-equivalent environment, negative under the former child environment and positive again when the child supplied only OS-derived `USER`/`LOGNAME`; config directory and effective UID matched. The local fix and closed diagnostic passed 70/70 PoC and 210/210 Application tests, but canary #6 was NOT RUN: the original private five-attempt ledger and plugin-ID receipt are no longer available at their recorded `/tmp` location. No replacement ledger or inference was started. Recover those exact receipts or make a separate evidence-control decision before another attempt. This is not proof of model auth acceptance. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
+- **HISTORICAL — CHILD STATUS CORRECTED / PRIVATE EVIDENCE LOST:** official `auth status` was positive under the login-equivalent environment, negative under the former child environment and positive again when the child supplied only OS-derived `USER`/`LOGNAME`; config directory and effective UID matched. At that checkpoint, canary #6 was NOT RUN because the original five-attempt ledger and private plugin-ID receipt were unavailable. This did not prove model auth acceptance.
+
+## 2026-09-30 — authorized experiment recovery
+
+- **CURRENT — 7/8 USED / POST-INIT CONTAINMENT:** the Product Owner authorized a private persistent recovery checkpoint, explicitly debiting the five historical attempts without fabricating their lost receipts. The checkpoint and new pre-spawn reservations are owner-only and survive process restart. Attempt #6 recaptured current private builtin identifiers at the first init and stopped without analysis. PT-BR attempt #7 applied their session-only restrictive override; the original init gate passed, but the next event was `system` with an unretained subtype outside the closed reader contract. The reader failed `CONTAINMENT`, the child closed, and Application accepted no semantic result or mutation. One of eight slots remains; it was not spent on EN-US/continuation/cancellation after the material containment failure. Review the precise post-init event semantics before another authorized process; do not call this tool execution or a proven escape.
 
 ---
 
@@ -2189,7 +2211,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Resolve the **NEXT REQUIRED GATE** by recovering the original five-attempt private ledger and diagnostic #3 plugin-ID receipt, or obtaining an explicit Product Owner evidence-control decision if recovery is impossible. The non-secret child-auth environment defect is corrected and read-only status now matches the login profile, but canary #6 is NOT RUN and no semantic result has been accepted. The prior #4 model classification is not retroactively a proven auth failure. Three of eight historical attempts remain nominally; no new call is authorized by this record or executable safely without the original override evidence. Do not loosen no-tools/no-MCP/no-unmanaged-context or model controls, silently substitute model/billing, or proceed to the editorial matrix before a complete validated canary. No strategy, take selection or cut planning is authorized implicitly.
+1. Resolve the **NEXT REQUIRED GATE** by reviewing the exact post-init `system` event contract behind Claude attempt #7. Authorized recovery now supplies durable control and current private override metadata, but it does not restore the five historical raw receipts. The #7 init passed and the next unknown `system` event failed closed before any Opus answer; no semantic result has been accepted. **7/8 historical slots are used; #8 is not automatically authorized as a retry.** Do not loosen no-tools/no-MCP/no-unmanaged-context or model controls, silently substitute model/billing, or proceed to the editorial matrix before a complete validated real result. No strategy, take selection or cut planning is authorized implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

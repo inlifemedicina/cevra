@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE AUTH STATUS FIXED, PRIVATE LEDGER MISSING]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE POST-INIT SYSTEM EVENT, 7/8 USED]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -182,8 +182,15 @@ login-equivalent profile and after adding only the OS-derived user identity.
 This is not proof that inference now works. Canary #6 remains **NOT RUN**
 because the original private five-attempt ledger and plugin override receipt
 are absent from their recorded temporary location; they were not recreated.
-Recover the exact private evidence or make a separate evidence-control decision
-before any further real process. The historical count stays **5/8**.
+That was the historical 5/8 checkpoint. The Product Owner subsequently
+authorized recovery without fabricating the lost originals: five remain
+debited in a persistent private checkpoint. Diagnostic #6 recaptured current
+builtin IDs at init and stopped. PT-BR #7 used the restrictive session override;
+its init passed, but a subsequent `system` event of unknown subtype failed the
+unchanged containment gate. No final Opus or semantic result was accepted;
+ProjectHistory/redo were unchanged. **7/8** attempts are used, with one slot
+unspent. EN-US, continuation and cancellation remain NOT RUN. The next focused
+decision is the exact post-init event contract, not automatic use of #8.
 Effective end-to-end Opus/Medium, real transport success and editorial matrix remain unproven.
 Claude remains the next private proof candidate, not a replacement of the
 provider-neutral core or an approved commercial integration. Complete Semantic

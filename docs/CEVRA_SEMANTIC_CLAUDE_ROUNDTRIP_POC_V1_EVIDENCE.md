@@ -806,3 +806,66 @@ until the original private evidence is restored or the Product Owner makes a
 separate, explicit evidence/attempt-control decision. PT-BR, EN-US,
 continuation and cancellation remain **NOT RUN**. Model generation, effective
 effort, provider-side usage and semantic quality remain unproved.
+
+## Authorized evidence-control recovery and attempts #6–#7 — 2026-09-30
+
+The Product Owner explicitly authorized a recovery checkpoint after the
+temporary ledger and private diagnostic #3 receipt disappeared for an unknown
+reason. This did **not** recover those five original receipts. They remain
+historically recorded but no longer independently re-verifiable by their raw
+files. The new owner-only checkpoint records experiment identity, canonical
+base, prior head `4d220faadcdbc17aeae51c8be695aaf4a8ca21c4`, creation time,
+`authorized-recovery`, **five prior attempts debited**, eight maximum, and
+`originalReceipts: unavailable`. It is stored outside Git and `/tmp` in
+`$HOME/Library/Application Support/CEVRA/DeveloperEvidence/semantic-claude-roundtrip-poc-v1/`.
+Its directories are 0700 and files 0600. Reopening it does not replenish quota;
+normal execution without a valid checkpoint fails closed. An exclusive lock
+serializes the experiment, each attempt gets an exclusive fsynced reservation
+**before** Claude is spawned, and a missing final receipt still spends the
+reserved slot. Ambiguous lock ownership is not reclaimed automatically.
+No Project IR, ProjectHistory, Store or Media Archive persistence changed.
+The recovery/control and directed-test code checkpoint is
+`aa6e7c145df9977f8c560a1217e0bbfb2ec42daa`; the model processes above
+ran from its exact code tree before the documentation-only follow-up.
+
+Deterministic PoC tests, including recovery idempotence, missing/corrupt
+checkpoint, symlink/foreign file, concurrent reservation, post-reservation
+crash, ninth-attempt rejection and unchanged normal init containment, passed
+**77/77**. The directly related Application tests passed **210/210**. These
+tests use controlled processes and do not prove Claude behavior. The CLI hash
+remained `387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d`
+before and after the two new processes. Official `auth status --json` passed
+under the exact closed child environment before each process; that status is
+not proof of model generation. No login, installation, API key or extra-usage
+purchase was performed; the CEVRA harness wrote no global settings.
+Push CI [run 36663510816](https://github.com/inlifemedicina/cevra/actions/runs/36663510816)
+completed **SUCCESS 5/5** on code/test SHA
+`aa6e7c145df9977f8c560a1217e0bbfb2ec42daa` (Monorepo, Tauri, Media
+Runtime reproducibility, Transcription, Alignment). The workflow contains no
+Claude inference and is not the evidence for attempts #6 or #7.
+
+| Attempt | Purpose and observation | Transport/Application outcome | Persistent control |
+|---|---|---|---|
+| #6 | Current plugin-ID recapture; first `system/init` only; two distinct virtual builtin entries with `name`, `path`, `source`; zero accepted semantic output | `DIAGNOSTIC_STOP`; child reaped; 1 event, 890 stdout bytes, 0 stderr bytes, 1,237 envelope bytes, ~1,359 ms transport | New private `plugin-metadata-6.json` and exclusive reservation/receipt, **not** a recovered #3 receipt |
+| #7 | Small synthetic PT-BR, two sources, full Application → closed projection → Claude adapter path; same exact private IDs disabled by session-only `--settings` | Init passed the unchanged gate, then a second event was `type=system`, subtype outside the diagnostic summary vocabulary; `CONTAINMENT`, no generated-model or final semantic result accepted. Child reaped; 2 events, 951 stdout bytes, 0 stderr bytes, 2,459 envelope bytes, ~2,798 ms transport | Exclusive reservation/receipt and private bounded diagnostic (zero assistant/result entries); ProjectHistory and redo unchanged |
+
+The #7 last-event summary contains only `system/other`; the exact subtype was
+not retained, so it is **not** identified as a tool, hook, plugin execution,
+escape, provider error or harmless status. Since the reader rejects any
+unexpected post-init system event, containment remains fail-closed. The clean
+init is evidence that the current restrictive override was effective for that
+init, not universal isolation. No Opus generation, effective effort, usage,
+charge or editorial quality is established. The Application surfaced analyzer
+unavailable and made no mutation. The semantic response, citations, quality
+rubric and real-agent round-trip were **not** reached.
+
+The ledger now reads **7/8 consumed, one remaining**. The authorized PT-BR
+attempt failed materially at transport containment, so the final slot was not
+spent: EN-US, continuation and real cancellation are **NOT RUN**. Do not treat
+the old historical receipts as reconstructed or consume #8 to repeat an
+unclassified event. The next gate is a focused decision on the precise
+post-init `system` event contract in Claude Code 2.1.280; a future diagnostic
+must preserve the closed validator and the one remaining historical slot.
+This private PoC does not authorize Desktop/commercial integration. Slice A
+remains CLOSED, ADR 0030 remains IN DEVELOPMENT, complete Semantic Editorial
+Analysis remains NOT DELIVERED, and global weighted progress remains **55%**.

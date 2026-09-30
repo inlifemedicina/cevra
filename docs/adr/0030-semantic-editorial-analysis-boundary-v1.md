@@ -242,6 +242,22 @@ The first official-provider attempts do not alter the accepted boundary:
   count remains 5/8. Recovery of those exact receipts or a separate explicit
   evidence-control decision is required before any further real attempt.
 
+The 2026-09-30 Product Owner authorization supplied that evidence-control
+decision: a persistent, private experiment checkpoint counts the five original
+attempts as debited and their receipts as unavailable, without reconstructing
+them. New attempts reserve and sync a unique slot before spawning the client;
+an incomplete reservation is not refunded. Diagnostic #6 stopped at the first
+init after recapturing the two current virtual builtin identifiers, outside
+Git. Small synthetic PT-BR attempt #7 applied the session-only restrictive
+override and passed the unchanged init gate, but the next `system` event had a
+subtype not retained by the closed public summary and failed `CONTAINMENT`.
+There was no accepted model answer or Application result, and history/redo
+remained unchanged. The ledger is **7/8 used**; the final slot and EN-US,
+continuation and cancellation were not run after this material failure.
+Exact post-init event semantics require a focused decision before any further
+real process. This changes neither the accepted Slice A boundary nor the ADR's
+IN DEVELOPMENT status; the real-agent gate remains unproved.
+
 The private adapter is deterministically tested; the five bounded real processes
 have not yielded an accepted transport/Application round-trip. Synthetic canary envelopes were written to the CLI; remote inference
 or consumption before termination is unknown. No API key, extra usage, retry/
