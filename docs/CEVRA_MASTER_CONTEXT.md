@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-29, Slice A is closed; Claude CLI installation/auth are verified, canary #2 identified `INIT_PLUGINS_NONEMPTY`, and local inventory has not established the origin of its two entries (2/8 attempts, no accepted response); Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-29, Slice A is closed; Claude CLI diagnostic attempt #3 identified two virtual `@builtin` init entries (3/8 attempts, no accepted response), but no proven session-only disablement; Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1420,7 +1420,7 @@ Foundation / Media Runtime       [CLOSED]
 → Transcript Cache V1 [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
-→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — PLUGIN ORIGIN]
+→ real-agent semantic round-trip [ACTIVE GATE / CODEX BLOCKED — CONTAINMENT / CLAUDE BLOCKED — BUILT-IN INIT METADATA]
 → strategy / take selection / cut planning
 → missing typed Project IR edit commands
 → cut compiler
@@ -1690,7 +1690,7 @@ config edit or Gatekeeper bypass occurred. The historical AUTH blocker was
 resolved by the user's official subscription login: sanitized status now reports
 logged-in Claude.ai / first-party / Pro. Documented controls and local policy
 preflight permitted a minimal canary after deterministic adapter tests.
-Current stage: **BLOCKED — REAL CAPABILITY REPORTED IN INITIALIZATION**.
+Current stage: **BLOCKED — BUILT-IN INIT METADATA / NO PROVEN SESSION DISABLE**.
 Canary #1 failed generically on the first `system/init` event (1/8); its exact
 field was not retained. After closed, non-content diagnostic tests, exactly one
 additional canary with the same controls identified `INIT_PLUGINS_NONEMPTY`:
@@ -1700,10 +1700,18 @@ ledger is now **2 / 8**, six remaining. No tool execution or escape was
 observed, and the plugins' identities/function are not inferred from a count.
 Subsequent read-only official plugin inventory from the same CLI/environment
 returned zero entries; documented local plugin/skills directories and
-`enabledPlugins` entries are absent. No exact plugin IDs or origins can be
-correlated with the init event. Thus no safe per-session disablement has been
-applied and canary #3 was not run; ledger remains 2/8. This is a loader/init
-origin blocker, not proof of plugin execution or escape.
+`enabledPlugins` entries are absent. With an explicitly authorized refinement,
+operator-only capture stopped real attempt #3 at its first init. Both entries
+reported virtual `path: builtin` and `source` of the form `<name>@builtin`,
+which agrees with the official built-in source label; neither supplied a
+filesystem path, separate ID, version, component inventory or required status.
+The private identifiers remain outside Git/normal metrics. The apparent
+inventory/init mismatch is now attributable to different observed categories,
+not to a demonstrated third-party installation. Exact component activation
+and this version's loader semantics remain unproven. No documented session-only
+disablement for built-ins was established; the conditional fourth attempt was
+not run. Ledger is **3/8**, with **5** remaining. This is not proof of plugin
+execution or escape, and the init gate still fails closed.
 Effective effort, real transport success and editorial quality remain
 unproven. The adapter/test harness is private infrastructure, not Desktop
 integration. No API key, extra usage, fallback or audiovisual mutation was
@@ -2085,7 +2093,7 @@ delivered by scripted fixtures.
 - **PRESERVED DIAGNOSTIC:** the Codex App Server PoC remains **BLOCKED — CONTAINMENT** at `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1`, with zero threads and zero turns. It is not reclassified as a demonstrated escape or universal impossibility.
 - **BOUNDED CANDIDATE DECISION:** official Claude Code CLI is the next private proof candidate under the same provider-neutral Application port. This does not replace the historical Codex preference or approve product/commercial integration.
 - **HISTORICAL / RESOLVED — VERSION:** the first preflight found only Claude Desktop and its internal Linux/aarch64 2.1.270 payload. The subsequent explicitly authorized installation verified official macOS arm64 Claude Code 2.1.280 with signed manifest, binary checksum, native publisher signature and notarization. No global configuration was changed.
-- **CURRENT — BLOCKED / PLUGIN ORIGIN:** subscription login is verified. Canary #1 failed the init gate without a retained field; canary #2 reports `INIT_PLUGINS_NONEMPTY` with plugins count 2, tools/MCP/skills count 0 and no bypass. Official read-only plugin inventory under the same CLI/environment is empty; documented local plugin and managed settings sources do not explain the two init entries. Full IDs/origins are unproven, so no per-session `enabledPlugins` override or canary #3 was attempted. Ledger remains 2/8, zero accepted results. The count does not prove plugin execution or an escape. Resolve the loader/init provenance without weakening containment or repeating login/install. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
+- **CURRENT — BLOCKED / BUILT-IN INIT METADATA:** subscription login is verified. Canaries #1/#2 failed the init gate; #2 identified two plugin entries and zero tools/MCP/skills, no bypass. Official installed-plugin inventory was empty. Authorized diagnostic attempt #3 captured only bounded metadata and stopped at its first init: both entries are virtual `builtin` with `<name>@builtin` source identifiers, not paths to personal plugin directories. No components, hooks, instructions or execution were proven. The official documented per-session plugin controls do not establish a way to disable built-ins in pinned 2.1.280, so attempt #4 was not spent. Ledger **3/8**, zero accepted results; gate unchanged. Next decision needs an official built-in init/disablement contract or separately authorized containment-contract review. Director impact remains compatible I1/I3/I5 feasibility work only; no product authority or commercial integration changed.
 
 ---
 
@@ -2131,7 +2139,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Resolve the **NEXT REQUIRED GATE** by identifying the origin/full IDs or official 2.1.280 semantics of the two `system/init.plugins` entries. The CLI's read-only inventory returned zero; the safe per-session override cannot yet be constructed. Six of eight authorized attempts remain, but this diagnostic task ran no canary and authorizes no next call. Installation/auth already pass; no accepted semantic result exists. Do not loosen no-tools/no-MCP/no-unmanaged-context controls, silently substitute model/billing, or proceed to the editorial matrix before containment is established. No strategy, take selection or cut planning is authorized implicitly.
+1. Resolve the **NEXT REQUIRED GATE** by obtaining an official 2.1.280 explanation of its two virtual `@builtin` init entries and a supported session-only disablement, or by making a separate explicit containment-contract decision with evidence. The CLI installed-plugin inventory returned zero; diagnostic attempt #3 established built-in source labels but not effective components or a safe override. Five of eight authorized attempts remain; attempt #4 was not run and no next call is authorized by this record. Installation/auth pass, but no semantic result was accepted. Do not loosen no-tools/no-MCP/no-unmanaged-context controls, silently substitute model/billing, or proceed to the editorial matrix before containment is established. No strategy, take selection or cut planning is authorized implicitly.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

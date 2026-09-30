@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-29 — BLOCKED — PLUGIN ORIGIN (`INIT_PLUGINS_NONEMPTY` remains fail-closed).**
+**2026-09-29 — BLOCKED — BUILT-IN INIT METADATA / NO PROVEN SESSION DISABLE (`INIT_PLUGINS_NONEMPTY` remains fail-closed).**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -15,14 +15,15 @@ After the user's official subscription login, sanitized auth reports
 publisher signature and notarization assessment still pass. Installation and
 authentication are no longer blockers.
 
-The isolated adapter's first real canary was rejected at its first
+Historical state before the latest private diagnosis: the isolated adapter's first real canary was rejected at its first
 initialization event; that checkpoint did not retain the failing field. A
 focused diagnostic change preserved every pass/fail decision, and a second
 canary with the same synthetic input and controls identified
 `INIT_PLUGINS_NONEMPTY`: the `system/init` event reported **two plugins**.
 `tools`, `mcp_servers` and `skills` were present as empty arrays, and bypass
-was false. Both owned processes were terminated and reaped. **2 / 8** real
-process attempts used, **6 remain**. No final model response was accepted.
+was false. Both owned processes were terminated and reaped. At that checkpoint,
+**2 / 8** real process attempts had been used, with **6 remaining**. No final
+model response was accepted.
 The reported plugin list is a failed capability gate, not evidence that a
 plugin/tool ran, accessed data or escaped containment. Do not infer plugin
 names, function, provenance or administrative origin from the count alone.
@@ -540,3 +541,73 @@ IDs/origins, or an official explanation of the 2.1.280 init contract. Only
 then can a narrow session override be reviewed and one authorized canary
 considered. No editorial matrix, provider switch, product integration, or
 additional billing path was started.
+
+## Private init-metadata diagnosis — 2026-09-29
+
+The Product Owner refined the prior non-inference-only restriction to permit
+one synthetic diagnostic process, immediate termination after its first init,
+and at most one later corrective canary if an official per-session control was
+proven. Code/test checkpoint `3235082e403e7e5ebe5cd37a6207b7455b290170`
+adds an operator-only metadata projection and exclusive 0600 receipt in the
+existing 0700 ledger directory. The normal init validator and fixed CLI argv,
+model/effort, playbook, transport bounds and Application contracts are unchanged.
+Unknown event fields are not copied; the receipt is **private local diagnostic
+data, not publishable sanitized evidence**. It retains only bounded plugin
+identifiers and source/path metadata, never the raw event, prompt, instructions,
+tool input or reasoning. Public metrics and this document use P1/P2 aliases.
+
+Before the process, the ledger held two failed canaries and their separate
+receipts; the diagnostic receipt and execution lock were absent. The pinned
+Claude 2.1.280 darwin-arm64 binary SHA-256 matched
+`387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d`.
+Deterministic fake-process tests passed **34/34**, including capture, bounds,
+private receipt exclusivity/symlink refusal, process reaping, clean-init
+diagnostic stop, and unchanged nonempty-plugin rejection. The directly related
+Application tests passed **210/210**. These prove CEVRA behavior, not native
+Claude loader semantics.
+
+Exactly one additional real process, attempt **#3**, used the same synthetic
+minimal phrase, flags, Opus alias and Medium effort. It was stopped on its
+first `system/init` and reaped (one event, 889 stdout bytes, zero stderr bytes,
+about 733 ms local child latency). It supplied no accepted response; the
+Application reported analyzer unavailable and preserved ProjectHistory and
+redo. The init still reported tools/MCP/skills arrays of length zero, two
+plugin entries, no bypass, and a permitted Opus model class. The requested
+effort is not independently attested by this stopped run. Remote work or usage
+before init cannot be ruled out and no provider-side consumption count is
+claimed. The binary hash was unchanged afterwards.
+
+| Alias | Observed shape | Origin evidence | Not established |
+|---|---|---|---|
+| P1 | object with `name`, `path`, `source` | `path` is the virtual `builtin` marker; `source` is exactly `<name>@builtin` | manifest, components, enabled/required status, hooks/instructions, execution |
+| P2 | same shape, distinct name/source | same virtual `builtin` marker and `<name>@builtin` form | same unknowns |
+
+Neither entry supplies a separate `id`, version, enabled/required flag, or
+filesystem directory. No user path is represented by the virtual marker. The
+official [marketplace reference](https://code.claude.com/docs/en/plugins/marketplace-reference)
+reserves `builtin` for built-in plugins, corroborating the runtime's origin
+label; the exact internal loader behavior of 2.1.280 is still not public proof.
+This explains the observed difference in *category* between the empty
+installed-plugin CLI inventory and the init's built-in entries, without
+asserting that the inventory command has a universal normative exclusion rule.
+The [plugin loading reference](https://code.claude.com/docs/en/plugins/loading)
+documents `enabledPlugins` controls for marketplace, inline, skills-directory
+and synced IDs, but does not document a built-in override. The
+[CLI reference](https://code.claude.com/docs/en/cli-reference) says
+`--safe-mode` disables plugins and `--settings` overrides session settings;
+nevertheless the pinned 2.1.280 init reported both built-in entries with
+safe/restricted mode already active. Whether these entries register components
+or are metadata-only is not established by empty tools/MCP/skills alone.
+
+No documented, demonstrably effective per-process control for these built-in
+entries was established. An unverified `enabledPlugins` key or an exception to
+the init gate would not meet the corrective-canary prerequisite. **Attempt #4
+was not run.** The immutable ledger now holds **3/8** attempts, leaving **5**;
+the original two receipts and the private third receipt remain separate. No
+plugin name, path, manifest or raw event was committed, logged or supplied to
+the analyzer. No personal/global settings, plugin installation, authentication
+or billing mode changed. The remaining decision is a focused provider-contract
+question: obtain an official 2.1.280 account of built-in init entries and a
+supported session-only disablement, or explicitly reconsider the containment
+contract with separate evidence and authorization. This task does neither and
+does not proceed to the editorial matrix.
