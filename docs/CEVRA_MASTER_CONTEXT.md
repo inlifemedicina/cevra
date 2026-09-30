@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-30, PRs #57/#58 merged and post-merge validated; bounded offline Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED. Approved ChatGPT/cloud/mobile planning is reconciled in Draft PR #56. Slice A remains closed; real semantic round-trip is NOT DEMONSTRATED; the historical experiment remains terminal (8/8 used, zero balance). Codex diagnosis remains preserved and blocked.
+**Last decision reconciliation:** 2026-09-30, PRs #57/#58 merged and post-merge validated; bounded offline Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED. PR #56 is CLOSED / MERGED and post-merge validated; INT-CLOUD-01–05 are incorporated into planning only. Slice A remains closed; real semantic round-trip is NOT DEMONSTRATED; the historical experiment remains terminal (8/8 used, zero balance). Codex diagnosis remains preserved and blocked.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1326,9 +1326,11 @@ the roadmap on 2026-09-30. [Issue #55](https://github.com/inlifemedicina/cevra/i
 retains the dated research/evidence and open questions;
 [CEVRA_INTEGRATION_DECISIONS.md](CEVRA_INTEGRATION_DECISIONS.md) records the
 direction, and [CEVRA_ORGANOGRAMA.md](CEVRA_ORGANOGRAMA.md) owns the sequencing
-of INT-CLOUD-01–05. This planning is reconciled over the post-PR #58 baseline
-in Draft PR #56; approval of planning is not an implemented capability or
-completed independent documentary review.
+of INT-CLOUD-01–05. PR #56 is CLOSED / MERGED after independent documentary
+approval, by normal merge commit `9728f865dfc035d980a7071f1c6bb0421157e5a9`.
+Post-merge CI `36790864159` passed 5/5 on that exact SHA. INT-CLOUD-01–05
+are incorporated into planning, not implemented capabilities. Issue #55
+remains OPEN; its findings still require revalidation.
 
 INT-CLOUD-01 official eligibility/capability/auth/privacy/quota/deployment
 review and INT-CLOUD-02 authorized official transport evaluation belong
@@ -1522,9 +1524,16 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Verified canonical main after PR #58:
-`be1e0e99fd189a1c976b44ec3a72e66d5fa5608c`, the baseline before this
-PR #56 planning reconciliation. PR #58 merged the docs-only closeout head
+Verified canonical main after PR #56:
+`9728f865dfc035d980a7071f1c6bb0421157e5a9`, the baseline for this minimal
+documentary closeout. PR #56 is CLOSED / MERGED; its parents are
+`be1e0e99fd189a1c976b44ec3a72e66d5fa5608c` and approved planning head
+`bbfb56ffece4683f40619185ebc7fb442609458d`. Post-merge push CI
+`36790864159` passed 5/5 on the exact merge SHA. Exact Runtime was not
+triggered by the docs-only path filters; no execution success is implied.
+
+The preceding canonical main after PR #58 was
+`be1e0e99fd189a1c976b44ec3a72e66d5fa5608c`. PR #58 merged the docs-only closeout head
 `9da286cf98fe19a14d13fa8409f3042bde6af99c`; post-merge push CI
 `36782216081` passed 5/5 on that canonical SHA.
 
@@ -1536,8 +1545,8 @@ Its first parent is the historical Claude PoC baseline after PR #54,
 approved feature head. Post-merge push CI `36774947802` passed 5/5 and
 Exact Runtime `36774947781` passed on the exact merge SHA.
 PRs #57/#58 close only the bounded offline transport/evidence PoC, not real
-semantic analysis. No future PR #56 merge or self-referential commit SHA is
-implied by this baseline record.
+semantic analysis. PR #56 incorporates planning only; no future documentary
+closeout merge or self-referential commit SHA is implied by this baseline record.
 
 The older `360bf60d4ed4b0a985c0c254a109fac2d6bc0d64` value remains historical:
 it was the canonical main after PR #50 and the feature base for PR #51.
@@ -2326,7 +2335,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Review the reconciled docs-only planning in PR #56, which remains OPEN / DRAFT / UNMERGED over the validated post-PR #58 baseline. PRs #57/#58 closed the bounded offline Claude CLI transport/evidence PoC; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** INT-CLOUD-01/02 support that next gate through official eligibility review and conditional authorized transport evaluation; they do not replace it or authorize execution. A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. INT-CLOUD-03–05 remain future planning under their own prerequisites; progress stays 55%.
+1. Review the minimal temporal closeout of PR #56, now CLOSED / MERGED and post-merge validated at `9728f865dfc035d980a7071f1c6bb0421157e5a9` (CI `36790864159`, SUCCESS 5/5). INT-CLOUD-01–05 are incorporated into planning only. PRs #57/#58 closed the bounded offline Claude CLI transport/evidence PoC; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** INT-CLOUD-01/02 support that next gate through official eligibility review and conditional authorized transport evaluation; they do not replace it or authorize execution. A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. INT-CLOUD-03–05 remain future planning under their own prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
