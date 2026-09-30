@@ -56,8 +56,9 @@ export async function verifyBinary(path) {
 
 // Closed transport reader: never retains thinking blocks or raw event logs.
 export class ClaudeStreamReader {
-  constructor(sessionId, limits = LIMITS) {
+  constructor(sessionId, limits = LIMITS, diagnosticInit) {
     this.sessionId=sessionId; this.limits=limits; this.pending=Buffer.alloc(0);
+    this.diagnosticInit=diagnosticInit;
     this.bytes=0; this.events=0; this.initialized=false; this.result=undefined;
     this.model=undefined; this.usage=undefined; this.estimate=undefined;
   }
@@ -90,6 +91,10 @@ export class ClaudeStreamReader {
     if(e.session_id!==this.sessionId) fail('CORRELATION');
     if(e.type==='system' && e.subtype==='init') {
       if(this.initialized) fail('DUPLICATE_INIT');
+      if(this.diagnosticInit) {
+        this.diagnosticInit(e);
+        fail('DIAGNOSTIC_STOP'); // Never validate or accept a semantic result in diagnostic mode.
+      }
       for(const [field,prefix] of [['tools','INIT_TOOLS'],['mcp_servers','INIT_MCP']]) {
         if(!Object.hasOwn(e,field)) fail('CONTAINMENT',`${prefix}_MISSING`);
         if(!Array.isArray(e[field])) fail('CONTAINMENT',`${prefix}_WRONG_TYPE`);
@@ -141,10 +146,10 @@ export class ClaudeStreamReader {
 }
 
 // Internal process seam is only for deterministic tests; no caller/request callback.
-export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs=60000,sessionId=randomUUID(),limits=LIMITS}, spawnProcess=spawn) {
+export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs=60000,sessionId=randomUUID(),limits=LIMITS,diagnosticInit}, spawnProcess=spawn) {
   if(signal?.aborted) fail('CANCELLED');
   const started=performance.now();
-  const reader=new ClaudeStreamReader(sessionId,limits);
+  const reader=new ClaudeStreamReader(sessionId,limits,diagnosticInit);
   const child=spawnProcess(binary,childArguments(sessionId),{cwd,env:childEnvironment(home),shell:false,stdio:['pipe','pipe','pipe']});
   return await new Promise((resolve,reject)=>{
     let error, killTimer, stderrBytes=0, tail=Buffer.alloc(0), closed=false;

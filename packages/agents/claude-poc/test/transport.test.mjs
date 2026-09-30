@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {mkdtemp,rmdir} from 'node:fs/promises';
+import {mkdtemp,rmdir,readFile,lstat,symlink,unlink} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {childArguments,childEnvironment,ClaudeStreamReader,runClaudeProcess,ClaudePocAnalyzer,LIMITS} from '../transport.mjs';
+import {captureInitPlugins,publicInitShape,writePrivateInitReceipt} from '../init-diagnostic.mjs';
 const fake=fileURLToPath(new URL('./fake-cli.mjs',import.meta.url));
 const payload=JSON.stringify({context:{contextId:'test',evidence:[{reference:'E1',text:'Café'}]}});
 const runner=mode=>(bin,args,opts)=>spawn(process.execPath,[fake,mode,...args],opts);
@@ -57,6 +58,37 @@ test('rejected initialization retains only non-content shape diagnostics',async(
   assert.deepEqual(e.metrics.lastEventSummary.mcp_servers,{present:true,kind:'array',count:0});
   assert(!JSON.stringify(e.metrics).includes('Café'));assert.equal(e.metrics.stdinBytes,Buffer.byteLength(payload));return e.code==='CONTAINMENT';
  });
+});
+test('operator-only init capture stops and reaps before any answer; normal gate still rejects plugins',async()=>{
+ let captured;
+ await assert.rejects(run('diagnostic-plugins',{diagnosticInit:e=>{captured=captureInitPlugins(e);}}),e=>{
+  assert.equal(e.code,'DIAGNOSTIC_STOP');assert.equal(e.metrics.childClosed,true);
+  assert(!JSON.stringify(e.metrics).includes('private-one'));return true;
+ });
+ assert.equal(captured.plugins.length,2);
+ assert.equal(captured.plugins[0].id,'private-one@fixture');
+ assert.equal(captured.plugins[0].otherFieldCount,1);
+ assert(!JSON.stringify(captured).includes('DO NOT COPY'));
+ assert(!JSON.stringify(publicInitShape(captured)).includes('private-one'));
+ await assert.rejects(run('diagnostic-plugins'),e=>e.code==='CONTAINMENT'&&e.reason==='INIT_PLUGINS_NONEMPTY');
+ let clean;
+ await assert.rejects(run('utf8',{diagnosticInit:e=>{clean=captureInitPlugins(e);}}),e=>e.code==='DIAGNOSTIC_STOP');
+ assert.equal(clean.plugins.length,0);
+});
+test('private receipt is exclusive, mode-restricted and rejects symlink; metadata bounds are closed',async()=>{
+ const dir=await mkdtemp('/tmp/cevra-init-diagnostic-test-');
+ try{
+  const result=captureInitPlugins({type:'system',subtype:'init',plugins:[{name:'private',unknown:'hidden'}]});
+  await writePrivateInitReceipt(dir,'diagnostic.json',result);
+  assert.equal((await lstat(`${dir}/diagnostic.json`)).mode&0o777,0o600);
+  assert.deepEqual(JSON.parse(await readFile(`${dir}/diagnostic.json`,'utf8')),result);
+  await assert.rejects(writePrivateInitReceipt(dir,'diagnostic.json',result),e=>e.code==='EEXIST');
+  await symlink(`${dir}/diagnostic.json`,`${dir}/symlink.json`);
+  await assert.rejects(writePrivateInitReceipt(dir,'symlink.json',result),e=>e.code==='EEXIST');
+  assert.throws(()=>captureInitPlugins({type:'system',subtype:'init',plugins:Array(9).fill('x')}),e=>e.code==='DIAGNOSTIC_METADATA_LIMIT');
+  assert.throws(()=>captureInitPlugins({type:'system',subtype:'init',plugins:[{path:'x'.repeat(1025)}]}),e=>e.code==='DIAGNOSTIC_METADATA_LIMIT');
+  await unlink(`${dir}/symlink.json`);await unlink(`${dir}/diagnostic.json`);
+ }finally{await rmdir(dir);}
 });
 test('every init field reports a closed reason without changing pass/fail semantics',()=>{
  const base={type:'system',subtype:'init',session_id:'fixture-session',

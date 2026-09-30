@@ -13,6 +13,7 @@ if(mode==='slow'||mode==='ignore-term'){
 }else{
  const init={type:'system',subtype:'init',session_id,tools:[],mcp_servers:[],plugins:[],skills:[],model};
  if(mode==='tools')init.tools=['Read'];
+ if(mode==='diagnostic-plugins')init.plugins=[{id:'private-one@fixture',path:'/private/one',version:'1.0',secretInstructions:'DO NOT COPY'},'private-two@fixture'];
  send(init);
  if(mode==='tool')send({type:'assistant',session_id,message:{model,content:[{type:'tool_use',name:'Read'}]}});
  if(mode==='permission')send({type:'control_request',session_id,request:{subtype:'can_use_tool'}});
