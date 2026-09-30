@@ -3,8 +3,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { lstat, mkdtemp, rmdir } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
+import { userInfo } from 'node:os';
 import { PLAYBOOK } from './playbook.mjs';
 import {createSessionPluginSettings} from './session-plugin-override.mjs';
+import {classifyAuthExplanation} from './auth-diagnostic.mjs';
 
 export const CLAUDE_VERSION = '2.1.280';
 export const CLAUDE_SHA256 = '387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d';
@@ -69,7 +71,12 @@ function privateEventSummary(event){
   const model=event.type==='assistant'?event.message?.model:usageModels.length===1?usageModels[0]:undefined;
   const safeModel=typeof model==='string'&&model.length<=128&&(/^[a-z0-9.-]*claude-[a-z0-9.-]+$/.test(model)||model==='<synthetic>')?model:undefined;
   const errorText=event.type==='assistant'&&event.error!==undefined&&Array.isArray(event.message?.content)?
-    event.message.content.filter(b=>b?.type==='text'&&typeof b.text==='string').map(b=>b.text).join('\n'):undefined;
+    event.message.content.filter(b=>b?.type==='text'&&typeof b.text==='string').map(b=>b.text).join('\n'):
+    event.type==='result'&&event.is_error===true?
+      [Array.isArray(event.errors)?event.errors.filter(x=>typeof x==='string').join('\n'):undefined,
+        typeof event.result==='string'?event.result:undefined].filter(Boolean).join('\n'):undefined;
+  const auth=event.type==='assistant'&&event.error!==undefined||event.type==='result'&&event.is_error===true?
+    classifyAuthExplanation({errorCode:event.error,status:event.api_error_status,text:errorText}):undefined;
   return Object.freeze({type:event.type,model:safeModel,modelKind:kind(model),modelHash:model!==undefined&&safeModel===undefined?
     createHash('sha256').update(String(model).slice(0,128)).digest('hex'):undefined,
     error:typeof event.error==='string'&&
@@ -81,11 +88,16 @@ function privateEventSummary(event){
       event.type==='assistant'?event.message.stop_reason:event.stop_reason:undefined,
     terminalReason:TERMINAL_REASONS.includes(event.terminal_reason)?event.terminal_reason:undefined,
     usageModelCount:usageModels.length,isError:event.is_error===true,errorTextPresent:errorText!==undefined&&errorText.length>0,
-    errorTextHash:errorText?createHash('sha256').update(errorText).digest('hex'):undefined});
+    errorTextHash:errorText?createHash('sha256').update(errorText).digest('hex'):undefined,
+    authExplanationCategory:auth?.category,authExplanationEvidence:auth?.evidence,
+    authStatusPresent:auth?.statusPresent});
 }
 export function childEnvironment(home) {
   if (!isAbsolute(home)) fail('INVALID_HOME');
-  return { HOME: home, PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', DISABLE_AUTOUPDATER: '1' };
+  const username=userInfo().username;
+  if(typeof username!=='string'||!username||/[\x00-\x1f\x7f]/.test(username))fail('INVALID_USER_IDENTITY');
+  return { HOME: home, USER: username, LOGNAME: username,
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', DISABLE_AUTOUPDATER: '1' };
 }
 export function childArguments(sessionId,settingsPath) {
   if(settingsPath!==undefined && !isAbsolute(settingsPath))fail('INVALID_SESSION_SETTINGS');

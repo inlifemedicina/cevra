@@ -16,9 +16,15 @@ if(mode==='slow'||mode==='ignore-term'){
  if(mode==='diagnostic-plugins')init.plugins=[{id:'private-one@fixture',path:'/private/one',version:'1.0',secretInstructions:'DO NOT COPY'},'private-two@fixture'];
  send(init);
  const assistantError=mode.startsWith('assistant-error-')?mode.slice('assistant-error-'.length):undefined;
+ const authDetail=mode==='assistant-error-auth-expired'?'Login expired. Please run /login':
+  mode==='assistant-error-auth-keychain'?'Keychain access denied for credential store':
+  mode==='assistant-error-auth-no-credential'?'No credential available; please log in':
+  mode==='assistant-error-auth-organization'?'Organization access denied':
+  mode==='assistant-error-auth-unsupported'?'Unsupported authentication route':
+  mode==='assistant-error-auth-sensitive'?'Authentication failed for user@example.com with Bearer private-token-123456789':undefined;
  const assistant={type:'assistant',session_id,message:{model:assistantError||mode==='synthetic' ? '<synthetic>' : model,
-  content:[{type:'text',text:assistantError?'synthetic provider error detail':'fixture response'}],stop_reason:'end_turn'}};
- if(assistantError)assistant.error=assistantError;
+  content:[{type:'text',text:authDetail??(assistantError?'synthetic provider error detail':'fixture response')}],stop_reason:'end_turn'}};
+ if(assistantError)assistant.error=authDetail?'authentication_failed':assistantError;
  if(mode==='assistant-missing-model')delete assistant.message.model;
  if(mode==='assistant-other-model')assistant.message.model='claude-sonnet-fixture';
  if(mode==='assistant-top-model'){assistant.model=model;delete assistant.message.model;}
@@ -43,6 +49,7 @@ if(mode==='slow'||mode==='ignore-term'){
  if(mode==='correlation')result.session_id='wrong';
  if(mode==='error')result.subtype='error_max_turns';
  if(mode==='result-is-error')result.is_error=true;
+ if(mode==='result-auth-expired'){result.is_error=true;result.api_error_status=401;result.errors=['Login expired. Please run /login'];}
  if(mode==='assistant-error-then-success')result.is_error=false;
  if(mode==='result-status-429'){result.is_error=true;result.api_error_status=429;}
  if(mode==='result-terminal-aborted')result.terminal_reason='aborted_streaming';

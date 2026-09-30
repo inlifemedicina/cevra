@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
+import {userInfo} from 'node:os';
 import {mkdtemp,rmdir,readFile,lstat,symlink,unlink,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {childArguments,childEnvironment,ClaudeStreamReader,runClaudeProcess,ClaudePocAnalyzer,LIMITS} from '../transport.mjs';
 import {captureInitPlugins,publicInitShape,writePrivateInitReceipt} from '../init-diagnostic.mjs';
 import {writePrivateEventReceipt} from '../event-diagnostic.mjs';
 import {pluginDisableSettings,loadPluginDisableSettings,createSessionPluginSettings} from '../session-plugin-override.mjs';
+import {classifyAuthExplanation,compareAuthStatus} from '../auth-diagnostic.mjs';
 const fake=fileURLToPath(new URL('./fake-cli.mjs',import.meta.url));
 const payload=JSON.stringify({context:{contextId:'test',evidence:[{reference:'E1',text:'Café'}]}});
 const runner=mode=>(bin,args,opts)=>spawn(process.execPath,[fake,mode,...args],opts);
@@ -64,8 +66,46 @@ test('session settings are private, exclusive, owner-scoped and retained until e
 });
 test('minimal environment excludes inherited credentials/endpoints',()=>{
  const env=childEnvironment('/fixture-home');
- assert.deepEqual(Object.keys(env).sort(),['DISABLE_AUTOUPDATER','HOME','LANG','PATH']);
+ assert.deepEqual(Object.keys(env).sort(),['DISABLE_AUTOUPDATER','HOME','LANG','LOGNAME','PATH','USER']);
  assert.equal(env.DISABLE_AUTOUPDATER,'1');
+ assert.equal(env.USER,userInfo().username);assert.equal(env.LOGNAME,userInfo().username);
+ for(const key of Object.keys(env))assert(!/^(ANTHROPIC_|CLAUDE_CODE_USE_|AWS_|GOOGLE_|AZURE_|HTTP_PROXY|HTTPS_PROXY|ALL_PROXY)/.test(key));
+});
+test('official status comparison detects config-directory drift without exposing a path',()=>{
+ const base={loggedIn:true,authMethod:'claude.ai',apiProvider:'firstParty',configDirectory:'/private/fixture'};
+ assert.deepEqual(compareAuthStatus(base,{...base,loggedIn:false}),{
+  status:'SAME_CONFIG_DIRECTORY',referenceLoggedIn:true,childLoggedIn:false,sameAuthMethod:true,sameApiProvider:true});
+ assert.equal(compareAuthStatus(base,{...base,configDirectory:'/foreign/profile'}).status,'CONFIG_DIRECTORY_DRIFT');
+ assert.equal(compareAuthStatus(base,{...base,configDirectory:undefined}).status,'INVALID_STATUS');
+ assert(!JSON.stringify(compareAuthStatus(base,{...base,configDirectory:'/foreign/profile'})).includes('/private/'));
+});
+test('closed authentication explanation never treats a wire code as proof of remote rejection',()=>{
+ for(const [text,category] of [
+  ['Login expired. Please run /login','LOGIN_EXPIRED_OR_REVOKED'],
+  ['Keychain access denied for credential store','CREDENTIAL_STORE_ACCESS'],
+  ['No credential available; please log in','NO_CREDENTIAL_AVAILABLE'],
+  ['Organization access denied','ORGANIZATION_ACCESS_RESTRICTION'],
+  ['Unsupported authentication route','UNSUPPORTED_AUTH_ROUTE'],
+ ])assert.equal(classifyAuthExplanation({errorCode:'authentication_failed',text}).category,category);
+ assert.deepEqual(classifyAuthExplanation({errorCode:'authentication_failed'}),{
+  category:'AUTH_REJECTED_UNSPECIFIED',textPresent:false,statusPresent:false,evidence:'EXPLICIT_AUTH_ERROR_ONLY'});
+ assert.equal(classifyAuthExplanation({text:'Login expired'}).category,'UNKNOWN');
+});
+for(const [mode,category] of [['assistant-error-auth-expired','LOGIN_EXPIRED_OR_REVOKED'],
+ ['assistant-error-auth-keychain','CREDENTIAL_STORE_ACCESS'],['assistant-error-auth-no-credential','NO_CREDENTIAL_AVAILABLE'],
+ ['assistant-error-auth-organization','ORGANIZATION_ACCESS_RESTRICTION'],
+ ['assistant-error-auth-unsupported','UNSUPPORTED_AUTH_ROUTE'],
+ ['assistant-error-auth-sensitive','AUTH_REJECTED_UNSPECIFIED']])test(`auth diagnostic ${mode} is closed and private`,async()=>{
+ await assert.rejects(run(mode),error=>{
+  assert.equal(error.code,'PROVIDER_AUTH_ERROR');
+  assert.equal(error.privateDiagnostic[0].authExplanationCategory,category);
+  assert.equal(error.privateDiagnostic[0].authExplanationEvidence,category==='AUTH_REJECTED_UNSPECIFIED'?'EXPLICIT_AUTH_ERROR_ONLY':'ERROR_TEXT_PATTERN');
+  for(const value of ['user@example.com','Bearer private-token','/login','Keychain access denied']){
+   assert(!JSON.stringify(error.privateDiagnostic).includes(value));
+   assert(!JSON.stringify(error.metrics).includes(value));
+  }
+  return true;
+ });
 });
 test('real child uses pipes/stdin/external temp cwd and no shell; Unicode survives fragmented stream',async()=>{
  const result=await run('utf8');assert.match(result.result,/Café — ação 🎬/);assert.equal(result.metrics.childClosed,true);
@@ -88,6 +128,7 @@ for(const [mode,code] of [
  ['assistant-top-model','MODEL_UNAVAILABLE'],['synthetic','MODEL_UNAVAILABLE'],
  ['assistant-aborted','PARTIAL_ASSISTANT'],['assistant-tool-error','CONTAINMENT'],
  ['result-is-error','PROVIDER_ERROR_UNKNOWN'],['result-status-429','PROVIDER_RATE_LIMIT'],
+ ['result-auth-expired','PROVIDER_AUTH_ERROR'],
  ['result-terminal-aborted','PROVIDER_ERROR_UNKNOWN'],['result-origin-other','CORRELATION'],
  ['no-assistant','MODEL_UNPROVEN'],
  ])test(`wire protocol ${mode} fails closed as ${code}`,async()=>{
@@ -121,6 +162,16 @@ test('assistant and result diagnostics use their actual locations without exposi
  assert.equal(success.privateDiagnostic[0].model,'claude-opus-fixture');
  assert.equal(success.privateDiagnostic[1].type,'result');
 });
+test('error result explanation is classified without retaining provider text',async()=>{
+ await assert.rejects(run('result-auth-expired'),e=>{
+  assert.equal(e.code,'PROVIDER_AUTH_ERROR');
+  assert.equal(e.privateDiagnostic.at(-1).authExplanationCategory,'LOGIN_EXPIRED_OR_REVOKED');
+  assert.equal(e.privateDiagnostic.at(-1).authStatusPresent,true);
+  assert(!JSON.stringify(e.metrics).includes('Login expired'));
+  assert(!JSON.stringify(e.privateDiagnostic).includes('Login expired'));
+  return true;
+ });
+});
 test('private event receipt is bounded, exclusive and never follows symlinks',async()=>{
  const dir=await mkdtemp('/tmp/cevra-event-diagnostic-test-');
  try{
@@ -133,6 +184,7 @@ test('private event receipt is bounded, exclusive and never follows symlinks',as
   await symlink(`${dir}/canary-5-private.json`,`${dir}/pt-6-private.json`);
   await assert.rejects(writePrivateEventReceipt(dir,'pt-6-private.json',events),e=>e.code==='EEXIST');
   await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',[{type:'assistant',content:'private'}]),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
+  await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',[{type:'assistant',authExplanationCategory:'private cause'}]),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
   await assert.rejects(writePrivateEventReceipt(dir,'en-7-private.json',Array(9).fill({type:'assistant'})),e=>e.code==='INVALID_EVENT_DIAGNOSTIC');
   await unlink(`${dir}/pt-6-private.json`);await unlink(`${dir}/canary-5-private.json`);
  }finally{await rmdir(dir);}
