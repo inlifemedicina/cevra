@@ -295,9 +295,11 @@ corrected with 115/115 PoC, 26/26 semantic Application, 210/210 full Application
 tests and a passing Node/TS build. No Application/History/projection contract,
 private ledger or provider authority changed. Independent review subsequently
 approved `de0aee79b0ed66b16b5434efad953da855ce0df0` with non-blocking notes.
-Only its N-1 follow-up (`1aa4324d9bcb4e404919d0af17c3b4d072abdbd5`, preserving
-recognized provider error before a same-chunk oversized tail) awaits focused
-verification; new offline PoC 119/119 and semantic Application 26/26 pass.
+Its N-1 follow-up (`1aa4324d9bcb4e404919d0af17c3b4d072abdbd5`, preserving
+recognized provider error before a same-chunk oversized tail) was independently
+VERIFIED / FIXED at `ea72f831c29aecc1e4017f6504d6f072a076ebcb`, with approval
+limited to the bounded offline remediation. Offline PoC 119/119 and semantic
+Application 26/26 pass; the PR gate remains distinct from that review.
 The existing evidence record retains reviewer/implementer separation and
 deferred N-2–N-4. There is still no accepted semantic round-trip. A new real proof requires
 explicit authorization of a new ID, budget and scope. This is a compatible

@@ -27,7 +27,7 @@ CEVRA VIDS
 │   ├─ Editorial Transcript Projection V1 [IMPLEMENTED / CLOSED]
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
-│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE EXPERIMENT CLOSED, OFFLINE N-1 VERIFICATION PENDING]
+│   │   └─ real-agent semantic round-trip [ACTIVE / CODEX BLOCKED-CONTAINMENT / CLAUDE EXPERIMENT CLOSED, OFFLINE REMEDIATION APPROVED / PR GATE]
 │   ├─ strategy
 │   ├─ take selection
 │   └─ cut planning
@@ -215,8 +215,10 @@ event classifications. PoC 115/115, semantic Application 26/26, full Application
 or private-ledger change occurred. Independent review approved `de0aee7` with
 non-blocking notes; the minimal N-1 oversized-tail correction at `1aa4324`
 passed four directed regressions, PoC 119/119, semantic Application 26/26 and
-Node/TS build. Only this new delta awaits focused verification; remaining
-notes are in the existing evidence record. A new real proof
+Node/TS build. Final independent verification at `ea72f83` found N-1
+VERIFIED / FIXED and approved the bounded offline remediation; PR gate is next.
+Deferred N-2–N-4 and separate CI/review evidence remain in the existing record.
+A new real proof
 requires explicit authorization of a new ID, budget and scope. Slice A stays
 CLOSED; full semantic analysis is NOT DELIVERED; progress remains 55%.
 Before future timeline/Cut Compiler workflows create many commits, remeasure

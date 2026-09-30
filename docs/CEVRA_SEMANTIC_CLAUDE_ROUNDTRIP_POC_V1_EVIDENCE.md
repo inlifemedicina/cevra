@@ -1,6 +1,6 @@
 # Semantic Editorial Analysis — Claude CLI Round-trip PoC V1
 
-**2026-09-30 — PREVIOUS OFFLINE REMEDIATION APPROVED WITH NOTES / N-1 DELTA AWAITS FOCUSED VERIFICATION.**
+**2026-09-30 — OFFLINE REMEDIATION INDEPENDENTLY APPROVED / N-1 VERIFIED / PR GATE NEXT.**
 
 Base: `a58ca419c2a0db2c416db83d84c432fcae23d830`.
 Branch: `feat/semantic-claude-roundtrip-poc-v1`.
@@ -1046,8 +1046,38 @@ Application rerun or manual Media/ML/Exact Runtime run was necessary for this
 one-line transport correction; the prior 210/210 remains historical evidence.
 New naturally triggered CI must be identified by its new SHA, not by the old run.
 
-**New delta: focused verification PENDING**, restricted to N-1; F-1–F-5 are not
-reopened. Remaining notes are recorded, **not fixed**:
+**Final independent verification received:**
+**N-1 VERIFIED — OFFLINE CLAUDE POC REMEDIATION APPROVED FOR ITS BOUNDED SCOPE**.
+The exact verified target is `ea72f831c29aecc1e4017f6504d6f072a076ebcb`.
+N-1 is VERIFIED / FIXED; no new finding was caused by the delta. F-1–F-5 remain
+independently approved offline and are not reopened.
+
+Evidence is separated as follows:
+
+- **Implementer:** the preceding section records the actual before/after
+  reproduction, four directed cases, PoC 119/119, semantic Application 26/26,
+  build and diff check. This final documentation-only task does not rerun them.
+- **Independent reviewer:** reproduced the four directed N-1 cases,
+  `npm run test:claude-poc` 119/119, `semantic-editorial-analysis.test.mjs`
+  26/26 and `git diff --check` PASS on the exact verified target above.
+- **CI:** GitHub push run [36758958057](https://github.com/inlifemedicina/cevra/actions/runs/36758958057)
+  is verified SUCCESS 5/5 on `ea72f831c29aecc1e4017f6504d6f072a076ebcb`:
+  Monorepo, Tauri, Media Runtime reproducibility, Transcription and Alignment.
+  This is **pre-PR branch evidence**. New push/PR checks must be linked to the
+  subsequent documentary HEAD; absent or in-progress runs are not PASS.
+
+The closeout changes only the five existing continuity documents/README;
+transport, tests, harness and product contracts are unchanged. Approval is
+offline and bounded: no accepted real semantic round-trip, production or
+commercial provider integration, semantic quality proof, real EN-US,
+continuation/cancellation, strategy, take selection or cut planning is delivered.
+Slice A stays IMPLEMENTED / CLOSED, ADR 0030 stays IN DEVELOPMENT, and complete
+Semantic Editorial Analysis remains NOT DELIVERED. The old experiment stays
+CLOSED at 8/8, zero balance; its five original private receipts remain unavailable.
+The next real gate requires explicitly approved **new experiment ID, budget
+and scope**; this documentary closeout grants no inference authorization.
+
+Remaining notes are **DEFERRED, not fixed**:
 
 | Note | Remaining limitation / revisit condition |
 |---|---|

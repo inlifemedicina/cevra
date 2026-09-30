@@ -17,8 +17,10 @@ that reopens this ID. The five original private receipts remain unavailable;
 historical records are retained without reconstruction. No semantic round-trip
 was accepted. Attempt #8 stopped at `system/thinking_tokens`; subsequent reader
 corrections, including F-1–F-5, have **offline validation only**. Independent
-review approved `de0aee7` with non-blocking notes; only the later N-1
-same-chunk oversized-tail correction awaits focused verification.
+review approved `de0aee7` with non-blocking notes; final independent verification
+at `ea72f83` found the N-1 same-chunk oversized-tail correction VERIFIED / FIXED
+and approved the bounded offline remediation. N-2–N-4 remain deferred in the
+evidence record; PR checks/merge are separate gates, not real inference proof.
 A new real proof requires explicit authorization of
 a new experiment ID, budget and scope; none is implemented here.
 

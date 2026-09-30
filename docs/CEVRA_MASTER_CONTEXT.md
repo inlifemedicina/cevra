@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-30, Slice A is closed; Claude PoC F-1–F-5 received independent offline approval with notes at de0aee7; the N-1 follow-up awaits focused verification, and the historical experiment remains terminal (8/8 used, zero balance; no accepted semantic response); Codex diagnosis remains preserved and blocked
+**Last decision reconciliation:** 2026-09-30, Slice A is closed; Claude PoC F-1–F-5 are independently approved offline and N-1 is independently verified at ea72f83; PR gate is next, with the historical experiment terminal (8/8 used, zero balance; no accepted semantic response); Codex diagnosis remains preserved and blocked
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1824,8 +1824,11 @@ was corrected offline at `1aa4324d9bcb4e404919d0af17c3b4d072abdbd5`: a
 recognized provider error now precedes an oversized tail in the same chunk.
 The baseline failed both positive reader/controlled-data regressions; all four
 directed tests now pass, as do PoC 119/119, semantic Application 26/26 and the
-Node/TS build. This new delta awaits focused verification; earlier approval
-does not approve it automatically. N-2–N-4 remain deferred in the existing
+Node/TS build. Final independent verification at
+`ea72f831c29aecc1e4017f6504d6f072a076ebcb` concluded **N-1 VERIFIED — OFFLINE
+CLAUDE POC REMEDIATION APPROVED FOR ITS BOUNDED SCOPE**. Branch push CI
+`36758958057` passed 5/5 on that exact SHA; this is pre-PR evidence, not CI for
+the subsequent documentary closeout. N-2–N-4 remain deferred in the existing
 [evidence record](CEVRA_SEMANTIC_CLAUDE_ROUNDTRIP_POC_V1_EVIDENCE.md).
 Additional real proof requires explicit authorization of a **new ID, budget
 and scope**, not recovery of this terminal experiment. Director impact is a
@@ -2260,7 +2263,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Perform focused verification of only the offline Claude PoC N-1 delta; F-1–F-5 received independent approval with non-blocking notes at `de0aee79b0ed66b16b5434efad953da855ce0df0`. **The old ID is CLOSED, 8/8 consumed, zero balance; no semantic round-trip is demonstrated.** A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or advance dependent editorial work from offline tests alone.
+1. Complete the PR gate for the bounded offline Claude PoC: F-1–F-5 received independent approval at `de0aee79b0ed66b16b5434efad953da855ce0df0`; N-1 is independently VERIFIED / FIXED at `ea72f831c29aecc1e4017f6504d6f072a076ebcb`. New PR checks must correspond to the documentary closeout HEAD; no automatic ready/merge or inference authorization follows. **The old ID is CLOSED, 8/8 consumed, zero balance; no semantic round-trip is demonstrated.** A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or advance dependent editorial work from offline tests alone.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
