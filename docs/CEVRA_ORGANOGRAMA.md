@@ -29,6 +29,8 @@ CEVRA VIDS
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
 │   │   ├─ bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
 │   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT DEMONSTRATED]
+│   │       ├─ INT-CLOUD-01 official ChatGPT eligibility/capability review [RESEARCH / SCHEDULED]
+│   │       └─ INT-CLOUD-02 authorized official transport PoC [CONDITIONAL / NOT IMPLEMENTED]
 │   ├─ strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   ├─ take selection [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   └─ cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
@@ -69,8 +71,11 @@ CEVRA VIDS
 │
 ├─ 9. INTEGRATIONS / EXPANSION
 │   ├─ agent protocol / external AI surfaces
+│   ├─ INT-CLOUD-03 isolated cloud skill feasibility pilot [SCHEDULED / NOT RUN]
 │   ├─ remote desktop workflow
-│   └─ mobile path later, without blocking desktop Vids
+│   ├─ INT-CLOUD-04 mobile companion after usable vertical flow [PLANNED / I15 PRESERVED]
+│   └─ INT-CLOUD-05 computer-off cloud execution [EVALUATION / FUTURE DECISION GATE]
+│       └─ no mandatory cloud renderer, commercial access or V1 delivery implied
 │
 └─ 10. HARDENING / RELEASE
     ├─ cross-platform validation
@@ -234,3 +239,25 @@ authorization follows. The old experiment stays CLOSED at 8/8, zero balance,
 and five original receipts remain unavailable.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.
+
+## Scheduling addition — 2026-09-30: official ChatGPT integration and cloud/mobile feasibility
+
+Research and dependency scheduling were requested by the Product Owner. Detailed dated findings, official sources, unresolved questions and proposed experiment checks are tracked in [issue #55](https://github.com/inlifemedicina/cevra/issues/55). These planning IDs are not a second behavioral acceptance catalog; implementation must reuse or extend the canonical Product Owner acceptance catalog explicitly.
+
+- **INT-CLOUD-01 — planning within the next real-agent gate:** verify official commercial eligibility, authentication, capabilities, privacy/retention, quotas and allowed deployment. Issue #55 records dated research, not commercial approval; revalidate its findings when the experiment and release are authorized. No external enrollment is authorized by this entry.
+- **INT-CLOUD-02 — conditional transport evaluation within that next gate:** evaluate the official App Server/direct Responses options only where authorized. Preserve ADR 0030's read-only bounded textual evidence, validation, deadlines, invocation budget and no-mutation boundary. Transport must bound response receipt before materialization. An unavailable new route must not block a different officially authorized route or justify billing/access circumvention.
+- **INT-CLOUD-03 — isolated parallel feasibility:** after defining environment, test media and budget, assess cloud-hosted skills using a short synthetic/licensed fixture. Verify dependencies, CPU/RAM/disk, media transfer, transcription, render, mobile preview/download, quota and recovery. No core dependency installation or desktop delay is implied.
+- **INT-CLOUD-04 — after a usable editing vertical:** preserve I15's paired Desktop companion path for media/preset/request, progress/cancellation, review and result delivery. Being away from the computer is different from the computer being unavailable.
+- **INT-CLOUD-05 — later conditional decision:** evaluate a cloud/BYOC runner for computer-off use only after real technical, commercial, privacy and cost evidence. Any new execution/storage architecture requires its own approval/ADR. No mandatory cloud runtime, storage service or V1 mobile deadline is approved here.
+
+Identity sign-in, permission to consume a subscriber's AI allowance, an agent execution environment and audiovisual rendering are distinct capabilities. New provider features do not authorize widening end-user shell/MCP access, sending complete media by default, replacing Project IR/History or silently falling back to paid API billing. Preserve provider independence, original-source quality, the existing desktop release targets and the current **55%** progress value.
+
+Reconciled over canonical main `be1e0e99fd189a1c976b44ec3a72e66d5fa5608c`
+after PRs #57/#58: Slice A and the bounded offline Claude PoC stay CLOSED.
+The historical experiment stays CLOSED at 8/8 with zero balance; the accepted
+real semantic round-trip remains NOT DEMONSTRATED. INT-CLOUD-01/02 support,
+not replace, that next required gate. It requires separately authorized new
+experiment scope, ID and budget. None of INT-CLOUD-01–05 is implemented or
+authorizes inference, spending, commercial upload or deployment.
+
+**Director impact:** compatible provider/transport investigation only. The current typed boundaries and canonical project authority are unchanged. A commercial cloud runner remains a separate future decision.

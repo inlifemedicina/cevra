@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-09-30, PR #57 merged and post-merge validated; bounded offline Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED. Slice A remains closed; real semantic round-trip is NOT DEMONSTRATED; the historical experiment remains terminal (8/8 used, zero balance). Codex diagnosis remains preserved and blocked.
+**Last decision reconciliation:** 2026-09-30, PRs #57/#58 merged and post-merge validated; bounded offline Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED. Approved ChatGPT/cloud/mobile planning is reconciled in Draft PR #56. Slice A remains closed; real semantic round-trip is NOT DEMONSTRATED; the historical experiment remains terminal (8/8 used, zero balance). Codex diagnosis remains preserved and blocked.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1319,6 +1319,40 @@ Target principles:
 - optional BYOK/provider paths;
 - no desktop CPython assumption on iOS.
 
+## 20.1 Approved ChatGPT/cloud/mobile planning — 2026-09-30
+
+The Product Owner approved adding official ChatGPT/cloud/mobile planning to
+the roadmap on 2026-09-30. [Issue #55](https://github.com/inlifemedicina/cevra/issues/55)
+retains the dated research/evidence and open questions;
+[CEVRA_INTEGRATION_DECISIONS.md](CEVRA_INTEGRATION_DECISIONS.md) records the
+direction, and [CEVRA_ORGANOGRAMA.md](CEVRA_ORGANOGRAMA.md) owns the sequencing
+of INT-CLOUD-01–05. This planning is reconciled over the post-PR #58 baseline
+in Draft PR #56; approval of planning is not an implemented capability or
+completed independent documentary review.
+
+INT-CLOUD-01 official eligibility/capability/auth/privacy/quota/deployment
+review and INT-CLOUD-02 authorized official transport evaluation belong
+within the next real-agent semantic round-trip gate, not in place of it.
+The bounded offline Claude PoC is CLOSED; its old experiment remains CLOSED
+at 8/8, zero balance. An accepted real semantic round-trip is still NOT
+DEMONSTRATED. Any new experiment needs explicit scope, ID and budget approval;
+ADR 0030 stays ACCEPTED DIRECTION / IN DEVELOPMENT and complete Semantic
+Editorial Analysis remains NOT DELIVERED. No Claude/ChatGPT/Codex route is
+commercially approved by this planning.
+
+Identity/entitlement is not an audiovisual runtime. Subscriber inference is
+not render, upload, transcription or a cloud runner. Provider capabilities,
+terms, eligibility and official mechanisms in issue #55 are dated findings,
+not future guarantees, and must be revalidated at experiment and release.
+INT-CLOUD-03 is an isolated cloud-skill pilot only after environment, test
+media and budget are defined. INT-CLOUD-04 preserves the paired Desktop
+companion as the first mobile path after a usable editing vertical; Desktop
+remains the initial executor. INT-CLOUD-05 computer-off/cloud/BYOC execution
+requires a separate future architecture/privacy/cost/commercialization
+decision. No spending, commercial media upload or deployment is authorized.
+Director impact is compatible planning only: no new execution authority.
+Global tracking progress remains **55%**.
+
 ---
 
 # 21. Operational development workflow
@@ -1488,17 +1522,22 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Verified canonical main after PR #57:
-`862e33f9e687579059d51269abdb4195b86bbd79`, the baseline for this
-docs-only closeout branch. PR #57 merged approved head
+Verified canonical main after PR #58:
+`be1e0e99fd189a1c976b44ec3a72e66d5fa5608c`, the baseline before this
+PR #56 planning reconciliation. PR #58 merged the docs-only closeout head
+`9da286cf98fe19a14d13fa8409f3042bde6af99c`; post-merge push CI
+`36782216081` passed 5/5 on that canonical SHA.
+
+The preceding implementation merge of PR #57 is
+`862e33f9e687579059d51269abdb4195b86bbd79`. It incorporated approved head
 `79327e8d951e31962af2c5d7915a38abcb0c8a4c` by normal merge commit.
 Its first parent is the historical Claude PoC baseline after PR #54,
 `a58ca419c2a0db2c416db83d84c432fcae23d830`; its second parent is that
 approved feature head. Post-merge push CI `36774947802` passed 5/5 and
 Exact Runtime `36774947781` passed on the exact merge SHA.
-This closes only the bounded offline transport/evidence PoC, not real
-semantic analysis. Documentary closeout is proposed separately; no future
-closeout merge SHA is implied.
+PRs #57/#58 close only the bounded offline transport/evidence PoC, not real
+semantic analysis. No future PR #56 merge or self-referential commit SHA is
+implied by this baseline record.
 
 The older `360bf60d4ed4b0a985c0c254a109fac2d6bc0d64` value remains historical:
 it was the canonical main after PR #50 and the feature base for PR #51.
@@ -1533,6 +1572,7 @@ it was the canonical main after PR #50 and the feature base for PR #51.
 | Editorial Transcript Projection V1 | #51 | `56161b2af44c9e2de008bb33bc1706d4e2beaf7e` | IMPLEMENTED / CLOSED |
 | Semantic Editorial Analysis Boundary V1 — Slice A only | #53 | `0cde0d29cfe3f3d417955e20e5ad672b3e02ceba` | IMPLEMENTED / CLOSED |
 | Claude CLI transport/evidence PoC V1 — bounded offline scope only | #57 | `862e33f9e687579059d51269abdb4195b86bbd79` | IMPLEMENTED / CLOSED |
+| Bounded offline Claude PoC documentary closeout | #58 | `be1e0e99fd189a1c976b44ec3a72e66d5fa5608c` | CLOSED |
 
 ## 24.3 Active work
 
@@ -2286,7 +2326,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Review the docs-only closeout of PR #57 after its successful post-merge validation. The bounded offline Claude CLI transport/evidence PoC is IMPLEMENTED / CLOSED; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. PR #56 remains OPEN / DRAFT / UNMERGED and requires separate reconciliation over the new main; do not reconcile it within this closeout.
+1. Review the reconciled docs-only planning in PR #56, which remains OPEN / DRAFT / UNMERGED over the validated post-PR #58 baseline. PRs #57/#58 closed the bounded offline Claude CLI transport/evidence PoC; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** INT-CLOUD-01/02 support that next gate through official eligibility review and conditional authorized transport evaluation; they do not replace it or authorize execution. A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. INT-CLOUD-03–05 remain future planning under their own prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

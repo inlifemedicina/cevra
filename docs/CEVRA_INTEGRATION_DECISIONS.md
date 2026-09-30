@@ -2,6 +2,7 @@
 
 **Aprovações originais:** 2026-09-17 a 2026-09-18.
 **Reconciliação canônica:** 2026-09-21.
+**Adendo de planejamento aprovado:** 2026-09-30 — integração oficial ChatGPT, skills em nuvem e continuidade mobile.
 **Status:** DIREÇÃO APROVADA / IMPLEMENTAÇÃO, PROVIDERS E TERMOS A REVALIDAR.
 
 Este é o registro consolidado das decisões de integração I1–I19, Creation Modes e produtos Skill. Ele substitui, no estado reconciliado, a necessidade de manter vinte documentos provider-specific como fontes concorrentes. Detalhes de arquitetura aceitos continuam nos ADRs; fatos de provider datados são somente evidência e devem ser revalidados na implementação e no release.
@@ -116,3 +117,37 @@ Faceless Explainer e Slideshow são direção V1; Music-to-video é condicional 
 ## Gate de implementação
 
 Para cada provider/dependência, revalidar na data de implementação e release: mecanismo oficial, entitlement, autenticação, transporte, terms/privacy/retention, licença/proveniência, comercialização, custo, quota, plataforma, segurança, empacotamento e capability real. Ausência ou mudança nunca autoriza scraping, credencial consumer, API paga silenciosa ou promessa não comprovada.
+
+## Adendo aprovado — 2026-09-30: assinatura ChatGPT, skills em nuvem e mobile
+
+**Status: PLANEJAMENTO APROVADO / VIABILIDADE E IMPLEMENTAÇÃO PENDENTES.** O Product Owner aprovou incorporar esta frente ao planejamento e continuar a execução no chat principal. Este adendo complementa I1–I5, I14–I15 e I19; não substitui suas fronteiras nem aprova um novo runtime ou serviço de armazenamento.
+
+A pesquisa datada e as questões abertas estão na [issue #55](https://github.com/inlifemedicina/cevra/issues/55). O sequenciamento INT-CLOUD-01–05 está em [CEVRA_ORGANOGRAMA.md](CEVRA_ORGANOGRAMA.md). Fontes e capabilities de provider devem ser verificadas novamente no experimento e no release; a aprovação do planejamento não certifica a elegibilidade comercial do CEVRA nem resultados ainda não testados.
+
+**Reconciliação após PRs #57/#58:** o bounded offline Claude CLI transport/evidence
+PoC é **IMPLEMENTED / CLOSED**, somente no escopo offline revisado. O experimento
+histórico está CLOSED, 8/8 consumidas e saldo zero; o real-agent semantic
+round-trip aceito continua **NOT DEMONSTRATED / NEXT REQUIRED GATE**. INT-CLOUD-01/02
+podem integrar esse NOVO gate se houver elegibilidade oficial e autorização
+explícita de escopo, ID e orçamento. Este adendo não reabre a cota antiga nem
+autoriza experimento, inferência ou gasto. Nenhuma rota Claude/ChatGPT/Codex está
+aprovada para integração comercial. ADR 0030 permanece **ACCEPTED DIRECTION /
+IN DEVELOPMENT**; a análise semântica completa continua **NOT DELIVERED**.
+
+Direção aprovada:
+
+- Priorizar a avaliação de identidade, autenticação, entitlement, transporte e uso autorizado da assinatura junto do próximo gate já previsto de **real-agent semantic round-trip**. Comparar mecanismos oficiais conforme elegibilidade e necessidade, sem escolher uma infraestrutura por pressuposto.
+- Preservar ADR 0030: evidência textual compacta, resposta não confiável validada, orçamento e deadline limitados, proteção contra stale/duplicate/late e nenhuma mutação Project IR nesse primeiro round-trip. O adaptador deve limitar o recebimento antes de materializar a resposta completa.
+- Programar um piloto isolado de skills em nuvem, condicionado a ambiente, mídia de teste e orçamento definidos. Não tratar EDVID ou qualquer outra skill como compatível ponta a ponta sem medir preparação, transferência, execução, prévia, entrega e retomada no celular. Não atualizar o baseline de paridade nem incorporar dependências por causa dessa pesquisa.
+- Manter o companion pareado de I15 como primeiro caminho mobile, após o fluxo vertical de edição utilizável. Estar longe do computador não significa que o computador possa estar desligado.
+- Manter execução com o computador indisponível como avaliação posterior e condicional. Runner cloud/BYOC, armazenamento, custos, privacidade e mudanças de arquitetura exigem decisão própria e, quando aplicável, ADR; não são dependências obrigatórias do core nem entrega V1 aprovada por este adendo.
+
+Preservações: Codex continua programador principal; Claude permanece revisão/especialista. Um único Project IR/history/timeline, originais imutáveis, independência de provider e funcionamento desktop continuam obrigatórios. Não elevar o progresso pelo registro desta frente; a referência de planejamento permanece **55%**. Não iniciar estratégia, take selection ou cut planning por consequência deste adendo.
+
+A hipótese de diferenciação é reduzir preparação e intervenção do usuário, oferecer revisão/correção localizada e preservar continuidade do projeto. Não alegar exclusividade de edição mobile/cloud sem evidência comparativa. O percurso a avaliar é **selecionar vídeo no celular → pedir/preset → processar → revisar/ajustar → receber resultado**, com qualidade, consumo por tarefa concluída e recuperação medidos.
+
+Antes da implementação, vincular os critérios ao catálogo único `CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md`; não criar uma segunda fonte de aceite. Se a nova modalidade não estiver disponível, avaliar outro mecanismo oficialmente autorizado ou registrar o bloqueio, sem contornar acesso, termos ou cobrança. Nenhum gasto, cadastro comercial, upload de mídia ou implantação é autorizado implicitamente pelo registro de planejamento.
+
+**Continuidade documental:** esta direção e a referência à issue #55 estão reconciliadas no `CEVRA_MASTER_CONTEXT.md` sobre o main pós-PR #58, mantendo o organograma como referência de sequência e este documento como registro de direção. O PR #56 permanece Draft, sujeito a revisão documental independente e merge normais; aprovação de produto não equivale a revisão independente já concluída.
+
+**Impacto no Director:** extensão compatível de planejamento de provider/transporte. O Director continua coordenando evidências, permissões e candidatos; operações tipadas e ProjectHistory mantêm execução e autoridade. Um executor remoto comercial permanece decisão separada.
