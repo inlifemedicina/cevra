@@ -1,9 +1,23 @@
 # Semantic Real-Agent Round-trip V2 — Phase A
 
-**2026-10-01 — OFFLINE PREPARATION / IN DEVELOPMENT — DOCUMENTARY PROPOSAL.**
-Only Phase A preparation is authorized. Live Phase B is **NOT AUTHORIZED / NOT
-RUN**. No provider is selected, no operative experiment is created, and this
-document changes no product contract or runtime. Progress remains **55%**.
+**2026-10-01 — OFFLINE PREPARATION / CLOSED — DOCUMENTARY SPECIFICATION.**
+Phase A offline preparation was completed by [PR #62](https://github.com/inlifemedicina/cevra/pull/62),
+merged at the dated material checkpoint
+`9c6d9b8484d1c1e1be6f19c080baf22a42c9fc7f`. Post-merge push CI
+[36884965482](https://github.com/inlifemedicina/cevra/actions/runs/36884965482)
+is COMPLETED / SUCCESS, 5/5, attempt 1 on that SHA. Exact Runtime was
+NOT TRIGGERED by the documentary path filter, not PASS. Final independent
+review: **APPROVE PR #62 DOCUMENTATION WITH NON-BLOCKING FOLLOW-UPS**;
+B-1/B-2 are **VERIFIED FIXED**. Temporal NB-1 is reconciled in this record;
+NB-2 ledger correlation/implementation and NB-3 executable F-B materialization
+remain **Phase B prerequisites**, not implemented here.
+
+Closure covers offline preparation only. Live Phase B is **NOT AUTHORIZED /
+NOT RUN**; real semantic round-trip remains **NOT DEMONSTRATED**. Provider/model
+remain **UNSELECTED / NOT VERIFIED**; the proposed ID is **PROPOSED / INERT /
+NOT CREATED** and ledger **PROPOSED / NOT CREATED**. No operative experiment is
+created, and this document changes no product contract or runtime.
+Progress remains **55%**.
 
 ## 1. Baseline, authority and separation from V1
 
