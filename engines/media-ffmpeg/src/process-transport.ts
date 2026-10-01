@@ -40,6 +40,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   private retirement: Promise<void> | undefined;
   private readonly invalid = new WeakSet<ChildProcessWithoutNullStreams>();
   private readonly closed = new WeakSet<ChildProcessWithoutNullStreams>();
+  private readonly expiredRetirements = new WeakSet<ChildProcessWithoutNullStreams>();
   private nextId = 1;
   private stdoutBuffer = "";
   private stderrTail = "";
@@ -128,6 +129,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
     child.once("close", () => {
       this.closed.add(child);
       this.failWorker(child, new WorkerProcessExitedError("CEVRA media worker closed."));
+      this.releaseExpiredRetirement(child);
     });
     try {
       await this.send("ping");
@@ -291,11 +293,23 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
         if (cleanupError) throw cleanupError;
       }, (cause) => {
         attachCleanupError(error, cause);
+        this.expiredRetirements.add(child);
+        // close can arrive after the timer fired but before this rejection handler.
+        this.releaseExpiredRetirement(child);
         throw cause;
       });
     // stop/start explicitly observe this promise; don't create an unhandled rejection
     // when a failure happens between public requests.
     void this.retirement.catch(() => undefined);
+  }
+
+  private releaseExpiredRetirement(child: ChildProcessWithoutNullStreams): void {
+    if (this.child !== child || !this.closed.has(child) || !this.expiredRetirements.has(child)) return;
+    // Real close releases this generation, never an unresolved timeout or a new child.
+    // Captured retirement promises and attached cleanup errors remain unchanged.
+    this.child = undefined;
+    this.retirement = undefined;
+    this.expiredRetirements.delete(child);
   }
 }
 

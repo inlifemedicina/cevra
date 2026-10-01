@@ -246,6 +246,103 @@ test("close timeout is observable, ownership retained, wait listener removed", a
   assert.equal(worker.listenerCount("close"), 1); // only the permanent identity-scoped listener
 });
 
+for (const observer of ["stop", "start"]) {
+  test(`R11/R12 ${observer}: expired retirement blocks restart until actual late close`, async t => {
+    const old = new Worker(); const next = new Worker();
+    old.pid = 123456; next.pid = 123457;
+    mock.method(process, "kill", () => true);
+    const { transport, spawns } = setup(t, [old, next], { shutdownTimeoutMs: 10, renderTimeoutMs: 30, renderLivenessIntervalMs: 20 });
+    await transport.start();
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    old.autoClose = false; old.onWrite = () => {};
+    const controller = new AbortController();
+    const job = transport.request("tools/call", { jobId: "no-replay" }, controller.signal);
+    let primary; let settlements = 0;
+    job.then(() => settlements++, () => settlements++);
+    const rejected = assert.rejects(job, error => { primary = error; return error instanceof WorkerProcessExitedError; });
+    await tick();
+    const write = old.writes.at(-1);
+    old.stdin.emit("error", pipe()); await rejected;
+    const retirement = transport.retirement;
+    const observed = transport[observer]();
+    let timeout;
+    const expired = assert.rejects(observed, error => { timeout = error; return /close timed out/.test(error.message); });
+    t.mock.timers.tick(10); await expired;
+    assert.equal(primary.cleanupError, timeout);
+    assert.equal(transport.child, old); assert.equal(transport.workerPid, old.pid);
+    assert.equal(transport.retirement, retirement); assert.equal(transport.closed.has(old), false);
+    assert.equal(transport.pending.size, 0); assert.equal(spawns(), 1);
+    // A caller before close sees the original timeout, never a replacement worker.
+    await assert.rejects(transport.request("ping"), error => error === timeout);
+    await assert.rejects(transport.stop(), error => error === timeout);
+    assert.equal(transport.child, old); assert.equal(spawns(), 1);
+    controller.abort(); t.mock.timers.tick(100); await tick();
+    assert.equal(old.writes.length, 2); assert.equal(old.kills, 1); assert.equal(settlements, 1);
+    old.finish();
+    assert.equal(transport.child, undefined); assert.equal(transport.workerPid, undefined);
+    assert.equal(transport.retirement, undefined); assert.equal(transport.pending.size, 0);
+    // Captured promises/errors retain their original failure after ownership is released.
+    await assert.rejects(retirement, error => error === timeout);
+    assert.equal(primary.cleanupError, timeout);
+    const fresh = await transport.request("ping");
+    assert.deepEqual(fresh, { activeJobId: null }); assert.equal(spawns(), 2);
+    old.emit("close", null, "SIGKILL"); old.emit("exit", 99, null);
+    old.stdin.emit("error", pipe()); old.emit("error", pipe()); write.callback(pipe());
+    old.reply(write.id, "late"); old.stderr.emit("data", Buffer.from("old generation"));
+    assert.deepEqual(await transport.request("ping"), { activeJobId: null });
+    assert.equal(transport.child, next); assert.equal(next.kills, 0);
+    assert.equal(transport.workerPid, next.pid);
+    assert.equal(transport.stderrTail, ""); assert.equal(settlements, 1);
+    assert.equal(old.writes.length, 2); assert.equal(transport.pending.size, 0);
+    await transport.stop();
+  });
+}
+
+test("R11 close between retirement timer and rejection microtask also releases only the old generation", async t => {
+  const old = new Worker(); const next = new Worker();
+  const { transport, spawns } = setup(t, [old, next], { shutdownTimeoutMs: 10 });
+  await transport.start();
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  old.autoClose = false; old.stdin.emit("error", pipe());
+  const retirement = transport.retirement;
+  const expired = assert.rejects(retirement, /close timed out/);
+  t.mock.timers.tick(10); old.finish(); // rejection handler has not run yet
+  await expired;
+  assert.equal(transport.child, undefined); assert.equal(transport.retirement, undefined);
+  assert.equal(spawns(), 1);
+  assert.deepEqual(await transport.request("ping"), { activeJobId: null });
+  assert.equal(spawns(), 2); assert.equal(transport.child, next);
+  await assert.rejects(retirement, /close timed out/);
+  await transport.stop();
+});
+
+test("NB-3 exit before write callback/stdin error retires once and isolates the next generation", async t => {
+  const old = new Worker(); const next = new Worker();
+  const groups = [];
+  old.pid = 123456;
+  mock.method(process, "kill", (pid, signal) => { groups.push([pid, signal]); return true; });
+  const { transport, spawns } = setup(t, [old, next]);
+  await transport.start(); old.autoClose = false; old.onWrite = () => {};
+  const pending = transport.request("ping"); let settlements = 0;
+  pending.then(() => settlements++, () => settlements++);
+  const rejected = assert.rejects(pending, error => error instanceof WorkerProcessExitedError && /exited \(9\)/.test(error.message));
+  await tick(); const write = old.writes.at(-1);
+  old.exitCode = 9; old.emit("exit", 9, null);
+  await rejected; const retirement = transport.retirement;
+  write.callback(pipe()); old.stdin.emit("error", pipe()); old.emit("error", pipe());
+  assert.equal(transport.retirement, retirement); assert.equal(settlements, 1);
+  assert.equal(transport.child, old); assert.equal(transport.pending.size, 0);
+  const fresh = transport.request("ping"); await tick(); assert.equal(spawns(), 1);
+  old.emit("close", 9, null); await fresh;
+  assert.equal(spawns(), 2); assert.equal(settlements, 1);
+  assert.deepEqual(groups, process.platform === "win32" ? [] : [[-123456, "SIGKILL"]]);
+  assert.equal(old.kills, 0); // exit is already observed; only its owned POSIX group needs a signal.
+  write.callback(pipe()); old.stdin.emit("error", pipe()); old.emit("exit", 9, null); old.emit("close", 9, null);
+  assert.deepEqual(await transport.request("ping"), { activeJobId: null });
+  assert.equal(transport.child, next); assert.equal(next.kills, 0); assert.equal(transport.pending.size, 0);
+  await transport.stop();
+});
+
 test("synchronous write throw shares failure path; unrelated frozen error preserved", async t => {
   const { transport, workers: [worker] } = setup(t);
   await transport.start();
