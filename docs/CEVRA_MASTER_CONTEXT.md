@@ -1524,7 +1524,29 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Verified canonical main after PR #56:
+Verified canonical base after the PR #59 planning closeout:
+`847504ada6c6f8b9f6fccbd590008f690152cc0f` (parents
+`9728f865dfc035d980a7071f1c6bb0421157e5a9` and
+`50c8b1502a9c1c9b86d51a610ca0a3038c0a1321`). PRs #56–#59 remain
+incorporated; INT-CLOUD-01–05 are planning only. Post-merge push CI
+`36794046368` FAILED in Monorepo: the original POSIX worker-death test
+raised uncaught `write EPIPE` in the production Media stdin transport.
+
+**Active correction / independent review pending:**
+`fix/media-worker-stdin-channel-failure`, based on that exact main. The
+bounded transport patch handles stdin event/write-callback failures together,
+preserves earlier abort/timeout, owns cleanup until child close, and isolates
+late events before a new request restarts the worker (no operation retry).
+Controlled baseline probes reproduce both unhandled stdin error and raw EPIPE
+propagation. The independent reviewer's earlier 1/100 finding is reported
+evidence, not a local measurement. Local deterministic/real-fixture evidence
+and current CI are recorded in the correction PR; this fix is not CLOSED.
+Real-agent V2 design/execution is PAUSED for this production blocker. No new
+experiment/ledger is created; the old Claude experiment remains CLOSED, 8/8,
+zero balance. Director impact: no new authority or command/state contract;
+transport-only lifecycle hardening. Progress remains **55%**.
+
+Historical canonical main after PR #56:
 `9728f865dfc035d980a7071f1c6bb0421157e5a9`, the baseline for this minimal
 documentary closeout. PR #56 is CLOSED / MERGED; its parents are
 `be1e0e99fd189a1c976b44ec3a72e66d5fa5608c` and approved planning head
@@ -1545,8 +1567,8 @@ Its first parent is the historical Claude PoC baseline after PR #54,
 approved feature head. Post-merge push CI `36774947802` passed 5/5 and
 Exact Runtime `36774947781` passed on the exact merge SHA.
 PRs #57/#58 close only the bounded offline transport/evidence PoC, not real
-semantic analysis. PR #56 incorporates planning only; no future documentary
-closeout merge or self-referential commit SHA is implied by this baseline record.
+semantic analysis. PR #56 incorporates planning only; PR #59 closes its
+temporal documentary follow-up, not any provider capability.
 
 The older `360bf60d4ed4b0a985c0c254a109fac2d6bc0d64` value remains historical:
 it was the canonical main after PR #50 and the feature base for PR #51.
@@ -2335,7 +2357,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Review the minimal temporal closeout of PR #56, now CLOSED / MERGED and post-merge validated at `9728f865dfc035d980a7071f1c6bb0421157e5a9` (CI `36790864159`, SUCCESS 5/5). INT-CLOUD-01–05 are incorporated into planning only. PRs #57/#58 closed the bounded offline Claude CLI transport/evidence PoC; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** INT-CLOUD-01/02 support that next gate through official eligibility review and conditional authorized transport evaluation; they do not replace it or authorize execution. A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. INT-CLOUD-03–05 remain future planning under their own prerequisites; progress stays 55%.
+1. Independently review and validate the bounded Media Worker stdin correction on `fix/media-worker-stdin-channel-failure` before resuming real-agent V2 design. PR #59 incorporated the minimal temporal closeout of PR #56; the new main's production EPIPE blocker is recorded in §24.1. INT-CLOUD-01–05 are incorporated into planning only. PRs #57/#58 closed the bounded offline Claude CLI transport/evidence PoC; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** INT-CLOUD-01/02 support that next gate through official eligibility review and conditional authorized transport evaluation; they do not replace it or authorize execution. A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. INT-CLOUD-03–05 remain future planning under their own prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

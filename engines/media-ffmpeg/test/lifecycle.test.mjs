@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -16,9 +16,21 @@ const vendor = path.join(here, "fixtures", "vendor");
 const requestedPython = process.env.CEVRA_TEST_PYTHON || "python3";
 const resolvedPython = spawnSync(requestedPython, ["-c", "import sys; print(sys.executable)"], { encoding: "utf8" });
 const python = resolvedPython.status === 0 ? resolvedPython.stdout.trim() : requestedPython;
+const ownedDirectories = new Set();
+const ownedTransports = new Set();
+function scratch(prefix) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  ownedDirectories.add(directory);
+  return directory;
+}
+after(async () => {
+  // Only resources created by this test file; also runs after a test failure.
+  try { await Promise.all([...ownedTransports].map(transport => transport.stop())); }
+  finally { for (const directory of ownedDirectories) fs.rmSync(directory, { recursive: true, force: true }); }
+});
 
 function createRuntime(options = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-media-lifecycle-"));
+  const directory = scratch("cevra-media-lifecycle-");
   const transport = new ProcessMediaWorkerTransport({
     mode: options.releaseMode ? "release" : "development",
     pythonExecutable: python,
@@ -36,6 +48,7 @@ function createRuntime(options = {}) {
       ...(options.pathValue ? { PATH: options.pathValue } : {})
     }
   });
+  ownedTransports.add(transport);
   return { directory, transport, client: new PersistentMediaWorkerClient(transport) };
 }
 
@@ -145,13 +158,14 @@ test("zero render timeout disables the wall-clock limit while liveness remains b
 });
 
 test("control request timeout kills an unresponsive worker and permits a clean retry", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-control-timeout-"));
+  const directory = scratch("cevra-control-timeout-");
   const hangingWorker = path.join(directory, "worker.py");
   fs.writeFileSync(hangingWorker, "import sys,time\nfor line in sys.stdin:\n time.sleep(30)\n");
   const transport = new ProcessMediaWorkerTransport({
     mode: "development", pythonExecutable: python, workerScript: hangingWorker,
     controlTimeoutMs: 30, shutdownTimeoutMs: 30, renderLivenessIntervalMs: 30
   });
+  ownedTransports.add(transport);
   await assert.rejects(transport.start(), (error) => error?.name === "TimeoutError");
   const pid = transport.workerPid;
   assert.equal(pid === undefined || !processExists(pid), true);
@@ -159,13 +173,14 @@ test("control request timeout kills an unresponsive worker and permits a clean r
 });
 
 test("disabled render timeout still rejects a lost completed-job response", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-lost-response-"));
+  const directory = scratch("cevra-lost-response-");
   const worker = path.join(directory, "worker.py");
   fs.writeFileSync(worker, `import json,sys\nactive=None\nfor line in sys.stdin:\n r=json.loads(line); m=r['method']; p=r.get('params',{})\n if m=='tools/call': active=p['jobId']; active=None; continue\n result={'activeJobId':active} if m=='ping' else {'shuttingDown':True}\n print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}),flush=True)\n if m=='cevra/shutdown': break\n`);
   const transport = new ProcessMediaWorkerTransport({
     mode: "development", pythonExecutable: python, workerScript: worker,
     controlTimeoutMs: 200, shutdownTimeoutMs: 200, renderTimeoutMs: 0, renderLivenessIntervalMs: 20
   });
+  ownedTransports.add(transport);
   try {
     await assert.rejects(transport.request("tools/call", { name: "probe", arguments: {}, jobId: "lost-job" }), /lost the response/);
   } finally {
@@ -174,13 +189,14 @@ test("disabled render timeout still rejects a lost completed-job response", asyn
 });
 
 test("render timeout settles when cancellation succeeds but the terminal job response is lost", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-lost-cancel-response-"));
+  const directory = scratch("cevra-lost-cancel-response-");
   const worker = path.join(directory, "worker.py");
   fs.writeFileSync(worker, `import json,sys\nactive=None\nfor line in sys.stdin:\n r=json.loads(line); m=r['method']; p=r.get('params',{})\n if m=='tools/call': active=p['jobId']; continue\n if m=='cevra/cancel': active=None; result={'cancelled':True,'jobId':p['jobId']}\n elif m=='ping': result={'activeJobId':active}\n else: result={'shuttingDown':True}\n print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':result}),flush=True)\n if m=='cevra/shutdown': break\n`);
   const transport = new ProcessMediaWorkerTransport({
     mode: "development", pythonExecutable: python, workerScript: worker,
     controlTimeoutMs: 200, shutdownTimeoutMs: 200, renderTimeoutMs: 30, renderLivenessIntervalMs: 20
   });
+  ownedTransports.add(transport);
   try {
     await assert.rejects(
       transport.request("tools/call", { name: "probe", arguments: {}, jobId: "lost-cancel-job" }),
@@ -283,8 +299,8 @@ test("RPC publishes only CEVRA allow-listed tools and rejects raw argv", async (
 });
 
 test("release worker ignores PATH/bin overrides and fails closed without its bundle manifest", async () => {
-  const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-release-runtime-"));
-  const systemBin = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-system-bin-"));
+  const runtimeRoot = scratch("cevra-release-runtime-");
+  const systemBin = scratch("cevra-system-bin-");
   const runtimeBin = path.join(runtimeRoot, "bin");
   fs.mkdirSync(runtimeBin);
   const suffix = process.platform === "win32" ? ".exe" : "";
@@ -323,7 +339,7 @@ test("release worker ignores PATH/bin overrides and fails closed without its bun
 });
 
 test("ffmpeg-skill patch routes its direct ffprobe version call through the CEVRA resolver", () => {
-  const source = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-patch-source-"));
+  const source = scratch("cevra-patch-source-");
   const scripts = path.join(source, "scripts");
   fs.mkdirSync(scripts);
   fs.writeFileSync(path.join(source, "package.json"), JSON.stringify({ version: "1.4.2" }));
@@ -360,7 +376,7 @@ def ffmpeg_version():
 });
 
 test("ffmpeg-skill patch fails closed if the pinned ffmpeg_base loses -nostdin", () => {
-  const source = fs.mkdtempSync(path.join(os.tmpdir(), "cevra-patch-nostdin-"));
+  const source = scratch("cevra-patch-nostdin-");
   const scripts = path.join(source, "scripts");
   fs.mkdirSync(scripts);
   fs.writeFileSync(path.join(source, "package.json"), JSON.stringify({ version: "1.4.2" }));

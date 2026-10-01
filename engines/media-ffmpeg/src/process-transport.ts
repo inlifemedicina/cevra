@@ -26,8 +26,8 @@ interface PendingRequest {
 }
 
 export class WorkerProcessExitedError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "WorkerProcessExitedError";
   }
 }
@@ -36,6 +36,11 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   private child: ChildProcessWithoutNullStreams | undefined;
   private starting: Promise<void> | undefined;
   private stopping: Promise<void> | undefined;
+  // Keep the failed child owned until close (not merely exit / reference removal).
+  private retirement: Promise<void> | undefined;
+  private readonly invalid = new WeakSet<ChildProcessWithoutNullStreams>();
+  private readonly closed = new WeakSet<ChildProcessWithoutNullStreams>();
+  private readonly expiredRetirements = new WeakSet<ChildProcessWithoutNullStreams>();
   private nextId = 1;
   private stdoutBuffer = "";
   private stderrTail = "";
@@ -50,16 +55,22 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   get workerPid(): number | undefined { return this.child?.pid; }
 
   async start(): Promise<void> {
-    if (this.child?.exitCode === null && this.child.signalCode === null) return;
     if (this.stopping) await this.stopping;
+    if (this.retirement) {
+      await this.retirement;
+      this.retirement = undefined;
+    }
+    if (this.starting) return this.starting;
+    if (this.child && !this.invalid.has(this.child) && this.child.exitCode === null && this.child.signalCode === null) return;
     this.starting ??= this.spawnWorker().finally(() => { this.starting = undefined; });
     return this.starting;
   }
 
   async stop(): Promise<void> {
     if (this.stopping) return this.stopping;
+    if (this.retirement) return this.retirement;
     const child = this.child;
-    if (!child || child.exitCode !== null || child.signalCode !== null) return;
+    if (!child) return;
     this.stopping = this.stopWorker(child).finally(() => { this.stopping = undefined; });
     return this.stopping;
   }
@@ -99,31 +110,44 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
     this.child = child;
     this.stdoutBuffer = "";
     this.stderrTail = "";
-    child.stdout.on("data", (chunk) => this.consumeStdout(chunk.toString("utf8")));
+    child.stdin.on("error", (error) => this.failWorker(child, channelError(error)));
+    child.stdout.on("data", (chunk) => {
+      if (this.child === child && !this.invalid.has(child)) this.consumeStdout(chunk.toString("utf8"));
+    });
     child.stderr.on("data", (chunk) => {
+      if (this.child !== child || this.invalid.has(child)) return;
       this.stderrTail = (this.stderrTail + chunk.toString("utf8")).slice(-4000);
     });
     child.on("error", (error) => this.failWorker(child, error));
     child.once("exit", (code, signal) => {
+      if (this.child !== child || this.invalid.has(child)) return;
       const detail = this.stderrTail.trim();
       this.failWorker(child, new WorkerProcessExitedError(
         `CEVRA media worker exited (${code ?? signal ?? "unknown"})${detail ? `: ${detail}` : ""}`
       ));
     });
+    child.once("close", () => {
+      this.closed.add(child);
+      this.failWorker(child, new WorkerProcessExitedError("CEVRA media worker closed."));
+      this.releaseExpiredRetirement(child);
+    });
     try {
       await this.send("ping");
     } catch (error) {
-      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
-      await waitForExit(child, 1000).catch(() => undefined);
       this.failWorker(child, error instanceof Error ? error : new WorkerProcessExitedError("CEVRA media worker failed to start."));
+      // Retain the primary start failure; cleanup failures remain attached / observable.
+      try { await this.retirement; } catch (cleanupError) { attachCleanupError(error, cleanupError); }
       throw error;
     }
   }
 
   private send<T>(method: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     const child = this.child;
-    if (!child || child.exitCode !== null || child.signalCode !== null || !child.stdin.writable) {
-      return Promise.reject(new WorkerProcessExitedError("CEVRA media worker is not running."));
+    if (!child || this.invalid.has(child) || child.exitCode !== null || child.signalCode !== null ||
+        !child.stdin.writable || child.stdin.destroyed || child.stdin.writableEnded) {
+      const error = new WorkerProcessExitedError("CEVRA media worker input channel is unavailable.");
+      if (child) this.failWorker(child, error);
+      return Promise.reject(error);
     }
     if (signal?.aborted) return Promise.reject(abortError());
     const id = this.nextId++;
@@ -137,7 +161,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
         if (!pending) return;
         this.pending.delete(id);
         pending.cleanup();
-        pending.reject(error);
+        pending.reject(pending.terminalError ?? error);
       };
       const requestTermination = (error: Error) => {
         const pending = this.pending.get(id);
@@ -182,7 +206,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
         } catch (error) {
           const current = this.pending.get(id);
           settleError(current?.terminalError ?? (error instanceof Error ? error : new WorkerProcessExitedError("CEVRA media worker stopped responding.")));
-          if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+          this.failWorker(child, error instanceof Error ? error : new WorkerProcessExitedError("CEVRA media worker stopped responding."));
           return;
         }
         if (this.pending.has(id)) livenessTimer = setTimeout(checkLiveness, this.options.renderLivenessIntervalMs ?? 5000);
@@ -198,14 +222,13 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       if (method === "tools/call") {
         livenessTimer = setTimeout(checkLiveness, this.options.renderLivenessIntervalMs ?? 5000);
       }
-      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`, (error) => {
-        if (!error) return;
-        const pending = this.pending.get(id);
-        if (!pending) return;
-        this.pending.delete(id);
-        pending.cleanup();
-        pending.reject(error);
-      });
+      try {
+        child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) })}\n`, (error) => {
+          if (error) this.failWorker(child, channelError(error));
+        });
+      } catch (error) {
+        this.failWorker(child, error instanceof Error ? channelError(error) : new Error("Media worker input write failed.", { cause: error }));
+      }
     });
   }
 
@@ -236,39 +259,57 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       if (pending.method !== "tools/call") continue;
       this.pending.delete(id);
       pending.cleanup();
-      pending.reject(abortError());
+      pending.reject(pending.terminalError ?? abortError());
     }
     try {
       await withTimeout(this.send("cevra/shutdown"), timeoutMs, "worker shutdown timed out");
-    } catch {
-      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+    } catch (error) {
+      this.failWorker(child, error instanceof Error ? error : new WorkerProcessExitedError("Worker shutdown failed."));
     }
-    if (child.exitCode === null && child.signalCode === null) {
+    if (!this.invalid.has(child)) {
       try {
-        await waitForExit(child, timeoutMs);
-      } catch {
-        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
-        await waitForExit(child, 1000);
+        await waitForClose(child, this.closed, timeoutMs);
+      } catch (error) {
+        this.failWorker(child, error as Error);
       }
     }
+    await this.retirement;
   }
 
   private failWorker(child: ChildProcessWithoutNullStreams, error: Error): void {
-    if (this.child !== child) return;
-    if (process.platform !== "win32" && child.pid !== undefined) {
-      try { process.kill(-child.pid, "SIGKILL"); }
-      catch (cause) {
-        if ((cause as NodeJS.ErrnoException).code !== "ESRCH") {
-          error = new WorkerProcessExitedError(`Owned media process-group termination failed: ${String(cause)}`);
-        }
-      }
-    }
-    this.child = undefined;
+    if (this.child !== child || this.invalid.has(child)) return;
+    this.invalid.add(child);
+    let cleanupError: unknown;
+    try { terminateOwned(child); } catch (cause) { cleanupError = cause; attachCleanupError(error, cause); }
     for (const pending of this.pending.values()) {
       pending.cleanup();
-      pending.reject(error);
+      if (cleanupError) attachCleanupError(pending.terminalError, cleanupError);
+      pending.reject(pending.terminalError ?? error);
     }
     this.pending.clear();
+    this.retirement = waitForClose(child, this.closed, this.options.shutdownTimeoutMs ?? 5000)
+      .then(() => {
+        if (this.child === child) this.child = undefined;
+        if (cleanupError) throw cleanupError;
+      }, (cause) => {
+        attachCleanupError(error, cause);
+        this.expiredRetirements.add(child);
+        // close can arrive after the timer fired but before this rejection handler.
+        this.releaseExpiredRetirement(child);
+        throw cause;
+      });
+    // stop/start explicitly observe this promise; don't create an unhandled rejection
+    // when a failure happens between public requests.
+    void this.retirement.catch(() => undefined);
+  }
+
+  private releaseExpiredRetirement(child: ChildProcessWithoutNullStreams): void {
+    if (this.child !== child || !this.closed.has(child) || !this.expiredRetirements.has(child)) return;
+    // Real close releases this generation, never an unresolved timeout or a new child.
+    // Captured retirement promises and attached cleanup errors remain unchanged.
+    this.child = undefined;
+    this.retirement = undefined;
+    this.expiredRetirements.delete(child);
   }
 }
 
@@ -304,7 +345,45 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
   });
 }
 
-function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<void> {
-  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
-  return withTimeout(new Promise<void>((resolve) => child.once("exit", () => resolve())), timeoutMs, "worker exit timed out");
+function waitForClose(child: ChildProcessWithoutNullStreams, closed: WeakSet<ChildProcessWithoutNullStreams>, timeoutMs: number): Promise<void> {
+  if (closed.has(child)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const close = () => { clearTimeout(timer); resolve(); };
+    const timer = setTimeout(() => {
+      child.removeListener("close", close);
+      reject(new Error("Media worker close timed out."));
+    }, timeoutMs);
+    child.once("close", close);
+  });
+}
+
+function channelError(error: Error): Error {
+  // EPIPE means the pipe's reader is unavailable; destroyed streams reject
+  // writes with ERR_STREAM_DESTROYED. Neither establishes remote process death.
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === "EPIPE" || code === "ERR_STREAM_DESTROYED"
+    ? new WorkerProcessExitedError("CEVRA media worker input channel is unavailable.", { cause: error })
+    : error;
+}
+
+function attachCleanupError(error: unknown, cleanupError: unknown): void {
+  if (error instanceof Error && Object.isExtensible(error) && !Object.hasOwn(error, "cleanupError")) {
+    Object.defineProperty(error, "cleanupError", { value: cleanupError, enumerable: false });
+  }
+}
+
+function terminateOwned(child: ChildProcessWithoutNullStreams): void {
+  let groupError: unknown;
+  if (process.platform !== "win32" && child.pid !== undefined) {
+    try { process.kill(-child.pid, "SIGKILL"); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") groupError = error; }
+  }
+  // Also cover Windows and a failed group kill. Never use a negative PID there.
+  try {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  } catch (error) {
+    if (groupError) throw new AggregateError([groupError, error], "Owned media worker termination failed.");
+    throw error;
+  }
+  if (groupError) throw groupError;
 }
