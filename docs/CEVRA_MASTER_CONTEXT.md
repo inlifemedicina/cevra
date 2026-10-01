@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-10-01, PR #60 merged and post-merge validated; Media Worker stdin/lifecycle fix is IMPLEMENTED / CLOSED, and real-agent V2 remains PAUSED during documentary closeout. PRs #57/#58 merged and post-merge validated; bounded offline Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED. PR #56 is CLOSED / MERGED and post-merge validated; INT-CLOUD-01–05 are incorporated into planning only. Slice A remains closed; real semantic round-trip is NOT DEMONSTRATED; the historical experiment remains terminal (8/8 used, zero balance). Codex diagnosis remains preserved and blocked.
+**Last decision reconciliation:** 2026-10-01, PR #61 documentary closeout merged and post-merge validated; Media Worker stdin/lifecycle fix is IMPLEMENTED / CLOSED. Only real-agent V2 Phase A offline preparation is approved and IN DEVELOPMENT; live proof remains PAUSED / NOT AUTHORIZED. PRs #57/#58 merged and post-merge validated; bounded offline Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED. PR #56 is CLOSED / MERGED and post-merge validated; INT-CLOUD-01–05 are incorporated into planning only. Slice A remains closed; real semantic round-trip is NOT DEMONSTRATED; the historical experiment remains terminal (8/8 used, zero balance). Codex diagnosis remains preserved and blocked.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1524,7 +1524,14 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-Verified canonical main after PR #60:
+Verified canonical main after PR #61:
+`aea53160b8f5af5124e461b0bcb44d60987454f3`. PR #61 is CLOSED / MERGED;
+its parents are `9fa9101ffe1c43431b2701a0c8243b586f1f283e` and
+`38cdebf4d1603bb030a053dc4a5e899f3dff0a4e`. Post-merge push CI
+`36854827180` is SUCCESS 5/5 on this exact SHA. Exact Runtime was NOT TRIGGERED
+by the documentary path filter. The minimal PR #60 documentary closeout is closed.
+
+Historical canonical main after PR #60:
 `9fa9101ffe1c43431b2701a0c8243b586f1f283e`. PR #60 is CLOSED / MERGED;
 its normal merge parents are the preceding main
 `847504ada6c6f8b9f6fccbd590008f690152cc0f` and approved feature head
@@ -1562,7 +1569,7 @@ in PR metadata only. Ubuntu/Linux is validated by CI; macOS arm64 has local
 evidence plus Exact Runtime. **Windows native: NOT RUN** for this correction;
 V1 targets remain macOS arm64 and Windows x64.
 
-Real-agent V2 design/execution remains **PAUSED**; any resumption requires a separate gate.
+Real-agent V2 live execution remains **PAUSED / NOT AUTHORIZED**; any execution requires a separate gate.
 The production blocker is closed, but real semantic round-trip remains NOT
 DEMONSTRATED. No new
 experiment/ledger is created; the old Claude experiment remains CLOSED, 8/8,
@@ -1632,6 +1639,18 @@ it was the canonical main after PR #50 and the feature base for PR #51.
 | Bounded offline Claude PoC documentary closeout | #58 | `be1e0e99fd189a1c976b44ec3a72e66d5fa5608c` | CLOSED |
 
 ## 24.3 Active work
+
+**2026-10-01 — Real-agent V2 Phase A offline preparation — IN DEVELOPMENT.**
+The Product Owner approved only documentary/offline preparation. The
+[Phase A proposal](CEVRA_SEMANTIC_REAL_AGENT_ROUNDTRIP_V2_PHASE_A.md) specifies
+the unchanged boundary, candidate transports, synthetic fixtures, proposed
+limits, receipt/ledger design and future decision checklist. The proposed ID
+`semantic-real-agent-roundtrip-v2-poc-01` is INERT / NOT CREATED; no ledger,
+budget or reservation is activated. No auth/provider call or live proof is
+authorized or run. Real round-trip remains NOT DEMONSTRATED; V1 stays CLOSED,
+8/8 used, zero balance. No roadmap, Director or mobile authority changes;
+progress remains **55%**. Review and explicit Product Owner approval precede
+any future live Phase B.
 
 **ProjectHistory Scalability V2 — IMPLEMENTED / CLOSED.** PR #30 merged at
 `b6f201afa73aae0aa85f8a3d4187a568ab749e72`. Compact snapshots plus exact
@@ -2383,7 +2402,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Preserve the next required real-agent semantic round-trip gate, still NOT DEMONSTRATED. The Media Worker stdin/lifecycle blocker is IMPLEMENTED / CLOSED after PR #60 and green post-merge validation (§24.1). Real-agent V2 remains PAUSED; resumption requires a separate gate, and this documentary closeout starts no experiment. PR #59 incorporated the minimal temporal closeout of PR #56. INT-CLOUD-01–05 are incorporated into planning only. PRs #57/#58 closed the bounded offline Claude CLI transport/evidence PoC; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** INT-CLOUD-01/02 support that next gate through official eligibility review and conditional authorized transport evaluation; they do not replace it or authorize execution. A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. INT-CLOUD-03–05 remain future planning under their own prerequisites; progress stays 55%.
+1. Preserve the next required real-agent semantic round-trip gate, still NOT DEMONSTRATED. The Media Worker stdin/lifecycle blocker is IMPLEMENTED / CLOSED after PR #60 and green post-merge validation (§24.1). Only Phase A offline preparation is approved (§24.3); live V2 remains PAUSED / NOT AUTHORIZED and requires a separate gate. This proposal starts no experiment. PR #59 incorporated the minimal temporal closeout of PR #56. INT-CLOUD-01–05 are incorporated into planning only. PRs #57/#58 closed the bounded offline Claude CLI transport/evidence PoC; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** INT-CLOUD-01/02 support that next gate through official eligibility review and conditional authorized transport evaluation; they do not replace it or authorize execution. A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. INT-CLOUD-03–05 remain future planning under their own prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
