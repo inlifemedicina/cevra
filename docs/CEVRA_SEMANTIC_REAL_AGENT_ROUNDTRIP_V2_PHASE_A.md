@@ -130,8 +130,8 @@ authority, architecture pattern, dependency, UI enablement or Take work.
 Every figure below is **PROPOSED / SUBJECT TO PRODUCT OWNER APPROVAL**:
 
 - Maximum **4 live reservations**, across all purposes, not four analyses each
-  with two free calls. Each provider process/session/contact requires its own
-  reservation. One continuation analysis can consume two reservations.
+  with two free calls. The reservation unit is the explicitly enumerated CEVRA
+  operation defined below, not each technical event inside that operation.
 - Reserve irreversibly before any operation capable of starting a provider
   process, remote session/request, remote auth/capability/model endpoint or
   subscription/billing contact. Pure local offline reading/testing consumes none.
@@ -150,22 +150,52 @@ Every figure below is **PROPOSED / SUBJECT TO PRODUCT OWNER APPROVAL**:
   required, stop before inference and present mechanism, confirmed cost,
   reason and a simpler authorized alternative to the owner.
 
+### Reservation unit — PROPOSED
+
+One live reservation authorizes **one explicitly enumerated CEVRA operation
+capable of provider contact**, subject to later owner approval. Each
+`SemanticEditorialAnalyzerPort` invocation capable of contact needs its own
+reservation. A second invocation/continuation needs another reservation,
+already reserved before starting the two-invocation sequence.
+
+Separately CEVRA-initiated remote preflight operations — auth/status,
+capability/model or entitlement/billing — each require their own reservation.
+Process start, session establishment and internal transport steps that are
+inseparable parts of the SAME enumerated operation do not multiply reservations
+merely because they are technical events. Any later independent CEVRA operation,
+new invocation, preflight, session-contact, retry or fallback receives no free
+coverage from an earlier reservation. Reusing a process/session does not
+authorize an extra operation. Retry/fallback remain forbidden unless explicitly
+authorized later; no implicit reservations or additional contact are permitted.
+
+This unit is not an estimate of raw provider/client-internal HTTP calls. Record
+observed internal fan-out/retries without inventing counts. If that behavior
+prevents the approved accounting or enforcement, STOP BEFORE CONTACT/INFERENCE
+at the point determinable and return the gap to the owner. Reservation remains
+irreversible before the operation; failures, interruption and crash uncertainty
+do not refund it, and no automatic retry is introduced.
+
 ### Candidate live matrix and accounting feasibility
 
 | Purpose | Candidate evidence | Slots potentially required / gate |
 |---|---|---|
-| R1 preflight | Exact official access, model/capability/billing and containment | 1 if provider-capable contact; 0 only if entirely local/offline |
-| R2 PT-BR direct | F-A, initial context contains both short sources | 1; needs-evidence is PARTIAL, no unreserved continuation |
-| R3 textual continuation | F-B, partial initial context then authorized text | 2 reserved before starting this two-invocation analysis |
-| R4 cancellation | Own in-flight execution, terminal settlement and no acceptance | 1, only with remaining separately authorized slot |
+| R1 preflight | Exact official access, model/capability/billing and containment | 1 ONLY if approved remote checks form one enumerated operation under the selected transport; each separately CEVRA-initiated check needs its own reservation. 0 only if entirely local/offline |
+| R2 PT-BR direct | F-A, initial context contains both short sources | 1 covers only the initial direct invocation; needs-evidence without a second reservation is PARTIAL / experiment-budget-limited, with no automatic continuation |
+| R3 textual continuation | F-B, partial initial context then authorized text | 2 available and reserved before starting invocations 1/2; no third invocation. Extra CEVRA operations outside those invocations require prior allocation approval |
+| R4 cancellation | Own in-flight execution, terminal settlement and no acceptance | 1 ONLY if execution/cancellation/observation fit within one approved CEVRA operation; separate provider-contact cancellation needs an additional reservation |
 
 These rows are candidate priorities, NOT a promise that all fit in four slots.
-Live R1 + R2 + two-call R3 uses all four, leaving R4 NOT RUN. An entirely offline
-R1 could make R2 + R3 + R4 fit four, but reallocation (including possible EN-US)
-requires explicit owner decision, never automatic redistribution. No two-call
-sequence starts with only one authorized slot. A one-call case may use the last
-slot; needs-evidence then remains partial/experiment-budget-limited, not provider
-failure or simulated success. No fifth reservation is permitted by this proposal.
+If R1 requires separate auth/status, capability/model or entitlement/billing
+operations, R1=1 is invalid: return the allocation to the owner BEFORE uncovered
+contact, without extra contact. Only under the table's one-operation R1
+assumption does live R1 + R2 + two-call R3 = 1 + 1 + 2 = 4, leaving R4 NOT RUN.
+An entirely offline R1 could make R2 + R3 + R4 fit four only under R4's
+one-operation assumption. Reallocation (including possible EN-US) requires
+explicit owner decision, never automatic redistribution. No four-slot whole-gate
+completion is promised. No two-call sequence starts with only one authorized
+slot. A one-call case may use the last slot; needs-evidence then remains
+PARTIAL / experiment-budget-limited, not provider failure, full semantic success
+or simulated success. No fifth reservation is permitted by this proposal.
 
 ## 5. Offline fixture specifications and fixed rubric
 
@@ -319,7 +349,42 @@ synthetic response and necessary metadata in private protected storage.
 
 ## 7. Future PASS, FAIL and BLOCKED gates
 
-Future PASS requires ALL applicable proof, not just clean init or valid JSON:
+### Scenario result → permitted claim
+
+| Scenario result | Permitted claim | Claims NOT established |
+|---|---|---|
+| R1 PASS | Observed preflight mechanism/configuration checks only | Semantic round-trip, quality, generic commercial eligibility or universal compatibility |
+| R1 BLOCKED/FAIL | Observed blocker in that mechanism/configuration/environment | Universal impossibility for the provider, model or entitlement |
+| R2 PASS | Direct PT-BR semantic round-trip for the specific scenario and controls actually exercised | Continuation, live cancellation/timeout, EN-US, commercial readiness, complete analysis delivery or whole-gate completion |
+| R2 needs-evidence without second reservation | PARTIAL / experiment-budget-limited | Provider failure or full semantic success; no automatic continuation |
+| R3 PASS | Bounded textual continuation for the specific scenario, at most two authorized invocations and supplied-evidence citations | Live cancellation/timeout, EN-US, commercial readiness or whole-gate completion |
+| R4 PASS | Observed live cancel/abort settlement, cancelled/late response not accepted and receipt-covered behavior | Accepted semantic candidate or semantic quality; neither is required for this cancellation scenario |
+| R4 NOT RUN | LIVE CANCELLATION NOT VALIDATED | Implicit cancellation PASS |
+
+**SCENARIO PASS != WHOLE REAL-AGENT GATE COMPLETE.** A bounded successful real
+exchange is scenario evidence only. Do not declare REAL-AGENT GATE COMPLETE,
+Semantic Editorial Analysis V1 functional/DELIVERED or a dependent UX gate
+satisfied while authority-required proof is missing. R2/R3 semantic success
+does not close the whole gate. R4 NOT RUN means LIVE CANCELLATION NOT VALIDATED;
+timeout remains NOT LIVE VALIDATED unless actually exercised. Other required
+scenarios not exercised remain explicitly NOT RUN.
+
+Integration decision I1 requires proof before dependent UX of authentication,
+transport, structure, evidence-loop, latency/usage/cost, data disclosure,
+malformed output, stale/duplicate behavior, cancellation, timeout and containment.
+ADR 0030 additionally requires measured fidelity, caveat preservation, relations,
+uncertainty, citations, data disclosure, latency, cost and failure behavior.
+Aggregate gate completion requires all proof necessary for that claim, not the
+sum of convenient scenario PASS labels. If four reservations are insufficient,
+return to the owner for a separate allocation/authorization decision: no R5,
+quota expansion or implicit extra execution is authorized here.
+
+Future scenario PASS requires ALL applicable proof below, evaluated against
+the scenario actually exercised, not just clean init or valid JSON. Semantic
+candidate/result requirements apply to semantic success scenarios; cancellation
+or failure/lifecycle scenarios do not fail merely because their expected outcome
+is no accepted candidate. They must instead prove the prescribed terminal
+behavior, settlement, non-acceptance and integrity:
 
 1. Official mechanism explicitly approved for this experiment.
 2. Exact transport version/configuration identified.
@@ -344,7 +409,9 @@ Unproved eligibility/transport/model/entitlement, incompatible auth/policy,
 unauthorized capability/context, silent model or paid fallback, unknown/excess
 cost, unbounded output or unverified accounting are BLOCKED before inference
 where knowable. Malformed terminal/output, containment breach, timeout, stale,
-mutation or exhausted approved budget is terminal FAIL/BLOCKED with exact cause.
+mutation or attempted contact beyond the approved budget is terminal FAIL/BLOCKED
+with exact cause. A valid needs-evidence result with no authorized continuation
+remains PARTIAL / experiment-budget-limited as specified above, not full success.
 Provider errors stay provider errors, not automatic escape accusations. Earlier
 error cannot be erased by a later result. Stop/reap only owned processes; no
 repair, retry, best-of, extra reservation, model substitution or new permission.
