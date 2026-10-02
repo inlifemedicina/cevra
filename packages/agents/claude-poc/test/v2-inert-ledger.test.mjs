@@ -423,7 +423,8 @@ test('inert ledger never deletes a replaced lock it did not acquire', async t =>
 });
 
 test('inert ledger policy cannot authorize live, alter tokens/cost, or expose provider capability', async () => {
-  assert.deepEqual(Object.keys(ledger).sort(), ['initializeInertLedger', 'inspectInertLedger', 'reserveInertOperations', 'writeInertReceipt'].sort());
+  assert.deepEqual(Object.keys(ledger).sort(), ['assertInertExperimentId', 'createFirstFaLedgerFacade', 'initializeInertLedger', 'inspectInertLedger',
+    'reserveInertOperations', 'reserveInertFirstFa', 'writeInertReceipt'].sort());
   assert.deepEqual(OFFLINE_POLICY.bytes, { initial: 65536, cumulative: 262144, response: 65536 });
   assert.equal(OFFLINE_POLICY.maxReservations, 4); assert.equal(OFFLINE_POLICY.maxSemanticInvocations, 2);
   assert.equal(OFFLINE_POLICY.totalDeadlineMs, 30000); assert.equal(OFFLINE_POLICY.retries, 0); assert.equal(OFFLINE_POLICY.fallbacks, 0);

@@ -1524,7 +1524,47 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-**Active first-F-A V2 preparation — 2026-10-02:** based on
+**First-F-A V2 end-to-end wiring — IN DEVELOPMENT, 2026-10-02:** PR #68
+integrated the reviewed offline preparation at
+`46b62d37461bb039a64264ae1c29284a1dd8ea91`; post-merge push CI
+`37052463808` passed 5/5 and Exact Runtime `37052463706` passed 1/1
+on that exact merge. Branch `feat/semantic-v2-first-fa-admission` adds
+the private `runPrivateFirstFa` composition: immutable request/history/runtime
+binding → local per-run TTY consent → ephemeral issuer → one-shot capability →
+gated ledger init/open → committed reservation → closed transport/Application →
+correlated receipt. Authorization is not candidate recognition,
+ledger/anchor existence or a persisted record. The capability is consumed before
+I/O; F-A uses one durable operation key, one slot/invocation and the entry-to-final
+30s deadline, without retry/fallback or refund. All persistence uses explicit
+synthetic fixture IDs/roots in this validation. The session issuer, operational
+facade and owned closed-spawn binder are implemented but NOT executed live;
+default/missing/denied/non-TTY consent fails before ledger mutation/contact.
+The public inert ledger API still rejects real IDs; its core/anchor/lock/fsync
+and four-operation ceiling are reused, not duplicated. Receipt digests and
+observed process/usage metadata are accounting, never permission or proof of
+final acceptance after deadline. The prior binding-only approval at `46ed082`
+does not cover this new PR #69 delta: focused independent re-review is pending.
+The end-to-end review of `fd7f168` required B-1: synchronous binding work
+could expose cancellation/deadline expiry before spawn without a post-work
+check. The same branch adds that check and two zero-spawn regressions while
+retaining the committed slot/receipt; independent verification is still pending.
+The existing [acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md), §F,
+now sequences essential future app flows without changing A–E IDs/expectations
+or claiming functional execution/approval from CI/fake evidence.
+Real ID activation, reservation and inference remain NOT RUN / NOT AUTHORIZED;
+future execution still requires explicit human approval of one exact F-A scope,
+fixture digests and validated explicit root/runtime inputs (canonical private
+ledger root, pinned binary, correct home, owned scratch parent, and the private
+plugin-override receipt with the exact two observed IDs). None of these external
+inputs was read/activated with a real candidate in this offline validation.
+The local consent message preserves PT-BR/EN-US. No persisted grant,
+account service, default path, implicit preflight, replay or new live quota.
+Remote 32k/4k hard enforcement, exact HTTP contacts, absolute R$0 and immediate
+server cancellation remain unproved. No Director/IR/History authority changes;
+historical V1 stays CLOSED / 8/8 / zero, real semantic round-trip stays
+NOT DEMONSTRATED, complete analysis NOT DELIVERED and progress **55%**.
+
+**Historical first-F-A V2 preparation checkpoint — 2026-10-02:** based on
 `66fea7db04590a7d013fe63fb8cd66bc57287c80`, the Product Owner approved
 **LOCAL CONTAINMENT FOR PREPARATION OF FIRST F-A; LIVE CONSUMPTION NOT
 AUTHORIZED**. Branch `feat/semantic-v2-first-fa-preparation` prepares one
@@ -1540,7 +1580,8 @@ Synthetic ledger regressions and the new fake-only Application integration
 preserve reservation-before-callback and no refund. Candidate ID recognition
 does not initialize persistence or grant authority:
 `LIVE_AUTHORIZATION_PRIMITIVE_MISSING`; activation, real reservations and
-inference remain absent. Independent review is pending. No account metadata is
+inference remain absent. Review was pending at this checkpoint; subsequent
+independent approval and integration are recorded above. No account metadata is
 published by this preparation. Historical V1 remains CLOSED / 8/8 / zero;
 real semantic round-trip remains NOT DEMONSTRATED and progress stays **55%**.
 
