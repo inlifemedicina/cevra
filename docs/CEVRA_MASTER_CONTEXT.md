@@ -1524,6 +1524,26 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
+**Active first-F-A V2 preparation — 2026-10-02:** based on
+`66fea7db04590a7d013fe63fb8cd66bc57287c80`, the Product Owner approved
+**LOCAL CONTAINMENT FOR PREPARATION OF FIRST F-A; LIVE CONSUMPTION NOT
+AUTHORIZED**. Branch `feat/semantic-v2-first-fa-preparation` prepares one
+invocation, one total 30,000 ms deadline and zero CEVRA retry/fallback.
+The 64/256/64 KiB budgets respectively bound the first Application envelope,
+cumulative Application envelopes and final response; JSONL/stdout/stderr have
+separate bounds. Remote 32k input / 4k output hard enforcement remains
+**NOT DEMONSTRATED**; local controls are not equivalent and do not prove HTTP
+counts, absolute R$0 or immediate server cancellation. Exact requested
+`claude-opus-5-5` / Medium is grounded in official model documentation and
+read-only help from pinned CLI 2.1.280, not generation or entitlement proof.
+Synthetic ledger regressions and the new fake-only Application integration
+preserve reservation-before-callback and no refund. Candidate ID recognition
+does not initialize persistence or grant authority:
+`LIVE_AUTHORIZATION_PRIMITIVE_MISSING`; activation, real reservations and
+inference remain absent. Independent review is pending. No account metadata is
+published by this preparation. Historical V1 remains CLOSED / 8/8 / zero;
+real semantic round-trip remains NOT DEMONSTRATED and progress stays **55%**.
+
 **Latest material Phase A checkpoint on main — 2026-10-01:**
 PR #62 merged as `9c6d9b8484d1c1e1be6f19c080baf22a42c9fc7f`; its parents
 are `aea53160b8f5af5124e461b0bcb44d60987454f3` and

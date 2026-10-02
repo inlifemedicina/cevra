@@ -131,13 +131,14 @@ export function childEnvironment(home) {
   return { HOME: home, USER: username, LOGNAME: username,
     PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', DISABLE_AUTOUPDATER: '1' };
 }
-export function childArguments(sessionId,settingsPath) {
+export function childArguments(sessionId,settingsPath,expectedModel) {
   if(settingsPath!==undefined && !isAbsolute(settingsPath))fail('INVALID_SESSION_SETTINGS');
+  if(expectedModel!==undefined&&(typeof expectedModel!=='string'||!OPUS.test(expectedModel)))fail('MODEL_ARGV_NOT_CLOSED');
   return ['--print', '--restricted', '--safe-mode', '--tools', '',
     '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
     '--disallowedTools', 'mcp__*', '--permission-prompts', 'none',
     '--setting-sources', '', '--disable-slash-commands', '--no-chrome',
-    '--no-session-persistence', '--max-turns', '1', '--model', 'opus',
+    '--no-session-persistence', '--max-turns', '1', '--model', expectedModel??'opus',
     '--effort', 'medium', '--output-format', 'stream-json', '--verbose',
     ...(settingsPath===undefined?[]:['--settings',settingsPath]),
     '--session-id', sessionId, '--system-prompt', PLAYBOOK];
@@ -153,7 +154,9 @@ export async function verifyBinary(path) {
 
 // Closed transport reader: never retains thinking blocks or raw event logs.
 export class ClaudeStreamReader {
-  constructor(sessionId, limits = LIMITS, diagnosticInit) {
+  constructor(sessionId, limits = LIMITS, diagnosticInit, expectedModel) {
+    if(expectedModel!==undefined&&(typeof expectedModel!=='string'||!OPUS.test(expectedModel)))fail('MODEL_ARGV_NOT_CLOSED');
+    this.expectedModel=expectedModel;
     this.sessionId=sessionId; this.limits=limits; this.pending=Buffer.alloc(0);
     this.diagnosticInit=diagnosticInit;
     this.bytes=0; this.events=0; this.initialized=false; this.result=undefined;
@@ -353,6 +356,7 @@ export class ClaudeStreamReader {
   checkModel(model,origin) {
     if(typeof model!=='string'||!OPUS.test(model)) fail('MODEL_UNAVAILABLE',origin==='init'?'INIT_MODEL_INVALID':
       origin==='assistant'&&model==='<synthetic>'?'ASSISTANT_SYNTHETIC_UNPROVEN':'MODEL_INVALID');
+    if(this.expectedModel!==undefined&&model!==this.expectedModel)fail('MODEL_DRIFT','EXPECTED_MODEL_MISMATCH');
     if(this.model && this.model!==model) fail('MODEL_DRIFT',origin==='init'?'INIT_MODEL_DRIFT':'MODEL_MISMATCH');
   }
   finish() {
@@ -365,12 +369,13 @@ export class ClaudeStreamReader {
 
 // Internal process seam is only for deterministic tests; no caller/request callback.
 const TERM_TO_KILL_MS=1000, FAILURE_SETTLEMENT_MS=2000, EXIT_DRAIN_MS=250;
-export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs=60000,sessionId=randomUUID(),limits=LIMITS,diagnosticInit,settingsPath}, spawnProcess=spawn,
+export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs=60000,sessionId=randomUUID(),limits=LIMITS,diagnosticInit,settingsPath,expectedModel}, spawnProcess=spawn,
   clock={now:()=>performance.now(),setTimeout,clearTimeout}) {
   if(signal?.aborted) fail('CANCELLED');
+  if(!Number.isFinite(timeoutMs)||timeoutMs<=0)fail('TIMEOUT');
   const started=clock.now();
-  const reader=new ClaudeStreamReader(sessionId,limits,diagnosticInit);
-  const child=spawnProcess(binary,childArguments(sessionId,settingsPath),{cwd,env:childEnvironment(home),shell:false,stdio:['pipe','pipe','pipe']});
+  const reader=new ClaudeStreamReader(sessionId,limits,diagnosticInit,expectedModel);
+  const child=spawnProcess(binary,childArguments(sessionId,settingsPath,expectedModel),{cwd,env:childEnvironment(home),shell:false,stdio:['pipe','pipe','pipe']});
   return await new Promise((resolve,reject)=>{
     let error, killTimer, failureTimer, drainTimer, stderrBytes=0, tail=Buffer.alloc(0), closed=false, exited=false, settled=false, signalFailures=0;
     let completeChild;
@@ -450,7 +455,7 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
         reject(error);return;}
       try {
         const result=reader.result;
-        const accepted={result,metrics:{model:reader.model,requestedAlias:'opus',requestedEffort:'medium',
+        const accepted={result,metrics:{model:reader.model,...(expectedModel?{requestedModel:expectedModel}:{requestedAlias:'opus'}),requestedEffort:'medium',
           envelopeBytes:Buffer.byteLength(payload),systemPromptBytes:Buffer.byteLength(PLAYBOOK),stdinBytes:Buffer.byteLength(payload),
           responseBytes:Buffer.byteLength(result),stdoutBytes:reader.bytes,stderrBytes,events:reader.events,
           latencyMs:clock.now()-started,usage:reader.usage,estimatedUsd:reader.estimate,childClosed:true}};
