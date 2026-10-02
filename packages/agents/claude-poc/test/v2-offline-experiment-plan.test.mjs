@@ -73,7 +73,8 @@ test('NB-2 token controls and R$0 remain explicit unresolved live gates, not est
   assert.equal(plan.OFFLINE_POLICY.tokens.usage, 'OBSERVATIONAL ONLY');
   assert.equal(plan.OFFLINE_POLICY.tokens.overhead, 'UNKNOWN');
   assert.equal(plan.TOKEN_DECISION_OPTIONS.strict.state, 'BLOCK LIVE UNTIL PROOF');
-  assert.match(plan.TOKEN_DECISION_OPTIONS.explicitAlternative.state, /NOT ADOPTED/);
+  assert.match(plan.TOKEN_DECISION_OPTIONS.explicitAlternative.state, /APPROVED FOR FIRST F-A PREPARATION ONLY/);
+  assert.match(plan.TOKEN_DECISION_OPTIONS.selection, /LIVE CONSUMPTION NOT AUTHORIZED/);
   assert.match(plan.TOKEN_DECISION_OPTIONS.explicitAlternative.guarantee, /NO hard token guarantee/);
   assert.equal(plan.OFFLINE_POLICY.incrementalCost, 'R$0 REQUIRED / NOT VERIFIED');
   // A supplied assertion cannot turn this inert package into a preflight pass.

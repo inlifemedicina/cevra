@@ -85,11 +85,11 @@ export const OFFLINE_SCENARIOS = freeze({
 });
 
 export const TOKEN_DECISION_OPTIONS = freeze({
-  selection: 'NOT MADE / MATERIAL PRODUCT OWNER DECISION REQUIRED',
+  selection: 'LOCAL CONTAINMENT APPROVED FOR PREPARATION OF FIRST F-A; LIVE CONSUMPTION NOT AUTHORIZED',
   nonProof: 'Prompt instruction, environment literal, observed usage and post-validation do not prove hard remote enforcement; no byte-to-token/currency conversion',
   strict: { state: 'BLOCK LIVE UNTIL PROOF', requirement: 'Hard remote input 32000 / output 4000 enforcement demonstrated before contact' },
-  explicitAlternative: { state: 'NOT ADOPTED / FUTURE EXPLICIT APPROVAL REQUIRED',
-    guarantee: 'Hard local bytes, total deadline, max two semantic invocations, no retry/fallback; NO hard token guarantee',
+  explicitAlternative: { state: 'APPROVED FOR FIRST F-A PREPARATION ONLY / LIVE NOT AUTHORIZED',
+    guarantee: 'Hard local bytes, total deadline 30000 ms, one first-F-A invocation, no retry/fallback; NO hard token guarantee',
     usage: 'Post-receipt observation; record excess without corrective extra invocation' }
 });
 
@@ -121,7 +121,7 @@ export const FUTURE_DECISION_PACKAGE = freeze({
   firstLiveCase: 'PROPOSED F-A PT-BR / one invocation / synthetic text only / no media / no retry',
   fB: 'FAKE-ONLY here; future live F-B needs a new explicit allocation of two reservations upfront',
   tokenDecision: TOKEN_DECISION_OPTIONS,
-  liveBlockers: ['Unknown or non-enumerable contact operation', 'Unverified subscription entitlement and R$0', 'Strict token enforcement unproven or alternative not explicitly approved'],
+  liveBlockers: ['Unknown or non-enumerable contact operation', 'Live consumption not authorized; R$0 not absolutely verified', 'LIVE_AUTHORIZATION_PRIMITIVE_MISSING'],
   missingAuthorizations: ['Concrete preflight/provider contacts and subscription consumption', 'Create and activate NEW experiment ID', 'Implement operational NB-2 ledger and real reservations', 'F-A inference'],
   architecture: 'SemanticEditorialAnalyzerPort → adapter → untrusted candidate → closed validation → accepted derived result',
   mutation: 'NONE: Project IR/History, editing commands, cache/archive, Director authority unchanged',
