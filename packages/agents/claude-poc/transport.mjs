@@ -412,9 +412,10 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
     };
     const processError=()=>{if(!settled)stop('PROCESS_ERROR');};
     const stdinError=()=>{if(!settled)stop('STDIN_ERROR');};
-    const exit=()=>{
+    const exit=(code,terminationSignal)=>{
       exited=true;completeChild();clock.clearTimeout(killTimer);
       if(settled){releaseListeners();child.stdout.destroy?.();child.stderr.destroy?.();child.stdin.destroy?.();return;}
+      if(code!==0||terminationSignal)error??=new ClaudePocError('PROCESS_EXIT');
       if(error&&!closed&&drainTimer===undefined)drainTimer=clock.setTimeout(()=>finish(),EXIT_DRAIN_MS);
     };
     const close=(code,terminationSignal)=>{

@@ -42,6 +42,48 @@ function controlledRun(child,clock,extra={}){
  return runClaudeProcess({binary:'/fake-owned-child',home:'/fixture-home',cwd:'/fake-owned-cwd',payload,
   sessionId:'controlled',timeoutMs:100,...extra},()=>child,clock);
 }
+for(const [exitLabel,exitCode,exitSignal] of [['nonzero',1,null],['signal',null,'SIGTERM']]){
+ for(const order of ['exit-before-cancel','exit-before-timeout','cancel-before-exit','timeout-before-exit','provider-before-exit','wire-before-exit'])
+  test(`B1 ${exitLabel}: ${order} preserves the first observed cause without close`,async()=>{
+   const clock=controlledClock(),child=controlledChild(),controller=new AbortController();
+   const expected=order.startsWith('exit-before')?'PROCESS_EXIT':order==='cancel-before-exit'?'CANCELLED':
+    order==='timeout-before-exit'?'TIMEOUT':order==='provider-before-exit'?'PROVIDER_AUTH_ERROR':'CORRELATION';
+   const promise=controlledRun(child,clock,{signal:controller.signal});
+   const rejected=assert.rejects(promise,error=>{
+    assert.equal(error.code,expected);
+    assert.equal(error.metrics.childClosed,false);assert.equal(error.metrics.directChildExited,true);
+    assert.equal(error.metrics.settlementIncomplete,false);assert.equal(error.metrics.descendantReaping,'NOT_PROVEN');
+    return true;
+   });
+   const exit=()=>child.emit('exit',exitCode,exitSignal);
+   if(order==='exit-before-cancel'){exit();controller.abort();}
+   else if(order==='exit-before-timeout'){exit();clock.advance(100);}
+   else if(order==='cancel-before-exit'){controller.abort();exit();}
+   else if(order==='timeout-before-exit'){clock.advance(100);exit();}
+   else {
+    const events=wireEvents();
+    if(order==='provider-before-exit')events[1].error='authentication_failed';else events[1].session_id='foreign-session';
+    emitWire(child,events.slice(0,2));exit();
+   }
+   const signalsAtExit=[...child.signals];
+   emitWire(child,wireEvents());clock.advance(2000);await rejected;
+   assert.deepEqual(child.signals,signalsAtExit); // No TERM/KILL after observed exit.
+   assert.deepEqual(child.signals,order.startsWith('exit-before')?[]:['SIGTERM']);
+   assert.equal(clock.pending(),0);assert(child.stdout.destroyed);
+   child.emit('close',exitCode,exitSignal);child.emit('error',new Error('late owned error'));
+   assert.equal(child.stdout.listenerCount('data'),0);
+  });
+}
+test('B1 clean exit with a complete-looking result but no close remains non-success',async()=>{
+ const clock=controlledClock(),child=controlledChild();let accepted=false;
+ const promise=controlledRun(child,clock).then(value=>{accepted=true;return value;});
+ const rejected=assert.rejects(promise,error=>error.code==='TIMEOUT'&&!error.metrics.childClosed&&error.metrics.directChildExited);
+ emitWire(child,wireEvents());child.emit('exit',0,null);
+ await Promise.resolve();assert.equal(accepted,false);
+ clock.advance(350);await rejected;
+ assert.equal(accepted,false);assert.deepEqual(child.signals,[]);assert.equal(clock.pending(),0);
+ child.emit('close',0,null);
+});
 test('L1 cancellation settles after direct exit despite inherited open streams; late result is discarded',async()=>{
  const clock=controlledClock(),child=controlledChild(),controller=new AbortController();
  const promise=controlledRun(child,clock,{signal:controller.signal});
