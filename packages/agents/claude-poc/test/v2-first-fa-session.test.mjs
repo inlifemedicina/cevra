@@ -327,6 +327,38 @@ test('expired durable reservation keeps slot but blocks process callback', async
   const r = await read(join(s.root, 'ledger/receipt-0001.json'));
   assert.equal(r.processStarted, false); assert.equal(r.outcome, 'failure');
 });
+for (const mode of ['deadline', 'abort']) test(`B-1 ${mode} during final pre-spawn binding: zero spawn and no refund`, async t => {
+  const s = await setup(t), clock = clockFixture(), abort = new AbortController(), fake = childFixture(s);
+  s.input.signal = abort.signal;
+  const archive = s.input.history.toArchive.bind(s.input.history);
+  let readsAfterReservation = 0;
+  s.input.history.toArchive = () => {
+    const value = archive();
+    if (existsSync(join(s.root, 'ledger/reservation-0001.json')) && ++readsAfterReservation === 2) {
+      // First binding read is after durable reservation; the second is inside
+      // the transport callback, immediately before its owned spawn seam.
+      if (mode === 'deadline') clock.advance(30000);
+      else abort.abort();
+    }
+    return value;
+  };
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake, { clock })),
+    code(mode === 'deadline' ? 'TIMEOUT' : 'SEMANTIC_ANALYSIS_CANCELLED'));
+  assert(readsAfterReservation >= 2); assert.equal(fake.calls.length, 0);
+  const reservation = await read(join(s.root, 'ledger/reservation-0001.json'));
+  const receipt = await read(join(s.root, 'ledger/receipt-0001.json'));
+  assert.equal((await read(join(s.root, 'ledger/ledger-state.json'))).watermark, 1);
+  assert.equal(receipt.reservationDigest, reservation.reservationDigest);
+  assert.equal(receipt.processStarted, false); assert.equal(receipt.childClosed, false);
+  assert.equal(receipt.outcome, mode === 'deadline' ? 'failure' : 'cancelled');
+  assert.equal(receipt.responseDigest, null); assert.equal(clock.pending(), 0);
+  assert.equal(JSON.stringify(archive()), s.before); assert(s.input.history.canRedo);
+  assert.deepEqual(await readdir(s.runtime.scratchParent), []);
+  s.input.signal = undefined;
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake, { clock })), code('FIRST_FA_ALREADY_RESERVED'));
+  assert.equal(fake.calls.length, 0);
+  assert.equal((await read(join(s.root, 'ledger/ledger-state.json'))).watermark, 1);
+});
 test('receipt duration cannot extend acceptance; accounting is not authority', async t => {
   const s = await setup(t), clock = clockFixture(), fake = childFixture(s);
   await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake, { clock, ledgerControl: {

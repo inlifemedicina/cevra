@@ -87,6 +87,10 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
     if (signal?.aborted) fail('CANCELLED');
     if (timedOut || clock.now() >= deadline) fail('TIMEOUT');
     execution?.checkBinding();
+    // Binding is synchronous work, not an atomic checkpoint: it can expose
+    // cancellation or consume the remaining deadline before the spawn seam.
+    if (signal?.aborted) fail('CANCELLED');
+    if (timedOut || clock.now() >= deadline) fail('TIMEOUT');
   };
   guard();
   if (!execution) {

@@ -1544,6 +1544,13 @@ and four-operation ceiling are reused, not duplicated. Receipt digests and
 observed process/usage metadata are accounting, never permission or proof of
 final acceptance after deadline. The prior binding-only approval at `46ed082`
 does not cover this new PR #69 delta: focused independent re-review is pending.
+The end-to-end review of `fd7f168` required B-1: synchronous binding work
+could expose cancellation/deadline expiry before spawn without a post-work
+check. The same branch adds that check and two zero-spawn regressions while
+retaining the committed slot/receipt; independent verification is still pending.
+The existing [acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md), §F,
+now sequences essential future app flows without changing A–E IDs/expectations
+or claiming functional execution/approval from CI/fake evidence.
 Real ID activation, reservation and inference remain NOT RUN / NOT AUTHORIZED;
 future execution still requires explicit human approval of one exact F-A scope,
 fixture digests and validated explicit root/runtime inputs (canonical private
