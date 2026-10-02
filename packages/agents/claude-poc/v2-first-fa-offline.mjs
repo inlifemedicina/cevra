@@ -40,7 +40,7 @@ export function describeFirstFaCandidate(id) {
     blocker: 'LIVE_AUTHORIZATION_PRIMITIVE_MISSING' });
 }
 
-function validateFixture(value) {
+export function validateFirstFaFixture(value) {
   if (!closed(value, ['authorization', 'candidateId', 'provider', 'route', 'model',
     'argvClosed', 'reauthRequired', 'extraUsage', 'capabilities'])) fail('OFFLINE_AUTHORIZATION_ABSENT');
   if (value.authorization !== 'OFFLINE_FAKE_ONLY') fail('OFFLINE_AUTHORIZATION_ABSENT');
@@ -52,6 +52,7 @@ function validateFixture(value) {
   if (value.extraUsage !== false) fail('EXTRA_USAGE');
   const names = ['tools', 'mcp', 'plugins', 'skills', 'hooks', 'externalRoutes'];
   if (!closed(value.capabilities, names) || names.some(key => value.capabilities[key] !== 0)) fail('CONTAINMENT');
+  return frozen({ ...value, capabilities: { ...value.capabilities } });
 }
 
 // The test authorization describes a synthetic fixture, never a consumer login
@@ -61,9 +62,15 @@ function validateFixture(value) {
 // is accounting, not authority to accept a late result or authorize another call.
 export async function runOfflineFirstFa({
   root, experimentId, fixtureAuthorization, history, request, fakeSpawn,
-  signal, clock = { now: () => performance.now(), setTimeout, clearTimeout }
+  signal, clock = { now: () => performance.now(), setTimeout, clearTimeout },
+  admissionDeadline, ledgerAdapter = {
+    inspect: inspectInertLedger, reserve: reserveInertOperations, receipt: writeInertReceipt
+  }
 }) {
-  const deadline = clock.now() + FIRST_FA_POLICY.totalDeadlineMs;
+  const localDeadline = clock.now() + FIRST_FA_POLICY.totalDeadlineMs;
+  if (admissionDeadline !== undefined && !Number.isFinite(admissionDeadline)) fail('TIMEOUT');
+  const deadline = admissionDeadline === undefined ? localDeadline : Math.min(localDeadline, admissionDeadline);
+  const ledgerIo = { inspect: ledgerAdapter.inspect, reserve: ledgerAdapter.reserve, receipt: ledgerAdapter.receipt };
   const controller = new AbortController();
   let timedOut = false, reservation, primary, result, calls = 0, transportMetrics, adapterCall, transportFailure;
   const guard = () => {
@@ -71,7 +78,7 @@ export async function runOfflineFirstFa({
     if (timedOut || clock.now() >= deadline) fail('TIMEOUT');
   };
   guard();
-  validateFixture(fixtureAuthorization); // Synchronous capture before I/O.
+  validateFirstFaFixture(fixtureAuthorization); // Synchronous capture before I/O.
   if (typeof fakeSpawn !== 'function') fail('FAKE_PROVIDER_REQUIRED');
   childArguments('offline-session', undefined, FIRST_FA_POLICY.expectedModel);
   const abort = () => controller.abort();
@@ -87,7 +94,7 @@ export async function runOfflineFirstFa({
           invocation.payloadBytes > FIRST_FA_POLICY.applicationBytes.initialEnvelope) fail('INPUT_LIMIT');
       // Admission/validation/preparation can fail before reservation: no fictitious
       // execution. Once reserved, any cancellation, crash or failure keeps the slot.
-      [reservation] = await reserveInertOperations(root, { experimentId, operations: [{
+      [reservation] = await ledgerIo.reserve(root, { experimentId, operations: [{
         operationId: 'first-fa-direct', operation: 'semantic-f-a-direct', purpose: 'offline-semantic-f-a'
       }] });
       guard();
@@ -111,7 +118,7 @@ export async function runOfflineFirstFa({
   };
   try {
     guard();
-    const ledger = await inspectInertLedger(root, experimentId);
+    const ledger = await ledgerIo.inspect(root, experimentId);
     guard();
     if (ledger.unresolvedReservations.length) fail('LEDGER_UNRESOLVED');
     if (!ledger.remainingReservations) fail('LEDGER_RESERVATION_LIMIT');
@@ -120,7 +127,10 @@ export async function runOfflineFirstFa({
     // The general boundary keeps its historical two-invocation contract. This
     // adapter blocks the second invocation BEFORE any reservation/fake spawn.
     const app = new SemanticEditorialAnalysisService({ history, analyzer,
-      timeoutMs: FIRST_FA_POLICY.totalDeadlineMs, monotonicClock: clock.now,
+      // Application requires integer milliseconds and a 100ms minimum. Its
+      // internal timer cannot extend admission: the outer timer and guards own
+      // the exact remaining deadline, including the last sub-100ms interval.
+      timeoutMs: Math.max(100, Math.floor(deadline - clock.now())), monotonicClock: clock.now,
       initialContextMaxBytes: FIRST_FA_POLICY.applicationBytes.initialEnvelope,
       totalEvidenceMaxBytes: FIRST_FA_POLICY.applicationBytes.cumulativeEnvelopes,
       responseMaxBytes: FIRST_FA_POLICY.applicationBytes.response });
@@ -139,7 +149,7 @@ export async function runOfflineFirstFa({
         primary ? signal?.aborted || primary.code === 'CANCELLED' ? 'cancelled' : 'failure' :
         result?.kind === 'analysis-candidate' ? 'success' : 'failure';
       try {
-        await writeInertReceipt(root, { version: 1, experimentId,
+        await ledgerIo.receipt(root, { version: 1, experimentId,
           reservationNumber: reservation.number, operationId: reservation.operationId,
           purpose: reservation.purpose, reservationDigest: reservation.reservationDigest,
           outcome, providerContact: false, live: false });

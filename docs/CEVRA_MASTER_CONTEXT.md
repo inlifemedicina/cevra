@@ -1524,7 +1524,26 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-**Active first-F-A V2 preparation — 2026-10-02:** based on
+**First-F-A V2 admission binding — IN DEVELOPMENT, 2026-10-02:** PR #68
+integrated the reviewed offline preparation at
+`46b62d37461bb039a64264ae1c29284a1dd8ea91`; post-merge push CI
+`37052463808` passed 5/5 and Exact Runtime `37052463706` passed 1/1
+on that exact merge. Branch `feat/semantic-v2-first-fa-admission` adds
+only offline, one-shot capability → ledger admission → committed reservation
+→ controlled fake-process evaluation. Authorization is not candidate recognition,
+ledger/anchor existence or a persisted record. The capability is consumed before
+I/O; F-A uses one durable operation key, one slot/invocation and the entry-to-final
+30s deadline, without retry/fallback or refund. All persistence uses explicit
+synthetic fixture IDs/roots; the real candidate is only recognized. The trusted
+live issuer is not implemented/wired:
+`TRUSTED_LIVE_AUTHORIZATION_ISSUER_NOT_WIRED`. Real ID activation, reservation
+and inference remain NOT RUN; independent review of this slice is pending.
+Remote 32k/4k hard enforcement, exact HTTP contacts, absolute R$0 and immediate
+server cancellation remain unproved. No Director/IR/History authority changes;
+historical V1 stays CLOSED / 8/8 / zero, real semantic round-trip stays
+NOT DEMONSTRATED, complete analysis NOT DELIVERED and progress **55%**.
+
+**Historical first-F-A V2 preparation checkpoint — 2026-10-02:** based on
 `66fea7db04590a7d013fe63fb8cd66bc57287c80`, the Product Owner approved
 **LOCAL CONTAINMENT FOR PREPARATION OF FIRST F-A; LIVE CONSUMPTION NOT
 AUTHORIZED**. Branch `feat/semantic-v2-first-fa-preparation` prepares one
@@ -1540,7 +1559,8 @@ Synthetic ledger regressions and the new fake-only Application integration
 preserve reservation-before-callback and no refund. Candidate ID recognition
 does not initialize persistence or grant authority:
 `LIVE_AUTHORIZATION_PRIMITIVE_MISSING`; activation, real reservations and
-inference remain absent. Independent review is pending. No account metadata is
+inference remain absent. Review was pending at this checkpoint; subsequent
+independent approval and integration are recorded above. No account metadata is
 published by this preparation. Historical V1 remains CLOSED / 8/8 / zero;
 real semantic round-trip remains NOT DEMONSTRATED and progress stays **55%**.
 

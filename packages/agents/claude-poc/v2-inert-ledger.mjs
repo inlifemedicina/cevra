@@ -46,6 +46,8 @@ function experiment(id) {
   if (id === OFFLINE_POLICY.historicalExperiment) fail('HISTORICAL_EXPERIMENT_CLOSED');
   if (typeof id !== 'string' || !/^synthetic-semantic-v2-ledger-[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(id)) fail('SYNTHETIC_EXPERIMENT_ID_REQUIRED');
 }
+// Pure identity check; it never initializes storage or grants authority.
+export const assertInertExperimentId = experiment;
 function identifier(id) {
   if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id)) fail('LEDGER_OPERATION_ID_INVALID');
 }
@@ -263,10 +265,21 @@ export async function inspectInertLedger(root, experimentId) {
   catch (cause) { throw normalize(cause); }
 }
 export async function reserveInertOperations(root, request, control) {
+  return reserveOperations(root, request, control, false);
+}
+// Admission's durable F-A key is the operation, not a caller-selected ID.
+// Keep the general synthetic API unchanged; only this narrow entry point adds
+// the one-F-A-per-ledger invariant under the existing exclusive writer lock.
+export async function reserveInertFirstFa(root, request, control) {
+  return reserveOperations(root, request, control, true);
+}
+async function reserveOperations(root, request, control, firstFaOnly) {
   closed(request, ['experimentId', 'operations']); experiment(request.experimentId);
   if (!Array.isArray(request.operations) || ![1, 2].includes(request.operations.length)) fail('LEDGER_OPERATIONS_INVALID');
   // Capture closed caller values before the first await; no aliasing during I/O.
   const operations = request.operations.map(entry => { operation(entry); return { operationId: entry.operationId, operation: entry.operation, purpose: entry.purpose }; });
+  if (firstFaOnly && (operations.length !== 1 || operations[0].operation !== 'semantic-f-a-direct' ||
+      operations[0].operationId !== 'first-fa-direct')) fail('LEDGER_FIRST_FA_SCOPE_INVALID');
   if (new Set(operations.map(e => e.operationId)).size !== operations.length) fail('LEDGER_DUPLICATE_OPERATION_ID');
   const fb = operations.some(e => e.operation.startsWith('semantic-f-b-'));
   if (operations.length === 2 && !fb || fb && !(operations.length === 2 && operations[0].operation === 'semantic-f-b-invocation-1' && operations[1].operation === 'semantic-f-b-invocation-2')) fail('LEDGER_F_B_UPFRONT_REQUIRED');
@@ -275,6 +288,7 @@ export async function reserveInertOperations(root, request, control) {
     const current = await inspect(root, id, lock);
     if (current.state.status === 'CLOSED_OFFLINE') fail('LEDGER_CLOSED');
     if (current.usedReservations + operations.length > OFFLINE_POLICY.maxReservations) fail('LEDGER_RESERVATION_LIMIT');
+    if (firstFaOnly && current.reservations.some(r => r.operation === 'semantic-f-a-direct')) fail('LEDGER_FIRST_FA_ALREADY_RESERVED');
     if (operations.some(e => current.reservations.some(r => r.operationId === e.operationId))) fail('LEDGER_DUPLICATE_OPERATION_ID');
     const first = current.usedReservations + 1, created = [];
     for (const [offset, entry] of operations.entries()) {
