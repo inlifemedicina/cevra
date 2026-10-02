@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import { createEmptyProject, createSourceTranscript, ProjectHistory } from "@cevra/project-ir";
@@ -304,8 +305,113 @@ for (const losesCondition of [false, true]) test(`F-A direct PT-BR real boundary
   assert.equal(result.provenance.invocationCount, 1);
   assert(result.provenance.requestBytes[0] <= DEFAULT_SEMANTIC_ANALYSIS_INITIAL_BYTES);
   assert(result.provenance.responseBytes[0] <= 64 * 1024);
+  if (!losesCondition) console.log(JSON.stringify({ offlineDisclosure: "F-A", syntheticTexts: directFA,
+    canonicalTranscriptDigests: result.binding.sourceTranscripts.map(t => t.transcriptDigest),
+    payloads: analyzer.calls.map(({ invocation }) => payloadDisclosure(invocation.payload)),
+    sumRequestBytes: result.provenance.requestBytes.reduce((sum, bytes) => sum + bytes, 0),
+    responseBytes: result.provenance.responseBytes, realProviderContact: false }));
 });
 function idsForFA() { return directFA.map((text, index) => segmentTranscript(index === 0 ? "source-a" : "source-b", text)); }
+
+function payloadDisclosure(payload) {
+  return { bytes: Buffer.byteLength(payload, "utf8"), sha256: createHash("sha256").update(payload, "utf8").digest("hex") };
+}
+const continuationFB = {
+  initial: "Para o próximo pedido sob encomenda, o material ainda não foi separado.",
+  additional: "A etiqueta só será emitida depois da separação, e por isso a entrega no dia seguinte ainda não pode ser confirmada."
+};
+function gradeContinuationFB(candidate) {
+  return {
+    condition: candidate.observations.some(o => o.kind === "caveat" && /depois da separação/.test(o.statement)),
+    presentFutureContrast: candidate.relations.some(r => r.kind === "complement" && /ainda não.*só depois/.test(r.statement)),
+    labelRole: candidate.observations.some(o => /etiqueta.*emitida/.test(o.statement)),
+    deliveryUncertainty: candidate.uncertainties.some(u => /entrega.*não.*confirmada/.test(u.statement)) &&
+      !candidate.observations.some(o => /entrega.*garantida/.test(o.statement))
+  };
+}
+for (const mode of ["faithful", "guarantees-tomorrow", "expired-total-deadline"]) test(`F-B PT-BR real evidence exchange, fake-only: ${mode}`, async () => {
+  // Mechanical word segmentation of the unchanged F-A source creates canonical
+  // fragments, not filler/summary/truncation. At 4 KiB the ordinary initial
+  // policy supplies S2's first unit but cannot supply its longer second unit.
+  const { history, ids } = fixture({ transcripts: [
+    transcript("source-a", directFA[0].split(" ")),
+    transcript("source-b", [continuationFB.initial, continuationFB.additional])
+  ] });
+  history.commit({ type: "project.rename", name: "preserve redo F-B" }); history.undo();
+  const before = structuredClone(history.toArchive());
+  const projection = new CountingProjectionService(history);
+  let clock = 0;
+  let firstContext;
+  const analyzer = new FixtureAnalyzer([
+    envelope => {
+      firstContext = structuredClone(envelope.context);
+      const anchor = envelope.context.evidence.find(e => e.sourceReference === "S2");
+      assert.equal(anchor.text, continuationFB.initial);
+      assert(!envelope.context.evidence.some(e => e.text.includes(continuationFB.additional)));
+      assert.equal(envelope.context.coverage.status, "partial");
+      clock = 20000;
+      return needsEvidence(envelope.context.contextId, { type: "text-context", sourceReference: anchor.sourceReference,
+        afterEvidenceReference: anchor.reference, maxAdditionalBytes: 4096,
+        reason: "É necessário o próximo trecho da fonte para esclarecer a condição do pedido futuro." });
+    },
+    envelope => {
+      assert.equal(envelope.context.contextId, firstContext.contextId);
+      for (const previous of firstContext.evidence) assert.deepEqual(envelope.context.evidence.find(e => e.reference === previous.reference), previous);
+      const initial = envelope.context.evidence.find(e => e.sourceReference === "S2" && e.text === continuationFB.initial);
+      const additional = envelope.context.evidence.find(e => e.sourceReference === "S2" && e.text === continuationFB.additional);
+      assert(additional); assert(initial);
+      assert(!firstContext.coverage.providedEvidenceReferences.includes(additional.reference));
+      assert(envelope.context.coverage.providedEvidenceReferences.includes(additional.reference));
+      clock = mode === "expired-total-deadline" ? 30000 : 29999;
+      return analysisCandidate(envelope.context.contextId, {
+        observations: [
+          { id: "condition-fb", kind: "caveat", statement: "A etiqueta só será emitida depois da separação.", uncertainty: "low", justification: "Condição explícita no trecho adicional.", evidenceReferences: [additional.reference], quote: "A etiqueta só será emitida depois da separação" },
+          { id: "delivery-fb", kind: "idea", statement: mode === "guarantees-tomorrow" ? "A entrega amanhã está garantida." : "A entrega no dia seguinte ainda não pode ser confirmada.", uncertainty: "material", justification: "O trecho adicional discute a entrega futura.", evidenceReferences: [additional.reference] }
+        ],
+        relations: [{ id: "contrast-fb", kind: "complement", statement: "O material ainda não foi separado; a etiqueta será emitida só depois da separação.", uncertainty: "low", justification: "O segundo trecho complementa o estado atual com a condição futura.", leftEvidenceReferences: [initial.reference], rightEvidenceReferences: [additional.reference] }],
+        uncertainties: [{ statement: "A entrega no dia seguinte não está confirmada.", reason: "A separação ainda não ocorreu.", evidenceReferences: [initial.reference, additional.reference] }],
+        limitations: ["Fixture fake-only; avaliação editorial local não equivale a IA real."]
+      });
+    }
+  ]);
+  const operation = service(history, analyzer, { projectionService: projection, initialContextMaxBytes: 4096,
+    timeoutMs: 30000, monotonicClock: () => clock }).analyze({ sourceIds: ids, locale: "pt-BR",
+    brief: "Descreva ideias, relações e ressalvas somente a partir da evidência textual." });
+  if (mode === "expired-total-deadline") {
+    await assert.rejects(operation, code("SEMANTIC_ANALYSIS_TIMEOUT"));
+  } else {
+    const result = await operation;
+    assert.equal(result.kind, "analysis-candidate");
+    assert.equal(result.provenance.invocationCount, 2);
+    assert.deepEqual(gradeContinuationFB(result.candidate), { condition: true, presentFutureContrast: true, labelRole: true, deliveryUncertainty: mode !== "guarantees-tomorrow" });
+    assert.equal(result.contextId, firstContext.contextId);
+    assert.equal(result.candidate.contextId, result.contextId);
+    assert.equal(result.binding.projectId, history.current.project.id);
+    assert.deepEqual(result.binding.sourceTranscripts.map(t => t.sourceId), ids);
+    assert.deepEqual(result.binding.sourceTranscripts.map(t => t.transcriptDigest), history.current.sourceTranscripts.map(t => t.transcriptDigest));
+    assert.equal(result.binding.projectRevision, history.current.history.revision);
+    assert.equal(result.binding.projectSnapshotId, history.current.history.headSnapshotId);
+    assert.equal(result.binding.journalEntryCount, history.entries.length);
+    assert.equal(result.coverage.status, "partial"); // S1 not fully disclosed.
+    assert.deepEqual(result.coverage.providedEvidenceReferences, result.evidence.map(e => e.reference));
+    assert(Object.isFrozen(result)); assert(Object.isFrozen(result.candidate));
+    assert.throws(() => result.evidence.push({}), TypeError);
+    const disclosures = analyzer.calls.map(({ invocation }) => payloadDisclosure(invocation.payload));
+    assert.deepEqual(result.provenance.requestBytes, disclosures.map(d => d.bytes));
+    assert(disclosures[0].bytes <= 4096);
+    assert(disclosures.reduce((sum, d) => sum + d.bytes, 0) <= MAX_SEMANTIC_ANALYSIS_TOTAL_EVIDENCE_BYTES);
+    assert(result.provenance.responseBytes.every(bytes => bytes <= 65536));
+    if (mode === "faithful") console.log(JSON.stringify({ offlineDisclosure: "F-B", syntheticTexts: [directFA[0], continuationFB.initial, continuationFB.additional],
+      canonicalTranscriptDigests: result.binding.sourceTranscripts.map(t => t.transcriptDigest),
+      segmentation: "S1 mechanical word units / S2 two canonical units", payloads: disclosures,
+      sumRequestBytes: disclosures.reduce((sum, d) => sum + d.bytes, 0), responseBytes: result.provenance.responseBytes,
+      totalDeadlineMs: 30000, realProviderContact: false }));
+  }
+  assert.equal(analyzer.calls.length, 2); assert.equal(analyzer.handlers.length, 0);
+  assert.equal(MAX_SEMANTIC_ANALYSIS_INVOCATIONS, 2);
+  assert(analyzer.calls.every(c => !c.invocation.payload.includes("gradeContinuationFB") && !c.invocation.payload.includes("rubric")));
+  assert.deepEqual(history.toArchive(), before); assert.equal(history.canRedo, true);
+});
 
 test("runs the real PT-BR projection through a scripted fixture analyzer without mutating canonical state", async () => {
   const { history, ids } = fixture();
