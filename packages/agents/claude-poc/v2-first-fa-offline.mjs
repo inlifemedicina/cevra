@@ -5,6 +5,7 @@ import { SemanticEditorialAnalysisService } from '@cevra/application';
 import { inspectInertLedger, reserveInertOperations, writeInertReceipt } from './v2-inert-ledger.mjs';
 import { OFFLINE_POLICY } from './v2-offline-experiment-plan.mjs';
 import { LIMITS, childArguments, runClaudeProcess } from './transport.mjs';
+import { createHash } from 'node:crypto';
 
 const frozen = value => {
   for (const child of Object.values(value)) if (child && typeof child === 'object') frozen(child);
@@ -67,19 +68,31 @@ export async function runOfflineFirstFa({
     inspect: inspectInertLedger, reserve: reserveInertOperations, receipt: writeInertReceipt
   }
 }) {
+  return evaluateFirstFa({ root, experimentId, fixtureAuthorization, history, request, fakeSpawn,
+    signal, clock, admissionDeadline, ledgerAdapter });
+}
+
+// Shared orchestration for the old explicit fake seam and the host-owned
+// session composition. Execution dependencies are infrastructure, never model
+// request fields. No import-time provider or filesystem activity.
+export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization, history, request, fakeSpawn,
+  signal, clock, admissionDeadline, ledgerAdapter, execution }) {
   const localDeadline = clock.now() + FIRST_FA_POLICY.totalDeadlineMs;
   if (admissionDeadline !== undefined && !Number.isFinite(admissionDeadline)) fail('TIMEOUT');
   const deadline = admissionDeadline === undefined ? localDeadline : Math.min(localDeadline, admissionDeadline);
-  const ledgerIo = { inspect: ledgerAdapter.inspect, reserve: ledgerAdapter.reserve, receipt: ledgerAdapter.receipt };
+  const ledgerIo = { initialize: ledgerAdapter.initialize, inspect: ledgerAdapter.inspect, reserve: ledgerAdapter.reserve, receipt: ledgerAdapter.receipt };
   const controller = new AbortController();
-  let timedOut = false, reservation, primary, result, calls = 0, transportMetrics, adapterCall, transportFailure;
+  let timedOut = false, reservation, primary, result, calls = 0, processStarted = false, transportMetrics, adapterCall, transportFailure, responseDigest, requestBytes, contextId;
   const guard = () => {
     if (signal?.aborted) fail('CANCELLED');
     if (timedOut || clock.now() >= deadline) fail('TIMEOUT');
+    execution?.checkBinding();
   };
   guard();
-  validateFirstFaFixture(fixtureAuthorization); // Synchronous capture before I/O.
-  if (typeof fakeSpawn !== 'function') fail('FAKE_PROVIDER_REQUIRED');
+  if (!execution) {
+    validateFirstFaFixture(fixtureAuthorization); // Synchronous capture before I/O.
+    if (typeof fakeSpawn !== 'function') fail('FAKE_PROVIDER_REQUIRED');
+  }
   childArguments('offline-session', undefined, FIRST_FA_POLICY.expectedModel);
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort, { once: true });
@@ -92,22 +105,30 @@ export async function runOfflineFirstFa({
       if (calls !== 0) fail('FIRST_FA_INVOCATION_LIMIT');
       if (typeof invocation.payload !== 'string' || invocation.payloadBytes !== Buffer.byteLength(invocation.payload) ||
           invocation.payloadBytes > FIRST_FA_POLICY.applicationBytes.initialEnvelope) fail('INPUT_LIMIT');
+      requestBytes = invocation.payloadBytes;
+      contextId = JSON.parse(invocation.payload).context.contextId;
       // Admission/validation/preparation can fail before reservation: no fictitious
       // execution. Once reserved, any cancellation, crash or failure keeps the slot.
       [reservation] = await ledgerIo.reserve(root, { experimentId, operations: [{
-        operationId: 'first-fa-direct', operation: 'semantic-f-a-direct', purpose: 'offline-semantic-f-a'
+        operationId: 'first-fa-direct', operation: 'semantic-f-a-direct', purpose: execution ? 'semantic-f-a' : 'offline-semantic-f-a'
       }] });
       guard();
-      const transport = await runClaudeProcess({
+      const transportOptions = execution ? execution.transportOptions() : {
         binary: '/offline-fake-only', home: '/offline-fixture-home', cwd: '/offline-fixture-cwd',
+      };
+      const transport = await runClaudeProcess({ ...transportOptions,
         payload: invocation.payload, signal: context.signal,
         expectedModel: FIRST_FA_POLICY.expectedModel, timeoutMs: deadline - clock.now()
       }, (binary, argv, options) => {
         guard(); calls++; // Guard inside the callback immediately before contact.
-        return fakeSpawn(binary, argv, options);
+        const child = (execution?.spawn ?? fakeSpawn)(binary, argv, options);
+        processStarted = execution?.mode === 'CONTROLLED_FAKE' || Number.isSafeInteger(child?.pid) && child.pid > 0;
+        return child;
       }, clock);
       transportMetrics = transport.metrics;
       guard();
+      if (execution) { await execution.verify(); guard(); }
+      responseDigest = createHash('sha256').update(transport.result).digest('hex');
       return transport.result;
       })();
       // Attach an observer immediately: Application can finish its cancellation
@@ -118,7 +139,8 @@ export async function runOfflineFirstFa({
   };
   try {
     guard();
-    const ledger = await ledgerIo.inspect(root, experimentId);
+    if (execution) { await execution.prepare(guard); guard(); }
+    const ledger = await (ledgerIo.initialize ? ledgerIo.initialize(root, experimentId) : ledgerIo.inspect(root, experimentId));
     guard();
     if (ledger.unresolvedReservations.length) fail('LEDGER_UNRESOLVED');
     if (!ledger.remainingReservations) fail('LEDGER_RESERVATION_LIMIT');
@@ -144,7 +166,12 @@ export async function runOfflineFirstFa({
     if (adapterCall) await adapterCall.catch(error => { transportFailure = error; });
     clock.clearTimeout(timer);
     signal?.removeEventListener('abort', abort);
+    if (timedOut && !signal?.aborted && primary?.code === 'SEMANTIC_ANALYSIS_CANCELLED') {
+      primary = Object.assign(new Error('TIMEOUT'), { code: 'TIMEOUT', cause: primary });
+    }
     if (reservation) {
+      const m = transportMetrics ?? transportFailure?.metrics;
+      const wireUsage = transportMetrics?.usage?.[FIRST_FA_POLICY.expectedModel];
       const outcome = transportFailure?.childSettlement || transportFailure?.metrics?.settlementIncomplete ? 'crash-uncertain' :
         primary ? signal?.aborted || primary.code === 'CANCELLED' ? 'cancelled' : 'failure' :
         result?.kind === 'analysis-candidate' ? 'success' : 'failure';
@@ -152,18 +179,41 @@ export async function runOfflineFirstFa({
         await ledgerIo.receipt(root, { version: 1, experimentId,
           reservationNumber: reservation.number, operationId: reservation.operationId,
           purpose: reservation.purpose, reservationDigest: reservation.reservationDigest,
-          outcome, providerContact: false, live: false });
+          outcome, providerContact: execution?.mode === 'OWNED_CLI_ATTEMPT' ? 'UNKNOWN' : false,
+          live: execution?.mode === 'OWNED_CLI_ATTEMPT' && processStarted,
+          ...(execution ? { scopeDigest: execution.scopeDigest, bindingDigests: execution.bindingDigests,
+            transportObservation: { requestBytes: requestBytes ?? null, responseBytes: m?.responseBytes ?? null,
+              contextId: contextId ?? null, requestedModel: FIRST_FA_POLICY.expectedModel,
+              observedModel: transportMetrics?.model ?? null, requestedEffort: FIRST_FA_POLICY.requestedEffort,
+              stdoutBytes: m?.stdoutBytes ?? null, stderrBytes: m?.stderrBytes ?? null, events: m?.events ?? null,
+              latencyMs: m?.latencyMs ?? null, inputTokens: wireUsage?.inputTokens ?? null, outputTokens: wireUsage?.outputTokens ?? null,
+              errorCode: /^[A-Z][A-Z_]{0,79}$/.test(primary?.code ?? '') ? primary.code : null }, executionMode: execution.mode,
+            processStarted, childClosed: transportMetrics?.childClosed === true || transportFailure?.metrics?.childClosed === true,
+            resultKind: result?.kind ?? 'none', responseDigest: responseDigest ?? null } : {}) });
       } catch (error) {
         if (primary) primary.receiptCode = error.code;
         else primary = error;
       }
     }
+    if (execution) {
+      // Unknown child settlement keeps its temporary settings alive; no claim
+      // that a bounded rejection is a reaped process. Never contact again.
+      if (transportFailure?.childSettlement) {
+        transportFailure.pendingCleanup = transportFailure.childSettlement.then(() => execution.cleanup());
+        void transportFailure.pendingCleanup.catch(() => { transportFailure.cleanupCode = 'FIRST_FA_CLEANUP_FAILED'; });
+      } else {
+        try { await execution.cleanup(); } catch { if (primary) primary.cleanupCode = 'FIRST_FA_CLEANUP_FAILED'; else primary = Object.assign(new Error('FIRST_FA_CLEANUP_FAILED'), { code: 'FIRST_FA_CLEANUP_FAILED' }); }
+      }
+    }
   }
   if (primary && transportFailure?.code) primary.transportCode = transportFailure.code;
   if (primary) throw primary;
-  const accepted = Object.freeze({ state: result.kind === 'analysis-candidate' ? 'OFFLINE_FAKE_PASS' : 'OFFLINE_PARTIAL',
+  const accepted = Object.freeze({ state: execution?.mode === 'OWNED_CLI_ATTEMPT' ?
+    result.kind === 'analysis-candidate' ? 'FIRST_FA_VALIDATED' : 'FIRST_FA_PARTIAL' :
+    result.kind === 'analysis-candidate' ? 'OFFLINE_FAKE_PASS' : 'OFFLINE_PARTIAL',
     result, invocations: calls, reservation, transportMetrics,
-    liveAuthorized: false, providerContact: false, deadlineMs: FIRST_FA_POLICY.totalDeadlineMs });
+    liveAuthorized: execution?.mode === 'OWNED_CLI_ATTEMPT', providerContact: execution?.mode === 'OWNED_CLI_ATTEMPT' ? 'UNKNOWN' : false,
+    deadlineMs: FIRST_FA_POLICY.totalDeadlineMs });
   guard(); // Persistence is not extra inference time; no await before return.
   return accepted;
 }
