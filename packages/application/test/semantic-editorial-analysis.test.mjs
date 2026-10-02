@@ -246,6 +246,67 @@ function snapshot(history) {
   };
 }
 
+// Phase A F-A, synthetic/non-medical, fake port only. Rubric stays in this test,
+// never in the analyzer envelope; it is not an Application semantic validator.
+const directFA = [
+  "A oficina monta caixas sob encomenda. A entrega no dia seguinte só vale quando o material está disponível. O prazo não é uma promessa sem essa condição.",
+  "Com o material disponível, podemos entregar no dia seguinte. Além disso, cada caixa recebe uma etiqueta para acompanhamento. Não sabemos se haverá material para pedidos futuros."
+];
+function gradeDirectFA(candidate) {
+  return {
+    condition: candidate.observations.some(o => o.kind === "caveat" && /material disponível/.test(o.statement)),
+    complement: candidate.relations.some(r => r.kind === "complement" && /etiqueta.*acompanhamento/.test(r.statement)),
+    repetition: candidate.relations.some(r => r.kind === "possible-equivalence" && /condicionada/.test(r.statement)),
+    uncertainty: candidate.uncertainties.some(u => /material.*pedidos futuros/.test(u.statement))
+  };
+}
+for (const losesCondition of [false, true]) test(`F-A direct PT-BR real boundary, fake-only: ${losesCondition ? "structural PASS/editorial rubric FAIL" : "structural and fixture rubric PASS"}`, async () => {
+  const { history, ids } = fixture({ transcripts: idsForFA() });
+  history.commit({ type: "project.rename", name: "preserve redo F-A" });
+  history.undo();
+  const before = structuredClone(history.toArchive());
+  const projection = new CountingProjectionService(history);
+  const analyzer = new FixtureAnalyzer([envelope => {
+    const [a, b] = ["S1", "S2"].map(alias => envelope.context.evidence.find(e => e.sourceReference === alias));
+    assert.equal(a.text, directFA[0]); assert.equal(b.text, directFA[1]);
+    const candidate = {
+      observations: [
+        { id: "main", kind: "idea", statement: losesCondition ? "A oficina entrega no dia seguinte." : "A oficina entrega no dia seguinte quando há material disponível.", uncertainty: "low", justification: "Entrega descrita em ambas as fontes.", evidenceReferences: [a.reference, b.reference] },
+        ...(losesCondition ? [] : [{ id: "condition", kind: "caveat", statement: "A promessa depende de material disponível.", uncertainty: "low", justification: "A primeira fonte limita a promessa.", evidenceReferences: [a.reference], quote: "O prazo não é uma promessa sem essa condição." }])
+      ],
+      relations: [
+        { id: "repeat", kind: "possible-equivalence", statement: "As duas fontes repetem a entrega condicionada à disponibilidade.", uncertainty: "low", justification: "A formulação condicionada aparece nas duas fontes.", leftEvidenceReferences: [a.reference], rightEvidenceReferences: [b.reference] },
+        { id: "complement", kind: "complement", statement: "A etiqueta para acompanhamento complementa a explicação da entrega.", uncertainty: "low", justification: "A segunda fonte acrescenta acompanhamento, não uma promessa incondicional.", leftEvidenceReferences: [a.reference], rightEvidenceReferences: [b.reference] }
+      ],
+      uncertainties: [{ statement: "Não se sabe se haverá material para pedidos futuros.", reason: "A segunda fonte declara a incerteza.", evidenceReferences: [b.reference] }],
+      limitations: ["Fixture roteirizada somente textual; nenhuma análise de IA real."]
+    };
+    return analysisCandidate(envelope.context.contextId, candidate);
+  }]);
+  const result = await service(history, analyzer, { projectionService: projection }).analyze({ sourceIds: ids, locale: "pt-BR", brief: "Descreva ideias, relações e ressalvas somente a partir da evidência textual." });
+  assert.equal(result.kind, "analysis-candidate");
+  assert.equal(analyzer.calls.length, 1); assert.equal(projection.calls.length, 2);
+  assert.equal(result.contextId, analyzer.calls[0].envelope.context.contextId);
+  assert.equal(result.candidate.contextId, result.contextId);
+  assert.equal(result.coverage.status, "complete");
+  assert.deepEqual(result.coverage.requestedSourceReferences, ["S1", "S2"]);
+  assert.deepEqual(result.coverage.providedEvidenceReferences, result.evidence.map(e => e.reference));
+  assert.deepEqual(result.binding.sourceTranscripts.map(e => e.transcriptDigest), history.current.sourceTranscripts.map(e => e.transcriptDigest));
+  assert.equal(result.binding.projectRevision, history.current.history.revision);
+  assert.equal(result.binding.projectSnapshotId, history.current.history.headSnapshotId);
+  assert.equal(result.binding.journalEntryCount, history.entries.length);
+  assert.deepEqual(history.toArchive(), before); assert.equal(history.canRedo, true);
+  assert(Object.isFrozen(result)); assert(Object.isFrozen(result.candidate)); assert(Object.isFrozen(result.binding));
+  assert.throws(() => result.candidate.observations[0].statement = "mutate", TypeError);
+  assert.deepEqual(gradeDirectFA(result.candidate), { condition: !losesCondition, complement: true, repetition: true, uncertainty: true });
+  assert.equal(analyzer.calls[0].invocation.payload.includes("gradeDirectFA"), false);
+  assert.equal(analyzer.calls[0].invocation.payload.includes("rubric"), false);
+  assert.equal(result.provenance.invocationCount, 1);
+  assert(result.provenance.requestBytes[0] <= DEFAULT_SEMANTIC_ANALYSIS_INITIAL_BYTES);
+  assert(result.provenance.responseBytes[0] <= 64 * 1024);
+});
+function idsForFA() { return directFA.map((text, index) => segmentTranscript(index === 0 ? "source-a" : "source-b", text)); }
+
 test("runs the real PT-BR projection through a scripted fixture analyzer without mutating canonical state", async () => {
   const { history, ids } = fixture();
   history.commit({ type: "project.rename", name: "second" });

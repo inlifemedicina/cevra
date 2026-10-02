@@ -327,16 +327,27 @@ export class ClaudeStreamReader {
     if(e.num_turns!==1) fail('TURN_LIMIT');
     if(!this.generatedModel||!this.generatedText)fail('MODEL_UNPROVEN','NO_GENERATED_TEXT');
     if(typeof e.result!=='string'||Buffer.byteLength(e.result)>this.limits.response) fail('RESPONSE_LIMIT');
-    if(!e.modelUsage || !Object.keys(e.modelUsage).length) fail('MODEL_UNPROVEN');
-    for(const model of Object.keys(e.modelUsage)) this.checkModel(model);
-    this.result=e.result;
+    if(!e.modelUsage||typeof e.modelUsage!=='object'||Array.isArray(e.modelUsage)||
+      Object.getPrototypeOf(e.modelUsage)!==Object.prototype)fail('MODEL_UNPROVEN','MODEL_USAGE_SHAPE');
+    const models=Object.keys(e.modelUsage);
+    if(!models.length)fail('MODEL_UNPROVEN','MODEL_USAGE_EMPTY');
+    for(const model of models)this.checkModel(model);
+    if(models.length!==1)fail('MODEL_UNPROVEN','MODEL_USAGE_MULTIPLE');
     this.usage={};
     for(const [model,usage] of Object.entries(e.modelUsage)) {
+      if(!usage||typeof usage!=='object'||Array.isArray(usage)||Object.getPrototypeOf(usage)!==Object.prototype)
+        fail('PROTOCOL_EVENT_INVALID','MODEL_USAGE_VALUE');
+      for(const field of ['inputTokens','outputTokens','cacheReadInputTokens','cacheCreationInputTokens']) {
+        if((field==='inputTokens'||field==='outputTokens'||usage[field]!==undefined)&&
+          (!Number.isSafeInteger(usage[field])||usage[field]<0))fail('PROTOCOL_EVENT_INVALID','MODEL_USAGE_TOKENS');
+      }
       this.usage[model]={};
       for(const field of ['inputTokens','outputTokens','cacheReadInputTokens','cacheCreationInputTokens']) {
         if(Number.isSafeInteger(usage[field])&&usage[field]>=0) this.usage[model][field]=usage[field];
       }
     }
+    // Reported usage is observation, not a hard token budget, entitlement or billing proof.
+    this.result=e.result;
     if(Number.isFinite(e.total_cost_usd)&&e.total_cost_usd>=0) this.estimate=e.total_cost_usd;
   }
   checkModel(model,origin) {
@@ -353,53 +364,87 @@ export class ClaudeStreamReader {
 }
 
 // Internal process seam is only for deterministic tests; no caller/request callback.
-export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs=60000,sessionId=randomUUID(),limits=LIMITS,diagnosticInit,settingsPath}, spawnProcess=spawn) {
+const TERM_TO_KILL_MS=1000, FAILURE_SETTLEMENT_MS=2000, EXIT_DRAIN_MS=250;
+export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs=60000,sessionId=randomUUID(),limits=LIMITS,diagnosticInit,settingsPath}, spawnProcess=spawn,
+  clock={now:()=>performance.now(),setTimeout,clearTimeout}) {
   if(signal?.aborted) fail('CANCELLED');
-  const started=performance.now();
+  const started=clock.now();
   const reader=new ClaudeStreamReader(sessionId,limits,diagnosticInit);
   const child=spawnProcess(binary,childArguments(sessionId,settingsPath),{cwd,env:childEnvironment(home),shell:false,stdio:['pipe','pipe','pipe']});
   return await new Promise((resolve,reject)=>{
-    let error, killTimer, stderrBytes=0, tail=Buffer.alloc(0), closed=false;
+    let error, killTimer, failureTimer, drainTimer, stderrBytes=0, tail=Buffer.alloc(0), closed=false, exited=false, settled=false, signalFailures=0;
+    let completeChild;
+    const childSettlement=new Promise(resolve=>{completeChild=resolve;});
+    // Cleanup grace is not additional inference time or a renewed Application deadline.
+    // Only signal this spawned child. Exit is not close, nor proof of descendant reaping.
+    const cancelTimers=()=>{for(const timer of [operationTimer,killTimer,failureTimer,drainTimer])clock.clearTimeout(timer);};
+    const releaseListeners=()=>{
+      child.stdout.off('data',stdout);child.stderr.off('data',stderr);
+      // Terminal error guards remain on these owned emitters for late errors;
+      // they neither retain data nor schedule work after settlement.
+      child.off('exit',exit);child.off('close',close);
+    };
+    const signalChild=kind=>{try{if(!child.kill(kind))signalFailures++;}catch{signalFailures++;}};
     const stop=(code,reason)=>{
       error??=new ClaudePocError(code);
       if(reason && error.code===code) error.reason??=reason;
-      if(!closed && killTimer===undefined) {
-        child.kill('SIGTERM');
-        killTimer=setTimeout(()=>{if(!closed)child.kill('SIGKILL');},1000);
+      if(!settled && !closed && failureTimer===undefined) {
+        failureTimer=clock.setTimeout(()=>finish(),FAILURE_SETTLEMENT_MS);
+        if(!exited){
+          signalChild('SIGTERM');
+          if(!closed&&!exited)killTimer=clock.setTimeout(()=>{if(!closed&&!exited)signalChild('SIGKILL');},TERM_TO_KILL_MS);
+        }
+        if(exited&&!closed&&drainTimer===undefined)drainTimer=clock.setTimeout(()=>finish(),EXIT_DRAIN_MS);
       }
     };
     const abort=()=>stop('CANCELLED');
-    const timer=setTimeout(()=>stop('TIMEOUT'),timeoutMs);
-    signal?.addEventListener('abort',abort,{once:true});
-    if(signal?.aborted)abort();
-    child.stdout.on('data',chunk=>{if(error)return;try{
+    const operationTimer=clock.setTimeout(()=>stop('TIMEOUT'),timeoutMs);
+    const stdout=chunk=>{if(error||settled)return;try{
       reader.push(chunk);
       // Promote a wire result error immediately, before any late event or lifecycle signal.
       if(reader.primaryError){reader.markDecision(reader.primaryError.code);stop(reader.primaryError.code);}
-    }catch(e){reader.markDecision(e.code??'INVALID_EVENT',e.reason);stop(e.code??'INVALID_EVENT',e.reason);}});
-    child.stderr.on('data',chunk=>{
+    }catch(e){reader.markDecision(e.code??'INVALID_EVENT',e.reason);stop(e.code??'INVALID_EVENT',e.reason);}};
+    const stderr=chunk=>{
+      if(settled)return;
       stderrBytes+=chunk.length;
       tail=Buffer.concat([tail,chunk.subarray(-limits.stderrTail)]).subarray(-limits.stderrTail);
       if(stderrBytes>limits.stderr) stop('STDERR_LIMIT');
-    });
-    child.on('error',()=>stop('PROCESS_ERROR'));
-    child.stdin.on('error',()=>stop('STDIN_ERROR'));
-    child.on('close',(code,terminationSignal)=>{
-      closed=true; clearTimeout(timer);clearTimeout(killTimer);signal?.removeEventListener('abort',abort);
-      if(signal?.aborted) error??=new ClaudePocError('CANCELLED');
-      if(performance.now()-started>=timeoutMs)error??=new ClaudePocError('TIMEOUT');
-      error??=reader.primaryError;
+    };
+    const processError=()=>{if(!settled)stop('PROCESS_ERROR');};
+    const stdinError=()=>{if(!settled)stop('STDIN_ERROR');};
+    const exit=(code,terminationSignal)=>{
+      exited=true;completeChild();clock.clearTimeout(killTimer);
+      if(settled){releaseListeners();child.stdout.destroy?.();child.stderr.destroy?.();child.stdin.destroy?.();return;}
       if(code!==0||terminationSignal)error??=new ClaudePocError('PROCESS_EXIT');
-      // Never return before process close/reap. No transcript/stderr in errors.
+      if(error&&!closed&&drainTimer===undefined)drainTimer=clock.setTimeout(()=>finish(),EXIT_DRAIN_MS);
+    };
+    const close=(code,terminationSignal)=>{
+      closed=true;exited=true;completeChild();
+      if(settled){releaseListeners();return;}
+      if(code!==0||terminationSignal)error??=new ClaudePocError('PROCESS_EXIT');
+      finish();
+    };
+    const finish=()=>{
+      if(settled)return;
+      settled=true;cancelTimers();signal?.removeEventListener('abort',abort);
+      if(signal?.aborted) error??=new ClaudePocError('CANCELLED');
+      if(clock.now()-started>=timeoutMs)error??=new ClaudePocError('TIMEOUT');
+      error??=reader.primaryError;
+      if(!closed)error??=new ClaudePocError('MISSING_CLOSE');
+      // Success requires close. Failure may finish after bounded local grace, honestly
+      // distinguishing direct-child exit from missing close/inherited open pipes.
+      if(exited){releaseListeners();if(!closed){child.stdout.destroy?.();child.stderr.destroy?.();child.stdin.destroy?.();}}
       tail=Buffer.alloc(0);
       if(!error){try{reader.finish();}catch(e){error=e;}}
       if(error){error.metrics={stdoutBytes:reader.bytes,stderrBytes,events:reader.events,
         ...(error.reason?{initFailureReason:error.reason}:{}),
         lastEventSummary:reader.lastEventSummary,envelopeBytes:Buffer.byteLength(payload),
         systemPromptBytes:Buffer.byteLength(PLAYBOOK),stdinBytes:Buffer.byteLength(payload),
-        latencyMs:performance.now()-started,childClosed:true};
+        latencyMs:clock.now()-started,childClosed:closed,directChildExited:exited,
+        settlementIncomplete:!exited,signalFailures,descendantReaping:'NOT_PROVEN'};
+        if(!exited)Object.defineProperty(error,'childSettlement',{value:childSettlement});
         if(reader.protocolTrace.at(-1)?.decision===undefined)reader.appendTrace({phase:reader.terminal?'after-result':reader.initialized?'session':'before-init',
-          type:'process',typeKind:'string',subtype:'close',subtypeKind:'string',decision:error.code});
+          type:'process',typeKind:'string',subtype:closed?'close':exited?'exit-without-close':'settlement-incomplete',subtypeKind:'string',decision:error.code});
         Object.defineProperty(error,'privateDiagnostic',{value:Object.freeze([...reader.privateEvents])});
         Object.defineProperty(error,'protocolTrace',{value:Object.freeze(reader.protocolTrace.map(e=>Object.freeze({...e})))});
         reject(error);return;}
@@ -408,13 +453,19 @@ export async function runClaudeProcess({binary,home,cwd,payload,signal,timeoutMs
         const accepted={result,metrics:{model:reader.model,requestedAlias:'opus',requestedEffort:'medium',
           envelopeBytes:Buffer.byteLength(payload),systemPromptBytes:Buffer.byteLength(PLAYBOOK),stdinBytes:Buffer.byteLength(payload),
           responseBytes:Buffer.byteLength(result),stdoutBytes:reader.bytes,stderrBytes,events:reader.events,
-          latencyMs:performance.now()-started,usage:reader.usage,estimatedUsd:reader.estimate,childClosed:true}};
+          latencyMs:clock.now()-started,usage:reader.usage,estimatedUsd:reader.estimate,childClosed:true}};
         Object.defineProperty(accepted,'privateDiagnostic',{value:Object.freeze([...reader.privateEvents])});
         Object.defineProperty(accepted,'protocolTrace',{value:Object.freeze(reader.protocolTrace.map(e=>Object.freeze({...e})))});
         resolve(accepted);
       }catch(e){reject(e);}
-    });
-    if(!error)child.stdin.end(payload);else child.stdin.destroy();
+    };
+    child.stdout.on('data',stdout);child.stderr.on('data',stderr);
+    child.stdout.on('error',processError);child.stderr.on('error',processError);
+    child.on('error',processError);child.stdin.on('error',stdinError);
+    child.on('exit',exit);child.on('close',close);
+    signal?.addEventListener('abort',abort,{once:true});
+    if(signal?.aborted)abort();
+    try{if(!error)child.stdin.end(payload);else child.stdin.destroy();}catch{stop('STDIN_ERROR');}
   });
 }
 
@@ -427,7 +478,7 @@ export class ClaudePocAnalyzer {
   async analyze(invocation,context) {
     if(this.active)fail('BUSY');
     this.active=true;
-    let cwd,sessionSettings;
+    let cwd,sessionSettings,childSettlement;
     try {
       if(context.signal?.aborted)fail('CANCELLED');
       if(invocation.payloadBytes!==Buffer.byteLength(invocation.payload)||invocation.payloadBytes>256*1024)fail('INPUT_LIMIT');
@@ -441,14 +492,24 @@ export class ClaudePocAnalyzer {
       if(context.signal?.aborted)fail('CANCELLED');
       return result.result;
     } catch(error) {
+      childSettlement=error.childSettlement;
       this.receipts.push(Object.freeze({error:error.code??'UNCLASSIFIED',...error.metrics}));
       throw error;
     } finally {
-      try{if(sessionSettings)await sessionSettings.cleanup();}
-      finally{
-        if(cwd) {try{await rmdir(cwd);}catch{/* Preserve unexpected client files; no recursive deletion. */}}
-        this.active=false;
+      const cleanup=async()=>{
+        try{if(sessionSettings)await sessionSettings.cleanup();}
+        finally{
+          if(cwd) {try{await rmdir(cwd);}catch{/* Preserve unexpected client files; no recursive deletion. */}}
+          this.active=false;
+        }
+      };
+      // A finite rejection is not proof that an unresponsive child has ended. Keep
+      // this adapter busy and its settings alive until actual exit/close is observed.
+      if(childSettlement){
+        this.pendingCleanup=childSettlement.then(cleanup);
+        void this.pendingCleanup.catch(()=>{this.active=true;});
       }
+      else await cleanup();
     }
   }
 }

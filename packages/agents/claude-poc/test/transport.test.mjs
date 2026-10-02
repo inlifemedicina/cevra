@@ -12,6 +12,177 @@ import {pluginDisableSettings,loadPluginDisableSettings,createSessionPluginSetti
 import {classifyAuthExplanation,compareAuthStatus} from '../auth-diagnostic.mjs';
 const fake=fileURLToPath(new URL('./fake-cli.mjs',import.meta.url));
 const payload=JSON.stringify({context:{contextId:'test',evidence:[{reference:'E1',text:'Café'}]}});
+
+// Owned, in-memory children and a monotonic clock: no CLI/provider is contacted.
+function controlledClock(){
+ let time=0,sequence=0;const timers=new Map();
+ return {now:()=>time,setTimeout:(fn,delay)=>{const id=++sequence;timers.set(id,{fn,at:time+delay});return id;},
+  clearTimeout:id=>timers.delete(id),pending:()=>timers.size,
+  advance(ms){const end=time+ms;for(;;){const next=[...timers.entries()].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at||a[0]-b[0])[0];
+   if(!next)break;time=next[1].at;timers.delete(next[0]);next[1].fn();}time=end;}};
+}
+function controlledChild(onKill=()=>{}){
+ const child=new EventEmitter();child.signals=[];child.writes=[];
+ for(const name of ['stdin','stdout','stderr']){child[name]=new EventEmitter();child[name].destroy=()=>{child[name].destroyed=true;};}
+ child.stdin.end=data=>child.writes.push(data);
+ child.kill=signal=>{child.signals.push(signal);onKill(signal,child);return true;};
+ return child;
+}
+function wireEvents(session='controlled'){
+ const model='claude-opus-fixture';
+ return [
+  {type:'system',subtype:'init',session_id:session,model,tools:[],mcp_servers:[],plugins:[],skills:[],permissionMode:'default'},
+  {type:'assistant',session_id:session,message:{id:'message-fixture',model,content:[{type:'text',text:'Synthetic only'}],stop_reason:'end_turn'}},
+  {type:'result',subtype:'success',session_id:session,is_error:false,stop_reason:'end_turn',num_turns:1,
+   permission_denials:[],result:'synthetic final',modelUsage:{[model]:{inputTokens:1,outputTokens:2}}}
+ ];
+}
+const emitWire=(child,events)=>child.stdout.emit('data',Buffer.from(events.map(e=>JSON.stringify(e)).join('\n')+'\n'));
+function controlledRun(child,clock,extra={}){
+ return runClaudeProcess({binary:'/fake-owned-child',home:'/fixture-home',cwd:'/fake-owned-cwd',payload,
+  sessionId:'controlled',timeoutMs:100,...extra},()=>child,clock);
+}
+for(const [exitLabel,exitCode,exitSignal] of [['nonzero',1,null],['signal',null,'SIGTERM']]){
+ for(const order of ['exit-before-cancel','exit-before-timeout','cancel-before-exit','timeout-before-exit','provider-before-exit','wire-before-exit'])
+  test(`B1 ${exitLabel}: ${order} preserves the first observed cause without close`,async()=>{
+   const clock=controlledClock(),child=controlledChild(),controller=new AbortController();
+   const expected=order.startsWith('exit-before')?'PROCESS_EXIT':order==='cancel-before-exit'?'CANCELLED':
+    order==='timeout-before-exit'?'TIMEOUT':order==='provider-before-exit'?'PROVIDER_AUTH_ERROR':'CORRELATION';
+   const promise=controlledRun(child,clock,{signal:controller.signal});
+   const rejected=assert.rejects(promise,error=>{
+    assert.equal(error.code,expected);
+    assert.equal(error.metrics.childClosed,false);assert.equal(error.metrics.directChildExited,true);
+    assert.equal(error.metrics.settlementIncomplete,false);assert.equal(error.metrics.descendantReaping,'NOT_PROVEN');
+    return true;
+   });
+   const exit=()=>child.emit('exit',exitCode,exitSignal);
+   if(order==='exit-before-cancel'){exit();controller.abort();}
+   else if(order==='exit-before-timeout'){exit();clock.advance(100);}
+   else if(order==='cancel-before-exit'){controller.abort();exit();}
+   else if(order==='timeout-before-exit'){clock.advance(100);exit();}
+   else {
+    const events=wireEvents();
+    if(order==='provider-before-exit')events[1].error='authentication_failed';else events[1].session_id='foreign-session';
+    emitWire(child,events.slice(0,2));exit();
+   }
+   const signalsAtExit=[...child.signals];
+   emitWire(child,wireEvents());clock.advance(2000);await rejected;
+   assert.deepEqual(child.signals,signalsAtExit); // No TERM/KILL after observed exit.
+   assert.deepEqual(child.signals,order.startsWith('exit-before')?[]:['SIGTERM']);
+   assert.equal(clock.pending(),0);assert(child.stdout.destroyed);
+   child.emit('close',exitCode,exitSignal);child.emit('error',new Error('late owned error'));
+   assert.equal(child.stdout.listenerCount('data'),0);
+  });
+}
+test('B1 clean exit with a complete-looking result but no close remains non-success',async()=>{
+ const clock=controlledClock(),child=controlledChild();let accepted=false;
+ const promise=controlledRun(child,clock).then(value=>{accepted=true;return value;});
+ const rejected=assert.rejects(promise,error=>error.code==='TIMEOUT'&&!error.metrics.childClosed&&error.metrics.directChildExited);
+ emitWire(child,wireEvents());child.emit('exit',0,null);
+ await Promise.resolve();assert.equal(accepted,false);
+ clock.advance(350);await rejected;
+ assert.equal(accepted,false);assert.deepEqual(child.signals,[]);assert.equal(clock.pending(),0);
+ child.emit('close',0,null);
+});
+test('L1 cancellation settles after direct exit despite inherited open streams; late result is discarded',async()=>{
+ const clock=controlledClock(),child=controlledChild(),controller=new AbortController();
+ const promise=controlledRun(child,clock,{signal:controller.signal});
+ const rejected=assert.rejects(promise,e=>e.code==='CANCELLED'&&!e.metrics.childClosed&&e.metrics.directChildExited&&e.metrics.descendantReaping==='NOT_PROVEN');
+ emitWire(child,wireEvents().slice(0,1));controller.abort();
+ assert.deepEqual(child.signals,['SIGTERM']);
+ child.emit('exit',0,null);emitWire(child,wireEvents().slice(1));clock.advance(250);
+ await rejected;assert.equal(clock.pending(),0);assert(child.stdout.destroyed);
+ child.emit('close',0,null);child.emit('error',new Error('late owned error'));assert.deepEqual(child.signals,['SIGTERM']);
+ assert.equal(child.stdout.listenerCount('data'),0);
+});
+test('L2 timeout cannot accept a validated result without close; L4 TERM escalates only the owned child',async()=>{
+ const clock=controlledClock(),foreign=controlledChild(),child=controlledChild((signal,c)=>{if(signal==='SIGKILL')c.emit('exit',null,signal);});
+ const promise=controlledRun(child,clock);
+ const rejected=assert.rejects(promise,e=>e.code==='TIMEOUT'&&!e.metrics.childClosed&&e.metrics.directChildExited);
+ emitWire(child,wireEvents());clock.advance(100);assert.deepEqual(child.signals,['SIGTERM']);
+ clock.advance(1000);assert.deepEqual(child.signals,['SIGTERM','SIGKILL']);clock.advance(250);
+ await rejected;assert.equal(clock.pending(),0);assert.deepEqual(foreign.signals,[]);
+ child.emit('close',0,null);emitWire(child,wireEvents());
+});
+for(const primary of ['PROVIDER_AUTH_ERROR','CORRELATION'])test(`L3 ${primary} survives abort, process error, late result and close`,async()=>{
+ const clock=controlledClock(),child=controlledChild(),controller=new AbortController();
+ const promise=controlledRun(child,clock,{signal:controller.signal});
+ const rejected=assert.rejects(promise,e=>e.code===primary&&e.metrics.childClosed);
+ const events=wireEvents();
+ if(primary==='PROVIDER_AUTH_ERROR')events[1].error='authentication_failed';else events[1].session_id='foreign-session';
+ emitWire(child,events.slice(0,2));controller.abort();child.emit('error',new Error('late'));
+ emitWire(child,wireEvents().slice(2));child.emit('close',1,'SIGTERM');await rejected;
+ assert.deepEqual(child.signals,['SIGTERM']);assert.equal(clock.pending(),0);
+});
+test('L5 valid textual generation still waits for proper close before success',async()=>{
+ const clock=controlledClock(),child=controlledChild();let completed=false;
+ const promise=controlledRun(child,clock).then(value=>{completed=true;return value;});
+ emitWire(child,wireEvents());child.emit('exit',0,null);await Promise.resolve();assert.equal(completed,false);
+ child.emit('close',0,null);const value=await promise;
+ assert.equal(value.result,'synthetic final');assert.equal(value.metrics.childClosed,true);
+ assert.deepEqual(child.signals,[]);assert.equal(clock.pending(),0);
+});
+test('finite incomplete settlement reports no exit proof, preserves cause and keeps adapter/settings busy until exit',async()=>{
+ const dir=await mkdtemp('/tmp/cevra-incomplete-settlement-test-');const receipt=`${dir}/plugins.json`;
+ const clock=controlledClock(),child=controlledChild(),controller=new AbortController();let options,entered,calls=0;
+ const ready=new Promise(resolve=>{entered=resolve;});
+ const adapter=new ClaudePocAnalyzer({binary:'/fixture-only',home:'/fixture-home',pluginOverrideReceipt:receipt},
+  {verifyBinary:async()=>{},runProcess:opts=>{
+   calls++;
+   if(calls>1){const clean=controlledChild();clean.stdin.end=()=>{emitWire(clean,wireEvents());clean.emit('close',0,null);};
+    return runClaudeProcess({...opts,sessionId:'controlled',timeoutMs:100},()=>clean,clock);}
+   options=opts;const running=runClaudeProcess({...opts,timeoutMs:100},()=>child,clock);entered();return running;
+  }});
+ try{
+  await writeFile(receipt,JSON.stringify(syntheticPlugins),{mode:0o600,flag:'wx'});
+  const promise=adapter.analyze({payload,payloadBytes:Buffer.byteLength(payload)},{signal:controller.signal});
+  const rejected=assert.rejects(promise,e=>e.code==='CANCELLED'&&e.metrics.settlementIncomplete&&!e.metrics.directChildExited);
+  await ready;controller.abort();clock.advance(2000);await rejected;
+  assert.deepEqual(child.signals,['SIGTERM','SIGKILL']);assert.equal(clock.pending(),0);
+  assert.equal(adapter.active,true);await lstat(options.settingsPath);
+  await assert.rejects(adapter.analyze({payload,payloadBytes:Buffer.byteLength(payload)},{}),e=>e.code==='BUSY');
+  child.emit('error',new Error('late'));child.emit('exit',null,'SIGKILL');
+  await adapter.pendingCleanup;
+  assert.equal(adapter.active,false);
+  assert.equal(calls,1); // No replay or automatic replacement process after failure.
+  await assert.rejects(lstat(options.settingsPath),e=>e.code==='ENOENT');
+  assert.equal(child.stdout.listenerCount('data'),0);
+  assert.equal(await adapter.analyze({payload,payloadBytes:Buffer.byteLength(payload)},{}),'synthetic final');
+  assert.equal(calls,2);assert.equal(clock.pending(),0);
+ }finally{child.emit('close',null,'SIGKILL');await unlink(receipt);await rmdir(dir);}
+});
+test('kill failure is observable without replacing the primary wire error',async()=>{
+ const clock=controlledClock(),child=controlledChild();child.kill=()=>{throw new Error('private cleanup failure');};
+ const promise=controlledRun(child,clock);
+ const rejected=assert.rejects(promise,e=>e.code==='PROVIDER_AUTH_ERROR'&&e.metrics.signalFailures===2&&e.metrics.settlementIncomplete&&!JSON.stringify(e).includes('private cleanup failure'));
+ const events=wireEvents();events[1].error='authentication_failed';emitWire(child,events.slice(0,2));clock.advance(2000);
+ await rejected;child.emit('close',1,null);assert.equal(clock.pending(),0);
+});
+function readSequence(mutate=()=>{}){
+ const events=wireEvents();mutate(events);const reader=new ClaudeStreamReader('controlled');
+ reader.push(Buffer.from(events.map(e=>JSON.stringify(e)).join('\n')+'\n'));reader.finish();return reader;
+}
+test('I1 exact authorized init/assistant/usage identity is coherent, not an alias or fallback',()=>{
+ assert.equal(readSequence().model,'claude-opus-fixture');
+ for(const model of ['opus','claude-sonnet-fixture',null])assert.throws(()=>readSequence(e=>{e[1].message.model=model;}),e=>e.code==='MODEL_UNAVAILABLE');
+ assert.throws(()=>readSequence(e=>{e[1].message.model='claude-opus-other-fixture';}),e=>e.code==='MODEL_DRIFT');
+ assert.throws(()=>readSequence(e=>{e[2].modelUsage={'claude-opus-other-fixture':{inputTokens:1,outputTokens:2}};}),e=>e.code==='MODEL_DRIFT');
+});
+test('I2 num_turns is exactly the integer 1; missing/coerced/multiple turns fail closed',()=>{
+ for(const value of [undefined,null,'1',0,2,1.5,[1]])assert.throws(()=>readSequence(e=>{e[2].num_turns=value;}),e=>e.code==='TURN_LIMIT');
+});
+test('I3/I5 modelUsage requires one authorized model with valid token counters; incompatible wire fails',()=>{
+ for(const value of [undefined,null,[],['claude-opus-fixture'],'model',{}])assert.throws(()=>readSequence(e=>{e[2].modelUsage=value;}),e=>e.code==='MODEL_UNPROVEN');
+ for(const value of [null,[],1,'usage',{}, {inputTokens:'1',outputTokens:2},{inputTokens:1,outputTokens:-1},
+  {inputTokens:1,outputTokens:0.5},{inputTokens:1,outputTokens:2,cacheReadInputTokens:null}])
+  assert.throws(()=>readSequence(e=>{e[2].modelUsage={'claude-opus-fixture':value};}),e=>e.code==='PROTOCOL_EVENT_INVALID');
+ assert.throws(()=>readSequence(e=>{e[2].modelUsage['claude-opus-secondary']={inputTokens:1,outputTokens:2};}),e=>e.code==='MODEL_DRIFT');
+});
+test('I4 usage is observation only: proposed 32k/4k limits are not implemented or billing/entitlement proof',()=>{
+ const reader=readSequence(e=>{e[2].modelUsage['claude-opus-fixture']={inputTokens:32001,outputTokens:4001,cacheReadInputTokens:0,cacheCreationInputTokens:0};});
+ assert.equal(reader.usage['claude-opus-fixture'].inputTokens,32001);
+ assert.equal(reader.usage['claude-opus-fixture'].outputTokens,4001);
+});
 const runner=mode=>(bin,args,opts)=>spawn(process.execPath,[fake,mode,...args],opts);
 async function run(mode,options={}){
  const cwd=await mkdtemp('/tmp/cevra-transport-test-');
