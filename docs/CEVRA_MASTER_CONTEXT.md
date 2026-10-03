@@ -2808,8 +2808,11 @@ checkpoint cannot be reconstructed. This supersedes any earlier pending-format
 approval checkpoint; approval is already granted.
 
 The separately verified `dd7f1e4` native visual remains frozen with window-only
-numbering; the older instance and original pair were preserved. Human acceptance
-and final typography/colors/logo/icons are pending. Details and test evidence
+numbering; the older instance and original pair were preserved. The owner's
+direct “Feito. Td ok.” accepts card separation and Video 1/2 source association
+in that demo; physical `3e9f82e7` persistence and broader functional/narrative
+acceptance are not claimed. Group later human checks into a functional round;
+final typography/colors/logo/icons remain pending. Details and test evidence
 remain in [the offline review record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#subsequent-visual-and-stable-numbering-approval--2026-10-03).
 PR #76 stays documentation-only; optional profile §4.3 remains PLANNING APPROVED /
 NOT IMPLEMENTED. Compatible Director presentation identity adds no provider or

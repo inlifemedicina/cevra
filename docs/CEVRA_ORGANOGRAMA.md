@@ -500,6 +500,9 @@ and V1/V2 read compatibility implement the approved bounded evolution. Earlier
 format-approval gates are superseded; lost/never-persisted labels remain
 unrecoverable. Details: [offline review record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#subsequent-visual-and-stable-numbering-approval--2026-10-03).
 PR #76 remains documentation-only; profile planning has no implementation.
-Human visual/narrative acceptance and final branding stay pending; notes remain
-in memory. Director impact is compatible presentation identity; no progress
+The owner accepted `dd7f1e4` card clarity and Video 1/2 association; see the
+[bounded acceptance record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#limited-owner-visual-acceptance--2026-10-03).
+Physical durable save/reopen, broader functional/narrative acceptance and final
+branding are not claimed. Group remaining human checks into a functional round;
+notes remain in memory. Director impact is compatible presentation identity; no progress
 increase, new provider allocation or broader strategy/take/cut authority.

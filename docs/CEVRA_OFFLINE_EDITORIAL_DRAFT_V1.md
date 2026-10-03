@@ -152,8 +152,9 @@ Local verification has exercised the actual pair through the real host factory: 
 owner-approved clearer editorial cards/shared source labels and the subsequent
 bounded durable-numbering evolution. The reviewed visual demo at `dd7f1e4`
 remains a separate native instance with window-only numbers; the older instance
-and original pair were preserved. Final visual identity and human acceptance
-remain pending.
+and original pair were preserved. The owner accepted its bounded visual clarity
+as recorded below. Final visual identity and broader functional/narrative
+acceptance remain pending.
 
 The follow-up at `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8` is IN DEVELOPMENT /
 NOT MERGED: existing ProjectHistory owns source-ID/number reservations and one
@@ -171,3 +172,22 @@ gate. This documentation track adds no feature code or profile implementation.
 Editorial review notes remain in memory and no real owner project is migrated
 by these tests. Director impact is compatible presentation identity; progress
 stays 55%, broader agent gates remain open and F-A02 stays exhausted 1/1.
+
+### Limited owner visual acceptance — 2026-10-03
+
+**APP / BUILD REAL, macOS arm64, PT-BR; visual clarity PASS.** The owner selected
+the reviewed native demo at `dd7f1e43fd125bfddabebdd9363f6bf06874ff96` and was
+asked to assess whether the bordered/spaced blocks were clear and whether each
+excerpt was easily associated with Video 1/2. The direct response was
+“Feito. Td ok.” This closes that subjective presentation check without another
+micro-test. The original pair and temporary review sessions are preserved.
+
+This acceptance covers card separation and numbered-source association only.
+It is not a physical save/reopen test of `3e9f82e7`, proof of all review controls,
+narrative/strategy acceptance, final branding or merge authorization. The demo's
+numbers remain window-only; durable numbering has its independent automated
+evidence in PR #78. Existing X-T1/T2/T5, I8-T3/T6 and I17-T9 remain the appropriate
+save/reopen variants for a later combined functional round, not newly completed
+owner cases. Group future human checks into that round instead of repeatedly
+requesting isolated visual confirmations; technical fixtures/checks remain
+autonomous and are distinguished from app/owner acceptance.
