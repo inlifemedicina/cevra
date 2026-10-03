@@ -31,7 +31,7 @@ CEVRA VIDS
 │   │   └─ real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED / WHOLE GATE OPEN]
 │   │       ├─ INT-CLOUD-01 official ChatGPT eligibility/capability review [RESEARCH / SCHEDULED]
 │   │       └─ INT-CLOUD-02 authorized official transport PoC [CONDITIONAL / NOT IMPLEMENTED]
-│   ├─ offline evidence-linked editorial draft [APPLICATION #75 / OFFLINE REVIEW #77 INTEGRATED; DESIGNATED ADMISSION IN DEVELOPMENT]
+│   ├─ offline evidence-linked editorial draft [APPLICATION #75 / OFFLINE REVIEW #77 / DESIGNATED ADMISSION + SOURCE NUMBERING #78 INTEGRATED]
 │   ├─ broader strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   ├─ take selection [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   └─ cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
@@ -66,6 +66,7 @@ CEVRA VIDS
 │   └─ B-roll / overlays / camera / music / SFX
 │
 ├─ 8. CEVRA DIRECTOR / WORKFLOW PRESETS / AI ORCHESTRATION
+│   ├─ optional editorial profile [PLANNING APPROVED / IMPLEMENTATION GATED; after current-flow stabilization]
 │   ├─ AI decisions → validated typed plan
 │   ├─ direct user intervention at any time
 │   └─ one Project IR / one timeline
@@ -350,18 +351,163 @@ authorizes inference, spending, commercial upload or deployment.
 
 This supersedes the earlier unmerged offline-draft checkpoint: Application #75 and offline host/backend/UI #77 are integrated. PR #77 merged at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI `37127986470` SUCCESS 5/5 and Exact Runtime `37127986468` SUCCESS 1/1, attempt 1.
 
-The owner subsequently approved only the designated existing F-A02 result/history admission into a temporary native review session; this bounded addition is IN DEVELOPMENT / NOT MERGED. The ordinary saved project is preserved, PARTIAL/uncertainty remain visible, and canonical editing/provider/timing/cut/export authority is not added. Details: [offline admission](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Subjective acceptance remains pending. Director impact: compatible review extension; progress 55%, F-A02 exhausted 1/1. PR #76 remains a separate Draft.
+The owner subsequently approved only the designated existing F-A02 result/history admission into a temporary native review session; this bounded addition and the approved stable-numbering follow-up are IMPLEMENTED / MERGED through PR #78 at `182081e6a9e6c1b7849a099ebd3f6bba13663415`, with post-merge CI `37151631882` SUCCESS 5/5, attempt 1. The ordinary saved project is preserved, PARTIAL/uncertainty remain visible, and canonical editing/provider/timing/cut/export authority is not added. Details: [offline admission](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Subjective acceptance remains pending. Director impact: compatible review extension; progress 55%, F-A02 exhausted 1/1. PR #76 remains a separate Draft.
 
-PR #78 also contains the owner-approved shared source labels and editorial card
-clarity. The reviewed `dd7f1e4` visual has a separate verified native window, with
-the older instance preserved; its numbers remain window-only. The approved
-durable follow-up is IN DEVELOPMENT / NOT MERGED: existing ProjectHistory owns
-source-ID/number reservations and one monotonic project counter outside undo;
-existing ProjectStore writes V3 and reads V1/V2. No new database or audiovisual
-IR shape is introduced. Explicit save/reopen retains retired/abandoned-branch
-reservations; legacy initialization cannot recover labels that were never saved.
-Details and recovery limits: [ADR 0031](adr/0031-stable-source-numbering-v1.md).
-Reuse X-T1/T2/T5, I8-T3/T6 and I17-T9 rather than duplicating acceptance cases.
-The draft/notes remain in memory; human acceptance and final visual identity are
-pending. Director impact is compatible presentation identity; progress and
-provider gates are unchanged. PR #76 remains the separate documentation track.
+<a id="vids-roadmap-2026-10-03"></a>
+
+## Propostas de simplificação e cronograma por resultados — 2026-10-03
+
+**Direção geral endossada em 2026-10-03; refinamentos específicos: PROPOSTA /
+NÃO IMPLEMENTADO.** O Product Owner endossou organizar o cronograma por
+resultados e confirmou manter as legendas como já planejadas (seis estilos +
+Nenhum). O endosso não aprova implementar todas as ideias, trocar modelo/engine,
+usar API, gastar ou executar novos testes reais. A organização respeita os gates
+existentes, sem datas de entrega, mudança de prioridades ou aumento do
+progresso canônico de 55%.
+
+### Decisões preservadas e refinamentos propostos
+
+Independência, local-first, edição Normal/More Controls/Advanced sobre o mesmo
+projeto e timeline, fidelidade ao material, fontes originais, controle manual e
+undo/recovery continuam canônicos. Integrações são opcionais. O alvo comercial
+é um vídeo fiel e publicável com menos retrabalho; isso é **hipótese a validar
+com usuários**, não diferenciação comprovada.
+
+As 16 ideias discutidas se agrupam majoritariamente nos módulos atuais; não
+criam 16 módulos nem um novo catálogo de aceitação:
+
+| Grupo de propostas | Encaixe no organograma existente | Limite para manter simples |
+|---|---|---|
+| Edição por intenção; preservar ideia/frase | 3 Editorial + 4 execução + 8 Director | Constraint do mesmo plano revisável, ligada às fontes; preservar condições/ressalvas. Não criar plano ou editor paralelo. |
+| Revisão antes/depois localizada | 4 QA + 5 UX + 6 preview/timeline | Mostrar mudanças e justificativas no trecho afetado; plano/Change Set e undo exigem integração real. |
+| Legendas e áudio bons por padrão | 2 runtime + 7 apresentação/composição | Reusar transcrição/alinhamento válidos; cumprir D14–D18, timing, legibilidade e benchmark. |
+| Três atalhos de receitas versionadas | 5 UX + 8 Workflow Presets | Atalhos ajustáveis de ADR 0010, com capacidades verificadas e sem scripts livres; não substituem o catálogo visual. |
+| Referência por aspectos; montagem sem fala e split-screen | 3 planejamento + 4 comandos + 5 UX + 7 composição | Ritmo/layout/transições/cor/música escolhidos pelo usuário, evidência adequada e execução determinística; [issue #71](https://github.com/inlifemedicina/cevra/issues/71)/[PR #73](https://github.com/inlifemedicina/cevra/pull/73) continuam o registro específico. |
+| Perfil editorial opcional | 3 contexto editorial + 8 brief/constraints do Director | Base opcional sem login e ajustes por projeto; contexto não é evidência. Definição e gates em [master §4.3](CEVRA_MASTER_CONTEXT.md#43-optional-editorial-profile--planning-approved-not-implemented). |
+| Export confiável/variantes; reprocessar só dependências afetadas | 4 compiler/QA + 6 preview + 10 release | Mesmas fontes e plano verificável; medir invalidação/custo, não prometer cache ou export integrados ainda ausentes. |
+
+[D14–D18](CEVRA_VISUAL_DECISIONS.md) preservam **Karaokê, Empilhado, Disperso,
+Simples, Serifada, Clássica e Nenhum**. Poucos atalhos não reduzem os seis estilos
++ Nenhum; D18 continua pós-V1. Preset visual, receita de workflow e perfil de
+exportação mantêm responsabilidades distintas. Reusar os IDs de
+[aceitação existentes](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md), sem duplicá-los.
+
+### Cronograma por resultados e critérios de avanço
+
+| Ordem proposta | Resultado verificável | Dependência/gate preservado |
+|---|---|---|
+| 1 | #74/#75 e consumidor offline #77 integrados; estabilizar a revisão temporária designada e sua clareza visual já integradas no [PR #78](https://github.com/inlifemedicina/cevra/pull/78). | F-A02 PT-BR é limitado; clareza dos cards e associação Vídeo 1/2 aceitas em dd7f1e4. Salvar/navegar/descartar e usabilidade funcional ampla não foram homologados; agrupar a próxima rodada humana. Análise completa, I1-T1/plano/Change Set e cortes não estão homologados. |
+| 1a — após estabilizar 1; no próximo incremento de brief/constraints | Planejar perfil editorial opcional: definir campos, precedência base→projeto, contexto mínimo transparente e critérios de revisão; implementar somente a fatia depois aprovada. | UI/schema/persistência/consentimento e compatibilidade aprovados antes de implementar; não bloqueia tarefas independentes nem antecipa chamada real. Ver seção específica abaixo. |
+| 2 | Estratégia/takes e plano temporal verificável → comandos tipados/Cut Compiler/QA → preview/timeline/revisão/export do primeiro fluxo vertical. | Autorizar uma fatia concreta futura; não inventar timing. UX Surface Contract precede considerar preview/timeline completos; respeitar pré-requisitos da matriz Media Runtime e aceitação. |
+| 3 | Legendas, áudio e composição conforme decisões e benchmark. | Cue compiler, placement/QA, fontes e preview/export coerentes; seleção de Composition Engine continua pendente do benchmark, sem antecipar sua escolha. |
+| 4 | Montagens sem fala e referência por aspectos já planejadas em #71/#73. | Somente após primitivas temporais/layout, evidência e QA necessários; transcrição não é pré-condição universal para mídia muda. Referência não concede acesso privado/DRM, cópia, licença ou upload. |
+| 5 | Integrações opcionais e fechamento de release/licenças. | INT-CLOUD-01–05, enablement Windows, plataforma/distribuição e auditorias retêm seus gates; nenhuma nuvem obrigatória. |
+
+A tabela agrupa resultados; não substitui a ordem detalhada de
+[master §10.2](CEVRA_MASTER_CONTEXT.md#102-dependency-driven-implementation-sequence)
+nem reabre fundações fechadas. Reuso local de resultados válidos vem antes de
+cache remoto. **Proposta:** medir latência, uso/custo observado e retrabalho por
+etapa/projeto, com invalidação por dependência; comparar qualidade final e
+intervenções humanas antes de alegar economia. Não inferir custo zero, quota
+ilimitada ou billing efetivo a partir de uma estimativa de tokens.
+
+### Fontes oficiais verificadas em 2026-10-03
+
+Datas são de anúncio, não a data de atualização da documentação. Somente o
+Sonnet abaixo está na janela dos últimos sete dias; as referências Google
+de setembro/agosto ficam também fora dos últimos 30 dias.
+
+| Fonte / anúncio | Evidência e aplicação proposta |
+|---|---|
+| [Adobe Premiere Android — 22/09](https://blog.adobe.com/en/publish/2026/09/22/adobe-premiere-expands-android-fast-powerful-easy-mobile-video-editing) | Edição/export até 4K, sem login obrigatório ou marca d’água, com essenciais gratuitos; créditos generativos/armazenamento adicionais são separados. Inspira fricção baixa e qualidade, não equivalência de recursos/licença. |
+| [Claude Sonnet 5.5 — 28/09](https://www.anthropic.com/claude-sonnet-5-5) | Fornecedor alega até 30% menos custo por tarefa versus Sonnet 5 em seus testes, com o mesmo preço por token. Candidato a comparação futura, não economia garantida no CEVRA nem substituição do modelo atual. |
+| Google vídeo — [anúncio 01/09](https://ai.google.dev/gemini-api/docs/changelog#september-1-2026), [limites atuais](https://ai.google.dev/gemini-api/docs/video-understanding#agentic-video-understanding) | Análise seletiva de transcript/frames/áudio; alegação de até 88% menos tokens em vídeos longos. Curtos podem ter maior latência inicial. Inspira evidência seletiva e referência verificável; nenhuma integração aqui. |
+| Gemini 3.5 Transcribe — [GA 26/08](https://ai.google.dev/gemini-api/docs/changelog#august-26-2026), [documentação](https://ai.google.dev/gemini-api/docs/transcribe) | PT-BR/PT-PT e timestamps por palavra; ativá-los pode reduzir precisão. Modo smart não aceita timestamps/diarização. Comparação futura deve proteger fala canônica e distinguir timing de modelo de alinhamento comprovado. |
+| OpenAI Prompt Cache Diagnostics — [GA 08/09](https://developers.openai.com/api/docs/changelog), [diagnósticos](https://developers.openai.com/api/docs/guides/prompt-caching/diagnostics) | Inspira medir reuso/misses antes de otimizar; métricas de usage/billing prevalecem sobre estimativas. API futura seria opcional; [cobrança separada da assinatura ChatGPT](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform). |
+| [Descript — 17/09](https://feedback.descript.com/changelog/release-roundupseptember-17-2026) | Presets, busca/revisão de jump cuts e cache de scrubbing foram anunciados; active speaker está em rollout gradual e regeneração consome créditos por segundo. Preservar distinções entre entregue, rollout/beta e pago; inspiração de UX/reuso não autoriza regenerar fala nem copiar código. |
+
+### Propostas pendentes e conflitos a evitar
+
+Não há mudança de decisão aprovada necessária para os refinamentos acima.
+Reduzir os estilos para três, separar a timeline manual da automática, trocar
+engines/modelos, tornar API/nuvem obrigatória ou tratar texto como prova visual
+seriam conflitos materiais e exigiriam decisão explícita antes de implementação.
+“Preservar ideia/frase” não autoriza omitir condições, inventar tempo ou alterar
+áudio/transcrição silenciosamente. Novos schemas/comandos, seleção de provider,
+comparação real e licenças continuam seus processos próprios de aprovação.
+
+### Consumidor offline — gate anterior superado; estabilização em andamento
+
+O consumidor mínimo antes proposto foi autorizado separadamente e integrado
+pelo [PR #77](https://github.com/inlifemedicina/cevra/pull/77), com contexto/revisão
+no host, contratos tipados e PT/EN. O [PR #78](https://github.com/inlifemedicina/cevra/pull/78),
+integrado em `182081e6a9e6c1b7849a099ebd3f6bba13663415`, admite somente o par
+F-A02 designado numa revisão temporária offline e inclui o ajuste visual e a
+numeração durável aprovados. O CI pós-merge `37151631882` passou 5/5 na primeira
+execução. Não repetir a antiga decisão de autorizar o consumidor como se ainda
+estivesse ausente; escopo maior/persistência, cortes/export e análise completa
+continuam seus próprios gates.
+
+O owner observou leitura do conteúdo, título/nota preservados e reorder; clareza
+visual média motivou separar os cards e distinguir fonte de posição do bloco.
+Isso não prova salvar/navegar/descartar nem aceite geral. As janelas continuam
+preservadas. Posteriormente, o owner aceitou a clareza dos cards e associação
+Vídeo 1/2 na demo dd7f1e4, conforme o registro limitado abaixo. A evolução de
+numeração durável já foi aprovada e integrada no PR #78; a demo permanece
+window-only. Compatibilidade/testes técnicos estão verificados, sem declarar
+homologação física de save/reopen. Ícone de tipo não é miniatura real.
+
+<a id="vids-editorial-profile-2026-10-03"></a>
+
+### Perfil editorial opcional — PLANEJAMENTO APROVADO / NÃO IMPLEMENTADO
+
+Solicitação aprovada em 2026-10-03: contextualizar temas, texto e seleção editorial
+com perfil-base opcional sem login obrigatório, ajustável por projeto. A definição
+canônica dos campos mínimos, idade secundária/opcional, precedência, fidelidade
+às fontes, privacidade e envio proporcional está em
+[master §4.3](CEVRA_MASTER_CONTEXT.md#43-optional-editorial-profile--planning-approved-not-implemented).
+O perfil não é fato, fala ou prova de competência e não concede autorização de IA.
+
+**Posição:** linha 1a do cronograma por resultados, após estabilização/aceite do
+fluxo atual; integrar quando a próxima fatia autorizada de brief/constraints for
+consumida pela estratégia/takes. Sem nova data, mudança dos marcos aprovados ou
+aumento de 55%. Os gates Media Runtime, plano temporal, Cut Compiler/QA,
+preview/export e integrações mantêm suas dependências atuais.
+
+**Viabilidade e decisões antes de implementar:** brief limitado e contexto compacto
+já são primitivas; perfil salvo, resolver de overrides, schema, UI/consentimento e
+persistência não estão entregues. Definir uma fatia proporcional PT/EN,
+armazenamento local/lifecycle/limpeza, versão/compatibilidade, confirmação do
+contexto externo e invalidação/revisão. Variante mínima: brief opcional apenas do
+projeto, sem perfil-base salvo. Reusar o catálogo de aceitação; nenhuma conta,
+coleta, envio, provider/modelo ou novo armazenamento é criado por este registro.
+**Director impact:** extensão de planejamento compatível; decisões técnicas e de
+consentimento detalhadas permanecem gates.
+
+Pendências: validar com usuários os três atalhos e a revisão localizada; concluir aceite
+do consumidor integrado e decidir a próxima fatia temporal/estratégia no catálogo; medir reuso e
+custo reais quando uma execução for separadamente autorizada. **Director impact:**
+refinamento compatível de planejamento; intenção, constraints e evidência seguem
+para o mesmo plano tipado, sem nova autoridade de provider/engine/History.
+
+
+### Visual/source numbering — integrated implementation reconciled 2026-10-03
+
+[PR #78](https://github.com/inlifemedicina/cevra/pull/78) integrated the
+owner-approved visual clarification and stable source-numbering implementation
+at `182081e6a9e6c1b7849a099ebd3f6bba13663415`, with post-merge CI `37151631882`
+SUCCESS 5/5, attempt 1. The
+[exact-head integration record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#pr-78-integration-and-post-merge-validation--2026-10-03)
+preserves the reviewed tree and bounded scope. The frozen reviewed native visual is `dd7f1e4`
+(window-only numbers); the durable follow-up is `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8`.
+Existing History/Store, one project counter outside undo, archive/package V3
+and V1/V2 read compatibility implement the approved bounded evolution. Earlier
+format-approval gates are superseded; lost/never-persisted labels remain
+unrecoverable. Details: [offline review record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#subsequent-visual-and-stable-numbering-approval--2026-10-03).
+PR #76 remains documentation-only; profile planning has no implementation.
+The owner accepted `dd7f1e4` card clarity and Video 1/2 association; see the
+[bounded acceptance record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#limited-owner-visual-acceptance--2026-10-03).
+Physical durable save/reopen, broader functional/narrative acceptance and final
+branding are not claimed. Group remaining human checks into a functional round;
+notes remain in memory. Director impact is compatible presentation identity; no progress
+increase, new provider allocation or broader strategy/take/cut authority.

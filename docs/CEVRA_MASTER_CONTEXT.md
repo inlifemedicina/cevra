@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-10-03 UTC, bounded offline Editorial Draft V1 integrated by PR #75 after #74; its smallest offline host/backend/UI consumer is integrated through PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI 5/5 and Exact Runtime 1/1. The owner subsequently approved bounded offline admission of the designated existing F-A02 result/history into a temporary native review session; that addition is IN DEVELOPMENT / NOT MERGED (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
+**Last decision reconciliation:** 2026-10-03 UTC, optional editorial profile approved for planning after current-flow stabilization; implementation remains gated (§4.3). Roadmap refinements remain proposals; six caption styles + None are preserved. Bounded offline Editorial Draft V1 integrated by PR #75 after #74; its smallest offline host/backend/UI consumer is integrated through PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI 5/5 and Exact Runtime 1/1. The approved designated F-A02 offline admission, visual clarification and durable source numbering are integrated through PR #78; current `main` is `182081e6a9e6c1b7849a099ebd3f6bba13663415`, with reviewed tree preserved and post-merge CI SUCCESS 5/5, attempt 1 (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -353,6 +353,76 @@ The same Project IR and command API should allow different AI brains to create a
 - future embedded Claude if an official suitable mechanism exists.
 
 Different models may produce distinct editorial interpretations while the CEVRA infrastructure, Project IR and render engines remain stable.
+
+## 4.3 Optional editorial profile — PLANNING APPROVED, NOT IMPLEMENTED
+
+The Product Owner approved recording this direction on 2026-10-03. Its purpose
+is to contextualize topic suggestions, text review and evidence-based editorial
+selection while preserving conditions, uncertainty and caveats. Use an optional
+base profile without mandatory registration/login, with explicit per-project
+adjustments taking priority over that base. The current project's request and
+mandatory constraints remain authoritative. Omission must leave the supported
+manual/offline Vids flow usable; profile completion is not an ingest/edit gate.
+
+Minimum proposed fields, all optional and entered/confirmed by the user:
+
+- profession/area of work or specialty relevant to the project;
+- intended audience and its stated level of knowledge;
+- editorial objective;
+- tone and language;
+- themes, terminology and care/constraints to preserve.
+
+Age is optional, secondary and included only when the user sees a concrete
+editorial purpose. Do not infer age, demographic traits, health or other personal
+attributes from appearance, voice, profession, media or filenames. Exact date of
+birth, legal identity and an account are not prerequisites. The user can inspect,
+change, clear or omit context; conflicting project instructions need a visible
+resolution rather than silent profile precedence.
+
+**Context is not source evidence.** It cannot establish facts, expertise,
+credentials, statements, audience demographics or what the speaker actually
+said. Suggestions, selection and text review must remain traceable to available
+media/transcript evidence and preserve conditions/caveats under D2–D5 and D9.
+An optional specialty configuration/policy pack may inform constraints; it does
+not add medical/other specialist logic to the generic core or make Content
+Intelligence mandatory (ADRs 0009/0011).
+
+Use local-first, minimal collection and provider-neutral context. Select only
+relevant fields for the task, apply bounded token/context budgets and show the
+actual resolved context that would be sent externally, with applicable permission
+and confirmation before transmission. Do not automatically send the whole
+profile, all project/media data or unrelated personal details. Profile setup does
+not authorize inference, uploads, account creation, subscription use or paid API
+billing. Context formatting is an Application/Director responsibility; provider
+native identity, billing and auth remain in adapters.
+
+**Feasibility:** the existing optional bounded `brief` in
+[Semantic Editorial Analysis](../packages/application/src/semantic-editorial-analysis.ts)
+and the [Director's compact progressive context policy](CEVRA_DIRECTOR_DECISIONS.md#4-contexto-e-uso-eficiente-de-ia)
+are usable primitives, not an implemented profile consumer. Workflow Presets
+(ADR 0010) configure production orchestration; optional Content Intelligence
+(ADRs 0009/0011) owns its separate research/brief/memory domain. Extend these
+boundaries rather than create a parallel editorial context or acceptance catalog.
+No profile UI, versioned profile schema, base/project override resolver, persistence
+or profile-specific sending/consent surface is evidenced end to end today.
+
+**Position and gates:** schedule after stabilization and relevant Product Owner
+acceptance of the current offline review flow, at the next authorized
+brief/constraints/context integration supporting strategy/takes (organogram,
+[profile sequencing](CEVRA_ORGANOGRAMA.md#vids-editorial-profile-2026-10-03)).
+It is an optional increment, not a serial blocker for deterministic runtime,
+preview or release. No new delivery date or change to approved milestones/progress
+is made. Before implementation, decide UI/terminology and PT/EN behavior, minimum
+versioned schema and override precedence, local storage/lifecycle/clear/export
+policy, consent/disclosure and invalidation/review tests. A new persistence model
+requires its own ADR and Product Owner approval; do not put unrelated identity or
+Content Intelligence memory into Project IR. A simpler first slice can be a
+project-only optional brief, with no saved base profile. Reuse the acceptance
+catalog and separately authorize any live provider scenario.
+
+**Director impact:** compatible future extension of the existing brief/constraints
+context; no new provider, permission or execution authority. Detailed schema,
+UI/persistence and consent decisions remain gates before implementation.
 
 ---
 
@@ -1459,7 +1529,7 @@ Foundation / Media Runtime       [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
 → bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
 → real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED; WHOLE GATE OPEN; V1 CLOSED 8/8 / F-A02 EXHAUSTED 1/1]
-→ offline evidence-linked editorial draft [APPLICATION #75 / OFFLINE REVIEW #77 INTEGRATED; DESIGNATED F-A02 ADMISSION IN DEVELOPMENT]
+→ offline evidence-linked editorial draft [APPLICATION #75 / OFFLINE REVIEW #77 / DESIGNATED F-A02 ADMISSION + SOURCE NUMBERING #78 INTEGRATED]
 → broader strategy / take selection / cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 → missing typed Project IR edit commands
 → cut compiler
@@ -1526,7 +1596,7 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-**Offline Editorial Draft V1 — APPLICATION AND OFFLINE REVIEW CONSUMER INTEGRATED; DESIGNATED F-A02 ADMISSION IN DEVELOPMENT:**
+**Offline Editorial Draft V1 — APPLICATION, OFFLINE REVIEW CONSUMER, DESIGNATED F-A02 ADMISSION AND SOURCE NUMBERING INTEGRATED:**
 The owner explicitly approved reusing the saved F-A02 candidate to create a
 source-linked editorial proposal offline. `EditorialDraftService` adds a
 process-local immutable proposal in Application, retaining all observations,
@@ -1543,7 +1613,7 @@ at `d8d93b7678e4b74a7b3ce034b60d7e2105b6a361`. The separately approved offline
 review consumer is integrated through PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`; its tree
 `1166fc3f9979a18171cb6aeb7ee08073bc83748b` equals the reviewed tree. Post-merge push CI
 `37127986470` passed 5/5 and Exact Runtime `37127986468` passed 1/1, both attempt 1.
-The later approved designated F-A02 admission is in development on `feat/offline-fa02-native-review`. Whole-gate completion and broader strategy/take/cut
+The later approved designated F-A02 admission, visual clarification and stable source numbering are integrated through PR #78 at `182081e6a9e6c1b7849a099ebd3f6bba13663415`, with post-merge CI `37151631882` SUCCESS 5/5, attempt 1. Whole-gate completion and broader strategy/take/cut
 implementation remain unclaimed.
 Director impact is a compatible Application proposal extension; typed commands,
 Project IR, History, provider and engine authority are preserved. Progress 55%.
@@ -2614,6 +2684,29 @@ offline remediation are recorded in §24.3 and the immediate next action below.
   session identifiers, local paths and raw private artifacts are excluded from
   this update. This publication decision does not grant provider or merge authority.
 
+## 2026-10-03 — editorial integration and roadmap direction
+
+- **IMPLEMENTED / CLOSED, BOUNDED APPLICATION:** owner separately authorized
+  normal merges #74 then #75; exact reviewed trees, parents and terminal green
+  post-merge CI are recorded in §24.1. No new provider run occurred.
+- **GENERAL DIRECTION ENDORSED:** the owner endorsed organization by results and
+  keeping captions as already planned (six styles + None). Specific refinements,
+  further consumer refinements, vendor comparisons and commercial differentiation
+  remain proposals, not implemented decisions. Their source-linked record is
+  [the canonical organogram](CEVRA_ORGANOGRAMA.md#vids-roadmap-2026-10-03), without
+  a second acceptance catalog or change to the canonical 55% progress.
+
+## 2026-10-03 — optional editorial profile added to planning
+
+- **PLANNING APPROVED / NOT IMPLEMENTED:** optional base profile without required
+  login, overridden by project context; scope, evidence rules and feasibility are
+  recorded once in §4.3. The owner approved planning and dependency placement,
+  not UI/schema/persistence/consent implementation or a provider call.
+- **SEQUENCING:** after stabilization and acceptance of the current offline review
+  flow, at a separately authorized brief/constraints integration; no date or
+  approved milestone change and no increase from 55%. See the organogram's
+  profile row. Detailed choices remain gates.
+
 ---
 
 # 26. Explicitly unresolved decisions
@@ -2638,6 +2731,7 @@ Do not guess these in future chats:
 16. exact HDR→SDR dependency/build and quality/performance profile;
 17. Preview V1 ADR and final resolved composition-plan boundary;
 18. final provider mechanisms, entitlements and commercial terms for every external integration.
+19. optional editorial profile UI, versioned schema, local persistence/lifecycle and consent/override behavior (§4.3) — planning approved, implementation pending.
 
 ---
 
@@ -2658,12 +2752,13 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved admission of the designated F-A02 result/history into a temporary native session is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
+1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved designated F-A02 admission, visual clarification and durable source numbering are integrated through PR #78 at `182081e6a9e6c1b7849a099ebd3f6bba13663415`, with reviewed tree preserved and post-merge CI `37151631882` SUCCESS 5/5, attempt 1. Remaining human checks belong to one functional round; physical durable save/reopen and broader functional/narrative acceptance are unclaimed. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
 5. Preserve the provider-neutral flow, EDVID baseline, one Project IR/timeline and Normal/Advanced progressive disclosure throughout.
-6. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
+6. After current offline-flow stabilization/acceptance, review the optional editorial profile gates (§4.3) at the next brief/constraints integration; implement only an explicitly approved slice.
+7. Keep this ledger and `docs/CEVRA_ORGANOGRAMA.md` synchronized after material decision, merge, blocker transition or completed research finding.
 
 ---
 
@@ -2680,9 +2775,9 @@ If ChatGPT again reports “maximum conversation length”:
 **The project must never rely on a single chat thread as its only memory.**
 
 
-### Historical offline editorial review consumer — owner approval and implementation checkpoint, 2026-10-03
+### Offline editorial review consumer — owner-approved integration, 2026-10-03
 
-**Status:** IN DEVELOPMENT / NOT MERGED on `feat/offline-editorial-panel`, based on integrated `main` `d8d93b7678e4b74a7b3ce034b60d7e2105b6a361`. PR #76 remains a separate Draft containing roadmap proposals; it is not a prerequisite or merged by this slice.
+**Status:** IMPLEMENTED / MERGED via [PR #77](https://github.com/inlifemedicina/cevra/pull/77). The owner authorized exact head `23054b716a4ec705905c37eb12929a9c885543c8`; the SHA-guarded normal merge is `73f8427ac18337f779ceeda9c93f60edf35df33b`, with the same reviewed tree `1166fc3f9979a18171cb6aeb7ee08073bc83748b`. Post-merge validation is recorded in the offline draft document. PR #76 remains a separate Draft containing roadmap proposals; it is not a prerequisite or merged by this slice.
 
 After the morning recommendation, the owner authorized the smallest offline panel to inspect the existing five-block proposal, consult sources/justifications/caveats, reorder blocks and edit presentation titles/user notes. The host admits one accepted analysis per session and owns it and its service-issued draft in memory, bound to the same ProjectHistory; the closed backend permits only query/revision. UI PT-BR/EN-US shares the existing Director surface and canonical project/timeline. This acceptance authorizes the two narrow local query/revision commands and does not grant provider, arbitrary filesystem/network, persistent admission, import, cut/timing or export authority.
 
@@ -2695,18 +2790,22 @@ The [offline draft document](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#offline-review-
 
 PR #77 is integrated at `73f8427ac18337f779ceeda9c93f60edf35df33b`; post-merge CI `37127986470` (5/5) and Exact Runtime `37127986468` (1/1) are SUCCESS, attempt 1. This supersedes the earlier unmerged consumer checkpoint above. Subjective visual/narrative acceptance remains pending.
 
-The owner explicitly approved local reading of the already obtained F-A02 result and its corresponding history on 2026-10-03 at 14:33 UTC. The bounded addition on `feat/offline-fa02-native-review` is IN DEVELOPMENT / NOT MERGED: a native startup designation supplies one directory and two previously pinned hashes; the host reads only the two designated artifact names and creates a temporary in-memory review session. It uses existing history/draft validation, preserves PARTIAL and original assertions, and disables canonical project operations. The ordinary project store, engines, credentials and provider are not opened by this mode; no durable proposal or automatic recovery/import path is added. The historical `providerContact: UNKNOWN` stays unknown. This approval grants the designated offline admission, not a general importer or authority from serialized flags.
+The owner explicitly approved local reading of the already obtained F-A02 result and its corresponding history on 2026-10-03 at 14:33 UTC. The bounded addition is IMPLEMENTED / MERGED through PR #78 at `182081e6a9e6c1b7849a099ebd3f6bba13663415`: a native startup designation supplies one directory and two previously pinned hashes; the host reads only the two designated artifact names and creates a temporary in-memory review session. It uses existing history/draft validation, preserves PARTIAL and original assertions, and disables canonical project operations. The ordinary project store, engines, credentials and provider are not opened by this mode; no durable proposal or automatic recovery/import path is added. The historical `providerContact: UNKNOWN` stays unknown. This approval grants the designated offline admission, not a general importer or authority from serialized flags.
 
 Implementation and validation details are in [Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Director impact: compatible review/admission extension; no provider, engine, timing/cut or execution authority. Progress stays 55%; F-A02 remains exhausted 1/1.
 
 ### Shared stable source labels — approved bounded follow-up, 2026-10-03
 
-PR #78 remains Draft / IN DEVELOPMENT / NOT MERGED. The owner approved clearer
+PR #78 is IMPLEMENTED / MERGED at `182081e6a9e6c1b7849a099ebd3f6bba13663415`,
+with post-merge CI `37151631882` SUCCESS 5/5, attempt 1. The owner approved clearer
 editorial cards and shared numbered source labels, with filenames secondary.
 The reviewed visual commit `dd7f1e4` has a separately built and verified native
 window; the previous review instance and original F-A02 pair were preserved.
-That frozen demo uses window-only numbers. Human visual/narrative acceptance and
-final typography, colors, logo and icons remain pending.
+That frozen demo uses window-only numbers. The owner accepted card separation
+and Video 1/2 association; the [bounded record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#limited-owner-visual-acceptance--2026-10-03)
+limits this to visual clarity. Group later human checks into a functional round;
+physical durable save/reopen and broader functional/narrative acceptance are not
+claimed. Final typography, colors, logo and icons remain pending.
 
 The owner subsequently approved the smallest durable evolution: a versioned
 source-ID/number registry and one monotonic per-project counter in existing
@@ -2728,3 +2827,9 @@ compatible Director presentation-identity extension with no new execution,
 provider or permission authority. Editorial notes stay in memory; no real owner
 projects were migrated/saved by this task. Progress remains 55%, the wider agent
 gate stays open and F-A02 remains exhausted 1/1.
+
+The reviewed implementation is `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8`;
+the merge preserves its exact tree `f77eaa5d25175af69531dc56d23adaf91dc6ef0f`.
+[Exact-head integration and checks](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#pr-78-integration-and-post-merge-validation--2026-10-03)
+record the bounded closeout. PR #76 retains optional profile §4.3 as PLANNING
+APPROVED / NOT IMPLEMENTED and remains a separate Draft.
