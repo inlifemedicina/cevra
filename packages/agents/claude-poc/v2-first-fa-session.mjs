@@ -8,7 +8,7 @@ import { lstat, realpath, mkdtemp, rmdir } from 'node:fs/promises';
 import { isAbsolute, normalize, join } from 'node:path';
 import { createFirstFaSessionAdmissionController } from './v2-first-fa-admission.mjs';
 import { createFirstFaLedgerFacade, assertInertExperimentId } from './v2-inert-ledger.mjs';
-import { FIRST_FA_POLICY, describeFirstFaCandidate, evaluateFirstFa } from './v2-first-fa-offline.mjs';
+import { FIRST_FA_POLICY, SECOND_FA_POLICY, firstFaPolicyForCandidate, describeFirstFaCandidate, evaluateFirstFa } from './v2-first-fa-offline.mjs';
 import { CLAUDE_VERSION, CLAUDE_SHA256, childArguments, verifyBinary } from './transport.mjs';
 import { createSessionPluginSettings } from './session-plugin-override.mjs';
 
@@ -78,7 +78,9 @@ export async function acquireLocalFirstFaConsent(scope, { input = process.stdin,
       // Digest is binding/audit only, never authority. Human must affirm this
       // immutable request, not a reusable account credential or ledger grant.
       const portuguese = sessions.get(scope).locale === 'pt-BR';
-      const title = portuguese ? 'CEVRA: somente a primeira F-A privada' : 'CEVRA private first F-A only';
+      const title = scope.policy === SECOND_FA_POLICY ?
+        portuguese ? 'CEVRA: tentativa isolada 02; somente uma operação F-A' : 'CEVRA isolated attempt 02; one F-A operation only' :
+        portuguese ? 'CEVRA: somente a primeira F-A privada' : 'CEVRA private first F-A only';
       const warning = portuguese ? 'Garantias remotas de tokens/custo NÃO COMPROVADAS; sem repetição/fallback.' :
         'Remote token/cost guarantees NOT PROVEN; no retry/fallback.';
       const instruction = portuguese ? 'Digite exatamente' : 'Type exactly';
@@ -102,24 +104,25 @@ function capture(input, dependencies) {
   const v = record(input, ['candidateId', 'operation', 'experimentId', 'root', 'policy', 'runtime', 'history', 'request', 'signal']);
   describeFirstFaCandidate(v.candidateId);
   if (v.operation !== 'semantic-f-a-direct') fail('FIRST_FA_OPERATION_FORBIDDEN');
-  if (v.policy !== FIRST_FA_POLICY) fail('FIRST_FA_POLICY_MISMATCH');
+  const policy = firstFaPolicyForCandidate(v.candidateId);
+  if (v.policy !== policy) fail('FIRST_FA_POLICY_MISMATCH');
   const mode = dependencies.fakeSpawn ? 'CONTROLLED_FAKE' : 'OWNED_CLI_ATTEMPT';
   if (mode === 'CONTROLLED_FAKE') assertInertExperimentId(v.experimentId);
-  else if (v.experimentId !== FIRST_FA_POLICY.candidateId) fail('CANDIDATE_ID_MISMATCH');
+  else if (v.experimentId !== policy.candidateId) fail('CANDIDATE_ID_MISMATCH');
   if (mode === 'OWNED_CLI_ATTEMPT' && (process.platform !== 'darwin' || process.arch !== 'arm64')) fail('PLATFORM_UNSUPPORTED');
   const runtime = record(v.runtime, ['binary', 'home', 'scratchParent', 'pluginOverrideReceipt', 'version', 'sha256', 'provider', 'route', 'model', 'effort']);
   for (const key of ['binary', 'home', 'scratchParent', 'pluginOverrideReceipt']) runtime[key] = path(runtime[key]);
   if (runtime.version !== CLAUDE_VERSION || runtime.sha256 !== CLAUDE_SHA256) fail('VERSION_DRIFT');
   if (runtime.provider !== 'claude-cli' || runtime.route !== 'first-party-subscription') fail('ROUTE_PROVIDER_MISMATCH');
-  if (runtime.model !== FIRST_FA_POLICY.expectedModel || runtime.effort !== FIRST_FA_POLICY.requestedEffort) fail('MODEL_MISMATCH');
+  if (runtime.model !== policy.expectedModel || runtime.effort !== policy.requestedEffort) fail('MODEL_MISMATCH');
   const request = freeze(copyRequest(v.request));
-  if (Buffer.byteLength(JSON.stringify(request)) > FIRST_FA_POLICY.applicationBytes.initialEnvelope) fail('INPUT_LIMIT');
+  if (Buffer.byteLength(JSON.stringify(request)) > policy.applicationBytes.initialEnvelope) fail('INPUT_LIMIT');
   if (!v.history || typeof v.history.toArchive !== 'function') fail('FIRST_FA_HISTORY_INVALID');
   const archive = v.history.toArchive();
   const locale = request.locale ?? archive.snapshots.find(s => s.id === archive.cursorSnapshotId)?.project.project.defaultLocale;
   if (locale !== 'pt-BR' && locale !== 'en-US') fail('FIRST_FA_REQUEST_INVALID');
   const binding = { candidateId: v.candidateId, operation: v.operation, experimentId: v.experimentId,
-    root: path(v.root), policy: FIRST_FA_POLICY, runtime: freeze(runtime), mode,
+    root: path(v.root), policy, runtime: freeze(runtime), mode,
     requestDigest: digest(request), historyDigest: digest(archive) };
   // A scoped human disclosure attestation, not an automatic content classifier
   // or account entitlement. Future review must approve these exact fixture
@@ -198,7 +201,7 @@ export async function evaluateCapturedFirstFaSession(scope, { deadline, clock, a
     }
   };
   return evaluateFirstFa({ root: scope.root, experimentId: scope.experimentId, history: state.history,
-    request: state.request, signal: state.signal, clock, admissionDeadline: deadline, ledgerAdapter: ledger, execution });
+    request: state.request, signal: state.signal, clock, admissionDeadline: deadline, ledgerAdapter: ledger, execution, policy: scope.policy });
 }
 
 // Actual private entrypoint. No executable auto-run, default root, discovery,
@@ -217,7 +220,7 @@ export async function runPrivateFirstFa(input, dependencies = {}) {
   try { await directory(scope.root, true); } catch { fail('FIRST_FA_PATH_INVALID'); }
   checkBinding(scope);
   const consent = await acquireLocalFirstFaConsent(scope, deps.consentIO, input.signal);
-  const admissionDeadline = deps.clock.now() + FIRST_FA_POLICY.totalDeadlineMs;
+  const admissionDeadline = deps.clock.now() + scope.policy.totalDeadlineMs;
   try {
     checkBinding(scope);
     const controller = createFirstFaSessionAdmissionController({ authorizationIssuer: consent.issue });

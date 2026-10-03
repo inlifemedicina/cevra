@@ -26,6 +26,7 @@ function data(value, keys) {
 function captureScope(input) {
   const scope = data(input, ['candidateId', 'operation', 'root', 'experimentId', 'policy', 'fixtureAuthorization']);
   describeFirstFaCandidate(scope.candidateId); // Recognition alone never grants authority.
+  if (scope.candidateId !== FIRST_FA_POLICY.candidateId) fail('CANDIDATE_ID_MISMATCH'); // Legacy fake seam stays candidate 01 only.
   if (scope.operation !== operation) fail('FIRST_FA_OPERATION_FORBIDDEN');
   if (scope.policy !== FIRST_FA_POLICY) fail('FIRST_FA_POLICY_MISMATCH');
   assertInertExperimentId(scope.experimentId); // Real/historical IDs fail before any I/O.

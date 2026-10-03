@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createFirstFaAdmissionController } from '../v2-first-fa-admission.mjs';
-import { FIRST_FA_POLICY, describeFirstFaCandidate } from '../v2-first-fa-offline.mjs';
+import { FIRST_FA_POLICY, SECOND_FA_POLICY, describeFirstFaCandidate } from '../v2-first-fa-offline.mjs';
 import { initializeInertLedger, inspectInertLedger, reserveInertFirstFa,
   reserveInertOperations, writeInertReceipt } from '../v2-inert-ledger.mjs';
 import { fixture } from './fixtures.mjs';
@@ -353,4 +353,13 @@ test('bounded diagnostics never persist capability or fixture secrets', async t 
     assert(!record.includes(FIRST_FA_POLICY.candidateId));
   }
   assert.equal(result.liveAuthorized, false);
+});
+
+test('legacy fixture controller rejects second candidate with first policy before issuer or ledger I/O', () => {
+  let issuerCalls = 0, ioCalls = 0;
+  const c = createFirstFaAdmissionController({ authorizationIssuer(v) { issuerCalls++; return v; },
+    ledgerAdapter: { inspect() { ioCalls++; }, reserve() { ioCalls++; }, receipt() { ioCalls++; } } });
+  const mixed = { ...scope('/synthetic-no-io'), candidateId: SECOND_FA_POLICY.candidateId };
+  assert.throws(() => c.issueFirstFaCapability(mixed), code('CANDIDATE_ID_MISMATCH'));
+  assert.equal(issuerCalls, 0); assert.equal(ioCalls, 0);
 });
