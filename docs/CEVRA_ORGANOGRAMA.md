@@ -44,7 +44,7 @@ CEVRA VIDS
 ├─ 5. UX SURFACE CONTRACT
 │   ├─ NORMAL
 │   │   ├─ EDVID-level directness/simplicity
-│   │   ├─ preview
+│   │   ├─ preview — first-video manual IN/OUT [APPROVED / IN DEVELOPMENT; HUMAN ROUND PENDING]
 │   │   ├─ visible directly editable timeline
 │   │   ├─ contextual inspector
 │   │   ├─ presets / visual choices
@@ -355,13 +355,15 @@ The owner subsequently approved only the designated existing F-A02 result/histor
 PR #78 also contains the owner-approved shared source labels and editorial card
 clarity. The reviewed `dd7f1e4` visual has a separate verified native window, with
 the older instance preserved; its numbers remain window-only. The approved
-durable follow-up is IN DEVELOPMENT / NOT MERGED: existing ProjectHistory owns
+durable follow-up is integrated through #78: existing ProjectHistory owns
 source-ID/number reservations and one monotonic project counter outside undo;
 existing ProjectStore writes V3 and reads V1/V2. No new database or audiovisual
 IR shape is introduced. Explicit save/reopen retains retired/abandoned-branch
 reservations; legacy initialization cannot recover labels that were never saved.
 Details and recovery limits: [ADR 0031](adr/0031-stable-source-numbering-v1.md).
 Reuse X-T1/T2/T5, I8-T3/T6 and I17-T9 rather than duplicating acceptance cases.
-The draft/notes remain in memory; human acceptance and final visual identity are
-pending. Director impact is compatible presentation identity; progress and
+The draft/notes remain in memory; the bounded card/source-label review was accepted, while final visual identity remains pending. Director impact is compatible presentation identity; progress and
 provider gates are unchanged. PR #76 remains the separate documentation track.
+
+
+Manual first-video excerpt is now an approved active slice on `feat/manual-inout-preview`, based on integrated #78 `182081e6a9e6c1b7849a099ebd3f6bba13663415` (post-merge CI `37151631882`, SUCCESS 5/5). Real local original playback, manual IN/OUT, one canonical clip and existing undo/redo are implemented for an initial small-fixture test; the 8 MiB/one-clip limits are not the final product contract. Application/host 346 and UI 66 tests PASS, code review APPROVE; native playback/Owner acceptance remain NOT EXECUTED pending one consolidated round. No AI, invented F-A02 timing, automatic alignment, composition/export or brief/profile implementation. Director impact is a compatible execution extension on the same history/timeline; progress stays 55%. Details are the scoped manual-excerpt checkpoint in the master and existing acceptance IDs, not a new acceptance catalog.

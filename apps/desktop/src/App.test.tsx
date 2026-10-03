@@ -70,6 +70,8 @@ class FunctionalDesktopBackend implements DesktopBackend {
 
   async loadEditorialDraft() { return { status: "empty" as const }; }
   async reviseEditorialDraft(): Promise<never> { throw { code: "EDITORIAL_DRAFT_UNAVAILABLE" }; }
+  async previewLocalVideo(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
+  async createManualVideoClip(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
   async loadState(): Promise<DesktopBackendState> { return this.state(); }
   async pickAndImportMedia(): Promise<ImportMediaResult> {
     if (this.pickerCancelled) return { outcome: "cancelled" };
@@ -296,7 +298,7 @@ describe("CEVRA Vids desktop shell", () => {
   it("renders a true empty Project IR with presentation-only timeline scaffolding", async () => {
     await renderFunctional();
     expect(screen.getByText("Nenhuma mídia corresponde a este filtro.")).toBeTruthy();
-    expect(screen.getByText("Importe um vídeo para começar")).toBeTruthy();
+    expect(screen.getByText("Selecione um vídeo importado para reproduzir e marcar um trecho.")).toBeTruthy();
     expect(screen.queryByText("CONSULTA • SEÇÃO 02")).toBeNull();
     expect(screen.queryByText(/Clareza gera confiança/)).toBeNull();
     expect(screen.getAllByTestId(/^timeline-track-/)).toHaveLength(7);
@@ -357,10 +359,10 @@ describe("CEVRA Vids desktop shell", () => {
     expect(screen.getByRole("button", { name: "Retranscrever" })).toBeTruthy();
   });
 
-  it("keeps real preview playback disabled until preview integration", async () => {
+  it("keeps local playback disabled until a supported video is ready", async () => {
     await renderFunctional();
     expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByRole("button", { name: "Reproduzir" }).getAttribute("title")).toBe("A reprodução real ainda não está conectada.");
+    expect(screen.getByText("Selecione um vídeo importado para reproduzir e marcar um trecho.")).toBeTruthy();
   });
 
   it("maps only narrow Tauri application commands and never sends an ingest path", async () => {

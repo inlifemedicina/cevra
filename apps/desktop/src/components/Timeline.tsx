@@ -52,9 +52,10 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
   const ticks = canonicalDuration === 0 ? [0] : Array.from({ length: 14 }, (_, index) => Math.round((geometryDuration / 13) * index));
 
   function setPlayheadFromPointer(event: ReactPointerEvent<HTMLDivElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
+    const rect = event.currentTarget.querySelector<HTMLElement>(".timeline-width")!.getBoundingClientRect();
+    if (rect.width <= 0) return;
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-    onPlayheadChange(Math.round(ratio * canonicalDuration));
+    onPlayheadChange(Math.min(canonicalDuration, Math.round(ratio * geometryDuration)));
   }
 
   function movePlayheadFromKeyboard(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -91,7 +92,8 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
           </div>
         </div>
         {tracks.map((track) => {
-          const label = t(trackKeys[track.id as keyof typeof trackKeys]);
+          const labelKey = trackKeys[track.id as keyof typeof trackKeys];
+          const label = labelKey ? t(labelKey) : track.name;
           return <TimelineRow key={track.id} track={track} label={label} visuals={visualsForTrack(project, presentations, track)} duration={geometryDuration} zoom={zoom} playheadPercent={playheadPercent} selectedId={selectedId} t={t} onSelect={onSelect} />;
         })}
       </div>

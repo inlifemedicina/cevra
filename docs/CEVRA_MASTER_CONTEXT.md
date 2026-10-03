@@ -2701,12 +2701,7 @@ Implementation and validation details are in [Offline Editorial Draft V1](CEVRA_
 
 ### Shared stable source labels — approved bounded follow-up, 2026-10-03
 
-PR #78 remains Draft / IN DEVELOPMENT / NOT MERGED. The owner approved clearer
-editorial cards and shared numbered source labels, with filenames secondary.
-The reviewed visual commit `dd7f1e4` has a separately built and verified native
-window; the previous review instance and original F-A02 pair were preserved.
-That frozen demo uses window-only numbers. Human visual/narrative acceptance and
-final typography, colors, logo and icons remain pending.
+PR #78 is integrated at `182081e6a9e6c1b7849a099ebd3f6bba13663415`, from approved head `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8`; post-merge CI `37151631882` is SUCCESS, 5/5, attempt 1. The owner accepted the bounded native card/source-label review on frozen visual commit `dd7f1e4`; that demo used window-only numbering. Durable numbering is the integrated follow-up below. The older native instance and original F-A02 pair were preserved. Final typography, colors, logo and icons remain pending.
 
 The owner subsequently approved the smallest durable evolution: a versioned
 source-ID/number registry and one monotonic per-project counter in existing
@@ -2728,3 +2723,16 @@ compatible Director presentation-identity extension with no new execution,
 provider or permission authority. Editorial notes stay in memory; no real owner
 projects were migrated/saved by this task. Progress remains 55%, the wider agent
 gate stays open and F-A02 remains exhausted 1/1.
+
+
+### Manual first-video excerpt — approved implementation, 2026-10-03
+
+**Status:** IN DEVELOPMENT / NOT MERGED on `feat/manual-inout-preview`, based on integrated #78 `182081e6a9e6c1b7849a099ebd3f6bba13663415`. The owner approved the bounded original local video → real playback/manual IN/OUT → one visible timeline clip → undo/redo package. No real AI call, automatic selection/alignment, multi-clip composition, export or brief/profile implementation is included. F-A02 has `timingBasis: none`; its text supplies no invented cutting times.
+
+The Application service resolves a canonical admitted video by source ID/current snapshot and verified ingest evidence. It validates safe millisecond bounds against probed source duration, checks current file size before hashing and revalidates identity/snapshot before typed `track.add`/`clip.add` commits. Both candidates are preflighted before recording; track preparation is a separate existing journal step, so one undo removes the clip and leaves an empty track, and redo restores the same clip. Checkpoints and stable source numbering use existing ProjectHistory/ProjectStore; Project IR schema is unchanged and originals are read only.
+
+Two narrow native commands expose bounded verified bytes and the closed manual range request. The preview response contains no path; these requests admit no filesystem path or grant. Existing project snapshots still contain canonical source URIs. A regular file descriptor supplies the exact bytes whose hash is checked, then a local Blob URL is revoked on source/snapshot change or failure. Marking uses the media clock after metadata/seek readiness, never the demo clock. The clip mode supports only a single simple speed-1/default-volume/default-opacity excerpt on an enabled video track; older complex clips explicitly fall back to Original. Unsupported decoders/duration disagreement fail visibly. **The 8 MiB cap and one-clip limit are constraints of this initial fixture test, not the final product contract.** Streaming/composition and larger media remain separate work.
+
+Automated evidence: 346 Application/host tests and 66 UI tests PASS; independent code review APPROVE after size/zoom/legacy-preview corrections. Native build/CI receipts belong to the Draft PR closeout. Native playback and Product Owner acceptance are **NOT EXECUTED** until one consolidated round reuses I4-T1, D14-T2, D8-T2, X-T1/T2/T5/T6/T7/T9/T10 and I8-T3/T6 in the [acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#f-roteiro-essencial-para-a-build-de-homologacao). No general composition/export or real-agent gate is closed by these fixtures.
+
+**Director impact:** compatible manual-edit execution extension on the same canonical history/timeline. Director provider/context/permission responsibilities are unchanged; no command, engine or provider authority is admitted through a proposal or serialized result. Global roadmap progress stays 55%; F-A02 remains exhausted 1/1.

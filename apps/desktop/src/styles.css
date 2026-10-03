@@ -309,3 +309,15 @@ h1, h2, h3, p { margin: 0; }
 
 .source-file-details { margin: 8px 0 16px; color: var(--cevra-fg-muted); font-size: 11px; }
 .source-file-details p { overflow-wrap: anywhere; }
+.manual-video-preview { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; padding: 12px 18px; gap: 10px; }
+.manual-preview-heading { display: flex; justify-content: space-between; gap: 12px; color: #c9d2e0; font-size: 12px; }
+.manual-preview-heading span { color: #8190a5; }
+.manual-video-stage { flex: 1; min-height: 80px; position: relative; display: grid; place-items: center; overflow: hidden; background: #050609; border-radius: 8px; }
+.manual-video-stage video { width: 100%; height: 100%; position: absolute; object-fit: contain; }
+.manual-video-stage p { z-index: 1; margin: 20px; text-align: center; color: #9daabd; font-size: 12px; }
+.manual-preview-controls { display: flex; align-items: center; gap: 10px; }
+.manual-preview-controls input { flex: 1; min-width: 50px; accent-color: #a994ee; }
+.manual-preview-controls time { font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.manual-preview-marks { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.manual-preview-marks output { font-size: 11px; font-variant-numeric: tabular-nums; color: #b7c3d4; }
+.manual-preview-hint { margin: 0; font-size: 11px; color: #8291a6; }
