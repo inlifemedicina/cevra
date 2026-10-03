@@ -13,7 +13,8 @@
     "@cevra/ui": "0.1.0",
     "@tauri-apps/api": "2.11.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "@cevra/application": "0.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.4",
@@ -27,11 +28,11 @@
     "vitest": "5.0.0"
   },
   "scripts": {
-    "predev": "npm run build -w @cevra/project-ir && npm run build -w @cevra/i18n",
+    "predev": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application",
     "dev": "vite --host 127.0.0.1 --port 1420",
-    "prebuild": "npm run build -w @cevra/project-ir && npm run build -w @cevra/i18n",
+    "prebuild": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application",
     "build": "tsc -p tsconfig.json && vite build",
-    "pretest": "npm run build -w @cevra/project-ir && npm run build -w @cevra/i18n",
+    "pretest": "npm run build -w @cevra/project-ir && npm run build -w @cevra/contracts && npm run build -w @cevra/i18n && npm run build -w @cevra/application",
     "test": "vitest run",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

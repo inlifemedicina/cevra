@@ -1,5 +1,6 @@
 import {
   LocalSourceIngestService,
+  EditorialDraftService,
   MediaApplicationService,
   ResolvedAudioPlanApplicationService,
   SourceTechnicalDescriptorApplicationService,
@@ -14,6 +15,7 @@ import type {
   MediaExecutionRepository,
   MediaExecutionIntentRepository
 } from "@cevra/application";
+import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
   FfmpegMediaEngine,
@@ -55,11 +57,45 @@ export interface DesktopSessionServices {
 }
 
 export class DesktopSession {
+  private readonly editorial: EditorialDraftService;
+  private acceptedAnalysis: SemanticEditorialAnalysisCandidateV1 | null = null;
+  private editorialDraft: EditorialDraftV1 | null = null;
   private readonly operations = new Map<string, AbortController>();
   private readonly activeTasks = new Map<string, Promise<unknown>>();
   private activeMutationTask: Promise<unknown> | null = null;
 
-  constructor(private readonly services: DesktopSessionServices) {}
+  constructor(private readonly services: DesktopSessionServices) {
+    this.editorial = new EditorialDraftService(services.history);
+  }
+
+  /** Trusted in-process Application handoff only; never a WebView/RPC admission. */
+  acceptEditorialAnalysis(request: CreateEditorialDraftRequest): void {
+    if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+    // One accepted analysis per session: revision 0 cannot be reused by a
+    // replacement context while a WebView still holds an earlier projection.
+    if (this.acceptedAnalysis) throw safeError("EDITORIAL_DRAFT_ALREADY_ACCEPTED");
+    const draft = this.editorial.create(request);
+    this.acceptedAnalysis = structuredClone(request.analysis);
+    this.editorialDraft = draft;
+  }
+
+  editorialState(): EditorialDraftState {
+    if (!this.editorialDraft || !this.acceptedAnalysis) return { status: "empty" };
+    try {
+      this.editorial.assertCurrent(this.editorialDraft);
+      return { status: "current", draft: structuredClone(this.editorialDraft) };
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "code" in error && error.code === "EDITORIAL_DRAFT_STALE") return { status: "stale" };
+      throw error;
+    }
+  }
+
+  reviseEditorialDraft(request: ReviseEditorialDraftRequest): EditorialDraftState {
+    if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+    if (!this.editorialDraft) throw safeError("EDITORIAL_DRAFT_UNAVAILABLE");
+    this.editorialDraft = this.editorial.revise(this.editorialDraft, request);
+    return this.editorialState();
+  }
 
   state(): DesktopHostState {
     return {

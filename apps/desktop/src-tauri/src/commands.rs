@@ -30,6 +30,54 @@ pub struct CancelArgs {
     operation_id: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EditorialBlockEdit {
+    block_id: String,
+    title: Option<String>,
+    user_note: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EditorialRevisionArgs {
+    expected_revision: u64,
+    title: Option<String>,
+    block_order: Option<Vec<String>>,
+    block_edits: Option<Vec<EditorialBlockEdit>>,
+}
+
+#[tauri::command]
+pub async fn desktop_get_editorial_draft(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+) -> Result<Value, DesktopCommandError> {
+    supervisor.ensure_started(&app).await?;
+    supervisor.request_control("editorial.snapshot", json!({})).await
+}
+
+#[tauri::command]
+pub async fn desktop_revise_editorial_draft(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: EditorialRevisionArgs,
+) -> Result<Value, DesktopCommandError> {
+    let mut params = json!({ "expectedRevision": args.expected_revision });
+    if let Some(title) = args.title { params["title"] = json!(title); }
+    if let Some(order) = args.block_order { params["blockOrder"] = json!(order); }
+    if let Some(edits) = args.block_edits {
+        params["blockEdits"] = Value::Array(edits.into_iter().map(|edit| {
+            let mut value = json!({ "blockId": edit.block_id });
+            if let Some(title) = edit.title { value["title"] = json!(title); }
+            if let Some(note) = edit.user_note { value["userNote"] = json!(note); }
+            value
+        }).collect());
+    }
+    supervisor.ensure_started(&app).await?;
+    // Proposal-only revision: no canonical edit, provider or persistent admission.
+    supervisor.request_immediate_mutation("editorial.revise", params).await
+}
+
 #[tauri::command]
 pub async fn desktop_get_state(
     app: AppHandle,

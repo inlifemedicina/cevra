@@ -1,4 +1,5 @@
 import type { ProjectIR } from "@cevra/project-ir";
+import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import { createDemoProject } from "../fixtures/demo-project";
 import type { DesktopBackend, DesktopBackendState, DesktopCapabilityState, ImportMediaResult } from "./desktop-backend";
 
@@ -14,6 +15,8 @@ const unavailable: DesktopCapabilityState = Object.freeze({
 export class DemoDesktopBackend implements DesktopBackend {
   readonly adapterName = "DemoDesktopBackend";
   readonly presentationOnly = true;
+  async loadEditorialDraft(): Promise<EditorialDraftState> { return { status: "empty" }; }
+  async reviseEditorialDraft(_request: ReviseEditorialDraftRequest): Promise<EditorialDraftState> { throw { code: "EDITORIAL_DRAFT_UNAVAILABLE" }; }
 
   async loadState(): Promise<DesktopBackendState> {
     return demoState(structuredClone(createDemoProject()));

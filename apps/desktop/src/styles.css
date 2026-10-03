@@ -267,3 +267,29 @@ h1, h2, h3, p { margin: 0; }
   .director-title-row p, .director-footer > small { display: none; }
   .preview-stage { min-height: 90px; }
 }
+
+/* Offline review shares the Director surface and leaves the timeline visible. */
+.director-panel { grid-template-columns: minmax(0, 1fr) minmax(280px, 46%); grid-template-rows: minmax(0, 1fr); max-height: 38vh; }
+.change-set { min-height: 0; overflow-y: auto; }
+.editorial-review { font-size: 12px; line-height: 1.45; }
+.editorial-heading, .editorial-block-heading, .editorial-order { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.editorial-heading h3 { margin: 0; font-size: 14px; }
+.editorial-heading { position: sticky; top: -10px; padding: 6px 0; background: #161a1f; z-index: 1; }
+.editorial-status, .editorial-caveat { color: var(--cevra-warning); }
+.change-set .editorial-blocks { display: block; margin: 12px 0; padding: 0; list-style: none; }
+.change-set .editorial-blocks > li { display: block; padding: 12px 0; border-top: 1px solid var(--cevra-border); color: var(--cevra-fg); font-size: 12px; }
+.editorial-review label { display: block; margin: 8px 0; }
+.editorial-review input, .editorial-review textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 4px; padding: 7px; border: 1px solid var(--cevra-border); border-radius: 5px; color: var(--cevra-fg); background: var(--cevra-bg); font: inherit; }
+.editorial-review p { margin: 8px 0; }
+.editorial-review summary { cursor: pointer; color: var(--cevra-accent); }
+.editorial-review blockquote { margin: 8px 0; padding-left: 10px; border-left: 2px solid var(--cevra-border); }
+.editorial-order { justify-content: flex-start; }
+.editorial-order button { padding: 5px 8px; color: var(--cevra-fg); background: var(--cevra-surface-2); border: 1px solid var(--cevra-border); border-radius: 4px; }
+.editorial-review button:disabled { opacity: .45; cursor: default; }
+.editorial-limitations { margin: 12px 0; }
+.change-set .editorial-limitations ul { display: block; padding-left: 18px; list-style: disc; }
+.change-set .editorial-limitations li { display: list-item; font-size: 12px; }
+.editorial-review small { color: var(--cevra-fg-muted); }
+
+.director-slot { min-height: 0; }
+.director-slot[hidden] { display: none; }

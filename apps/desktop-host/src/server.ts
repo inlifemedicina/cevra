@@ -7,6 +7,7 @@ import {
   ProtocolValidationError,
   parseRequest,
   validateCancelParams,
+  validateEditorialRevisionParams,
   validateIngestParams,
   validateNoParams,
   validateTranscriptionParams,
@@ -113,6 +114,11 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
     case "history.undo":
       validateNoParams(request.params, request.id);
       return { result: await requireSession(session).undo() };
+    case "editorial.snapshot":
+      validateNoParams(request.params, request.id);
+      return { result: requireSession(session).editorialState() };
+    case "editorial.revise":
+      return { result: requireSession(session).reviseEditorialDraft(validateEditorialRevisionParams(request.params, request.id)) };
     case "history.redo":
       validateNoParams(request.params, request.id);
       return { result: await requireSession(session).redo() };

@@ -6,6 +6,8 @@ pub const APPLICATION_COMMANDS: &[&str] = &[
     "desktop_undo",
     "desktop_redo",
     "desktop_cancel_operation",
+    "desktop_get_editorial_draft",
+    "desktop_revise_editorial_draft",
 ];
 
 #[cfg(test)]

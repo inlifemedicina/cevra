@@ -8,6 +8,7 @@ mod supervisor;
 use commands::{
     desktop_cancel_operation, desktop_get_state, desktop_pick_and_ingest_media, desktop_redo,
     desktop_transcribe_source, desktop_undo,
+    desktop_get_editorial_draft, desktop_revise_editorial_draft,
 };
 use std::sync::Arc;
 use supervisor::DesktopHostSupervisor;
@@ -26,6 +27,8 @@ fn main() {
             desktop_undo,
             desktop_redo,
             desktop_cancel_operation,
+            desktop_get_editorial_draft,
+            desktop_revise_editorial_draft,
         ])
         .build(tauri::generate_context!())
         .expect("CEVRA Vids desktop runtime failed to build");

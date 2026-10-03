@@ -10,7 +10,8 @@
     "@cevra/project-ir": "0.1.0"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./editorial-draft": "./dist/editorial-draft.js"
   },
   "types": "./dist/index.d.ts",
   "scripts": {

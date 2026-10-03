@@ -31,7 +31,7 @@ CEVRA VIDS
 │   │   └─ real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED / WHOLE GATE OPEN]
 │   │       ├─ INT-CLOUD-01 official ChatGPT eligibility/capability review [RESEARCH / SCHEDULED]
 │   │       └─ INT-CLOUD-02 authorized official transport PoC [CONDITIONAL / NOT IMPLEMENTED]
-│   ├─ offline evidence-linked editorial draft [IMPLEMENTED / CLOSED — BOUNDED APPLICATION]
+│   ├─ offline evidence-linked editorial draft [APPLICATION #75 / OFFLINE REVIEW #77 INTEGRATED; DESIGNATED ADMISSION IN DEVELOPMENT]
 │   ├─ broader strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   ├─ take selection [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   └─ cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
@@ -66,6 +66,7 @@ CEVRA VIDS
 │   └─ B-roll / overlays / camera / music / SFX
 │
 ├─ 8. CEVRA DIRECTOR / WORKFLOW PRESETS / AI ORCHESTRATION
+│   ├─ optional editorial profile [PLANNING APPROVED / IMPLEMENTATION GATED; after current-flow stabilization]
 │   ├─ AI decisions → validated typed plan
 │   ├─ direct user intervention at any time
 │   └─ one Project IR / one timeline
@@ -254,10 +255,8 @@ and expected-revision guards protect review. The real saved-result demonstration
 produced five blocks with history/redo and original artifact preserved, zero new
 analyzer invocations, citations still PARTIAL and literal helper unchanged.
 No timing, take selection, applied commands, Change Set, preview or export.
-This bounded Application slice is IMPLEMENTED / CLOSED after owner-authorized
-normal merges #74 then #75, with exact reviewed trees and green post-merge CI
-and Exact Runtime recorded in master §24.1. It is not a delivered editing UI.
-Wider strategy/take/cut authority and whole
+This remains IMPLEMENTED / IN REVIEW on the branch dependent on draft PR #74,
+not merged or a delivered editing UI. Wider strategy/take/cut authority and whole
 real-agent gate completion are not inferred. See
 [Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md) and
 [master §24.1](CEVRA_MASTER_CONTEXT.md#241-main). Director impact: compatible
@@ -347,6 +346,13 @@ authorizes inference, spending, commercial upload or deployment.
 
 **Director impact:** compatible provider/transport investigation only. The current typed boundaries and canonical project authority are unchanged. A commercial cloud runner remains a separate future decision.
 
+
+## Offline review integration and designated admission — current 2026-10-03
+
+This supersedes the earlier unmerged offline-draft checkpoint: Application #75 and offline host/backend/UI #77 are integrated. PR #77 merged at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI `37127986470` SUCCESS 5/5 and Exact Runtime `37127986468` SUCCESS 1/1, attempt 1.
+
+The owner subsequently approved only the designated existing F-A02 result/history admission into a temporary native review session; this bounded addition is IN DEVELOPMENT / NOT MERGED. The ordinary saved project is preserved, PARTIAL/uncertainty remain visible, and canonical editing/provider/timing/cut/export authority is not added. Details: [offline admission](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Subjective acceptance remains pending. Director impact: compatible review extension; progress 55%, F-A02 exhausted 1/1. PR #76 remains a separate Draft.
+
 <a id="vids-roadmap-2026-10-03"></a>
 
 ## Propostas de simplificação e cronograma por resultados — 2026-10-03
@@ -377,6 +383,7 @@ criam 16 módulos nem um novo catálogo de aceitação:
 | Legendas e áudio bons por padrão | 2 runtime + 7 apresentação/composição | Reusar transcrição/alinhamento válidos; cumprir D14–D18, timing, legibilidade e benchmark. |
 | Três atalhos de receitas versionadas | 5 UX + 8 Workflow Presets | Atalhos ajustáveis de ADR 0010, com capacidades verificadas e sem scripts livres; não substituem o catálogo visual. |
 | Referência por aspectos; montagem sem fala e split-screen | 3 planejamento + 4 comandos + 5 UX + 7 composição | Ritmo/layout/transições/cor/música escolhidos pelo usuário, evidência adequada e execução determinística; [issue #71](https://github.com/inlifemedicina/cevra/issues/71)/[PR #73](https://github.com/inlifemedicina/cevra/pull/73) continuam o registro específico. |
+| Perfil editorial opcional | 3 contexto editorial + 8 brief/constraints do Director | Base opcional sem login e ajustes por projeto; contexto não é evidência. Definição e gates em [master §4.3](CEVRA_MASTER_CONTEXT.md#43-optional-editorial-profile--planning-approved-not-implemented). |
 | Export confiável/variantes; reprocessar só dependências afetadas | 4 compiler/QA + 6 preview + 10 release | Mesmas fontes e plano verificável; medir invalidação/custo, não prometer cache ou export integrados ainda ausentes. |
 
 [D14–D18](CEVRA_VISUAL_DECISIONS.md) preservam **Karaokê, Empilhado, Disperso,
@@ -389,7 +396,8 @@ exportação mantêm responsabilidades distintas. Reusar os IDs de
 
 | Ordem proposta | Resultado verificável | Dependência/gate preservado |
 |---|---|---|
-| 1 | #74/#75 integrados; consolidar consumo da proposta fonte-vinculada, revisão/invalidação e evidência do gate semântico. | O F-A02 textual PT-BR é limitado; análise completa, I1-T1/plano/Change Set e UI não são homologados por esse resultado. Ver checkpoint de integração acima. |
+| 1 | #74/#75 e consumidor offline #77 integrados; estabilizar a revisão temporária designada e sua clareza visual no [Draft #78](https://github.com/inlifemedicina/cevra/pull/78). | F-A02 PT-BR é limitado; aceite humano de salvar/navegar/descartar e visual/usabilidade permanece pendente. Análise completa, I1-T1/plano/Change Set e cortes não estão homologados. |
+| 1a — após estabilizar 1; no próximo incremento de brief/constraints | Planejar perfil editorial opcional: definir campos, precedência base→projeto, contexto mínimo transparente e critérios de revisão; implementar somente a fatia depois aprovada. | UI/schema/persistência/consentimento e compatibilidade aprovados antes de implementar; não bloqueia tarefas independentes nem antecipa chamada real. Ver seção específica abaixo. |
 | 2 | Estratégia/takes e plano temporal verificável → comandos tipados/Cut Compiler/QA → preview/timeline/revisão/export do primeiro fluxo vertical. | Autorizar uma fatia concreta futura; não inventar timing. UX Surface Contract precede considerar preview/timeline completos; respeitar pré-requisitos da matriz Media Runtime e aceitação. |
 | 3 | Legendas, áudio e composição conforme decisões e benchmark. | Cue compiler, placement/QA, fontes e preview/export coerentes; seleção de Composition Engine continua pendente do benchmark, sem antecipar sua escolha. |
 | 4 | Montagens sem fala e referência por aspectos já planejadas em #71/#73. | Somente após primitivas temporais/layout, evidência e QA necessários; transcrição não é pré-condição universal para mídia muda. Referência não concede acesso privado/DRM, cópia, licença ou upload. |
@@ -428,35 +436,54 @@ seriam conflitos materiais e exigiriam decisão explícita antes de implementaç
 áudio/transcrição silenciosamente. Novos schemas/comandos, seleção de provider,
 comparação real e licenças continuam seus processos próprios de aprovação.
 
-### Próximo incremento offline candidato — PROPOSTA / NÃO IMPLEMENTADO
+### Consumidor offline — gate anterior superado; estabilização em andamento
 
-Proposta principal para aproximar o produto de um fluxo utilizável: exibir e
-revisar o draft existente no editor, com os cinco blocos, links às fontes,
-ressalvas e avaliação anterior; permitir ordem/títulos/notas e bloquear revisão
-obsoleta. Reusar o mesmo projeto/History, sem IA nova, cut plan ou Apply habilitado.
+O consumidor mínimo antes proposto foi autorizado separadamente e integrado
+pelo [PR #77](https://github.com/inlifemedicina/cevra/pull/77), com contexto/revisão
+no host, contratos tipados e PT/EN. O [Draft #78](https://github.com/inlifemedicina/cevra/pull/78)
+admite somente o par F-A02 designado numa revisão temporária offline. O native
+build anterior foi demonstrado, mas essa PR e o ajuste visual posterior continuam
+sem merge. Não repetir a antiga decisão de autorizar o consumidor como se ainda
+estivesse ausente; escopo maior/persistência, cortes/export e análise completa
+continuam seus próprios gates.
 
-| Viabilidade no baseline integrado | Trabalho mínimo adicional |
-|---|---|
-| [EditorialDraftService](../packages/application/src/editorial-draft.ts) já cria/revisa propostas e invalida contexto/revisão; a demonstração F-A02 produziu cinco blocos preservando fonte, original e redo. | Consumir esse serviço; manter o objeto válido no host. JSON da tela não pode substituir a identidade de revisão emitida pelo serviço. |
-| [DesktopBackend](../apps/desktop/src/backend/desktop-backend.ts) não tem métodos de consulta/revisão editorial; [DesktopSession](../apps/desktop-host/src/session.ts) não possui a análise aceita/draft. | Definir contratos fechados de consulta/revisão, propriedade da análise aceita e binding à mesma History; revisar o alcance de permissão do host. |
-| [DirectorPanel](../apps/desktop/src/components/DirectorPanel.tsx) apresenta pedido textual/Change Set fixture; [backend Tauri](../apps/desktop/src/backend/tauri-desktop-backend.ts) mantém Director/Apply indisponíveis. | Uma apresentação real com PT-BR/EN-US, revisão localizada e estados de indisponível/stale, sem inventar execução ou timeline editada. |
+O owner observou leitura do conteúdo, título/nota preservados e reorder; clareza
+visual média motivou separar os cards e distinguir fonte de posição do bloco.
+Isso não prova salvar/navegar/descartar nem aceite geral. A janela aberta continua
+preservada; o delta não é automaticamente aceito por ter testes de UI verdes.
+Número por fonte é consistente nas superfícies e estável durante a janela;
+durabilidade após reabrir exige aprovação do contrato mínimo de histórico,
+compatibilidade e testes, antes de implementar. Ícone de tipo não é miniatura real.
 
-**Bloqueio concreto:** o #75 aprovou/entregou somente Application. Esse consumidor
-adiciona função de produto e contrato/permissão host/UI; a implementação fica
-pendente de decisão de escopo, em vez de ampliar o pacote fechado durante a noite.
-O caminho mínimo não requer nova dependência, provider, armazenamento remoto ou
-formato durável; persistência/importação de análises não é presumida.
+<a id="vids-editorial-profile-2026-10-03"></a>
 
-Critérios propostos: revisar a sequência demonstrada, inspecionar E1/E2, preservar
-condição/ressalvas/citações PARTIAL, rejeitar remoção/citação alterada e stale,
-manter history/redo e não oferecer cortes/export sem capability. Reusar o catálogo
-existente; esta revisão de proposta não homologa estratégia D9 nem I1-T1.
-Na manhã seguinte, o teste humano disponível é julgar a sequência/justificativas
-da demonstração e decidir essa primeira fatia de consumidor; testes de UI/corte
-aguardam implementação, não devem ser simulados como executados.
+### Perfil editorial opcional — PLANEJAMENTO APROVADO / NÃO IMPLEMENTADO
 
-Pendências: validar com usuários os três atalhos e a revisão localizada; decidir
-o consumidor e a próxima fatia temporal/estratégia no catálogo; medir reuso e
+Solicitação aprovada em 2026-10-03: contextualizar temas, texto e seleção editorial
+com perfil-base opcional sem login obrigatório, ajustável por projeto. A definição
+canônica dos campos mínimos, idade secundária/opcional, precedência, fidelidade
+às fontes, privacidade e envio proporcional está em
+[master §4.3](CEVRA_MASTER_CONTEXT.md#43-optional-editorial-profile--planning-approved-not-implemented).
+O perfil não é fato, fala ou prova de competência e não concede autorização de IA.
+
+**Posição:** linha 1a do cronograma por resultados, após estabilização/aceite do
+fluxo atual; integrar quando a próxima fatia autorizada de brief/constraints for
+consumida pela estratégia/takes. Sem nova data, mudança dos marcos aprovados ou
+aumento de 55%. Os gates Media Runtime, plano temporal, Cut Compiler/QA,
+preview/export e integrações mantêm suas dependências atuais.
+
+**Viabilidade e decisões antes de implementar:** brief limitado e contexto compacto
+já são primitivas; perfil salvo, resolver de overrides, schema, UI/consentimento e
+persistência não estão entregues. Definir uma fatia proporcional PT/EN,
+armazenamento local/lifecycle/limpeza, versão/compatibilidade, confirmação do
+contexto externo e invalidação/revisão. Variante mínima: brief opcional apenas do
+projeto, sem perfil-base salvo. Reusar o catálogo de aceitação; nenhuma conta,
+coleta, envio, provider/modelo ou novo armazenamento é criado por este registro.
+**Director impact:** extensão de planejamento compatível; decisões técnicas e de
+consentimento detalhadas permanecem gates.
+
+Pendências: validar com usuários os três atalhos e a revisão localizada; concluir aceite
+do consumidor integrado e decidir a próxima fatia temporal/estratégia no catálogo; medir reuso e
 custo reais quando uma execução for separadamente autorizada. **Director impact:**
 refinamento compatível de planejamento; intenção, constraints e evidência seguem
 para o mesmo plano tipado, sem nova autoridade de provider/engine/History.

@@ -1,9 +1,6 @@
 # Offline Editorial Draft V1
 
-**Status:** IMPLEMENTED / CLOSED — bounded Application slice integrated by
-[PR #75](https://github.com/inlifemedicina/cevra/pull/75) after #74, with reviewed
-tree and green post-merge CI/Exact Runtime recorded in
-[master §24.1](CEVRA_MASTER_CONTEXT.md#241-main). Editing UI remains pending.
+**Status:** Application service INTEGRATED via PR #75 after #74. Offline host/backend/UI review consumer INTEGRATED via PR #77. Designated F-A02 offline admission IN DEVELOPMENT / NOT MERGED; scope below.
 
 The owner explicitly approved the smallest offline passage from the existing
 F-A02 analysis candidate to a source-linked, user-reviewable editorial proposal.
@@ -96,12 +93,54 @@ of editing or subjective narrative quality.
 D5-T1/D4-T2/D3-T2 inform preservation; D9-T1/T2 inform the reviewable proposal.
 The existing acceptance catalog remains the authority: integrated mounting and
 I1-T1's plan/Change Set remain blocked beyond this Application-only slice.
-The next gate is a separately scoped consumer/strategy decision after integration
-of this bounded proposal; timing-backed take/cut planning
-retains its existing evidence and typed-command prerequisites. No new live
-scenario, model, feature, UI surface, engine, quota or merge is authorized here.
+The Application service is integrated; the owner subsequently approved the
+bounded offline consumer described below. Further strategy requires its own decision; timing-backed take/cut planning
+retains its existing evidence and typed-command prerequisites. The original Application-only approval authorized no new live scenario, model,
+UI surface, engine, quota or merge; the later consumer approval below is separately bounded.
 
 **Director impact:** compatible extension. A future Director/presentation
 consumer may request and display/revise this derived proposal; it receives no
 additional provider, engine, History or execution authority. Progress remains
 55%; the one real F-A02 allocation remains exhausted 1/1 with zero remaining.
+
+
+<a id="offline-review-consumer"></a>
+
+## Offline host/backend/UI review consumer — 2026-10-03
+
+**Status:** INTEGRATED via PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`, post-merge CI `37127986470` SUCCESS 5/5 and Exact Runtime `37127986468` SUCCESS 1/1 (attempt 1). The owner approved the smallest proposed panel after the morning report. It occupies the existing Director review area, replacing its static 12-change fixture with accepted-analysis review or an honest empty/stale state. Preview and timeline remain the same project surface. PT-BR and EN-US localize controls/status/errors; original analysis text and user content retain their own language.
+
+`DesktopSession.acceptEditorialAnalysis` is a trusted **in-process Application handoff**, not a WebView/JSONL method, file importer, authentication mechanism or persisted record. The caller supplies an already accepted `CreateEditorialDraftRequest` and the matching history. `EditorialDraftService.create` revalidates the original closed contract, source citations, provenance fields and legacy binding. Admission is one-shot per host session: a second handoff is rejected, preventing a previous revision-0 client from editing a replacement context. Another accepted analysis requires a new host session with its matching history. The host keeps the accepted analysis and the exact service-issued revision privately; snapshot queries return a detached presentation copy. The existing first-ingestion limitation remains: no new historical full-journal witness, transport receipt authentication or semantic re-proof is invented.
+
+Only `editorial.snapshot` / `editorial.revise` and their corresponding `desktop_get_editorial_draft` / `desktop_revise_editorial_draft` commands are added to the main-window ACL. There is no generic invoke, admission, provider, shell, filesystem or network permission. Revision accepts the existing expected revision/title/block-order/block-edit contract; service identity never crosses the UI boundary. The same-history binding and service journal witness disable revisions after canonical changes, undo/redo changes or replaced journal branches. Rejected revisions retain the valid prior draft. Draft presentation revisions do not change Project IR, its journal/checkpoints or redo history. No persistent draft undo/recovery format is introduced.
+
+The panel exposes five source-linked blocks, original assertions, justifications, uncertainty, caveat badges, relations/limitations and unchanged prior checks/PARTIAL assessment. Source actions select the existing canonical source; they do not seek to fabricated cut timing. Moving a block preserves unsaved title/note edits in the same revision request. Unsaved fields survive workspace navigation and refresh of the same draft revision; a local discard action restores the current titles/notes without changing the service, project or saved order. Invalid or concurrent revisions require refresh; stale proposals expose no editable blocks. The original analysis/citations/caveats cannot be deleted or rewritten. Session-only retention is visible; apply remains unavailable.
+
+The production host starts empty until a trusted Application producer performs the handoff. The original #77 slice added no saved-analysis picker, disk loading, analysis persistence, provider invocation or automatic recovery of drafts. The subsequent designated admission approval below permits its exact local file pair. These unavailable behaviors must not be implied by the fixture.
+
+### Offline verification and visible fixture
+
+One canonical synthetic fixture is `apps/desktop/src/fixtures/editorial-review.json`; it preserves the prior textual scenario, five observations, two caveats, two relations, explicit PARTIAL assessment and a redo branch. It contains synthetic identities/provenance only, not the private F-A02 result, receipt, ledger or paths. Host protocol tests use this same fixture. The explicit development URL `?editorial-fixture=1` selects a presentation adapter using the original Application service; it is excluded from production builds and is not proof of native saved-result admission. The browser-safe `@cevra/application/editorial-draft` export exposes the existing service without loading Node-only media URI code into this development fixture.
+
+Automated checks cover trusted admission, matching/foreign bindings, detached query copies, closed revisions, unsupported analysis/draft/command fields, immutable citations and prior assessment, title/note/order editing, retained redo, canonical staleness, UI source selection and locale parity. The full native host path and visible browser fixture have distinct evidence; neither calls a provider. Native compile/ACL and supported-Python runtime coverage are required CI gates. Review/CI do not replace subjective owner acceptance of the panel or narrative quality. D4-T2/D5-T1 and D9-T1/T2 inform this bounded source-linked review; strategy/mounting and I1-T1's plan/Change Set remain BLOCKED beyond this consumer.
+
+Local pre-publication verification passed TypeScript and the production Vite build, all 53 desktop tests and all eight new host protocol tests. The combined Application/host suite passed 319/321: two existing managed-transcription availability tests failed with the available Python 3.9 runtime, which does not satisfy the supported Python 3.12 gate. Their expectations were preserved; no runtime was installed or test skipped. Native Rust compilation is unavailable locally and remains a required CI check. The production bundle contains no synthetic-analysis/context markers or fixture selector. Controlled Chrome demonstration passed PT/EN display, five blocks/two caveats/PARTIAL, title/note editing and reorder without project revision changes, source selection, navigation, local discard and stale rejection after canonical redo. Screenshots and detailed local evidence remain outside the repository. Final independent review and remote CI evidence belong in the Draft PR; this record does not claim their completion in advance.
+
+**Director impact:** compatible proposal-review extension. No provider/engine, canonical edit, cut, timing, export or persistent admission authority is added. Progress remains 55%; F-A02 remains closed/exhausted 1/1 with zero remaining.
+
+
+<a id="designated-fa02-admission"></a>
+
+## Designated F-A02 native offline admission — owner approved 2026-10-03
+
+**Status:** IN DEVELOPMENT / NOT MERGED on `feat/offline-fa02-native-review`, based on integrated #77. This implements the owner-approved local reading of the existing F-A02 result and matching history into a temporary review session. It is deliberately limited to this designated pair, not a general import, analyzer or persistent analysis store.
+
+Native startup accepts exactly `--cevra-fa02-review ROOT RESULT_SHA256 HISTORY_SHA256`. The trusted designation identifies a canonical absolute directory and the previously recorded byte hashes of `first-fa-result.private.json` and `history-archive.json`. Those private paths/hashes are supplied outside the repository and are never WebView arguments. The host validates regular files, bounded bytes, no symlink/alias, stable read identity and exact hashes. It requires the original terminal F-A wrapper and existing analysis contract, then uses `ProjectHistory.fromArchive` and `EditorialDraftService.create` to validate the corresponding project, transcript citations, binding and provenance schema. Hashes identify the selected bytes; they do not authenticate historical provider transport or grant execution permission. The pre-existing first-ingestion full-journal-witness limitation remains explicit. The original producer intentionally records `providerContact: UNKNOWN`; admission preserves that uncertainty instead of rewriting it to confirmed contact.
+
+The host selects this path before opening the active Project Store, runtime, model cache or engines. The session shows **Temporary review · not saved** in PT/EN. Only existing proposal snapshot/revision operations are available; canonical undo/redo, ingest and transcription are unavailable and rejected by the host. Draft edits remain in memory; original artifact bytes and history are retained exactly. Closing loses those proposal edits. Explicitly launching a new session rereads the same pinned pair at revision zero; automatic host recovery cannot re-admit it. A changed, incomplete or invalid designation fails closed without falling back to the ordinary saved project. Ordinary startup behavior is unchanged.
+
+No new Tauri command, WebView filesystem permission, shell permission, CSP exemption, provider call, reservation, timing/cut, apply or export is added. The existing eight command ACL and environment clearing remain. The three new host values come solely from the explicit native startup tuple, without inherited credentials or runtime settings. Private originals, paths, execution/session identifiers and byte hashes are not committed. Tests use the existing canonical synthetic fixture; the actual F-A02 pair is verified only locally. The exact prior PARTIAL assessment and literal helper flags remain separate from schema validation.
+
+Local verification has exercised the actual pair through the real host factory: five blocks, two caveats, PARTIAL, editing/reorder, unchanged project and unchanged original bytes, with zero provider calls. A production-frontend/real-JSONL-host rehearsal also passed PT/EN display, source selection, title/note editing, reorder, workspace navigation, unsaved discard and disabled canonical history controls; only the browser transport substituted the native invoke bridge. Screenshots and detailed evidence remain outside the repository. Twelve targeted host tests and 54 Desktop tests passed; TypeScript and production build passed. Local native Rust compilation/window proof remains unavailable because Cargo is absent and the installed binary predates the editorial commands. Native compilation and the startup-parser tests are required CI gates; a frontend/host rehearsal is not a claim of native-window or Product Owner acceptance.
+
+**Director impact:** compatible bounded offline admission/review extension. Product Owner visual/narrative acceptance remains pending; strategy/mounting/I1-T1 and other broader capabilities retain their original gates. Progress stays 55%; F-A02 stays closed/exhausted 1/1.

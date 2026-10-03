@@ -72,6 +72,11 @@ export interface ReviseEditorialDraftRequest {
   blockEdits?: ReadonlyArray<{ blockId: string; title?: string; userNote?: string }>;
 }
 
+/** Presentation availability; the draft remains a service-owned derived proposal. */
+export type EditorialDraftState =
+  | { readonly status: "empty" | "stale" }
+  | { readonly status: "current"; readonly draft: EditorialDraftV1 };
+
 /** Offline, process-local proposal projection. No adapter, engine, command or persistence port. */
 export class EditorialDraftService {
   private readonly records = new WeakMap<EditorialDraftV1, { latest: EditorialDraftV1; journal: string }>();
