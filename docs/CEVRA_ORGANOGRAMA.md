@@ -487,3 +487,19 @@ do consumidor integrado e decidir a próxima fatia temporal/estratégia no catá
 custo reais quando uma execução for separadamente autorizada. **Director impact:**
 refinamento compatível de planejamento; intenção, constraints e evidência seguem
 para o mesmo plano tipado, sem nova autoridade de provider/engine/History.
+
+
+### Visual/source numbering — active implementation reconciled 2026-10-03
+
+[Draft PR #78](https://github.com/inlifemedicina/cevra/pull/78) contains the
+owner-approved visual clarification and stable source-numbering implementation,
+IN DEVELOPMENT / NOT MERGED. The frozen reviewed native visual is `dd7f1e4`
+(window-only numbers); the durable follow-up is `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8`.
+Existing History/Store, one project counter outside undo, archive/package V3
+and V1/V2 read compatibility implement the approved bounded evolution. Earlier
+format-approval gates are superseded; lost/never-persisted labels remain
+unrecoverable. Details: [offline review record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#subsequent-visual-and-stable-numbering-approval--2026-10-03).
+PR #76 remains documentation-only; profile planning has no implementation.
+Human visual/narrative acceptance and final branding stay pending; notes remain
+in memory. Director impact is compatible presentation identity; no progress
+increase, new provider allocation or broader strategy/take/cut authority.

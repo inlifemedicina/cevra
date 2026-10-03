@@ -141,6 +141,33 @@ The host selects this path before opening the active Project Store, runtime, mod
 
 No new Tauri command, WebView filesystem permission, shell permission, CSP exemption, provider call, reservation, timing/cut, apply or export is added. The existing eight command ACL and environment clearing remain. The three new host values come solely from the explicit native startup tuple, without inherited credentials or runtime settings. Private originals, paths, execution/session identifiers and byte hashes are not committed. Tests use the existing canonical synthetic fixture; the actual F-A02 pair is verified only locally. The exact prior PARTIAL assessment and literal helper flags remain separate from schema validation.
 
-Local verification has exercised the actual pair through the real host factory: five blocks, two caveats, PARTIAL, editing/reorder, unchanged project and unchanged original bytes, with zero provider calls. A production-frontend/real-JSONL-host rehearsal also passed PT/EN display, source selection, title/note editing, reorder, workspace navigation, unsaved discard and disabled canonical history controls; only the browser transport substituted the native invoke bridge. Screenshots and detailed evidence remain outside the repository. Twelve targeted host tests and 54 Desktop tests passed; TypeScript and production build passed. Local native Rust compilation/window proof remains unavailable because Cargo is absent and the installed binary predates the editorial commands. Native compilation and the startup-parser tests are required CI gates; a frontend/host rehearsal is not a claim of native-window or Product Owner acceptance.
+Local verification has exercised the actual pair through the real host factory: five blocks, two caveats, PARTIAL, editing/reorder, unchanged project and unchanged original bytes, with zero provider calls. A production-frontend/real-JSONL-host rehearsal also passed PT/EN display, source selection, title/note editing, reorder, workspace navigation, unsaved discard and disabled canonical history controls; only the browser transport substituted the native invoke bridge. Twelve targeted host tests and 54 Desktop tests passed at the original admission checkpoint. Subsequently, private pinned build tools enabled a successful native build and actual window verification. The reviewed visual commit `dd7f1e4` was built and opened as a separate native instance, preserving the older instance and original pair. Screenshots and detailed evidence remain outside the repository. This proves the displayed native visual at that commit; overall Product Owner acceptance remains pending.
 
 **Director impact:** compatible bounded offline admission/review extension. Product Owner visual/narrative acceptance remains pending; strategy/mounting/I1-T1 and other broader capabilities retain their original gates. Progress stays 55%; F-A02 stays closed/exhausted 1/1.
+
+
+## Subsequent visual and stable-numbering approval — 2026-10-03
+
+[Draft PR #78](https://github.com/inlifemedicina/cevra/pull/78) contains the
+owner-approved clearer editorial cards/shared source labels and the subsequent
+bounded durable-numbering evolution. The reviewed visual demo at `dd7f1e4`
+remains a separate native instance with window-only numbers; the older instance
+and original pair were preserved. Final visual identity and human acceptance
+remain pending.
+
+The follow-up at `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8` is IN DEVELOPMENT /
+NOT MERGED: existing ProjectHistory owns source-ID/number reservations and one
+monotonic project counter outside undo, and existing ProjectStore writes V3
+while reading V1/V2. It adds no database or audiovisual IR shape. Valid legacy
+opening initializes metadata in memory without rewriting saved files; old labels
+never persisted cannot be reconstructed. Recovery retains the registry of the
+valid recovered checkpoint. The format and approved limits are recorded in
+[ADR 0031 in the implementation commit](https://github.com/inlifemedicina/cevra/blob/3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8/docs/adr/0031-stable-source-numbering-v1.md).
+
+The implementation tree received independent APPROVE and passed the local
+production build plus IR 59/59, Store 15/15, Transcription 50/50, Alignment 33/33,
+Host 88/88 and UI 58/58 tests. Exact-head CI remains the implementation PR's
+gate. This documentation track adds no feature code or profile implementation.
+Editorial review notes remain in memory and no real owner project is migrated
+by these tests. Director impact is compatible presentation identity; progress
+stays 55%, broader agent gates remain open and F-A02 stays exhausted 1/1.

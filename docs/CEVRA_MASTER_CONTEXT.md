@@ -2793,3 +2793,24 @@ PR #77 is integrated at `73f8427ac18337f779ceeda9c93f60edf35df33b`; post-merge C
 The owner explicitly approved local reading of the already obtained F-A02 result and its corresponding history on 2026-10-03 at 14:33 UTC. The bounded addition on `feat/offline-fa02-native-review` is IN DEVELOPMENT / NOT MERGED: a native startup designation supplies one directory and two previously pinned hashes; the host reads only the two designated artifact names and creates a temporary in-memory review session. It uses existing history/draft validation, preserves PARTIAL and original assertions, and disables canonical project operations. The ordinary project store, engines, credentials and provider are not opened by this mode; no durable proposal or automatic recovery/import path is added. The historical `providerContact: UNKNOWN` stays unknown. This approval grants the designated offline admission, not a general importer or authority from serialized flags.
 
 Implementation and validation details are in [Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Director impact: compatible review/admission extension; no provider, engine, timing/cut or execution authority. Progress stays 55%; F-A02 remains exhausted 1/1.
+
+
+### Current visual/source-numbering work — owner-approved bounded follow-up, 2026-10-03
+
+[Draft PR #78](https://github.com/inlifemedicina/cevra/pull/78) now contains the
+reviewed visual clarification plus approved durable source numbers. Its follow-up
+commit `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8` is IN DEVELOPMENT / NOT MERGED.
+Existing ProjectHistory/ProjectStore owns a versioned source-ID registry and
+monotonic counter outside undo; archive/package V3 reads V1/V2 without rewriting
+a valid legacy checkpoint on open. No new database or audiovisual IR shape is
+introduced. Legacy labels never stored and reservations absent from a recovered
+checkpoint cannot be reconstructed. This supersedes any earlier pending-format
+approval checkpoint; approval is already granted.
+
+The separately verified `dd7f1e4` native visual remains frozen with window-only
+numbering; the older instance and original pair were preserved. Human acceptance
+and final typography/colors/logo/icons are pending. Details and test evidence
+remain in [the offline review record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#subsequent-visual-and-stable-numbering-approval--2026-10-03).
+PR #76 stays documentation-only; optional profile §4.3 remains PLANNING APPROVED /
+NOT IMPLEMENTED. Compatible Director presentation identity adds no provider or
+execution authority; editorial notes stay in memory, progress 55%, F-A02 1/1.
