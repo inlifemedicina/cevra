@@ -1,6 +1,9 @@
 # Offline Editorial Draft V1
 
-**Status:** IMPLEMENTED / IN REVIEW; not integrated or a delivered editing UI.
+**Status:** IMPLEMENTED / CLOSED — bounded Application slice integrated by
+[PR #75](https://github.com/inlifemedicina/cevra/pull/75) after #74, with reviewed
+tree and green post-merge CI/Exact Runtime recorded in
+[master §24.1](CEVRA_MASTER_CONTEXT.md#241-main). Editing UI remains pending.
 
 The owner explicitly approved the smallest offline passage from the existing
 F-A02 analysis candidate to a source-linked, user-reviewable editorial proposal.
@@ -93,8 +96,8 @@ of editing or subjective narrative quality.
 D5-T1/D4-T2/D3-T2 inform preservation; D9-T1/T2 inform the reviewable proposal.
 The existing acceptance catalog remains the authority: integrated mounting and
 I1-T1's plan/Change Set remain blocked beyond this Application-only slice.
-The next gate is review/integration of this bounded proposal, followed by a
-separately scoped consumer/strategy decision; timing-backed take/cut planning
+The next gate is a separately scoped consumer/strategy decision after integration
+of this bounded proposal; timing-backed take/cut planning
 retains its existing evidence and typed-command prerequisites. No new live
 scenario, model, feature, UI surface, engine, quota or merge is authorized here.
 
