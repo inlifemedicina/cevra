@@ -1,4 +1,4 @@
-import type { ProjectIR } from "@cevra/project-ir";
+import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
@@ -38,6 +38,7 @@ export interface CapabilityState {
 
 export interface DesktopHostState {
   project: ProjectIR;
+  sourceNumbering: SourceNumberingV1;
   canUndo: boolean;
   canRedo: boolean;
   status: {

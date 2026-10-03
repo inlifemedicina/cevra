@@ -1,4 +1,4 @@
-import type { ProjectIR } from "@cevra/project-ir";
+import { sourceNumberingForSources, type ProjectIR } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import { createDemoProject } from "../fixtures/demo-project";
 import type { DesktopBackend, DesktopBackendState, DesktopCapabilityState, ImportMediaResult } from "./desktop-backend";
@@ -32,6 +32,7 @@ export class DemoDesktopBackend implements DesktopBackend {
 function demoState(project: Readonly<ProjectIR>): DesktopBackendState {
   return {
     project,
+    sourceNumbering: sourceNumberingForSources(project.sources),
     canUndo: false,
     canRedo: false,
     status: "demo-not-persisted",

@@ -1,8 +1,8 @@
-import { SourcePresentationRegistry } from "./source-presentation";
+import { presentSources } from "./source-presentation";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { translate, translationKeys } from "@cevra/i18n";
-import { createEmptyProject, createSourceTranscript, ProjectHistory, validateProjectIR, type ProjectIR } from "@cevra/project-ir";
+import { createEmptyProject, createSourceTranscript, sourceNumberingForSources, ProjectHistory, validateProjectIR, type ProjectIR } from "@cevra/project-ir";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
@@ -55,7 +55,7 @@ class MultiSourceDemoDesktopBackend extends DemoDesktopBackend {
         }]
       }
     }));
-    return { ...state, project };
+    return { ...state, project, sourceNumbering: sourceNumberingForSources(project.sources) };
   }
 }
 
@@ -93,6 +93,7 @@ class FunctionalDesktopBackend implements DesktopBackend {
   state(project = this.history.current): DesktopBackendState {
     return {
       project,
+      sourceNumbering: this.history.sourceNumbering,
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
       status: "local-unsaved",
@@ -280,7 +281,7 @@ describe("CEVRA Vids desktop shell", () => {
 
   it("renders a neutral inspector state for an unresolved selection", () => {
     const project = createDemoProject();
-    render(<Inspector presentations={new SourcePresentationRegistry().present(project.project.id, project.sources, (key, parameters) => translate("pt-BR", key, parameters))} project={project} selectedProjectItemId="segment-1" workspace="edit" t={(key, parameters = {}) => translate("pt-BR", key, parameters)} />);
+    render(<Inspector presentations={presentSources(project.sources, sourceNumberingForSources(project.sources), (key, parameters) => translate("pt-BR", key, parameters))} project={project} selectedProjectItemId="segment-1" workspace="edit" t={(key, parameters = {}) => translate("pt-BR", key, parameters)} />);
     expect(screen.getByText("Selecione um item do projeto para inspecionar suas propriedades.")).toBeTruthy();
     expect(screen.queryByText("Selecionado: segment-1")).toBeNull();
   });
@@ -367,6 +368,7 @@ describe("CEVRA Vids desktop shell", () => {
     const empty = new FunctionalDesktopBackend().state();
     const hostState = {
       project: empty.project,
+      sourceNumbering: empty.sourceNumbering,
       canUndo: false,
       canRedo: false,
       status: { hostAvailable: true, persistence: "local-unsaved" as const },
@@ -525,6 +527,7 @@ describe("CEVRA Vids desktop shell", () => {
     const backend = new TauriDesktopBackend(async () => {
       throw { code: "OPERATION_TIMEOUT", message: "safe", details: { state: {
         project: state.project,
+        sourceNumbering: state.sourceNumbering,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
         status: { hostAvailable: true, persistence: "local-unsaved" },
@@ -545,6 +548,7 @@ describe("CEVRA Vids desktop shell", () => {
     for (const persistence of ["local-saved", "local-recovered", "persistence-error"] as const) {
       const backend = new TauriDesktopBackend(async () => ({
         project: state.project,
+        sourceNumbering: state.sourceNumbering,
         canUndo: false,
         canRedo: false,
         status: { hostAvailable: true, persistence },
@@ -580,6 +584,7 @@ describe("CEVRA Vids desktop shell", () => {
     const backend = new TauriDesktopBackend(async () => {
       throw { code: "HOST_RECOVERED", details: { state: {
         project: state.project,
+        sourceNumbering: state.sourceNumbering,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
         status: { hostAvailable: true, persistence: "local-recovered" },
@@ -620,3 +625,14 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+it("rejects missing or colliding host numbering before using it for source labels", async () => {
+  const project = createDemoProject();
+  const valid = sourceNumberingForSources(project.sources);
+  const malformed = structuredClone(valid);
+  malformed.sources.push({ ...malformed.sources[0] });
+  for (const sourceNumbering of [undefined, malformed]) {
+    const backend = new TauriDesktopBackend(async () => ({ project, sourceNumbering, canUndo: false, canRedo: false, status: { hostAvailable: true, persistence: "local-saved" }, capabilities: { mediaImport: { available: false, reason: "runtime-not-configured" }, transcription: { available: false, reason: "runtime-not-configured" } } }) as never);
+    await expect(backend.loadState()).rejects.toThrow(/source numbering|Source numbering/i);
+  }
+});

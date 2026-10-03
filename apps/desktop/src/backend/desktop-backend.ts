@@ -1,4 +1,4 @@
-import type { ProjectIR } from "@cevra/project-ir";
+import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 
 export type DesktopCapability = "media.import" | "director.execute" | "changes.apply" | "project.export";
@@ -12,6 +12,7 @@ export interface DesktopCapabilityState {
 
 export interface DesktopBackendState {
   readonly project: Readonly<ProjectIR>;
+  readonly sourceNumbering: SourceNumberingV1;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable" | "temporary-review";

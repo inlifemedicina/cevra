@@ -1,3 +1,4 @@
+import { assertValidSourceNumbering, SourceNumberRegistry, type SourceNumberingV1 } from "./source-numbering.js";
 import { applyCommand } from "./commands.js";
 import {
   computeHistoryTranscriptBlobDigest,
@@ -69,7 +70,12 @@ export interface HistoryArchiveV2 {
   cursorSnapshotId: Id;
 }
 
-export type HistoryArchive = HistoryArchiveV1 | HistoryArchiveV2;
+export interface HistoryArchiveV3 extends Omit<HistoryArchiveV2, "version"> {
+  version: 3;
+  sourceNumbering: SourceNumberingV1;
+}
+
+export type HistoryArchive = HistoryArchiveV1 | HistoryArchiveV2 | HistoryArchiveV3;
 
 export class ProjectHistory {
   private readonly idGenerator: () => string;
@@ -78,11 +84,13 @@ export class ProjectHistory {
   private snapshotsInternal: CompactProjectSnapshot[] = [];
   private transcriptBlobs = new Map<HistoryTranscriptBlobDigest, SourceTranscript>();
   private cursor = 0;
+  private sourceNumbers = new SourceNumberRegistry();
 
   constructor(initialProject: ProjectIR, options: HistoryOptions = {}) {
     this.idGenerator = options.idGenerator ?? defaultId;
     this.clock = options.clock ?? (() => new Date().toISOString());
     const project = assertValidProjectIR(initialProject);
+    for (const source of project.sources) this.sourceNumbers.reserve(source);
     for (const transcript of project.sourceTranscripts) computeHistoryTranscriptBlobDigest(transcript);
     const now = this.clock();
     const snapshotId = this.idGenerator();
@@ -130,7 +138,11 @@ export class ProjectHistory {
     return [...uris];
   }
 
-  toArchive(): HistoryArchiveV2 {
+  get sourceNumbering(): SourceNumberingV1 {
+    return this.sourceNumbers.toRegistry();
+  }
+
+  toArchive(): HistoryArchiveV3 {
     const reachable = new Set<HistoryTranscriptBlobDigest>();
     for (const snapshot of this.snapshotsInternal) {
       for (const ref of snapshot.sourceTranscriptRefs) reachable.add(ref.digest);
@@ -141,7 +153,8 @@ export class ProjectHistory {
       return { digest, transcript: clone(transcript) };
     });
     return {
-      version: 2,
+      version: 3,
+      sourceNumbering: this.sourceNumbering,
       entries: clone(this.entriesInternal),
       snapshots: clone(this.snapshotsInternal),
       transcriptBlobs,
@@ -150,6 +163,7 @@ export class ProjectHistory {
   }
 
   static fromArchive(archive: HistoryArchive, options: HistoryOptions = {}): ProjectHistory {
+    if (archive.version !== 3 && Object.hasOwn(archive, "sourceNumbering")) throw new Error("Source numbering requires history archive version 3.");
     if (archive.version === 1) {
       validateArchiveV1(archive);
       const history = new ProjectHistory(archive.snapshots[0]!.project, options);
@@ -160,9 +174,10 @@ export class ProjectHistory {
         history.snapshotsInternal.push(history.compactSnapshot(snapshot.id, snapshot.revision, snapshot.createdAt, snapshot.project));
       }
       history.restoreArchiveCursor(archive.cursorSnapshotId);
+      history.initializeSourceNumbering();
       return history;
     }
-    if (archive.version === 2) {
+    if (archive.version === 2 || archive.version === 3) {
       const blobs = validateArchiveV2(archive);
       const first = materializeSnapshot(archive.snapshots[0]!, blobs);
       const history = new ProjectHistory(first, options);
@@ -170,6 +185,12 @@ export class ProjectHistory {
       history.snapshotsInternal = clone(archive.snapshots);
       history.transcriptBlobs = new Map([...blobs].map(([digest, transcript]) => [digest, clone(transcript)]));
       history.restoreArchiveCursor(archive.cursorSnapshotId);
+      if (archive.version === 3) {
+        history.sourceNumbers = new SourceNumberRegistry(assertValidSourceNumbering(archive.sourceNumbering));
+        for (const snapshot of history.snapshotsInternal) {
+          for (const source of snapshot.project.sources) history.sourceNumbers.assertReserved(source);
+        }
+      } else history.initializeSourceNumbering();
       return history;
     }
     throw new Error(`Unsupported history archive version ${String((archive as { version?: unknown }).version)}.`);
@@ -209,6 +230,7 @@ export class ProjectHistory {
       ? this.entriesInternal.filter((item) => item.revision <= retainedSnapshots[retainedSnapshots.length - 1]!.revision)
       : [...this.entriesInternal];
 
+    if (command.type === "source.add") this.sourceNumbers.reserve(validated.sources.find(source => source.id === command.source.id)!);
     this.entriesInternal = [...retainedEntries, entry];
     this.snapshotsInternal = [...retainedSnapshots, snapshot];
     this.cursor = this.snapshotsInternal.length - 1;
@@ -232,6 +254,15 @@ export class ProjectHistory {
     if (index < 0) throw new Error(`Unknown snapshot ${snapshotId}.`);
     this.cursor = index;
     return this.current;
+  }
+
+  private initializeSourceNumbering(): void {
+    // Old archives never recorded labels. Seed once from retained snapshot order;
+    // discarded historical branches/labels cannot be reconstructed.
+    this.sourceNumbers = new SourceNumberRegistry();
+    for (const snapshot of this.snapshotsInternal) {
+      for (const source of snapshot.project.sources) this.sourceNumbers.reserve(source);
+    }
   }
 
   private compactSnapshot(
@@ -326,7 +357,7 @@ function validateArchiveV1(archive: HistoryArchiveV1): void {
   }), archive.entries, archive.cursorSnapshotId);
 }
 
-function validateArchiveV2(archive: HistoryArchiveV2): Map<HistoryTranscriptBlobDigest, SourceTranscript> {
+function validateArchiveV2(archive: HistoryArchiveV2 | HistoryArchiveV3): Map<HistoryTranscriptBlobDigest, SourceTranscript> {
   if (!Array.isArray(archive.snapshots) || archive.snapshots.length === 0) throw new Error("History archive must contain at least one snapshot.");
   if (!Array.isArray(archive.entries)) throw new Error("History archive entries must be an array.");
   if (!Array.isArray(archive.transcriptBlobs)) throw new Error("History archive transcriptBlobs must be an array.");

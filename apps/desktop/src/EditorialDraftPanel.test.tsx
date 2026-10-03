@@ -1,4 +1,4 @@
-import { SourcePresentationRegistry } from "./source-presentation";
+import { presentSources } from "./source-presentation";
 import { translate } from "@cevra/i18n";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -104,7 +104,7 @@ it("resets local edits when analysis identity changes at the same draft id and r
   const sourceBackend = new EditorialFixtureBackend();
   const state = await sourceBackend.loadEditorialDraft();
   if (state.status !== "current") throw new Error("fixture unavailable");
-  const props = { presentations: new SourcePresentationRegistry().present(sourceBackend.history.current.project.id, sourceBackend.history.current.sources, (key, parameters) => translate("pt-BR", key, parameters)), busy: false, error: false, t: (key: Parameters<typeof translate>[1]) => translate("pt-BR", key), onRefresh() {}, async onRevise() {}, onSourceSelect() {} };
+  const props = { presentations: presentSources(sourceBackend.history.current.sources, sourceBackend.history.sourceNumbering, (key, parameters) => translate("pt-BR", key, parameters)), busy: false, error: false, t: (key: Parameters<typeof translate>[1]) => translate("pt-BR", key), onRefresh() {}, async onRevise() {}, onSourceSelect() {} };
   const { rerender } = render(<EditorialDraftPanel state={state} {...props} />);
   fireEvent.change(screen.getAllByLabelText("Título do bloco")[0], { target: { value: "Nota do contexto anterior" } });
   const draft = { ...state.draft, analysis: { ...state.draft.analysis, contextId: "another-synthetic-context", candidate: { ...state.draft.analysis.candidate, observations: state.draft.analysis.candidate.observations.map(item => ({ ...item, id: `next-${item.id}` })) } }, blocks: state.draft.blocks.map(item => ({ ...item, id: `next-${item.id}`, observationId: `next-${item.observationId}`, title: "Novo contexto" })) };
@@ -116,7 +116,7 @@ it("reviews through the existing native commands while temporary-session canonic
   const source = new EditorialFixtureBackend(); const state = await source.loadState(); const calls: string[] = [];
   const backend = new TauriDesktopBackend(async (command, args) => {
     calls.push(command);
-    if (command === "desktop_get_state") return { project: state.project, canUndo: false, canRedo: false,
+    if (command === "desktop_get_state") return { project: state.project, sourceNumbering: state.sourceNumbering, canUndo: false, canRedo: false,
       status: { hostAvailable: true, persistence: "temporary-review" }, capabilities: {
         mediaImport: { available: false, reason: "review-session" }, transcription: { available: false, reason: "review-session" }
       } } as never;

@@ -107,7 +107,7 @@ test("project package round-trips history and redo state", () => {
   assert.ok(serialized.files["history/journal.jsonl"] !== undefined);
 });
 
-test("V2 package and history preserve the optional source technical descriptor through undo and redo", () => {
+test("V3 package and history preserve the optional source technical descriptor through undo and redo", () => {
   let seq = 0;
   const project = createEmptyProject({ id: "p-descriptor", name: "Descriptor", now: fixedTime });
   project.sources.push({
@@ -134,7 +134,7 @@ test("V2 package and history preserve the optional source technical descriptor t
   });
 
   assert.equal(manifest.projectSchemaVersion, 2);
-  assert.equal(manifest.formatVersion, 2);
+  assert.equal(manifest.formatVersion, 3);
   assert.deepEqual(restored.current.sources[0].technicalDescriptor, technicalDescriptor("ingest"));
   assert.equal(restored.current.sources[0].checksum, "legacy:unchanged");
   assert.equal(restored.canRedo, true);
@@ -155,7 +155,7 @@ test("tampered current project is rejected", () => {
   assert.throws(() => deserializeProjectPackage(serialized), /does not match/);
 });
 
-test("V2 package stores compact snapshots and exact per-source transcript blobs", () => {
+test("V3 package stores compact snapshots and exact per-source transcript blobs", () => {
   const history = historyWithTranscript();
   history.undo();
   const serialized = serializeProjectPackage(history, fixedTime);
@@ -163,7 +163,7 @@ test("V2 package stores compact snapshots and exact per-source transcript blobs"
   const snapshotFiles = Object.keys(serialized.files).filter((path) => path.startsWith("history/snapshots/"));
   const blobFiles = Object.keys(serialized.files).filter((path) => path.startsWith("history/transcript-blobs/"));
 
-  assert.equal(manifest.formatVersion, 2);
+  assert.equal(manifest.formatVersion, 3);
   assert.equal(snapshotFiles.length, 2);
   assert.equal(blobFiles.length, 1);
   for (const path of snapshotFiles) {
@@ -179,7 +179,7 @@ test("V2 package stores compact snapshots and exact per-source transcript blobs"
   assert.deepEqual(restored.current.sourceTranscripts[0], transcriptFor());
 });
 
-test("same editorial digest but different exact transcript state survives V2 save, undo, and redo", () => {
+test("same editorial digest but different exact transcript state survives V3 save, undo, and redo", () => {
   const history = historyWithTranscript();
   const initial = history.current.sourceTranscripts[0];
   const changed = clone(initial);
@@ -198,7 +198,7 @@ test("same editorial digest but different exact transcript state survives V2 sav
   assert.deepEqual(restored.redo().sourceTranscripts[0], changed);
 });
 
-test("V2 package corruption cases fail closed", () => {
+test("V3 package corruption cases fail closed", () => {
   const valid = serializeProjectPackage(historyWithTranscript(), fixedTime);
   const blobPath = Object.keys(valid.files).find((path) => path.startsWith("history/transcript-blobs/"));
   const snapshotPaths = Object.keys(valid.files).filter((path) => path.startsWith("history/snapshots/"));
@@ -269,7 +269,7 @@ test("V2 package corruption cases fail closed", () => {
   assert.throws(() => deserializeProjectPackage(unsafeBlobPath), /Invalid history transcript blob path/);
 });
 
-test("V2 package serializes 500 unrelated commits with one transcript blob", () => {
+test("V3 package serializes 500 unrelated commits with one transcript blob", () => {
   const history = historyWithTranscript();
   for (let index = 0; index < 500; index += 1) history.commit({ type: "project.rename", name: `Scale ${index}` });
   const serialized = serializeProjectPackage(history, fixedTime);
@@ -278,7 +278,7 @@ test("V2 package serializes 500 unrelated commits with one transcript blob", () 
   assert.equal(deserializeProjectPackage(serialized).current.project.name, "Scale 499");
 });
 
-test("v1 package migrates every snapshot and writes V2 on the next save", () => {
+test("v1 package migrates every snapshot and writes V3 on the next save", () => {
   const rawLegacy = {
     language: "pt",
     words: [{ id: "w1", text: "olá", startMs: 0, endMs: 100, extraWord: { keep: true } }],
@@ -342,7 +342,7 @@ test("v1 package migrates every snapshot and writes V2 on the next save", () => 
 
   const roundTrip = serializeProjectPackage(restored, fixedTime);
   const roundTripManifest = JSON.parse(roundTrip.files["manifest.json"]);
-  assert.equal(roundTripManifest.formatVersion, 2);
+  assert.equal(roundTripManifest.formatVersion, 3);
   assert.equal(roundTripManifest.projectSchemaVersion, 2);
   const reopened = deserializeProjectPackage(roundTrip);
   assert.equal(reopened.canRedo, true);
@@ -351,7 +351,7 @@ test("v1 package migrates every snapshot and writes V2 on the next save", () => 
   assert.equal(reopened.undo().sourceTranscripts.length, 1);
 });
 
-test("V1 package with Project IR V2 preserves exact transcript metadata, IDs, and redo cursor through V2 rewrite", () => {
+test("V1 package with Project IR V2 preserves exact transcript metadata, IDs, and redo cursor through V3 rewrite", () => {
   const original = historyWithTranscript();
   original.commit({ type: "project.rename", name: "Newest" });
   original.undo();
@@ -386,13 +386,13 @@ test("V1 package with Project IR V2 preserves exact transcript metadata, IDs, an
   assert.deepEqual(restoredV1.snapshots.map(({ id, revision }) => ({ id, revision })), fullSnapshots.map(({ id, revision }) => ({ id, revision })));
   assert.equal(restoredV1.canRedo, true);
 
-  const v2Package = serializeProjectPackage(restoredV1, fixedTime);
-  assert.equal(JSON.parse(v2Package.files["manifest.json"]).formatVersion, 2);
-  const reopenedV2 = deserializeProjectPackage(v2Package);
-  assert.deepEqual(reopenedV2.current, active);
-  assert.equal(reopenedV2.canRedo, true);
-  assert.equal(reopenedV2.redo().project.name, "Newest");
-  assert.deepEqual(reopenedV2.undo().sourceTranscripts[0], transcriptFor());
+  const v3Package = serializeProjectPackage(restoredV1, fixedTime);
+  assert.equal(JSON.parse(v3Package.files["manifest.json"]).formatVersion, 3);
+  const reopenedV3 = deserializeProjectPackage(v3Package);
+  assert.deepEqual(reopenedV3.current, active);
+  assert.equal(reopenedV3.canRedo, true);
+  assert.equal(reopenedV3.redo().project.name, "Newest");
+  assert.deepEqual(reopenedV3.undo().sourceTranscripts[0], transcriptFor());
 });
 
 test("v1 quarantine evidence survives a v2 source mutation and package round-trip", () => {

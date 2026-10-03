@@ -15,12 +15,11 @@ import { TopBar } from "./components/TopBar";
 import { WorkspaceStage } from "./components/WorkspaceStage";
 import { capabilityReasonKey, workspaceKeys, type Workspace } from "./ui-model";
 
-import { SourcePresentationRegistry } from "./source-presentation";
+import { presentSources } from "./source-presentation";
 
 const defaultBackend = new DemoDesktopBackend();
 
 export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) {
-  const sourceRegistry = useRef(new SourcePresentationRegistry());
   const [editorialState, setEditorialState] = useState<EditorialDraftState | null>(null);
   const [editorialBusy, setEditorialBusy] = useState(false);
   const [editorialError, setEditorialError] = useState(false);
@@ -46,7 +45,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const t = useMemo(() => (key: TranslationKey, parameters: Readonly<Record<string, string | number>> = {}) => translate(locale, key, parameters), [locale]);
 
-  const sourcePresentations = useMemo(() => sourceRegistry.current.present(project?.project.id ?? "", project?.sources ?? [], t), [project, t]);
+  const sourcePresentations = useMemo(() => project && backendState ? presentSources(project.sources, backendState.sourceNumbering, t) : new Map(), [project, backendState, t]);
 
   useEffect(() => {
     let current = true;

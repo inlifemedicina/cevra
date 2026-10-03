@@ -141,7 +141,7 @@ The host selects this path before opening the active Project Store, runtime, mod
 
 No new Tauri command, WebView filesystem permission, shell permission, CSP exemption, provider call, reservation, timing/cut, apply or export is added. The existing eight command ACL and environment clearing remain. The three new host values come solely from the explicit native startup tuple, without inherited credentials or runtime settings. Private originals, paths, execution/session identifiers and byte hashes are not committed. Tests use the existing canonical synthetic fixture; the actual F-A02 pair is verified only locally. The exact prior PARTIAL assessment and literal helper flags remain separate from schema validation.
 
-Local verification has exercised the actual pair through the real host factory: five blocks, two caveats, PARTIAL, editing/reorder, unchanged project and unchanged original bytes, with zero provider calls. A production-frontend/real-JSONL-host rehearsal also passed PT/EN display, source selection, title/note editing, reorder, workspace navigation, unsaved discard and disabled canonical history controls; only the browser transport substituted the native invoke bridge. Screenshots and detailed evidence remain outside the repository. Twelve targeted host tests and 54 Desktop tests passed; TypeScript and production build passed. Local native Rust compilation/window proof remains unavailable because Cargo is absent and the installed binary predates the editorial commands. Native compilation and the startup-parser tests are required CI gates; a frontend/host rehearsal is not a claim of native-window or Product Owner acceptance.
+Local verification has exercised the actual pair through the real host factory: five blocks, two caveats, PARTIAL, editing/reorder, unchanged project and unchanged original bytes, with zero provider calls. A production-frontend/real-JSONL-host rehearsal also passed PT/EN display, source selection, title/note editing, reorder, workspace navigation, unsaved discard and disabled canonical history controls; only the browser transport substituted the native invoke bridge. Twelve targeted host tests and 54 Desktop tests passed at the original admission checkpoint. Subsequently, private pinned build tools enabled a successful native build and actual window verification. The reviewed visual commit `dd7f1e4` was built and opened as a separate native instance, preserving the older instance and original pair. Screenshots and detailed evidence remain outside the repository. This proves the displayed native visual at that commit; overall Product Owner acceptance remains pending.
 
 **Director impact:** compatible bounded offline admission/review extension. Product Owner visual/narrative acceptance remains pending; strategy/mounting/I1-T1 and other broader capabilities retain their original gates. Progress stays 55%; F-A02 stays closed/exhausted 1/1.
 
@@ -155,28 +155,51 @@ source-derived timeline labels and editorial citations. Evidence references rema
 available as analysis traceability; they are not media identities. Source actions
 resolve the original source ID, never the block position or evidence label.
 
-One presentation registry per window reserves numbers independently for each
-project and source kind. Search/filter, block/source reordering, removing another
-source, undo/redo and switching between projects preserve seen identities and
-never reuse their numbers during that window. Original filenames remain in
+The reviewed visual commit `dd7f1e4` initially used a presentation registry per
+window, separately for each project and source kind. Its frozen native demo
+retains that window-only behavior. The current follow-up uses history-owned
+durable numbering as described below. Original filenames remain in
 source details/tooltips and accessible labels. The old index-based decorative
 4K badge is removed because it did not represent verified source resolution.
 No thumbnail provider exists in this UI baseline; type icons remain type icons.
 
-**Durable numbering remains a decision gate.** Reopening the project cannot yet
-preserve historical retired-source numbers. The minimal proposed follow-up is a
-versioned registry plus monotonic counters in the existing history archive,
-independent of its undo cursor, with tested legacy compatibility. It needs an
-architectural decision and explicit format-change approval before implementation;
-this presentation delta does not introduce that persistence contract. Temporary
-F-A02 admission continues to keep all review changes in memory and preserves the
-original pair unchanged.
+**Durable numbering is owner-approved and IN DEVELOPMENT / NOT MERGED in PR #78.**
+The minimal follow-up stores one source-ID/number registry and monotonic counter
+in existing ProjectHistory, independently of the undo cursor. HistoryArchive and
+Project Package V3 preserve reservations across explicit save/reopen, removal,
+undo/redo/restore and abandoned redo branches. One counter covers all source
+kinds in a project; a filtered view can show gaps. The shared UI uses host-owned
+numbers, retaining filenames as secondary details and canonical source IDs for
+actions. Project IR audiovisual schema and the persistence architecture remain
+unchanged. [ADR 0031](adr/0031-stable-source-numbering-v1.md) records the approval,
+format, validation and compatibility limits.
+
+V1/V2 archives initialize deterministically from retained snapshots without
+rewriting a valid saved project during opening; only an explicit existing
+checkpoint writes V3. Previously displayed labels and discarded branches never
+stored in legacy data cannot be reconstructed. Recovery retains the registry of
+the valid recovered checkpoint, not reservations lost with unsaved/lost state.
+Temporary F-A02 admission continues to keep all editorial review changes in
+memory and preserves the original pair unchanged.
 
 Save/discard/move controls explain their disabled state. The original analysis,
 PARTIAL support, caveats, revision validation, typed review operation and all
 provider/apply/export restrictions remain authoritative. The owner's prior
 native-window reading/edit/reorder observations are limited acceptance evidence;
 saving, navigation, discard and overall visual acceptance remain pending. The
-active native window is preserved on its prior compiled head while this separate
-worktree is reviewed. Frontend/browser fixtures do not prove the new native UI.
-Director impact: compatible presentation only; no new context or execution authority.
+older native window is preserved. The separate `dd7f1e4` native instance verifies
+the reviewed visual; it does not contain the current durable-numbering follow-up.
+Typography, colors, logo and icons are provisional. Director impact: compatible
+presentation identity only; no new context or execution authority.
+
+Offline validation of the durable follow-up passed the full production build,
+59 Project IR tests, 15 Project Store tests, 50 Transcription contract tests,
+33 Alignment contract tests, 88 Desktop Host tests and 58 Desktop UI tests.
+Host runtime fixtures used the repository-pinned private CPython with synthetic
+model-presence files, without model downloads or inference. Save/close/reopen
+used disposable fixture directories, not owner projects. V1/V2 compatibility,
+malformed/missing registries, retired IDs and discarded branches are covered.
+The existing Application suite also passed 239 tests during this work. An
+unchanged Media stdin fixture initially timed out; its focused rerun passed 3/3
+without modifying the engine. Required exact-head CI and independent review
+remain publication gates; these checks do not claim human acceptance.

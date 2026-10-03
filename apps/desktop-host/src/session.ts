@@ -102,6 +102,7 @@ export class DesktopSession {
   state(): DesktopHostState {
     return {
       project: this.services.history.current,
+      sourceNumbering: this.services.history.sourceNumbering,
       canUndo: !this.services.temporaryEditorialReview && this.services.history.canUndo,
       canRedo: !this.services.temporaryEditorialReview && this.services.history.canRedo,
       status: { hostAvailable: true, persistence: this.services.temporaryEditorialReview ? "temporary-review" : this.services.persistence?.state ?? "local-unsaved" },

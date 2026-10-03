@@ -2698,3 +2698,33 @@ PR #77 is integrated at `73f8427ac18337f779ceeda9c93f60edf35df33b`; post-merge C
 The owner explicitly approved local reading of the already obtained F-A02 result and its corresponding history on 2026-10-03 at 14:33 UTC. The bounded addition on `feat/offline-fa02-native-review` is IN DEVELOPMENT / NOT MERGED: a native startup designation supplies one directory and two previously pinned hashes; the host reads only the two designated artifact names and creates a temporary in-memory review session. It uses existing history/draft validation, preserves PARTIAL and original assertions, and disables canonical project operations. The ordinary project store, engines, credentials and provider are not opened by this mode; no durable proposal or automatic recovery/import path is added. The historical `providerContact: UNKNOWN` stays unknown. This approval grants the designated offline admission, not a general importer or authority from serialized flags.
 
 Implementation and validation details are in [Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Director impact: compatible review/admission extension; no provider, engine, timing/cut or execution authority. Progress stays 55%; F-A02 remains exhausted 1/1.
+
+### Shared stable source labels — approved bounded follow-up, 2026-10-03
+
+PR #78 remains Draft / IN DEVELOPMENT / NOT MERGED. The owner approved clearer
+editorial cards and shared numbered source labels, with filenames secondary.
+The reviewed visual commit `dd7f1e4` has a separately built and verified native
+window; the previous review instance and original F-A02 pair were preserved.
+That frozen demo uses window-only numbers. Human visual/narrative acceptance and
+final typography, colors, logo and icons remain pending.
+
+The owner subsequently approved the smallest durable evolution: a versioned
+source-ID/number registry and one monotonic per-project counter in existing
+ProjectHistory, outside its undo cursor, serialized in existing ProjectStore.
+The current follow-up writes HistoryArchive/Project Package V3 while reading
+V1/V2 deterministically without rewriting a valid legacy checkpoint on open.
+Project IR audiovisual schema, journal commands, compact transcript storage and
+persistence/recovery architecture remain unchanged. Reservations survive removal,
+undo/redo/restore and branch replacement; new IDs never reuse stored numbers.
+Kinds supply localized labels and filtered views can show gaps. Legacy labels or
+discarded reservations that were never stored cannot be reconstructed; recovery
+preserves the registry in the valid checkpoint actually recovered.
+
+[ADR 0031](adr/0031-stable-source-numbering-v1.md) is the format/compatibility
+record; [Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md) remains
+the review implementation/evidence record. Reuse X-T1/T2/T5, I8-T3/T6 and I17-T9
+for bounded automated persistence evidence and later app acceptance. This is a
+compatible Director presentation-identity extension with no new execution,
+provider or permission authority. Editorial notes stay in memory; no real owner
+projects were migrated/saved by this task. Progress remains 55%, the wider agent
+gate stays open and F-A02 remains exhausted 1/1.
