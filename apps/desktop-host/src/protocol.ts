@@ -28,7 +28,8 @@ export type CapabilityReason =
   | "archive-unavailable"
   | "archive-full"
   | "model-not-available"
-  | "host-unavailable";
+  | "host-unavailable"
+  | "review-session";
 
 export interface CapabilityState {
   available: boolean;
@@ -41,7 +42,7 @@ export interface DesktopHostState {
   canRedo: boolean;
   status: {
     hostAvailable: true;
-    persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error";
+    persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "temporary-review";
   };
   capabilities: {
     mediaImport: CapabilityState;

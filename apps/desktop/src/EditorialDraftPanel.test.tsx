@@ -6,6 +6,7 @@ import { App } from "./App";
 import { EditorialFixtureBackend } from "./backend/editorial-fixture-backend";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
 import { EditorialDraftPanel } from "./components/EditorialDraftPanel";
+import { TauriDesktopBackend } from "./backend/tauri-desktop-backend";
 
 it("shows accepted blocks, sources, caveats, unchanged partial assessment and original relations", async () => {
   const backend = new EditorialFixtureBackend(); const before = backend.history.toArchive();
@@ -107,4 +108,30 @@ it("resets local edits when analysis identity changes at the same draft id and r
   const draft = { ...state.draft, analysis: { ...state.draft.analysis, contextId: "another-synthetic-context", candidate: { ...state.draft.analysis.candidate, observations: state.draft.analysis.candidate.observations.map(item => ({ ...item, id: `next-${item.id}` })) } }, blocks: state.draft.blocks.map(item => ({ ...item, id: `next-${item.id}`, observationId: `next-${item.observationId}`, title: "Novo contexto" })) };
   rerender(<EditorialDraftPanel state={{ status: "current", draft }} {...props} />);
   expect((screen.getAllByLabelText("Título do bloco")[0] as HTMLInputElement).value).toBe("Novo contexto");
+});
+
+it("reviews through the existing native commands while temporary-session canonical actions remain disabled", async () => {
+  const source = new EditorialFixtureBackend(); const state = await source.loadState(); const calls: string[] = [];
+  const backend = new TauriDesktopBackend(async (command, args) => {
+    calls.push(command);
+    if (command === "desktop_get_state") return { project: state.project, canUndo: false, canRedo: false,
+      status: { hostAvailable: true, persistence: "temporary-review" }, capabilities: {
+        mediaImport: { available: false, reason: "review-session" }, transcription: { available: false, reason: "review-session" }
+      } } as never;
+    if (command === "desktop_get_editorial_draft") return await source.loadEditorialDraft() as never;
+    if (command === "desktop_revise_editorial_draft") return await source.reviseEditorialDraft(args!.args as Parameters<typeof source.reviseEditorialDraft>[0]) as never;
+    throw new Error("Unexpected native action");
+  });
+  const user = userEvent.setup(); render(<App backend={backend} />);
+  await screen.findByText("Revisão temporária · não guardada");
+  const titles = await screen.findAllByLabelText("Título do bloco");
+  expect((screen.getByRole("button", { name: "Refazer" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(titles[0], { target: { value: "Revisão na sessão temporária" } });
+  await user.click(screen.getByRole("button", { name: "Guardar títulos e notas na sessão" }));
+  await waitFor(() => expect(calls).toContain("desktop_revise_editorial_draft"));
+  await user.click(screen.getByRole("button", { name: "Trocar idioma" }));
+  expect(screen.getByText("Temporary review · not saved")).toBeTruthy();
+  expect((await source.loadEditorialDraft()).status).toBe("current");
+  expect(calls.every(command => ["desktop_get_state", "desktop_get_editorial_draft", "desktop_revise_editorial_draft"].includes(command))).toBe(true);
 });

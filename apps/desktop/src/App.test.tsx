@@ -560,7 +560,8 @@ describe("CEVRA Vids desktop shell", () => {
     const labels = [
       ["local-saved", "Salvo", "Saved"],
       ["local-recovered", "Sessão recuperada · salva", "Recovered session · saved"],
-      ["persistence-error", "Alterações não salvas", "Changes not saved"]
+      ["persistence-error", "Alterações não salvas", "Changes not saved"],
+      ["temporary-review", "Revisão temporária · não guardada", "Temporary review · not saved"]
     ] as const;
     for (const [status, pt, en] of labels) {
       const backend = new FunctionalDesktopBackend();

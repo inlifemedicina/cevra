@@ -651,6 +651,11 @@ fn trusted_runtime_environment(
     app: &AppHandle,
     recovering: bool,
 ) -> Result<BTreeMap<String, String>, DesktopCommandError> {
+    if let Some(review) = crate::fa02_review::review_environment(
+        &std::env::args_os().skip(1).collect::<Vec<_>>(), recovering,
+    )? {
+        return Ok(review);
+    }
     let mut allowed = BTreeMap::new();
     let persistence_root = app
         .path()

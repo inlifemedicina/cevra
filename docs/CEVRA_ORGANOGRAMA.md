@@ -31,7 +31,7 @@ CEVRA VIDS
 │   │   └─ real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED / WHOLE GATE OPEN]
 │   │       ├─ INT-CLOUD-01 official ChatGPT eligibility/capability review [RESEARCH / SCHEDULED]
 │   │       └─ INT-CLOUD-02 authorized official transport PoC [CONDITIONAL / NOT IMPLEMENTED]
-│   ├─ offline evidence-linked editorial draft [APPROVED BOUNDED SCOPE / IMPLEMENTED / IN REVIEW]
+│   ├─ offline evidence-linked editorial draft [APPLICATION #75 / OFFLINE REVIEW #77 INTEGRATED; DESIGNATED ADMISSION IN DEVELOPMENT]
 │   ├─ broader strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   ├─ take selection [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   └─ cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
@@ -344,3 +344,10 @@ requires separately authorized new experiment scope, ID and budget. None of INT-
 authorizes inference, spending, commercial upload or deployment.
 
 **Director impact:** compatible provider/transport investigation only. The current typed boundaries and canonical project authority are unchanged. A commercial cloud runner remains a separate future decision.
+
+
+## Offline review integration and designated admission — current 2026-10-03
+
+This supersedes the earlier unmerged offline-draft checkpoint: Application #75 and offline host/backend/UI #77 are integrated. PR #77 merged at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI `37127986470` SUCCESS 5/5 and Exact Runtime `37127986468` SUCCESS 1/1, attempt 1.
+
+The owner subsequently approved only the designated existing F-A02 result/history admission into a temporary native review session; this bounded addition is IN DEVELOPMENT / NOT MERGED. The ordinary saved project is preserved, PARTIAL/uncertainty remain visible, and canonical editing/provider/timing/cut/export authority is not added. Details: [offline admission](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Subjective acceptance remains pending. Director impact: compatible review extension; progress 55%, F-A02 exhausted 1/1. PR #76 remains a separate Draft.

@@ -15,7 +15,7 @@ interface HostState {
   project: ProjectIR;
   canUndo: boolean;
   canRedo: boolean;
-  status: { hostAvailable: true; persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" };
+  status: { hostAvailable: true; persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "temporary-review" };
   capabilities: {
     mediaImport: { available: boolean; reason: DesktopCapabilityReason };
     transcription: { available: boolean; reason: DesktopCapabilityReason };

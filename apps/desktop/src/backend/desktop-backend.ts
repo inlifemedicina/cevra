@@ -3,7 +3,7 @@ import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/ap
 
 export type DesktopCapability = "media.import" | "director.execute" | "changes.apply" | "project.export";
 export type DesktopRuntimeCapability = DesktopCapability | "transcription.transcribe";
-export type DesktopCapabilityReason = "available" | "desktop-runtime-deferred" | "runtime-not-configured" | "runtime-invalid" | "model-not-available" | "host-unavailable";
+export type DesktopCapabilityReason = "available" | "desktop-runtime-deferred" | "runtime-not-configured" | "runtime-invalid" | "model-not-available" | "host-unavailable" | "review-session";
 
 export interface DesktopCapabilityState {
   readonly available: boolean;
@@ -14,7 +14,7 @@ export interface DesktopBackendState {
   readonly project: Readonly<ProjectIR>;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
-  readonly status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable";
+  readonly status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable" | "temporary-review";
   readonly capabilities: Readonly<Record<DesktopRuntimeCapability, DesktopCapabilityState>>;
 }
 

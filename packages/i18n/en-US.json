@@ -301,5 +301,7 @@
   "editorialReview.uncertainty.material": "Material",
   "editorialReview.uncertainty.high": "High",
   "editorialReview.selectSource": "Select source {reference}",
-  "editorialReview.discardNotes": "Discard unsaved titles and notes"
+  "editorialReview.discardNotes": "Discard unsaved titles and notes",
+  "top.temporaryReview": "Temporary review · not saved",
+  "runtime.reviewSession": "This session supports proposal review only; the original project remains intact."
 }

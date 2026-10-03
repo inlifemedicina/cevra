@@ -301,5 +301,7 @@
   "editorialReview.uncertainty.material": "Relevante",
   "editorialReview.uncertainty.high": "Alta",
   "editorialReview.selectSource": "Selecionar fonte {reference}",
-  "editorialReview.discardNotes": "Descartar títulos e notas não guardados"
+  "editorialReview.discardNotes": "Descartar títulos e notas não guardados",
+  "top.temporaryReview": "Revisão temporária · não guardada",
+  "runtime.reviewSession": "Esta sessão permite apenas revisar a proposta; o projeto original permanece intacto."
 }
