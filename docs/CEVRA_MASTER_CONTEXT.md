@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-10-03, PR #69 merged and post-merge validated at `f80f423e997ddc6728d00016c5ed7b167d3e6d40`. The separately authorized first F-A on 2026-10-02 failed at init containment; its specific rejected field is INDETERMINATE, one durable slot is consumed, and no semantic result was accepted. Offline diagnostic persistence is IN DEVELOPMENT; no further live execution or merge is authorized by this correction. Slice A and V2 Phase A preparation remain closed; real semantic round-trip is NOT DEMONSTRATED. Historical V1 remains terminal (8/8, zero balance); the Codex diagnosis remains preserved and blocked.
+**Last decision reconciliation:** 2026-10-03, PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1336,8 +1336,9 @@ INT-CLOUD-01 official eligibility/capability/auth/privacy/quota/deployment
 review and INT-CLOUD-02 authorized official transport evaluation belong
 within the next real-agent semantic round-trip gate, not in place of it.
 The bounded offline Claude PoC is CLOSED; its old experiment remains CLOSED
-at 8/8, zero balance. An accepted real semantic round-trip is still NOT
-DEMONSTRATED. Any new experiment needs explicit scope, ID and budget approval;
+at 8/8, zero balance. The later F-A02 accepted a direct PT-BR textual candidate
+for its limited scenario; the whole real-agent gate remains open (§24.1).
+Any new experiment needs explicit scope, ID and budget approval;
 ADR 0030 stays ACCEPTED DIRECTION / IN DEVELOPMENT and complete Semantic
 Editorial Analysis remains NOT DELIVERED. No Claude/ChatGPT/Codex route is
 commercially approved by this planning.
@@ -1457,7 +1458,7 @@ Foundation / Media Runtime       [CLOSED]
 → Editorial Transcript Projection V1 [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
 → bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
-→ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT DEMONSTRATED; OLD EXPERIMENT CLOSED 8/8]
+→ real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED; WHOLE GATE OPEN; V1 CLOSED 8/8 / F-A02 EXHAUSTED 1/1]
 → strategy / take selection / cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 → missing typed Project IR edit commands
 → cut compiler
@@ -1524,7 +1525,15 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-**First-F-A V2 diagnostic correction — IN DEVELOPMENT, 2026-10-03:**
+**First-F-A V2 diagnostic correction — IMPLEMENTED / CLOSED, 2026-10-03:**
+PR #70 integrated exact reviewed head `c3b0960b8dd7ea37cd8387151667b60f20201dbb`
+by SHA-guarded normal merge `c9d96eb63877cc81230693a827b0d1469dd566b0`.
+Its tree `fe11a76875da3926d17a2e905d929ff5b08b63f0` equals the reviewed tree.
+Independent review approved; 375 deterministic PoC tests and 31 Application
+semantic tests passed. Post-merge push CI `37082549743`, attempt 1, passed
+5/5. Exact Runtime/Windows did not trigger under these changed-path filters.
+The following previous attempt evidence remains intact:
+
 PR #69 integrated reviewed wiring head
 `17e01a8e427a31c9d11864d050e9f640a7ba1a13` by normal merge at
 `f80f423e997ddc6728d00016c5ed7b167d3e6d40`. Post-merge push CI
@@ -1561,16 +1570,94 @@ replacing the Application error. Old receipts remain readable without rewrite;
 the historical failure cannot be retrospectively assigned a reason.
 Deterministic fake-only regressions cover all init containment reasons,
 post-init rejection, primary-error preservation, strict corruption/privacy,
-backward compatibility and no refund/replay. Independent review and draft-PR
-CI are required before closeout. No provider/CLI invocation, new operational
+backward compatibility and no refund/replay. The independent review and CI
+gates are completed as recorded above. No provider/CLI invocation, new operational
 experiment, reservation, retry or fallback is part of this correction.
 Containment/admission/model/cost rules and historical V1 remain unchanged.
 Director impact is a compatible diagnostic extension, with no change to
 Director/IR/History authority or the provider-neutral Application contract.
-Real semantic round-trip remains **NOT DEMONSTRATED**, complete analysis
-**NOT DELIVERED**, and progress **55%**. Any new real F-A requires a separate
-Product Owner decision; this branch must stay draft until its merge plan is
-approved.
+At this diagnostic-only closeout, no semantic result had been accepted. The
+later F-A02 result is recorded below; complete analysis remains **NOT DELIVERED**
+and progress **55%**. Any additional real F-A requires a separate Product Owner
+decision and exact local TTY consent. Neither correction nor preparation
+resurrects the original consumed allocation.
+
+**Isolated candidate 02 preparation — IMPLEMENTED / CLOSED, 2026-10-03:**
+[PR #72](https://github.com/inlifemedicina/cevra/pull/72) integrated exact reviewed
+head `83c1e1215bfd01183ef9d737e14aca5e99d79521` by SHA-guarded normal merge
+`363e70bf1c4f9e21c29df5906b861e4bba664a1c`. Its tree
+`9b765458aff10f0a5adb31df153383e8d4287ead` equals the independently approved tree.
+391 deterministic PoC tests, 31 Application semantic tests and five instrumented
+negative-TTY cases passed offline. Push CI `37084826500` and PR CI
+`37084861261` passed 5/5; post-merge push CI `37085879662`, attempt 1, passed
+5/5 on the exact merge. Exact Runtime/Windows did not trigger for these paths;
+NOT TRIGGERED is not PASS.
+
+The fixed ID `semantic-real-agent-roundtrip-v2-poc-02` has **one operation /
+one reservation**, one child invocation, 30000ms total, zero retries and zero
+fallbacks. `SECOND_FA_POLICY` is a closed immutable singleton; the original
+policy, digests and consumed ledger remain unchanged. Admission initializes a
+distinct private root and correlates reservation/receipt. Public inert APIs and
+fake seams accept synthetic identities only. The approved Phase A synthetic
+text fixture and history remain the inputs. Genuine TTY confirmation of the
+immutable scope grants authority; files, digests, arguments and environment
+variables do not. See the
+[preparation record](CEVRA_FIRST_FA_ISOLATED_ATTEMPT_02_PREPARATION.md), whose
+pre-execution wording describes that historical preparation checkpoint.
+
+**F-A02 owner-TTY result — LIMITED DIRECT PT-BR SCENARIO OBSERVED, 2026-10-03:**
+After separate owner authorization and manual CONFIRM, the owner reported
+`FIRST_FA_VALIDATED`, **one invocation**, `analysis-candidate`, locally saved
+result and no automatic retry. Read-only inspection and proportional independent
+review confirmed the closed Application parser, response digest, reservation /
+receipt correlation, context/history binding, complete E1/E2 coverage and exact
+ProjectHistory archive round-trip with redo preserved. Receipt outcome is
+`success`, execution mode `OWNED_CLI_ATTEMPT`, requested and observed model
+`claude-opus-5-5`, requested effort medium, latency approximately **16.143 s**,
+`processStarted:true`, `childClosed:true`, stderr zero and no failure diagnostic.
+Effective effort is not separately established. Request/response sizes are
+1711/4259 bytes. Reported input/output tokens (2/1738) are observational;
+`providerContact` remains `UNKNOWN` in the receipt. These fields are not proof
+of full remote token/cost enforcement, a remote hard cap or guaranteed R$0.
+No new authentication/account check was performed for this closeout; the earlier
+subscription-auth observations below retain their original date and scope.
+
+The useful textual content preserves the next-day-delivery condition of material
+availability, the label-for-accompaniment complement, possible E1/E2 repetition
+and uncertainty about material for future orders. It does not claim audiovisual
+perception, select takes, rank alternatives or propose precise cuts. Source
+`timingBasis:none` is not alignment or permission to infer cut boundaries.
+
+Independent documentary rubric review found semantic fidelity, caveat preservation,
+complement, possible repetition and appropriate uncertainty **PASS**; citation
+support is **PARTIAL**: the label observation says that information is absent
+from E1 but cites E2 alone, while the complementary relation cites both sources.
+The existing literal fixture helper was run **unchanged** and returned
+`condition:false`, `complement:true`, `repetition:false`, `uncertainty:false`.
+Equivalent wording does not match its condition/repetition regexes; future-material
+uncertainty is in a caveat observation rather than the helper's searched
+uncertainties array. This is recorded separately from the documentary semantic
+assessment; neither oracle nor candidate was rewritten to obtain a PASS.
+
+Private result, ledger and raw event content remain outside the public repository.
+The isolated budget is **1/1 consumed, zero remaining**; watermark 1 and legacy
+terminal label `CLOSED_OFFLINE` describe exhausted durable accounting, not denial
+that live execution occurred. Scratch is empty and no lock remains. No replay,
+refund, additional reservation, provider diagnostic, continuation or automatic
+retry is authorized. The earlier failed first-F-A artifacts remain unchanged.
+
+This demonstrates one integrated direct PT-BR textual scenario, **not WHOLE
+REAL-AGENT GATE COMPLETE**, complete Semantic Editorial Analysis, I1-T1's plan /
+Change Set, editing, preview or export. EN-US, live continuation, cancellation and
+timeout were not exercised by F-A02. ADR 0030 remains IN DEVELOPMENT; progress
+remains **55%**. Strategy, take selection and cut planning remain NOT STARTED /
+NOT AUTHORIZED IMPLICITLY. The next bounded proposal is to reuse this result in
+an offline, evidence-linked logical editorial draft under D9, retaining the
+condition, complement and uncertainty and leaving take choice unresolved;
+implementation requires its own scope decision and timing-backed cuts their
+existing prerequisites. No new feature or live work is authorized by this record.
+Director impact is a compatible evidence closeout: no change to Director,
+provider-neutral Application, typed-command, Project IR or History authority.
 
 **Historical first-F-A V2 end-to-end wiring review checkpoint, 2026-10-02:** PR #68
 integrated the reviewed offline preparation at
@@ -1633,7 +1720,7 @@ independent approval and integration are recorded above. No account metadata is
 published by this preparation. Historical V1 remains CLOSED / 8/8 / zero;
 real semantic round-trip remains NOT DEMONSTRATED and progress stays **55%**.
 
-**Latest material Phase A checkpoint on main — 2026-10-01:**
+**Historical Phase A checkpoint on main — 2026-10-01:**
 PR #62 merged as `9c6d9b8484d1c1e1be6f19c080baf22a42c9fc7f`; its parents
 are `aea53160b8f5af5124e461b0bcb44d60987454f3` and
 `b5780170a03306c69baf0e02f1803a24381af43d`. Post-merge push CI
@@ -1643,9 +1730,10 @@ Exact Runtime was NOT TRIGGERED by the documentary path filter, not PASS.
 [documentary specification](CEVRA_SEMANTIC_REAL_AGENT_ROUNDTRIP_V2_PHASE_A.md)
 retains the final independent approval and B-1/B-2 VERIFIED FIXED. Temporal
 NB-1 is reconciled; NB-2 ledger correlation/implementation and NB-3 executable
-F-B materialization remain Phase B prerequisites. Live V2 remains PAUSED /
-NOT AUTHORIZED and real semantic round-trip NOT DEMONSTRATED; the proposed
-ID/ledger remain inert/not created. This SHA is a dated material checkpoint:
+F-B materialization remain Phase B prerequisites. At that 2026-10-01 checkpoint,
+live V2 was PAUSED / NOT AUTHORIZED, real semantic round-trip NOT DEMONSTRATED
+and the proposed ID/ledger inert/not created. Later F-A02 evidence is in §24.1.
+This SHA is a dated material checkpoint:
 later documentary continuity commits may naturally advance `main` without
 changing the recorded functional state.
 
@@ -1694,11 +1782,11 @@ in PR metadata only. Ubuntu/Linux is validated by CI; macOS arm64 has local
 evidence plus Exact Runtime. **Windows native: NOT RUN** for this correction;
 V1 targets remain macOS arm64 and Windows x64.
 
-Real-agent V2 live execution remains **PAUSED / NOT AUTHORIZED**; any execution requires a separate gate.
-The production blocker is closed, but real semantic round-trip remains NOT
-DEMONSTRATED. No new
-experiment/ledger is created; the old Claude experiment remains CLOSED, 8/8,
-zero balance. Director impact: no new authority or command/state contract;
+At that Media Worker closeout, real-agent V2 live execution was **PAUSED /
+NOT AUTHORIZED** and a real semantic round-trip was NOT DEMONSTRATED. The later
+limited F-A02 result is recorded at the start of §24.1. The production blocker
+was closed without creating a new experiment/ledger; the old Claude experiment
+remains CLOSED, 8/8, zero balance. Director impact: no new authority or command/state contract;
 compatible Media Runtime lifecycle hardening, with no change to Project IR,
 ProjectHistory, typed commands, Director authority, provider architecture or
 the semantic analysis boundary. Approved Vids/mobile functionality, including
@@ -1763,8 +1851,18 @@ it was the canonical main after PR #50 and the feature base for PR #51.
 | Claude CLI transport/evidence PoC V1 — bounded offline scope only | #57 | `862e33f9e687579059d51269abdb4195b86bbd79` | IMPLEMENTED / CLOSED |
 | Bounded offline Claude PoC documentary closeout | #58 | `be1e0e99fd189a1c976b44ec3a72e66d5fa5608c` | CLOSED |
 | Real-Agent Round-trip V2 — Phase A offline preparation | #62 | `9c6d9b8484d1c1e1be6f19c080baf22a42c9fc7f` | CLOSED |
+| First-F-A V2 diagnostic persistence | #70 | `c9d96eb63877cc81230693a827b0d1469dd566b0` | IMPLEMENTED / CLOSED |
+| Isolated first-F-A candidate 02 offline preparation | #72 | `363e70bf1c4f9e21c29df5906b861e4bba664a1c` | IMPLEMENTED / CLOSED; later owner-run F-A02 limited result in §24.1 |
 
 ## 24.3 Active work
+
+**Current semantic checkpoint:** F-A02's integrated direct PT-BR textual result
+is observed; citation support is PARTIAL and the literal helper remains unchanged.
+The whole real-agent gate remains open; the accepted result does not authorize
+strategy, take selection or cut planning. Current evidence, exhausted budget and
+PR #70/#72 integration are in §24.1. The dated checkpoints below preserve their
+original evidence and are superseded only where §24.1 explicitly records later
+facts; their historical NOT DEMONSTRATED wording is not the current F-A02 status.
 
 **ProjectHistory Scalability V2 — IMPLEMENTED / CLOSED.** PR #30 merged at
 `b6f201afa73aae0aa85f8a3d4187a568ab749e72`. Compact snapshots plus exact
@@ -1836,8 +1934,8 @@ evidence, not decisions or execution authority. Approved feature head
 merge commit `56161b2af44c9e2de008bb33bc1706d4e2beaf7e`. PR CI `36487114791`
 passed 5/5 and naturally triggered Exact Runtime `36487114771` passed; on the
 merge SHA, CI `36487922851` passed 5/5 and Exact Runtime `36487922834` passed.
-Semantic editorial analysis with a real analyzer, strategy, take selection and
-cut planning have not started. A bounded non-blocking performance note remains: an extremely
+At that projection closeout, real-analyzer analysis, strategy, take selection and
+cut planning had not started. A bounded non-blocking performance note remains: an extremely
 pathological uninterrupted phrase spanning many tiny pages may re-evaluate its
 remaining fragment once per page; no current product fixture reproduces a
 blocker. Global weighted roadmap progress at that projection closeout was
@@ -1892,22 +1990,25 @@ multi-source coverage, continuation, invalid references, stale commit→undo,
 transcript replacement, cancellation/timeout and prompt-injection containment.
 They prove the boundary, not semantic intelligence. Semantic Editorial Analysis
 V1 as a product capability remains **NOT DELIVERED**; EDT-001/004/005 and the
-relevant D2/D3/D4/D5/I1/I5 acceptance cases are not marked complete. The
-**NEXT REQUIRED GATE** is a real round-trip through an officially supported
-analyzer, with quality, disclosure, latency, cost and failure evidence. The
+relevant D2/D3/D4/D5/I1/I5 acceptance cases are not marked complete. At Slice A
+closeout, the **NEXT REQUIRED GATE** was a real round-trip through an officially
+supported analyzer, with quality, disclosure, latency, cost and failure evidence.
+The later limited F-A02 scenario is recorded in §24.1; the whole gate remains open. The
 response bound begins after a `Promise<string>` reaches Application; a future
 adapter must also bound transport receipt. Global weighted roadmap progress is
 **55%**.
 
 ADR 0030 remains **ACCEPTED DIRECTION / IN DEVELOPMENT** because complete
-Semantic Editorial Analysis V1 is not delivered. The next required gate is an
-official and authorized real-agent round-trip; it is **ATTEMPTED / NOT DEMONSTRATED**. Retained
+Semantic Editorial Analysis V1 is not delivered. At that Slice A checkpoint,
+the real-agent round-trip was **ATTEMPTED / NOT DEMONSTRATED**. F-A02 later
+accepted one limited direct PT-BR candidate (§24.1), without completing the
+whole gate. Retained
 non-blocking notes are the potential dominance of `history.current` or one
 projector call at extreme scale, deterministic but not quantitatively balanced
 initial disclosure, incidental ID-before-busy/`AbortError` behavior, and the
 mandatory future adapter receipt limit before `Promise<string>` materialization.
 
-**Real-agent gate attempts — ACTIVE / BLOCKED BEFORE ACCEPTED RESULT.** The preserved
+**Historical real-agent gate attempts — BLOCKED BEFORE ACCEPTED RESULT AT THAT CHECKPOINT.** The preserved
 Codex App Server diagnostic branch
 `feat/semantic-codex-roundtrip-poc-v1` at
 `788e9c0dd5b3f66a4b531ce70853a82ff5f0cfd1` remains **BLOCKED —
@@ -2335,8 +2436,9 @@ Current dependency boundaries:
 1. pre-editorial correctness prerequisites are **CLOSED**;
 2. Editorial Transcript Projection V1 and Semantic Editorial Analysis Boundary
    V1 — Slice A are **IMPLEMENTED / CLOSED**, while
-   complete semantic analysis remains **NOT DELIVERED** and the real-agent
-   round-trip is the **NEXT REQUIRED GATE / ATTEMPTED, NOT DEMONSTRATED**;
+   complete semantic analysis remains **NOT DELIVERED**; F-A02 demonstrates
+   one direct PT-BR textual scenario, with PARTIAL citation support, while the
+   **WHOLE REAL-AGENT GATE REMAINS OPEN** (§24.1);
 3. the coordinated Media Runtime gate remains **ACTIVE IN PARALLEL** for its
    named downstream/platform/export/release consumers.
 
@@ -2472,6 +2574,23 @@ offline remediation are recorded in §24.3 and the immediate next action below.
 
 - **CURRENT — 7/8 USED / POST-INIT CONTAINMENT:** the Product Owner authorized a private persistent recovery checkpoint, explicitly debiting the five historical attempts without fabricating their lost receipts. The checkpoint and new pre-spawn reservations are owner-only and survive process restart. Attempt #6 recaptured current private builtin identifiers at the first init and stopped without analysis. PT-BR attempt #7 applied their session-only restrictive override; the original init gate passed, but the next event was `system` with an unretained subtype outside the closed reader contract. The reader failed `CONTAINMENT`, the child closed, and Application accepted no semantic result or mutation. One of eight slots remains; it was not spent on EN-US/continuation/cancellation after the material containment failure. Review the precise post-init event semantics before another authorized process; do not call this tool execution or a proven escape.
 
+## 2026-10-03 — F-A02 integrated result and public continuity
+
+- **IMPLEMENTED / CLOSED:** PR #70 diagnostic persistence and PR #72 isolated
+  preparation merged with independently approved trees and green post-merge CI.
+- **OBSERVED LIMITED RESULT:** the owner performed one authorized F-A02;
+  Application accepted a direct PT-BR textual candidate. Semantic content is
+  useful, citation support PARTIAL, and the literal fixture helper remains
+  unchanged with only its complement check true. Full evidence and limits: §24.1.
+- **PRESERVED AUTHORITY:** F-A02 is exhausted 1/1; previous failure and V1 8/8
+  remain preserved. Whole-gate completion, analysis delivery, strategy, take
+  selection and cuts are not inferred. No additional provider run is authorized.
+- **PUBLIC DISCLOSURE AUTHORIZED:** the owner explicitly authorized publication
+  of the technical test/model/provider/subscription-auth history in these two
+  canonical documents on 2026-10-03. Credentials, tokens, private component or
+  session identifiers, local paths and raw private artifacts are excluded from
+  this update. This publication decision does not grant provider or merge authority.
+
 ---
 
 # 26. Explicitly unresolved decisions
@@ -2516,7 +2635,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Preserve the next required real-agent semantic round-trip gate, still NOT DEMONSTRATED. The Media Worker stdin/lifecycle blocker is IMPLEMENTED / CLOSED after PR #60 and green post-merge validation (§24.1). Phase A offline preparation is CLOSED by PR #62 and validated post-merge (§24.1/§24.2); live V2 remains PAUSED / NOT AUTHORIZED. The next material point is a separate Product Owner decision on future Phase B; this documentation creates no experiment and authorizes no execution. PR #59 incorporated the minimal temporal closeout of PR #56. INT-CLOUD-01–05 are incorporated into planning only. PRs #57/#58 closed the bounded offline Claude CLI transport/evidence PoC; F-1–F-5 retain independent approval, N-1 is VERIFIED / FIXED and N-2–N-4 remain DEFERRED. **The old ID is CLOSED, 8/8 consumed, zero balance; real semantic round-trip is NOT DEMONSTRATED and remains required before strategy.** INT-CLOUD-01/02 support that next gate through official eligibility review and conditional authorized transport evaluation; they do not replace it or authorize execution. A future real proof requires explicit authorization of a new ID, budget and scope. The five original receipts remain unavailable and attempt #8's historical failure is preserved. Do not loosen capability/model controls or implicitly start strategy/takes/cut planning. INT-CLOUD-03–05 remain future planning under their own prerequisites; progress stays 55%.
+1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The smallest proposed advance is an offline evidence-linked logical editorial draft using the existing result, under D9 and a separate implementation-scope decision; do not invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-09-30
+**Updated:** 2026-10-03
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 **Current global weighted roadmap progress:** 55%.
 
@@ -28,7 +28,7 @@ CEVRA VIDS
 │   ├─ Semantic Editorial Analysis V1
 │   │   ├─ Slice A validated analysis boundary [IMPLEMENTED / CLOSED]
 │   │   ├─ bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
-│   │   └─ real-agent semantic round-trip [NEXT REQUIRED GATE / NOT DEMONSTRATED]
+│   │   └─ real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED / WHOLE GATE OPEN]
 │   │       ├─ INT-CLOUD-01 official ChatGPT eligibility/capability review [RESEARCH / SCHEDULED]
 │   │       └─ INT-CLOUD-02 authorized official transport PoC [CONDITIONAL / NOT IMPLEMENTED]
 │   ├─ strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
@@ -148,9 +148,11 @@ provider-neutral Application port, validates untrusted structured responses
 and returns no project mutation. PR CI `36575808711` and Exact Runtime
 `36575808713` passed; post-merge CI `36576763557` and Exact Runtime
 `36576763666` passed. Its scripted test analyzers are not a production AI
-capability. A real-agent round-trip remains the next required gate and is not
-delivered by these scripted fixtures. The preserved Codex App Server attempt is
-blocked on containment with zero turns; the bounded Claude CLI attempt
+capability. These scripted fixtures did not demonstrate a real-agent round-trip.
+The subsequent direct F-A02 scenario and the still-open whole gate are recorded
+in the current checkpoint below; the following V1 account/attempt narrative is
+historical evidence, not a new auth/model check. The preserved Codex App Server
+attempt is blocked on containment with zero turns; the bounded Claude CLI attempt
 now has official macOS arm64 Claude Code 2.1.280 installed and verified in a
 versioned CEVRA-owned developer-tools directory outside the repo. The earlier
 executable blocker is resolved and official subscription authentication now
@@ -232,10 +234,11 @@ Deferred N-2–N-4 and separate CI/review evidence remain in the existing record
 A new real proof
 requires explicit authorization of a new ID, budget and scope. Slice A stays
 CLOSED; full semantic analysis is NOT DELIVERED; progress remains 55%.
-ADR 0030 remains ACCEPTED DIRECTION / IN DEVELOPMENT. The real semantic
-round-trip remains NOT DEMONSTRATED and required before strategy; no new
-Director authority or implicit strategy/take-selection/cut-planning
-authorization follows. The old experiment stays CLOSED at 8/8, zero balance,
+ADR 0030 remains ACCEPTED DIRECTION / IN DEVELOPMENT. At that V1 closeout,
+the real semantic round-trip was NOT DEMONSTRATED.
+The later F-A02 direct scenario is recorded below; the whole gate remains open
+before strategy. No new Director authority or implicit strategy/take-selection/
+cut-planning authorization follows. The old experiment stays CLOSED at 8/8, zero balance,
 and five original receipts remain unavailable.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.
@@ -251,15 +254,56 @@ retain it; provider contact/consumption remains `UNKNOWN`. Original evidence
 is preserved and the same F-A cannot be replayed. Historical V1 remains CLOSED
 at 8/8, zero balance.
 
-`fix/first-fa-transport-diagnostics` is an **IN DEVELOPMENT, OFFLINE ONLY**
-correction of this diagnostic loss, preserving containment and execution
-authority. Its optional closed non-content diagnostic supports old receipts
-without rewrite; deterministic fake-only regressions, independent review and
-draft-PR CI do not demonstrate a real round-trip. The detailed evidence and
-Director impact are recorded in [master context §24.1](CEVRA_MASTER_CONTEXT.md#241-main).
-No further real F-A, new operational experiment, retry or merge is implied;
-each requires its separate approved scope. The real semantic round-trip stays
-**NOT DEMONSTRATED**, full analysis **NOT DELIVERED**, progress **55%**.
+PR #70 diagnostic persistence is **IMPLEMENTED / CLOSED** at
+`c9d96eb63877cc81230693a827b0d1469dd566b0`, equal to the reviewed tree;
+independent review and post-merge push CI `37082549743` passed 5/5.
+Exact Runtime/Windows did not trigger for this path set. Old receipts remain
+readable and the lost historical rejection reason stays INDETERMINATE.
+
+[PR #72](https://github.com/inlifemedicina/cevra/pull/72) isolated preparation is
+**IMPLEMENTED / CLOSED** at `363e70bf1c4f9e21c29df5906b861e4bba664a1c`,
+with tree `9b765458aff10f0a5adb31df153383e8d4287ead` matching independently
+approved head `83c1e1215bfd01183ef9d737e14aca5e99d79521`.
+391 deterministic PoC tests, 31 Application semantic tests and five negative-TTY
+cases passed. Post-merge push CI `37085879662`, attempt 1, passed 5/5;
+Exact Runtime/Windows did not trigger for this path set.
+
+The owner subsequently supplied genuine local-TTY CONFIRM for fixed candidate
+`semantic-real-agent-roundtrip-v2-poc-02`: **FIRST_FA_VALIDATED**, one invocation,
+accepted `analysis-candidate`, correlated success receipt, observed model
+`claude-opus-5-5` and closed child in approximately **16.143 s**. Pure read-only
+validation and independent review confirmed result/receipt/digest/history binding,
+complete E1/E2 coverage and preserved history/redo. Requested effort is medium;
+effective effort is not separately proved. Provider-contact and token/cost
+telemetry do not prove a remote hard cap or guaranteed R$0. No new account or
+authentication check is part of this closeout.
+
+The candidate preserves material availability as the next-day-delivery condition,
+label accompaniment as a complement, possible repetition and future-material
+uncertainty. Documentary semantic dimensions pass; **citations PARTIAL** because
+one label observation compares against E1 but cites only E2, while the relation
+cites both. The unchanged literal fixture helper returns condition false,
+complement true, repetition false and uncertainty false; wording/field placement
+explain the differences, and neither criteria nor response were rewritten.
+
+The isolated allocation is **1/1 consumed, zero remaining**: no replay/refund,
+automatic retry, continuation or new live authority. Earlier failed F-A and V1
+8/8 remain preserved. Raw private result/ledger/event content is not published.
+This is a **limited direct PT-BR textual result / WHOLE GATE OPEN**, not complete
+analysis, I1-T1 plan/Change Set, editing, preview or export. EN-US, live continuation,
+cancellation and timeout were not exercised. With `timingBasis:none`, source
+intervals are not cut alignment. Strategy/takes/cut planning remain NOT STARTED /
+NOT AUTHORIZED IMPLICITLY; an evidence-linked offline logical draft is the next
+bounded proposal under D9 and a separate scope decision. Progress remains **55%**.
+
+See [master context §24.1](CEVRA_MASTER_CONTEXT.md#241-main) and the
+[preparation record](CEVRA_FIRST_FA_ISOLATED_ATTEMPT_02_PREPARATION.md), whose
+pre-execution wording remains historical. The owner explicitly authorized public
+publication of the technical test/model/provider/subscription-auth history on
+2026-10-03; this update excludes credentials, tokens, private component/session
+identifiers, local paths and raw private files. Director impact is a compatible
+evidence closeout, preserving the existing typed authority and provider-neutral
+boundary. No feature, merge or additional provider authority follows.
 
 ## Scheduling addition — 2026-09-30: official ChatGPT integration and cloud/mobile feasibility
 
@@ -275,10 +319,10 @@ Identity sign-in, permission to consume a subscriber's AI allowance, an agent ex
 
 Reconciled over canonical main `be1e0e99fd189a1c976b44ec3a72e66d5fa5608c`
 after PRs #57/#58: Slice A and the bounded offline Claude PoC stay CLOSED.
-The historical experiment stays CLOSED at 8/8 with zero balance; the accepted
-real semantic round-trip remains NOT DEMONSTRATED. INT-CLOUD-01/02 support,
-not replace, that next required gate. It requires separately authorized new
-experiment scope, ID and budget. None of INT-CLOUD-01–05 is implemented or
+The historical experiment stays CLOSED at 8/8 with zero balance. F-A02 now
+provides limited direct PT-BR scenario evidence; the whole real-agent gate
+remains open. INT-CLOUD-01/02 support, not replace, that remaining gate. It
+requires separately authorized new experiment scope, ID and budget. None of INT-CLOUD-01–05 is implemented or
 authorizes inference, spending, commercial upload or deployment.
 
 **Director impact:** compatible provider/transport investigation only. The current typed boundaries and canonical project authority are unchanged. A commercial cloud runner remains a separate future decision.
