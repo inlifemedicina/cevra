@@ -1,0 +1,406 @@
+{
+  "history": {
+    "version": 2,
+    "entries": [
+      {
+        "id": "snapshot-2",
+        "revision": 1,
+        "command": {
+          "type": "project.rename",
+          "name": "redo preserved"
+        },
+        "actor": {
+          "type": "user"
+        },
+        "createdAt": "2026-09-28T18:00:00.000Z",
+        "snapshotId": "snapshot-3"
+      }
+    ],
+    "snapshots": [
+      {
+        "id": "snapshot-1",
+        "revision": 0,
+        "createdAt": "2026-09-28T18:00:00.000Z",
+        "project": {
+          "schemaVersion": 2,
+          "project": {
+            "id": "draft-fixture-project",
+            "name": "CEVRA",
+            "createdAt": "2026-09-28T18:00:00.000Z",
+            "updatedAt": "2026-09-28T18:00:00.000Z",
+            "defaultLocale": "pt-BR"
+          },
+          "sources": [
+            {
+              "id": "source-1",
+              "kind": "video",
+              "uri": "file:///synthetic/source-1.mov",
+              "displayName": "source-1.mov",
+              "durationMs": 10000
+            },
+            {
+              "id": "source-2",
+              "kind": "video",
+              "uri": "file:///synthetic/source-2.mov",
+              "displayName": "source-2.mov",
+              "durationMs": 10000
+            }
+          ],
+          "timeline": {
+            "durationMs": 0,
+            "tracks": [],
+            "clips": []
+          },
+          "captions": [],
+          "graphics": [],
+          "layouts": [],
+          "audio": {
+            "masterGainDb": 0
+          },
+          "style": {},
+          "generation": [],
+          "history": {
+            "revision": 0,
+            "headSnapshotId": "snapshot-1"
+          },
+          "qa": [],
+          "exports": [],
+          "extensions": {}
+        },
+        "sourceTranscriptRefs": [
+          {
+            "sourceId": "source-1",
+            "digest": "sha256-history-transcript-v1-9cf1f688dfb4d41878357eb797f6968766f49f59c512250cb4ac5b5a210e8128"
+          },
+          {
+            "sourceId": "source-2",
+            "digest": "sha256-history-transcript-v1-7b945261a8bd67a94a38808c3870cb0cd723b7ca1bead83b3f230d24bfcc927e"
+          }
+        ]
+      },
+      {
+        "id": "snapshot-3",
+        "revision": 1,
+        "createdAt": "2026-09-28T18:00:00.000Z",
+        "project": {
+          "schemaVersion": 2,
+          "project": {
+            "id": "draft-fixture-project",
+            "name": "redo preserved",
+            "createdAt": "2026-09-28T18:00:00.000Z",
+            "updatedAt": "2026-09-28T18:00:00.000Z",
+            "defaultLocale": "pt-BR"
+          },
+          "sources": [
+            {
+              "id": "source-1",
+              "kind": "video",
+              "uri": "file:///synthetic/source-1.mov",
+              "displayName": "source-1.mov",
+              "durationMs": 10000
+            },
+            {
+              "id": "source-2",
+              "kind": "video",
+              "uri": "file:///synthetic/source-2.mov",
+              "displayName": "source-2.mov",
+              "durationMs": 10000
+            }
+          ],
+          "timeline": {
+            "durationMs": 0,
+            "tracks": [],
+            "clips": []
+          },
+          "captions": [],
+          "graphics": [],
+          "layouts": [],
+          "audio": {
+            "masterGainDb": 0
+          },
+          "style": {},
+          "generation": [],
+          "history": {
+            "revision": 1,
+            "headEntryId": "snapshot-2",
+            "headSnapshotId": "snapshot-3"
+          },
+          "qa": [],
+          "exports": [],
+          "extensions": {}
+        },
+        "sourceTranscriptRefs": [
+          {
+            "sourceId": "source-1",
+            "digest": "sha256-history-transcript-v1-9cf1f688dfb4d41878357eb797f6968766f49f59c512250cb4ac5b5a210e8128"
+          },
+          {
+            "sourceId": "source-2",
+            "digest": "sha256-history-transcript-v1-7b945261a8bd67a94a38808c3870cb0cd723b7ca1bead83b3f230d24bfcc927e"
+          }
+        ]
+      }
+    ],
+    "transcriptBlobs": [
+      {
+        "digest": "sha256-history-transcript-v1-7b945261a8bd67a94a38808c3870cb0cd723b7ca1bead83b3f230d24bfcc927e",
+        "transcript": {
+          "sourceId": "source-2",
+          "wordTiming": "none",
+          "speakerState": "none",
+          "transcript": {
+            "language": "pt-BR",
+            "words": [],
+            "segments": [
+              {
+                "id": "segment-2",
+                "startMs": 0,
+                "endMs": 10000,
+                "text": "Com o material disponível, podemos entregar no dia seguinte. Além disso, cada caixa recebe uma etiqueta para acompanhamento. Não sabemos se haverá material para pedidos futuros.",
+                "wordIds": []
+              }
+            ]
+          },
+          "provenance": {
+            "stages": [
+              {
+                "kind": "transcription",
+                "executionId": "synthetic-transcription",
+                "engineId": "synthetic-engine",
+                "engineVersion": "1",
+                "engineApiVersion": "1",
+                "modelId": "synthetic-model",
+                "createdAt": "2026-09-28T18:00:00.000Z"
+              }
+            ]
+          },
+          "transcriptDigest": "sha256-v1:d16eeb558c22346f3cee25f316e8abff0bcb809945a1a811b44e4500edb4717f"
+        }
+      },
+      {
+        "digest": "sha256-history-transcript-v1-9cf1f688dfb4d41878357eb797f6968766f49f59c512250cb4ac5b5a210e8128",
+        "transcript": {
+          "sourceId": "source-1",
+          "wordTiming": "none",
+          "speakerState": "none",
+          "transcript": {
+            "language": "pt-BR",
+            "words": [],
+            "segments": [
+              {
+                "id": "segment-1",
+                "startMs": 0,
+                "endMs": 10000,
+                "text": "A oficina monta caixas sob encomenda. A entrega no dia seguinte só vale quando o material está disponível. O prazo não é uma promessa sem essa condição.",
+                "wordIds": []
+              }
+            ]
+          },
+          "provenance": {
+            "stages": [
+              {
+                "kind": "transcription",
+                "executionId": "synthetic-transcription",
+                "engineId": "synthetic-engine",
+                "engineVersion": "1",
+                "engineApiVersion": "1",
+                "modelId": "synthetic-model",
+                "createdAt": "2026-09-28T18:00:00.000Z"
+              }
+            ]
+          },
+          "transcriptDigest": "sha256-v1:9e945e81288d1c8fb0cb3ee185ad6fdcfa00c9a2ffeb9814c9dc317a249a87db"
+        }
+      }
+    ],
+    "cursorSnapshotId": "snapshot-1"
+  },
+  "request": {
+    "id": "draft-fixture",
+    "analysis": {
+      "version": 1,
+      "profile": "cevra.semantic-editorial-analysis.v1",
+      "kind": "analysis-candidate",
+      "executionId": "synthetic-analysis",
+      "contextId": "synthetic-context",
+      "binding": {
+        "projectId": "draft-fixture-project",
+        "projectRevision": 0,
+        "projectSnapshotId": "snapshot-1",
+        "journalEntryCount": 1,
+        "sourceTranscripts": [
+          {
+            "sourceId": "source-1",
+            "transcriptDigest": "sha256-v1:9e945e81288d1c8fb0cb3ee185ad6fdcfa00c9a2ffeb9814c9dc317a249a87db"
+          },
+          {
+            "sourceId": "source-2",
+            "transcriptDigest": "sha256-v1:d16eeb558c22346f3cee25f316e8abff0bcb809945a1a811b44e4500edb4717f"
+          }
+        ],
+        "projectionProfile": "cevra.editorial-transcript.v1",
+        "analysisProfile": "cevra.semantic-editorial-analysis.v1"
+      },
+      "coverage": {
+        "status": "complete",
+        "requestedSourceReferences": [
+          "S1",
+          "S2"
+        ],
+        "providedEvidenceReferences": [
+          "E1",
+          "E2"
+        ],
+        "transcriptUnavailableSourceReferences": [],
+        "noSpeechSourceReferences": [],
+        "sourcesWithRemainingEvidence": []
+      },
+      "evidence": [
+        {
+          "reference": "E1",
+          "sourceId": "source-1",
+          "transcriptDigest": "sha256-v1:9e945e81288d1c8fb0cb3ee185ad6fdcfa00c9a2ffeb9814c9dc317a249a87db",
+          "startMs": 0,
+          "endMs": 10000,
+          "timingBasis": "none",
+          "basis": "segments",
+          "wordIds": [],
+          "segmentId": "segment-1",
+          "text": "A oficina monta caixas sob encomenda. A entrega no dia seguinte só vale quando o material está disponível. O prazo não é uma promessa sem essa condição."
+        },
+        {
+          "reference": "E2",
+          "sourceId": "source-2",
+          "transcriptDigest": "sha256-v1:d16eeb558c22346f3cee25f316e8abff0bcb809945a1a811b44e4500edb4717f",
+          "startMs": 0,
+          "endMs": 10000,
+          "timingBasis": "none",
+          "basis": "segments",
+          "wordIds": [],
+          "segmentId": "segment-2",
+          "text": "Com o material disponível, podemos entregar no dia seguinte. Além disso, cada caixa recebe uma etiqueta para acompanhamento. Não sabemos se haverá material para pedidos futuros."
+        }
+      ],
+      "candidate": {
+        "version": 1,
+        "kind": "analysis-candidate",
+        "contextId": "synthetic-context",
+        "observations": [
+          {
+            "id": "observation-1",
+            "kind": "theme",
+            "statement": "A oficina monta caixas sob encomenda.",
+            "justification": "Synthetic textual evidence",
+            "uncertainty": "low",
+            "evidenceReferences": [
+              "E1"
+            ]
+          },
+          {
+            "id": "observation-2",
+            "kind": "caveat",
+            "statement": "Entrega no dia seguinte depende de material disponível; não é promessa incondicional.",
+            "justification": "Synthetic textual evidence",
+            "uncertainty": "low",
+            "evidenceReferences": [
+              "E1"
+            ]
+          },
+          {
+            "id": "observation-3",
+            "kind": "idea",
+            "statement": "Com material disponível, a entrega no dia seguinte é possível.",
+            "justification": "Synthetic textual evidence",
+            "uncertainty": "low",
+            "evidenceReferences": [
+              "E2"
+            ]
+          },
+          {
+            "id": "observation-4",
+            "kind": "idea",
+            "statement": "A etiqueta serve para acompanhamento. Essa informação não aparece em E1.",
+            "justification": "Synthetic textual evidence",
+            "uncertainty": "low",
+            "evidenceReferences": [
+              "E2"
+            ]
+          },
+          {
+            "id": "observation-5",
+            "kind": "caveat",
+            "statement": "Não sabemos se haverá material para pedidos futuros.",
+            "justification": "Synthetic textual evidence",
+            "uncertainty": "material",
+            "evidenceReferences": [
+              "E2"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "id": "relation-repeat",
+            "kind": "possible-equivalence",
+            "statement": "Possible repetition; keep both alternatives unresolved.",
+            "uncertainty": "material",
+            "justification": "Both sources discuss conditional delivery.",
+            "leftEvidenceReferences": [
+              "E1"
+            ],
+            "rightEvidenceReferences": [
+              "E2"
+            ]
+          },
+          {
+            "id": "relation-complement",
+            "kind": "complement",
+            "statement": "The label complements the delivery information.",
+            "uncertainty": "low",
+            "justification": "E2 adds information.",
+            "leftEvidenceReferences": [
+              "E1"
+            ],
+            "rightEvidenceReferences": [
+              "E2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "statement": "The relationship between sources is uncertain.",
+            "reason": "No audiovisual evidence.",
+            "evidenceReferences": [
+              "E1",
+              "E2"
+            ]
+          }
+        ],
+        "limitations": [
+          "Text only; no take choice or precise cut timing."
+        ]
+      },
+      "provenance": {
+        "invocationCount": 1,
+        "requestBytes": [
+          1711
+        ],
+        "responseBytes": [
+          4259
+        ]
+      }
+    },
+    "analysisReview": {
+      "citationSupport": "PARTIAL",
+      "notes": [
+        "The label observation compares E1 but cites only E2; the relation cites both."
+      ],
+      "priorChecks": [
+        {
+          "id": "prior-literal-helper",
+          "outcome": "PARTIAL",
+          "detail": "condition:false, complement:true, repetition:false, uncertainty:false; unchanged prior helper."
+        }
+      ]
+    }
+  }
+}

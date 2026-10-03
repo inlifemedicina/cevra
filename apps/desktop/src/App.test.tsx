@@ -67,6 +67,8 @@ class FunctionalDesktopBackend implements DesktopBackend {
   });
   pickerCancelled = false;
 
+  async loadEditorialDraft() { return { status: "empty" as const }; }
+  async reviseEditorialDraft(): Promise<never> { throw { code: "EDITORIAL_DRAFT_UNAVAILABLE" }; }
   async loadState(): Promise<DesktopBackendState> { return this.state(); }
   async pickAndImportMedia(): Promise<ImportMediaResult> {
     if (this.pickerCancelled) return { outcome: "cancelled" };

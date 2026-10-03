@@ -79,7 +79,8 @@ test("trusted cache root stays host-internal and adds no protocol or WebView com
   assert.doesNotMatch(rustMain, /desktop_.*cache/i);
   assert.deepEqual(capability.permissions.sort(), [
     "allow-desktop-cancel-operation", "allow-desktop-get-state", "allow-desktop-pick-and-ingest-media",
-    "allow-desktop-redo", "allow-desktop-transcribe-source", "allow-desktop-undo"
+    "allow-desktop-redo", "allow-desktop-transcribe-source", "allow-desktop-undo",
+    "allow-desktop-get-editorial-draft", "allow-desktop-revise-editorial-draft"
   ].sort());
 });
 

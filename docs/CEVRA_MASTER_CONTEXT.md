@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-10-03 UTC, bounded offline Editorial Draft V1 explicitly authorized and implemented in review (§24.1); wider strategy/takes/cuts remain outside that authorization.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
+**Last decision reconciliation:** 2026-10-03 UTC, bounded offline Editorial Draft V1 integrated by PR #75 after #74; the owner approved its smallest offline host/backend/UI review consumer on 2026-10-03, now IN DEVELOPMENT / NOT MERGED (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1459,7 +1459,7 @@ Foundation / Media Runtime       [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
 → bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
 → real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED; WHOLE GATE OPEN; V1 CLOSED 8/8 / F-A02 EXHAUSTED 1/1]
-→ offline evidence-linked editorial draft [APPROVED BOUNDED SCOPE / IMPLEMENTED / IN REVIEW]
+→ offline evidence-linked editorial draft [APPLICATION SERVICE INTEGRATED #75; OFFLINE REVIEW CONSUMER IN DEVELOPMENT]
 → broader strategy / take selection / cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 → missing typed Project IR edit commands
 → cut compiler
@@ -1526,7 +1526,7 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-**Offline Editorial Draft V1 — APPROVED SCOPE / IMPLEMENTED / IN REVIEW:**
+**Offline Editorial Draft V1 — APPLICATION SERVICE INTEGRATED / OFFLINE REVIEW CONSUMER IN DEVELOPMENT:**
 The owner explicitly approved reusing the saved F-A02 candidate to create a
 source-linked editorial proposal offline. `EditorialDraftService` adds a
 process-local immutable proposal in Application, retaining all observations,
@@ -1538,9 +1538,11 @@ five blocks, E1/E2 links, both caveats, preserved history/redo and result hash,
 zero new analyzer/provider invocations. Citation support stays PARTIAL and the
 prior literal helper stays false/true/false/false. Details and limits:
 [Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md).
-This branch is based on reviewed context PR #74 and will remain a draft dependent
-on that documentation PR. Neither change is merged by this record; whole-gate
-completion and broader strategy/take/cut implementation remain unclaimed.
+Context PR #74 and Application service PR #75 are merged; the service is integrated
+at `d8d93b7678e4b74a7b3ce034b60d7e2105b6a361`. The separately approved offline
+review consumer is in development on `feat/offline-editorial-panel` and is not
+merged by this record. Whole-gate completion and broader strategy/take/cut
+implementation remain unclaimed.
 Director impact is a compatible Application proposal extension; typed commands,
 Project IR, History, provider and engine authority are preserved. Progress 55%.
 
@@ -2654,7 +2656,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The owner has now explicitly approved and the current branch implements the bounded offline evidence-linked editorial draft under D9 (§24.1); review/integration is pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
+1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.
@@ -2674,3 +2676,14 @@ If ChatGPT again reports “maximum conversation length”:
 5. update this document again before the new chat becomes long.
 
 **The project must never rely on a single chat thread as its only memory.**
+
+
+### Offline editorial review consumer — owner approval and active implementation, 2026-10-03
+
+**Status:** IN DEVELOPMENT / NOT MERGED on `feat/offline-editorial-panel`, based on integrated `main` `d8d93b7678e4b74a7b3ce034b60d7e2105b6a361`. PR #76 remains a separate Draft containing roadmap proposals; it is not a prerequisite or merged by this slice.
+
+After the morning recommendation, the owner authorized the smallest offline panel to inspect the existing five-block proposal, consult sources/justifications/caveats, reorder blocks and edit presentation titles/user notes. The host admits one accepted analysis per session and owns it and its service-issued draft in memory, bound to the same ProjectHistory; the closed backend permits only query/revision. UI PT-BR/EN-US shares the existing Director surface and canonical project/timeline. This acceptance authorizes the two narrow local query/revision commands and does not grant provider, arbitrary filesystem/network, persistent admission, import, cut/timing or export authority.
+
+The [offline draft document](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#offline-review-consumer) is the single implementation/validation record for this consumer. Trusted Application handoff must supply the already accepted candidate and its matching history; the UI cannot submit a replacement analysis or serialized draft identity. Existing provenance, PARTIAL citation assessment and first-ingestion binding limitations remain unchanged. A session with no handoff is empty; a stale draft is unavailable for revision. Development demonstration uses an explicit synthetic fixture; it does not claim a production saved-analysis importer or restore a draft after restart.
+
+**Director impact:** compatible extension of proposal review, with no new provider/execution authority. Progress stays 55%; F-A02 stays closed/exhausted at 1/1. Broader strategy/take/cut planning, Change Set application, preview and export remain separate gates. No new live inference, diagnostic, model/configuration change or quota reservation is part of this work.
