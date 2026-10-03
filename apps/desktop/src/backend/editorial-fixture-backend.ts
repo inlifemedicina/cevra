@@ -10,7 +10,7 @@ export class EditorialFixtureBackend extends DemoDesktopBackend {
   private draft = this.service.create(structuredClone(fixture.request) as CreateEditorialDraftRequest);
 
   override async loadState() {
-    return { ...await super.loadState(), project: structuredClone(this.history.current), canUndo: this.history.canUndo, canRedo: this.history.canRedo };
+    return { ...await super.loadState(), project: structuredClone(this.history.current), sourceNumbering: this.history.sourceNumbering, canUndo: this.history.canUndo, canRedo: this.history.canRedo };
   }
   override async loadEditorialDraft(): Promise<EditorialDraftState> {
     try { this.service.assertCurrent(this.draft); }

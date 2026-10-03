@@ -1,7 +1,8 @@
+import { presentSources } from "./source-presentation";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { translate, translationKeys } from "@cevra/i18n";
-import { createEmptyProject, createSourceTranscript, ProjectHistory, validateProjectIR, type ProjectIR } from "@cevra/project-ir";
+import { createEmptyProject, createSourceTranscript, sourceNumberingForSources, ProjectHistory, validateProjectIR, type ProjectIR } from "@cevra/project-ir";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
@@ -54,7 +55,7 @@ class MultiSourceDemoDesktopBackend extends DemoDesktopBackend {
         }]
       }
     }));
-    return { ...state, project };
+    return { ...state, project, sourceNumbering: sourceNumberingForSources(project.sources) };
   }
 }
 
@@ -92,6 +93,7 @@ class FunctionalDesktopBackend implements DesktopBackend {
   state(project = this.history.current): DesktopBackendState {
     return {
       project,
+      sourceNumbering: this.history.sourceNumbering,
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
       status: "local-unsaved",
@@ -179,7 +181,7 @@ describe("CEVRA Vids desktop shell", () => {
     await user.click(within(screen.getByTestId("workspace-transcription")).getByRole("button", { name: /Quando a explicação é clara/ }));
     expect(shell.dataset.selectedProjectItemId).toBe("source-main");
     await user.click(screen.getByRole("tab", { name: "Editar" }));
-    expect(screen.getByTestId("inspector-selection").textContent).toContain("Consulta_Original.mov");
+    expect(screen.getByTestId("inspector-selection").textContent).toContain("Vídeo 1");
     expect(screen.getByTestId("inspector-selection").textContent).not.toContain("segment-1");
   });
 
@@ -190,20 +192,20 @@ describe("CEVRA Vids desktop shell", () => {
     await user.click(screen.getByRole("button", { name: "Overlays 1" }));
     expect(shell.dataset.selectedProjectItemId).toBe("source-main");
     await user.click(screen.getByRole("tab", { name: "Editar" }));
-    expect(screen.getByTestId("inspector-selection").textContent).toContain("Consulta_Original.mov");
+    expect(screen.getByTestId("inspector-selection").textContent).toContain("Vídeo 1");
   });
 
   it("binds a selected B-roll clip to its source and shows the no-transcript state", async () => {
     const user = await renderApplication();
     const timeline = screen.getByLabelText("Linha do tempo");
-    await user.click(within(timeline).getByRole("button", { name: "B-roll_Detalhes.mp4" }));
+    await user.click(within(timeline).getByRole("button", { name: "Vídeo 2 · B-roll_Detalhes.mp4" }));
     const shell = screen.getByTestId("app-shell");
     expect(shell.dataset.selectedProjectItemId).toBe("clip-broll-1");
     expect(shell.dataset.activeSourceId).toBe("source-broll");
     await user.click(screen.getByRole("tab", { name: "Transcrição" }));
     expect(screen.getByText("Nenhuma transcrição disponível para esta fonte.")).toBeTruthy();
     expect(screen.queryByText("Quando a explicação é clara, a confiança cresce.")).toBeNull();
-    expect(screen.getByText(/Fonte selecionada: B-roll_Detalhes\.mp4/)).toBeTruthy();
+    expect(screen.getByText(/Fonte selecionada: Vídeo 2/)).toBeTruthy();
   });
 
   it("edits the local Director draft while execution stays unavailable", async () => {
@@ -279,7 +281,7 @@ describe("CEVRA Vids desktop shell", () => {
 
   it("renders a neutral inspector state for an unresolved selection", () => {
     const project = createDemoProject();
-    render(<Inspector project={project} selectedProjectItemId="segment-1" workspace="edit" t={(key, parameters = {}) => translate("pt-BR", key, parameters)} />);
+    render(<Inspector presentations={presentSources(project.sources, sourceNumberingForSources(project.sources), (key, parameters) => translate("pt-BR", key, parameters))} project={project} selectedProjectItemId="segment-1" workspace="edit" t={(key, parameters = {}) => translate("pt-BR", key, parameters)} />);
     expect(screen.getByText("Selecione um item do projeto para inspecionar suas propriedades.")).toBeTruthy();
     expect(screen.queryByText("Selecionado: segment-1")).toBeNull();
   });
@@ -366,6 +368,7 @@ describe("CEVRA Vids desktop shell", () => {
     const empty = new FunctionalDesktopBackend().state();
     const hostState = {
       project: empty.project,
+      sourceNumbering: empty.sourceNumbering,
       canUndo: false,
       canRedo: false,
       status: { hostAvailable: true, persistence: "local-unsaved" as const },
@@ -524,6 +527,7 @@ describe("CEVRA Vids desktop shell", () => {
     const backend = new TauriDesktopBackend(async () => {
       throw { code: "OPERATION_TIMEOUT", message: "safe", details: { state: {
         project: state.project,
+        sourceNumbering: state.sourceNumbering,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
         status: { hostAvailable: true, persistence: "local-unsaved" },
@@ -544,6 +548,7 @@ describe("CEVRA Vids desktop shell", () => {
     for (const persistence of ["local-saved", "local-recovered", "persistence-error"] as const) {
       const backend = new TauriDesktopBackend(async () => ({
         project: state.project,
+        sourceNumbering: state.sourceNumbering,
         canUndo: false,
         canRedo: false,
         status: { hostAvailable: true, persistence },
@@ -560,7 +565,8 @@ describe("CEVRA Vids desktop shell", () => {
     const labels = [
       ["local-saved", "Salvo", "Saved"],
       ["local-recovered", "Sessão recuperada · salva", "Recovered session · saved"],
-      ["persistence-error", "Alterações não salvas", "Changes not saved"]
+      ["persistence-error", "Alterações não salvas", "Changes not saved"],
+      ["temporary-review", "Revisão temporária · não guardada", "Temporary review · not saved"]
     ] as const;
     for (const [status, pt, en] of labels) {
       const backend = new FunctionalDesktopBackend();
@@ -578,6 +584,7 @@ describe("CEVRA Vids desktop shell", () => {
     const backend = new TauriDesktopBackend(async () => {
       throw { code: "HOST_RECOVERED", details: { state: {
         project: state.project,
+        sourceNumbering: state.sourceNumbering,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
         status: { hostAvailable: true, persistence: "local-recovered" },
@@ -618,3 +625,14 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+it("rejects missing or colliding host numbering before using it for source labels", async () => {
+  const project = createDemoProject();
+  const valid = sourceNumberingForSources(project.sources);
+  const malformed = structuredClone(valid);
+  malformed.sources.push({ ...malformed.sources[0] });
+  for (const sourceNumbering of [undefined, malformed]) {
+    const backend = new TauriDesktopBackend(async () => ({ project, sourceNumbering, canUndo: false, canRedo: false, status: { hostAvailable: true, persistence: "local-saved" }, capabilities: { mediaImport: { available: false, reason: "runtime-not-configured" }, transcription: { available: false, reason: "runtime-not-configured" } } }) as never);
+    await expect(backend.loadState()).rejects.toThrow(/source numbering|Source numbering/i);
+  }
+});

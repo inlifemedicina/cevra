@@ -15,6 +15,8 @@ import { TopBar } from "./components/TopBar";
 import { WorkspaceStage } from "./components/WorkspaceStage";
 import { capabilityReasonKey, workspaceKeys, type Workspace } from "./ui-model";
 
+import { presentSources } from "./source-presentation";
+
 const defaultBackend = new DemoDesktopBackend();
 
 export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) {
@@ -42,6 +44,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [mediaOpen, setMediaOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const t = useMemo(() => (key: TranslationKey, parameters: Readonly<Record<string, string | number>> = {}) => translate(locale, key, parameters), [locale]);
+
+  const sourcePresentations = useMemo(() => project && backendState ? presentSources(project.sources, backendState.sourceNumbering, t) : new Map(), [project, backendState, t]);
 
   useEffect(() => {
     let current = true;
@@ -241,18 +245,18 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} inspectorOpen={inspectorOpen} exportAvailable={backendState.capabilities["project.export"].available} status={backendState.status} canUndo={backendState.canUndo && !mutationBusy} canRedo={backendState.canRedo && !mutationBusy} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onInspectorToggle={() => setInspectorOpen((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={setActiveTool} />
-        {mediaOpen && <MediaPanel sources={project.sources} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !transcriptionOperationId && !editorialBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
+        {mediaOpen && <MediaPanel sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !transcriptionOperationId && !editorialBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
-            <WorkspaceStage workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy || editorialBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />
+            <WorkspaceStage presentations={sourcePresentations} workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy || editorialBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />
           </div>
           {runtimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(runtimeError))}</div>}
           {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
-          <div className="director-slot" hidden={workspace !== "edit"}><DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} busy={editorialBusy || mutationBusy} error={editorialError} t={t} onRefresh={() => void refreshEditorial()} onRevise={reviseEditorial} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} /></div>
+          <div className="director-slot" hidden={workspace !== "edit"}><DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || mutationBusy} error={editorialError} t={t} onRefresh={() => void refreshEditorial()} onRevise={reviseEditorial} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} /></div>
         </div>
-        {inspectorOpen && <Inspector project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />}
+        {inspectorOpen && <Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />}
       </div>
-      <Timeline project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={setPlayheadMs} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} />
+      <Timeline presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={setPlayheadMs} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} />
     </main>
   );
 }

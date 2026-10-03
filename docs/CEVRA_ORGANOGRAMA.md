@@ -31,7 +31,7 @@ CEVRA VIDS
 │   │   └─ real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED / WHOLE GATE OPEN]
 │   │       ├─ INT-CLOUD-01 official ChatGPT eligibility/capability review [RESEARCH / SCHEDULED]
 │   │       └─ INT-CLOUD-02 authorized official transport PoC [CONDITIONAL / NOT IMPLEMENTED]
-│   ├─ offline evidence-linked editorial draft [APPLICATION #75 / OFFLINE REVIEW #77 INTEGRATED; DESIGNATED ADMISSION IN DEVELOPMENT]
+│   ├─ offline evidence-linked editorial draft [APPLICATION #75 / OFFLINE REVIEW #77 / DESIGNATED ADMISSION + SOURCE NUMBERING #78 INTEGRATED]
 │   ├─ broader strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   ├─ take selection [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   └─ cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
@@ -351,7 +351,7 @@ authorizes inference, spending, commercial upload or deployment.
 
 This supersedes the earlier unmerged offline-draft checkpoint: Application #75 and offline host/backend/UI #77 are integrated. PR #77 merged at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI `37127986470` SUCCESS 5/5 and Exact Runtime `37127986468` SUCCESS 1/1, attempt 1.
 
-The owner subsequently approved only the designated existing F-A02 result/history admission into a temporary native review session; this bounded addition is IN DEVELOPMENT / NOT MERGED. The ordinary saved project is preserved, PARTIAL/uncertainty remain visible, and canonical editing/provider/timing/cut/export authority is not added. Details: [offline admission](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Subjective acceptance remains pending. Director impact: compatible review extension; progress 55%, F-A02 exhausted 1/1. PR #76 remains a separate Draft.
+The owner subsequently approved only the designated existing F-A02 result/history admission into a temporary native review session; this bounded addition and the approved stable-numbering follow-up are IMPLEMENTED / MERGED through PR #78 at `182081e6a9e6c1b7849a099ebd3f6bba13663415`, with post-merge CI `37151631882` SUCCESS 5/5, attempt 1. The ordinary saved project is preserved, PARTIAL/uncertainty remain visible, and canonical editing/provider/timing/cut/export authority is not added. Details: [offline admission](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#designated-fa02-admission). Subjective acceptance remains pending. Director impact: compatible review extension; progress 55%, F-A02 exhausted 1/1. PR #76 remains a separate Draft.
 
 <a id="vids-roadmap-2026-10-03"></a>
 
@@ -396,7 +396,7 @@ exportação mantêm responsabilidades distintas. Reusar os IDs de
 
 | Ordem proposta | Resultado verificável | Dependência/gate preservado |
 |---|---|---|
-| 1 | #74/#75 e consumidor offline #77 integrados; estabilizar a revisão temporária designada e sua clareza visual no [Draft #78](https://github.com/inlifemedicina/cevra/pull/78). | F-A02 PT-BR é limitado; aceite humano de salvar/navegar/descartar e visual/usabilidade permanece pendente. Análise completa, I1-T1/plano/Change Set e cortes não estão homologados. |
+| 1 | #74/#75 e consumidor offline #77 integrados; estabilizar a revisão temporária designada e sua clareza visual já integradas no [PR #78](https://github.com/inlifemedicina/cevra/pull/78). | F-A02 PT-BR é limitado; clareza dos cards e associação Vídeo 1/2 aceitas em dd7f1e4. Salvar/navegar/descartar e usabilidade funcional ampla não foram homologados; agrupar a próxima rodada humana. Análise completa, I1-T1/plano/Change Set e cortes não estão homologados. |
 | 1a — após estabilizar 1; no próximo incremento de brief/constraints | Planejar perfil editorial opcional: definir campos, precedência base→projeto, contexto mínimo transparente e critérios de revisão; implementar somente a fatia depois aprovada. | UI/schema/persistência/consentimento e compatibilidade aprovados antes de implementar; não bloqueia tarefas independentes nem antecipa chamada real. Ver seção específica abaixo. |
 | 2 | Estratégia/takes e plano temporal verificável → comandos tipados/Cut Compiler/QA → preview/timeline/revisão/export do primeiro fluxo vertical. | Autorizar uma fatia concreta futura; não inventar timing. UX Surface Contract precede considerar preview/timeline completos; respeitar pré-requisitos da matriz Media Runtime e aceitação. |
 | 3 | Legendas, áudio e composição conforme decisões e benchmark. | Cue compiler, placement/QA, fontes e preview/export coerentes; seleção de Composition Engine continua pendente do benchmark, sem antecipar sua escolha. |
@@ -440,20 +440,22 @@ comparação real e licenças continuam seus processos próprios de aprovação.
 
 O consumidor mínimo antes proposto foi autorizado separadamente e integrado
 pelo [PR #77](https://github.com/inlifemedicina/cevra/pull/77), com contexto/revisão
-no host, contratos tipados e PT/EN. O [Draft #78](https://github.com/inlifemedicina/cevra/pull/78)
-admite somente o par F-A02 designado numa revisão temporária offline. O native
-build anterior foi demonstrado, mas essa PR e o ajuste visual posterior continuam
-sem merge. Não repetir a antiga decisão de autorizar o consumidor como se ainda
+no host, contratos tipados e PT/EN. O [PR #78](https://github.com/inlifemedicina/cevra/pull/78),
+integrado em `182081e6a9e6c1b7849a099ebd3f6bba13663415`, admite somente o par
+F-A02 designado numa revisão temporária offline e inclui o ajuste visual e a
+numeração durável aprovados. O CI pós-merge `37151631882` passou 5/5 na primeira
+execução. Não repetir a antiga decisão de autorizar o consumidor como se ainda
 estivesse ausente; escopo maior/persistência, cortes/export e análise completa
 continuam seus próprios gates.
 
 O owner observou leitura do conteúdo, título/nota preservados e reorder; clareza
 visual média motivou separar os cards e distinguir fonte de posição do bloco.
-Isso não prova salvar/navegar/descartar nem aceite geral. A janela aberta continua
-preservada; o delta não é automaticamente aceito por ter testes de UI verdes.
-Número por fonte é consistente nas superfícies e estável durante a janela;
-durabilidade após reabrir exige aprovação do contrato mínimo de histórico,
-compatibilidade e testes, antes de implementar. Ícone de tipo não é miniatura real.
+Isso não prova salvar/navegar/descartar nem aceite geral. As janelas continuam
+preservadas. Posteriormente, o owner aceitou a clareza dos cards e associação
+Vídeo 1/2 na demo dd7f1e4, conforme o registro limitado abaixo. A evolução de
+numeração durável já foi aprovada e integrada no PR #78; a demo permanece
+window-only. Compatibilidade/testes técnicos estão verificados, sem declarar
+homologação física de save/reopen. Ícone de tipo não é miniatura real.
 
 <a id="vids-editorial-profile-2026-10-03"></a>
 
@@ -489,11 +491,14 @@ refinamento compatível de planejamento; intenção, constraints e evidência se
 para o mesmo plano tipado, sem nova autoridade de provider/engine/History.
 
 
-### Visual/source numbering — active implementation reconciled 2026-10-03
+### Visual/source numbering — integrated implementation reconciled 2026-10-03
 
-[Draft PR #78](https://github.com/inlifemedicina/cevra/pull/78) contains the
-owner-approved visual clarification and stable source-numbering implementation,
-IN DEVELOPMENT / NOT MERGED. The frozen reviewed native visual is `dd7f1e4`
+[PR #78](https://github.com/inlifemedicina/cevra/pull/78) integrated the
+owner-approved visual clarification and stable source-numbering implementation
+at `182081e6a9e6c1b7849a099ebd3f6bba13663415`, with post-merge CI `37151631882`
+SUCCESS 5/5, attempt 1. The
+[exact-head integration record](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md#pr-78-integration-and-post-merge-validation--2026-10-03)
+preserves the reviewed tree and bounded scope. The frozen reviewed native visual is `dd7f1e4`
 (window-only numbers); the durable follow-up is `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8`.
 Existing History/Store, one project counter outside undo, archive/package V3
 and V1/V2 read compatibility implement the approved bounded evolution. Earlier

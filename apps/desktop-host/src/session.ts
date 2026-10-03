@@ -41,6 +41,7 @@ import {
   isDesktopMediaExecutionArchiveOperationalError
 } from "./media-execution-archive.js";
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
+import { readDesignatedFa02Pair } from "./fa02-review-admission.js";
 
 type Locale = "pt-BR" | "en-US";
 
@@ -52,6 +53,7 @@ export interface DesktopSessionServices {
   mediaCapability: CapabilityState;
   transcriptionCapability: CapabilityState;
   persistence?: DesktopProjectPersistence;
+  temporaryEditorialReview?: true;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
 }
@@ -100,9 +102,10 @@ export class DesktopSession {
   state(): DesktopHostState {
     return {
       project: this.services.history.current,
-      canUndo: this.services.history.canUndo,
-      canRedo: this.services.history.canRedo,
-      status: { hostAvailable: true, persistence: this.services.persistence?.state ?? "local-unsaved" },
+      sourceNumbering: this.services.history.sourceNumbering,
+      canUndo: !this.services.temporaryEditorialReview && this.services.history.canUndo,
+      canRedo: !this.services.temporaryEditorialReview && this.services.history.canRedo,
+      status: { hostAvailable: true, persistence: this.services.temporaryEditorialReview ? "temporary-review" : this.services.persistence?.state ?? "local-unsaved" },
       capabilities: {
         mediaImport: { ...this.services.mediaCapability },
         transcription: { ...this.services.transcriptionCapability }
@@ -225,6 +228,7 @@ export class DesktopSession {
   }
 
   private async runMutation<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     const task = operation();
     this.activeMutationTask = task;
@@ -237,6 +241,13 @@ export class DesktopSession {
 }
 
 export async function createProductionDesktopSession(environment: NodeJS.ProcessEnv = process.env): Promise<DesktopSession> {
+  const pair = await readDesignatedFa02Pair(environment);
+  if (pair) {
+    const session = new DesktopSession({ history: pair.history, temporaryEditorialReview: true,
+      mediaCapability: unavailable("review-session"), transcriptionCapability: unavailable("review-session") });
+    session.acceptEditorialAnalysis(pair.request);
+    return session;
+  }
   const persistenceRoot = environment.CEVRA_PROJECT_PERSISTENCE_ROOT;
   if (!persistenceRoot) throw new DesktopPersistenceError("PROJECT_PERSISTENCE_UNAVAILABLE");
   const opened = await DesktopProjectPersistence.open(persistenceRoot, {

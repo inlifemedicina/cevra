@@ -1,6 +1,6 @@
 # Offline Editorial Draft V1
 
-**Status:** Application service INTEGRATED via PR #75 after #74. Offline host/backend/UI review consumer INTEGRATED via PR #77. Designated F-A02 offline admission IN DEVELOPMENT / NOT MERGED; scope below.
+**Status:** Application service INTEGRATED via PR #75 after #74. Offline host/backend/UI review consumer INTEGRATED via PR #77. Designated F-A02 offline admission, visual clarification and durable source numbering INTEGRATED via PR #78 at `182081e6a9e6c1b7849a099ebd3f6bba13663415`; post-merge CI SUCCESS 5/5, attempt 1; bounded scope below.
 
 The owner explicitly approved the smallest offline passage from the existing
 F-A02 analysis candidate to a source-linked, user-reviewable editorial proposal.
@@ -108,7 +108,7 @@ additional provider, engine, History or execution authority. Progress remains
 
 ## Offline host/backend/UI review consumer — 2026-10-03
 
-**Status:** INTEGRATED via PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`, post-merge CI `37127986470` SUCCESS 5/5 and Exact Runtime `37127986468` SUCCESS 1/1 (attempt 1). The owner approved the smallest proposed panel after the morning report. It occupies the existing Director review area, replacing its static 12-change fixture with accepted-analysis review or an honest empty/stale state. Preview and timeline remain the same project surface. PT-BR and EN-US localize controls/status/errors; original analysis text and user content retain their own language.
+**Status:** IMPLEMENTED / MERGED via [PR #77](https://github.com/inlifemedicina/cevra/pull/77). The owner approved the smallest proposed panel after the morning report and subsequently authorized integration of exact head `23054b716a4ec705905c37eb12929a9c885543c8`. It occupies the existing Director review area, replacing its static 12-change fixture with accepted-analysis review or an honest empty/stale state. Preview and timeline remain the same project surface. PT-BR and EN-US localize controls/status/errors; original analysis text and user content retain their own language.
 
 `DesktopSession.acceptEditorialAnalysis` is a trusted **in-process Application handoff**, not a WebView/JSONL method, file importer, authentication mechanism or persisted record. The caller supplies an already accepted `CreateEditorialDraftRequest` and the matching history. `EditorialDraftService.create` revalidates the original closed contract, source citations, provenance fields and legacy binding. Admission is one-shot per host session: a second handoff is rejected, preventing a previous revision-0 client from editing a replacement context. Another accepted analysis requires a new host session with its matching history. The host keeps the accepted analysis and the exact service-issued revision privately; snapshot queries return a detached presentation copy. The existing first-ingestion limitation remains: no new historical full-journal witness, transport receipt authentication or semantic re-proof is invented.
 
@@ -124,7 +124,13 @@ One canonical synthetic fixture is `apps/desktop/src/fixtures/editorial-review.j
 
 Automated checks cover trusted admission, matching/foreign bindings, detached query copies, closed revisions, unsupported analysis/draft/command fields, immutable citations and prior assessment, title/note/order editing, retained redo, canonical staleness, UI source selection and locale parity. The full native host path and visible browser fixture have distinct evidence; neither calls a provider. Native compile/ACL and supported-Python runtime coverage are required CI gates. Review/CI do not replace subjective owner acceptance of the panel or narrative quality. D4-T2/D5-T1 and D9-T1/T2 inform this bounded source-linked review; strategy/mounting and I1-T1's plan/Change Set remain BLOCKED beyond this consumer.
 
-Local pre-publication verification passed TypeScript and the production Vite build, all 53 desktop tests and all eight new host protocol tests. The combined Application/host suite passed 319/321: two existing managed-transcription availability tests failed with the available Python 3.9 runtime, which does not satisfy the supported Python 3.12 gate. Their expectations were preserved; no runtime was installed or test skipped. Native Rust compilation is unavailable locally and remains a required CI check. The production bundle contains no synthetic-analysis/context markers or fixture selector. Controlled Chrome demonstration passed PT/EN display, five blocks/two caveats/PARTIAL, title/note editing and reorder without project revision changes, source selection, navigation, local discard and stale rejection after canonical redo. Screenshots and detailed local evidence remain outside the repository. Final independent review and remote CI evidence belong in the Draft PR; this record does not claim their completion in advance.
+Local pre-publication verification passed TypeScript and the production Vite build, all 53 desktop tests and all eight new host protocol tests. The combined Application/host suite passed 319/321: two existing managed-transcription availability tests failed with the available Python 3.9 runtime, which does not satisfy the supported Python 3.12 gate. Their expectations were preserved; no runtime was installed or test skipped. Native Rust compilation is unavailable locally and remains a required CI check. The production bundle contains no synthetic-analysis/context markers or fixture selector. Controlled Chrome demonstration passed PT/EN display, five blocks/two caveats/PARTIAL, title/note editing and reorder without project revision changes, source selection, navigation, local discard and stale rejection after canonical redo. Screenshots and detailed local evidence remain outside the repository. The PR body records the proportional independent APPROVE review on tree `1166fc3f9979a18171cb6aeb7ee08073bc83748b`. Pre-merge [push CI](https://github.com/inlifemedicina/cevra/actions/runs/37125402483), [PR CI](https://github.com/inlifemedicina/cevra/actions/runs/37125434819) and [exact macOS arm64 runtime](https://github.com/inlifemedicina/cevra/actions/runs/37125434813) each completed successfully on the authorized head, on their first attempt.
+
+### Exact-head integration and post-merge validation
+
+The owner authorized integration of PR #77 at exact head `23054b716a4ec705905c37eb12929a9c885543c8`. GitHub performed a SHA-guarded normal merge into `main` at `73f8427ac18337f779ceeda9c93f60edf35df33b` on 2026-10-03 at 13:58:03 UTC (10:58:03 America/Sao_Paulo). Its parents are the prior integrated main `d8d93b7678e4b74a7b3ce034b60d7e2105b6a361` and the authorized head; tree `1166fc3f9979a18171cb6aeb7ee08073bc83748b` is unchanged from the reviewed head.
+
+Post-merge [CI](https://github.com/inlifemedicina/cevra/actions/runs/37127986470) completed successfully, 5/5 jobs: monorepo build/tests, Python 3.12 transcription/alignment worker contracts, Media Runtime reproducibility and Tauri compile/Rust supervisor checks. [Audio Sequence Exact Runtime](https://github.com/inlifemedicina/cevra/actions/runs/37127986468) completed successfully, 1/1 native macOS arm64 job. Both runs validate the merge SHA and passed on attempt 1; no rerun or code adjustment was needed. The Python 3.9 local limitation remains a local environment limitation rather than a failed supported-runner gate. This records integration and objective checks; it does not invent subjective owner acceptance or widen the approved scope. PR #76 remains separate and unmerged.
 
 **Director impact:** compatible proposal-review extension. No provider/engine, canonical edit, cut, timing, export or persistent admission authority is added. Progress remains 55%; F-A02 remains closed/exhausted 1/1 with zero remaining.
 
@@ -133,7 +139,7 @@ Local pre-publication verification passed TypeScript and the production Vite bui
 
 ## Designated F-A02 native offline admission — owner approved 2026-10-03
 
-**Status:** IN DEVELOPMENT / NOT MERGED on `feat/offline-fa02-native-review`, based on integrated #77. This implements the owner-approved local reading of the existing F-A02 result and matching history into a temporary review session. It is deliberately limited to this designated pair, not a general import, analyzer or persistent analysis store.
+**Status:** IMPLEMENTED / MERGED through PR #78 at `182081e6a9e6c1b7849a099ebd3f6bba13663415`, extending integrated #77. This implements the owner-approved local reading of the existing F-A02 result and matching history into a temporary review session. It is deliberately limited to this designated pair, not a general import, analyzer or persistent analysis store.
 
 Native startup accepts exactly `--cevra-fa02-review ROOT RESULT_SHA256 HISTORY_SHA256`. The trusted designation identifies a canonical absolute directory and the previously recorded byte hashes of `first-fa-result.private.json` and `history-archive.json`. Those private paths/hashes are supplied outside the repository and are never WebView arguments. The host validates regular files, bounded bytes, no symlink/alias, stable read identity and exact hashes. It requires the original terminal F-A wrapper and existing analysis contract, then uses `ProjectHistory.fromArchive` and `EditorialDraftService.create` to validate the corresponding project, transcript citations, binding and provenance schema. Hashes identify the selected bytes; they do not authenticate historical provider transport or grant execution permission. The pre-existing first-ingestion full-journal-witness limitation remains explicit. The original producer intentionally records `providerContact: UNKNOWN`; admission preserves that uncertainty instead of rewriting it to confirmed contact.
 
@@ -145,33 +151,95 @@ Local verification has exercised the actual pair through the real host factory: 
 
 **Director impact:** compatible bounded offline admission/review extension. Product Owner visual/narrative acceptance remains pending; strategy/mounting/I1-T1 and other broader capabilities retain their original gates. Progress stays 55%; F-A02 stays closed/exhausted 1/1.
 
+<a id="subsequent-visual-and-stable-numbering-approval--2026-10-03"></a>
 
-## Subsequent visual and stable-numbering approval — 2026-10-03
+## Editorial presentation clarity — owner approved 2026-10-03
 
-[Draft PR #78](https://github.com/inlifemedicina/cevra/pull/78) contains the
-owner-approved clearer editorial cards/shared source labels and the subsequent
-bounded durable-numbering evolution. The reviewed visual demo at `dd7f1e4`
-remains a separate native instance with window-only numbers; the older instance
-and original pair were preserved. The owner accepted its bounded visual clarity
-as recorded below. Final visual identity and broader functional/narrative
-acceptance remain pending.
+The offline review now separates blocks into bordered, spaced cards and distinguishes
+block position, editable title, original analysis, user note and source evidence.
+The heading is visually uppercase. The media name is secondary: numbered Video,
+Audio and Image labels are shared by media, transcript selection, inspector,
+source-derived timeline labels and editorial citations. Evidence references remain
+available as analysis traceability; they are not media identities. Source actions
+resolve the original source ID, never the block position or evidence label.
 
-The follow-up at `3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8` is IN DEVELOPMENT /
-NOT MERGED: existing ProjectHistory owns source-ID/number reservations and one
-monotonic project counter outside undo, and existing ProjectStore writes V3
-while reading V1/V2. It adds no database or audiovisual IR shape. Valid legacy
-opening initializes metadata in memory without rewriting saved files; old labels
-never persisted cannot be reconstructed. Recovery retains the registry of the
-valid recovered checkpoint. The format and approved limits are recorded in
-[ADR 0031 in the implementation commit](https://github.com/inlifemedicina/cevra/blob/3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8/docs/adr/0031-stable-source-numbering-v1.md).
+The reviewed visual commit `dd7f1e4` initially used a presentation registry per
+window, separately for each project and source kind. Its frozen native demo
+retains that window-only behavior. The current follow-up uses history-owned
+durable numbering as described below. Original filenames remain in
+source details/tooltips and accessible labels. The old index-based decorative
+4K badge is removed because it did not represent verified source resolution.
+No thumbnail provider exists in this UI baseline; type icons remain type icons.
 
-The implementation tree received independent APPROVE and passed the local
-production build plus IR 59/59, Store 15/15, Transcription 50/50, Alignment 33/33,
-Host 88/88 and UI 58/58 tests. Exact-head CI remains the implementation PR's
-gate. This documentation track adds no feature code or profile implementation.
-Editorial review notes remain in memory and no real owner project is migrated
-by these tests. Director impact is compatible presentation identity; progress
-stays 55%, broader agent gates remain open and F-A02 stays exhausted 1/1.
+**Durable numbering is owner-approved and IMPLEMENTED / MERGED through PR #78.**
+The minimal follow-up stores one source-ID/number registry and monotonic counter
+in existing ProjectHistory, independently of the undo cursor. HistoryArchive and
+Project Package V3 preserve reservations across explicit save/reopen, removal,
+undo/redo/restore and abandoned redo branches. One counter covers all source
+kinds in a project; a filtered view can show gaps. The shared UI uses host-owned
+numbers, retaining filenames as secondary details and canonical source IDs for
+actions. Project IR audiovisual schema and the persistence architecture remain
+unchanged. [ADR 0031](adr/0031-stable-source-numbering-v1.md) records the approval,
+format, validation and compatibility limits.
+
+V1/V2 archives initialize deterministically from retained snapshots without
+rewriting a valid saved project during opening; only an explicit existing
+checkpoint writes V3. Previously displayed labels and discarded branches never
+stored in legacy data cannot be reconstructed. Recovery retains the registry of
+the valid recovered checkpoint, not reservations lost with unsaved/lost state.
+Temporary F-A02 admission continues to keep all editorial review changes in
+memory and preserves the original pair unchanged.
+
+Save/discard/move controls explain their disabled state. The original analysis,
+PARTIAL support, caveats, revision validation, typed review operation and all
+provider/apply/export restrictions remain authoritative. The owner's prior
+native-window reading/edit/reorder observations are limited acceptance evidence;
+card separation and source association are now accepted as recorded below.
+Saving, navigation, discard and broader functional acceptance are not claimed. The
+older native window is preserved. The separate `dd7f1e4` native instance verifies
+the reviewed visual; it does not contain the current durable-numbering follow-up.
+Typography, colors, logo and icons are provisional. Director impact: compatible
+presentation identity only; no new context or execution authority.
+
+Offline validation of the durable follow-up passed the full production build,
+59 Project IR tests, 15 Project Store tests, 50 Transcription contract tests,
+33 Alignment contract tests, 88 Desktop Host tests and 58 Desktop UI tests.
+Host runtime fixtures used the repository-pinned private CPython with synthetic
+model-presence files, without model downloads or inference. Save/close/reopen
+used disposable fixture directories, not owner projects. V1/V2 compatibility,
+malformed/missing registries, retired IDs and discarded branches are covered.
+The existing Application suite also passed 239 tests during this work. An
+unchanged Media stdin fixture initially timed out; its focused rerun passed 3/3
+without modifying the engine. Exact-head CI and independent review passed, followed
+by the authorized integration and successful post-merge checks below; these
+checks do not claim broader human acceptance.
+
+### PR #78 integration and post-merge validation — 2026-10-03
+
+The owner directly authorized PR #78 at exact head
+`3e9f82e7c4c22a5c0cfa3338d10ee8df5094a7d8`. The SHA-guarded normal merge is
+`182081e6a9e6c1b7849a099ebd3f6bba13663415`, integrated on 2026-10-03 at
+20:27:54 UTC (17:27:54 America/Sao_Paulo). Its parents are prior main
+`73f8427ac18337f779ceeda9c93f60edf35df33b` and the authorized head. Tree
+`f77eaa5d25175af69531dc56d23adaf91dc6ef0f` is identical to the independently
+approved feature tree.
+
+[PR CI](https://github.com/inlifemedicina/cevra/actions/runs/37144114804) and
+[push CI](https://github.com/inlifemedicina/cevra/actions/runs/37144111106)
+passed 5/5 on the exact feature head. [Post-merge CI](https://github.com/inlifemedicina/cevra/actions/runs/37151631882)
+passed 5/5 on the merge SHA: monorepo build/tests, Python 3.12 transcription and
+alignment worker contracts, Media Runtime reproducibility, and Tauri compile/Rust
+supervisor checks. All passed on attempt 1; no rerun or code correction was
+needed. A separate native build of the reviewed durable follow-up also passed,
+without launching it or changing existing windows.
+
+This closes technical integration of the designated admission, visual clarification
+and durable source numbering. Physical durable save/reopen, broader functional
+and narrative acceptance and final branding remain unclaimed; preserve the
+bounded visual acceptance below and group later human checks into one functional
+round. The optional profile and roadmap refinements remain planning-only in
+Draft #76. F-A02 remains exhausted 1/1, the wider agent gate stays open and
+progress stays 55%; no new AI/provider call or owner-project migration occurred.
 
 ### Limited owner visual acceptance — 2026-10-03
 

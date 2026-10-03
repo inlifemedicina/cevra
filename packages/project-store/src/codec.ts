@@ -5,6 +5,7 @@ import {
   type CompactProjectSnapshot,
   type HistoryArchiveV1,
   type HistoryArchiveV2,
+  type HistoryArchiveV3,
   type HistoryOptions,
   type HistoryTranscriptBlob,
   type JournalEntry,
@@ -14,8 +15,9 @@ import {
   PROJECT_PACKAGE_FORMAT,
   PROJECT_PACKAGE_VERSION,
   PROJECT_PACKAGE_VERSION_V1,
+  PROJECT_PACKAGE_VERSION_V2,
   type ProjectPackageManifest,
-  type ProjectPackageManifestV2,
+  type ProjectPackageManifestV3,
   type SerializedProjectPackage
 } from "./types.js";
 
@@ -28,9 +30,10 @@ const TRANSCRIPT_BLOB_PREFIX = "history/transcript-blobs/";
 export function serializeProjectPackage(history: ProjectHistory, savedAt = new Date().toISOString()): SerializedProjectPackage {
   const current = history.current;
   const archive = history.toArchive();
-  const manifest: ProjectPackageManifestV2 = {
+  const manifest: ProjectPackageManifestV3 = {
     format: PROJECT_PACKAGE_FORMAT,
     formatVersion: PROJECT_PACKAGE_VERSION,
+    sourceNumbering: archive.sourceNumbering,
     projectId: current.project.id,
     projectSchemaVersion: current.schemaVersion,
     activeSnapshotId: archive.cursorSnapshotId,
@@ -60,7 +63,7 @@ export function deserializeProjectPackage(serialized: SerializedProjectPackage, 
   if (manifest.projectSchemaVersion > current.schemaVersion) throw new Error("Project package manifest requires a newer Project IR schema.");
   return manifest.formatVersion === PROJECT_PACKAGE_VERSION_V1
     ? deserializeV1(serialized, manifest.activeSnapshotId, current, historyOptions)
-    : deserializeV2(serialized, manifest.activeSnapshotId, current, historyOptions);
+    : deserializeCompact(serialized, manifest, current, historyOptions);
 }
 
 function deserializeV1(
@@ -83,9 +86,9 @@ function deserializeV1(
   return ProjectHistory.fromArchive(archive, historyOptions);
 }
 
-function deserializeV2(
+function deserializeCompact(
   serialized: SerializedProjectPackage,
-  activeSnapshotId: string,
+  manifest: Exclude<ProjectPackageManifest, { formatVersion: 1 }>,
   current: ReturnType<typeof migrateProject>,
   historyOptions: HistoryOptions
 ): ProjectHistory {
@@ -100,7 +103,10 @@ function deserializeV2(
   snapshots.sort((a, b) => a.revision - b.revision);
   transcriptBlobs.sort((a, b) => a.digest.localeCompare(b.digest));
 
-  const archive: HistoryArchiveV2 = { version: 2, entries, snapshots, transcriptBlobs, cursorSnapshotId: activeSnapshotId };
+  const compact = { entries, snapshots, transcriptBlobs, cursorSnapshotId: manifest.activeSnapshotId };
+  const archive: HistoryArchiveV2 | HistoryArchiveV3 = manifest.formatVersion === PROJECT_PACKAGE_VERSION_V2
+    ? { version: 2, ...compact }
+    : { version: 3, ...compact, sourceNumbering: manifest.sourceNumbering };
   const history = ProjectHistory.fromArchive(archive, historyOptions);
   if (stableJson(history.current) !== stableJson(current)) throw new Error("project.json does not match the active history snapshot.");
   return history;
@@ -110,9 +116,10 @@ function readManifest(content: string | undefined): ProjectPackageManifest {
   const raw = parseRequired(content, MANIFEST_PATH);
   if (!isRecord(raw)) throw new Error("Project package manifest must be an object.");
   if (raw.format !== PROJECT_PACKAGE_FORMAT) throw new Error(`Unsupported project package format ${String(raw.format)}.`);
-  if (raw.formatVersion !== PROJECT_PACKAGE_VERSION_V1 && raw.formatVersion !== PROJECT_PACKAGE_VERSION) {
+  if (raw.formatVersion !== PROJECT_PACKAGE_VERSION_V1 && raw.formatVersion !== PROJECT_PACKAGE_VERSION_V2 && raw.formatVersion !== PROJECT_PACKAGE_VERSION) {
     throw new Error(`Unsupported project package version ${String(raw.formatVersion)}.`);
   }
+  if (raw.formatVersion !== PROJECT_PACKAGE_VERSION && Object.hasOwn(raw, "sourceNumbering")) throw new Error("Source numbering requires project package version 3.");
   for (const key of ["projectId", "activeSnapshotId", "createdAt", "savedAt", "defaultLocale"] as const) {
     if (typeof raw[key] !== "string" || raw[key].length === 0) throw new Error(`Project package manifest ${key} is invalid.`);
   }
