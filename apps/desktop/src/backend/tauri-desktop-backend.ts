@@ -1,4 +1,4 @@
-import type { ProjectIR } from "@cevra/project-ir";
+import { assertValidSourceNumbering, SourceNumberRegistry, type ProjectIR, type SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
@@ -13,9 +13,10 @@ type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>
 
 interface HostState {
   project: ProjectIR;
+  sourceNumbering: SourceNumberingV1;
   canUndo: boolean;
   canRedo: boolean;
-  status: { hostAvailable: true; persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" };
+  status: { hostAvailable: true; persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "temporary-review" };
   capabilities: {
     mediaImport: { available: boolean; reason: DesktopCapabilityReason };
     transcription: { available: boolean; reason: DesktopCapabilityReason };
@@ -98,8 +99,11 @@ function reconciledHostState(details: unknown): HostState | null {
 }
 
 function fromHostState(state: HostState): DesktopBackendState {
+  const numbering = new SourceNumberRegistry(assertValidSourceNumbering(state.sourceNumbering));
+  for (const source of state.project.sources) numbering.assertReserved(source);
   return {
     project: structuredClone(state.project),
+    sourceNumbering: numbering.toRegistry(),
     canUndo: state.canUndo,
     canRedo: state.canRedo,
     status: state.status.persistence,

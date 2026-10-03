@@ -40,6 +40,7 @@ export function capabilityReasonKey(reason: DesktopCapabilityReason): Translatio
     case "model-not-available": return "runtime.modelUnavailable";
     case "host-unavailable": return "runtime.hostUnavailable";
     case "available": return "status.ready";
+    case "review-session": return "runtime.reviewSession";
     case "desktop-runtime-deferred": return "status.unavailableDetail";
   }
 }

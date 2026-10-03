@@ -5,7 +5,10 @@ import { capabilityReasonKey, type Translate, type Workspace } from "../ui-model
 import { formatTime } from "../ui-model";
 import { Preview } from "./Preview";
 
+import type { SourcePresentation } from "../source-presentation";
+
 interface WorkspaceStageProps {
+  presentations: ReadonlyMap<string, SourcePresentation>;
   workspace: Workspace;
   project: Readonly<ProjectIR>;
   selectedProjectItemId: string | null;
@@ -31,7 +34,7 @@ export function WorkspaceStage(props: WorkspaceStageProps) {
   return <Preview empty={props.project.sources.length === 0} interactive={props.previewInteractive} playing={props.playing} playheadMs={props.playheadMs} durationMs={props.project.timeline.durationMs} t={props.t} onPlayingChange={props.onPlayingChange} />;
 }
 
-function TranscriptionWorkspace({ project, activeSourceId, playheadMs, playing, previewInteractive, transcriptionCapability, transcriptionBlocked, transcriptionOperationId, t, onPlayingChange, onTranscribe, onCancelTranscription }: WorkspaceStageProps) {
+function TranscriptionWorkspace({ project, presentations, activeSourceId, playheadMs, playing, previewInteractive, transcriptionCapability, transcriptionBlocked, transcriptionOperationId, t, onPlayingChange, onTranscribe, onCancelTranscription }: WorkspaceStageProps) {
   const [focusedSegmentId, setFocusedSegmentId] = useState<string | null>(null);
   const source = project.sources.find((item) => item.id === activeSourceId);
   const sourceTranscript = project.sourceTranscripts.find((item) => item.sourceId === activeSourceId);
@@ -50,7 +53,7 @@ function TranscriptionWorkspace({ project, activeSourceId, playheadMs, playing, 
           {!source && <p className="workspace-empty-state" role="status">{t("transcription.noSource")}</p>}
           {source && !transcript && <p className="workspace-empty-state" role="status">{t("transcription.emptyForSource")}</p>}
         </div>
-        <footer><span>{transcript?.words.length ?? 0} {t("transcription.words")}</span>{source && <span>{t("media.selectedSource")}: {source.displayName}</span>}</footer>
+        <footer><span>{transcript?.words.length ?? 0} {t("transcription.words")}</span>{source && <span title={source.displayName}>{t("media.selectedSource")}: {presentations.get(source.id)?.label}</span>}</footer>
       </section>
       <Preview compact empty={project.sources.length === 0} interactive={previewInteractive} playing={playing} playheadMs={playheadMs} durationMs={project.timeline.durationMs} t={t} onPlayingChange={onPlayingChange} />
     </div>

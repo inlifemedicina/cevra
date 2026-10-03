@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { capabilityReasonKey, workspaceKeys, type Translate, type Workspace } from "../ui-model";
 import type { DesktopCapabilityReason } from "../backend/desktop-backend";
 import { Icon } from "./Icon";
+import type { SourcePresentation } from "../source-presentation";
 
 type MediaFilter = "all" | SourceAsset["kind"];
 
@@ -13,13 +14,13 @@ const filters = [
   ["image", "media.filter.image"]
 ] as const;
 
-export function MediaPanel({ sources, selectedId, workspace, importAvailable, importReason, importBusy, t, onSelect, onImport }: { sources: readonly SourceAsset[]; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; t: Translate; onSelect(id: string): void; onImport(): void }) {
+export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, t, onSelect, onImport }: { sources: readonly SourceAsset[]; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; t: Translate; onSelect(id: string): void; onImport(): void }) {
   const [filter, setFilter] = useState<MediaFilter>("all");
   const [query, setQuery] = useState("");
   const visibleSources = useMemo(() => sources.filter((source) => {
     const matchesFilter = filter === "all" || source.kind === filter;
-    return matchesFilter && source.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase());
-  }), [filter, query, sources]);
+    return matchesFilter && [source.displayName, presentations.get(source.id)!.label].some(name => name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  }), [filter, query, sources, presentations]);
 
   return (
     <aside className="media-panel" aria-label={t("media.title")}>
@@ -39,13 +40,12 @@ export function MediaPanel({ sources, selectedId, workspace, importAvailable, im
         ))}
       </div>
       <div className="media-grid">
-        {visibleSources.map((source, index) => (
-          <button key={source.id} type="button" className={selectedId === source.id ? "media-card selected" : "media-card"} onClick={() => onSelect(source.id)} aria-pressed={selectedId === source.id}>
+        {visibleSources.map((source) => (
+          <button key={source.id} type="button" className={selectedId === source.id ? "media-card selected" : "media-card"} onClick={() => onSelect(source.id)} aria-pressed={selectedId === source.id} aria-label={`${presentations.get(source.id)!.label} · ${source.displayName}`} title={source.displayName}>
             <span className={`media-thumb media-thumb-${source.kind}`}>
               <span aria-hidden="true">{source.kind === "video" ? "▶" : source.kind === "audio" ? "≋" : "▧"}</span>
-              {index === 0 && <small>4K</small>}
             </span>
-            <span className="media-card-copy"><strong>{source.displayName}</strong><small>{metadata(source)}</small></span>
+            <span className="media-card-copy"><strong>{presentations.get(source.id)!.label}</strong><small>{metadata(source)}</small></span>
           </button>
         ))}
         {visibleSources.length === 0 && <p className="empty-state">{t("media.empty")}</p>}

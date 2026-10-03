@@ -2,6 +2,7 @@
 
 mod command_manifest;
 mod commands;
+mod fa02_review;
 mod protocol;
 mod supervisor;
 

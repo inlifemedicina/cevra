@@ -4,5 +4,6 @@ export * from "./factory.js";
 export * from "./migrations.js";
 export * from "./commands.js";
 export * from "./history.js";
+export * from "./source-numbering.js";
 export * from "./transcript-digest.js";
 export * from "./history-transcript-digest.js";

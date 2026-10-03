@@ -753,7 +753,7 @@ test("history blob identity preserves exact transcript state beyond editorial tr
   });
 
   const archive = history.toArchive();
-  assert.equal(archive.version, 2);
+  assert.equal(archive.version, 3);
   assert.equal(archive.transcriptBlobs.length, 2);
   assert.deepEqual(history.undo().sourceTranscripts[0], initial);
   assert.deepEqual(history.redo().sourceTranscripts[0], confidenceUpdate);
@@ -883,7 +883,7 @@ test("commit return remains detached from compact snapshot and transcript storag
   assert.equal(history.toArchive().transcriptBlobs[0].transcript.transcript.words[0].text, "ação");
 });
 
-test("branching after undo excludes abandoned transcript blobs from the V2 archive", () => {
+test("branching after undo excludes abandoned transcript blobs from the V3 archive", () => {
   let sequence = 0;
   const initial = sourceTranscript();
   const replacement = sourceTranscript({
@@ -938,7 +938,7 @@ test("history transcript digest rejects unsupported non-JSON state instead of no
   assert.throws(() => computeHistoryTranscriptBlobDigest(circular), /circular reference/);
 });
 
-test("V2 history archive rejects duplicate and tampered transcript blobs", () => {
+test("V3 history archive rejects duplicate and tampered transcript blobs", () => {
   const history = new ProjectHistory(v2ProjectWith(sourceTranscript()), { clock: () => fixedTime });
   const duplicate = clone(history.toArchive());
   duplicate.transcriptBlobs.push(clone(duplicate.transcriptBlobs[0]));

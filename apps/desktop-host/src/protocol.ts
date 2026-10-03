@@ -1,4 +1,4 @@
-import type { ProjectIR } from "@cevra/project-ir";
+import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
@@ -28,7 +28,8 @@ export type CapabilityReason =
   | "archive-unavailable"
   | "archive-full"
   | "model-not-available"
-  | "host-unavailable";
+  | "host-unavailable"
+  | "review-session";
 
 export interface CapabilityState {
   available: boolean;
@@ -37,11 +38,12 @@ export interface CapabilityState {
 
 export interface DesktopHostState {
   project: ProjectIR;
+  sourceNumbering: SourceNumberingV1;
   canUndo: boolean;
   canRedo: boolean;
   status: {
     hostAvailable: true;
-    persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error";
+    persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "temporary-review";
   };
   capabilities: {
     mediaImport: CapabilityState;

@@ -36,11 +36,11 @@ async function temporaryRoot(t) {
   return root;
 }
 
-function options() {
+function options(prefix = "persist") {
   let sequence = 0;
   return {
     initialProject: undefined,
-    historyOptions: { idGenerator: () => `persist-${++sequence}`, clock: () => now },
+    historyOptions: { idGenerator: () => `${prefix}-${++sequence}`, clock: () => now },
     clock: () => now
   };
 }
@@ -512,3 +512,53 @@ async function runHost(persistenceRoot, recovered) {
   const messages = stdout.trim().split("\n").map((line) => JSON.parse(line));
   return { snapshot: messages.find((message) => message.id === "state").result };
 }
+
+test("source numbers survive actual checkpoint/close/reopen, removal and replacement of a redo branch", async (t) => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options());
+  const source = id => ({ id, kind: "video", uri: `/definitely/offline/${id}.mov`, displayName: "same.mov" });
+  opened.history.commit({ type: "source.add", source: source("a") });
+  opened.history.commit({ type: "source.add", source: source("b") });
+  opened.history.commit({ type: "source.remove", sourceId: "a" });
+  opened.history.commit({ type: "source.add", source: source("c") });
+  opened.history.undo();
+  await opened.persistence.checkpoint(opened.history);
+  const expected = opened.history.sourceNumbering;
+  await opened.persistence.close();
+  const reopened = await DesktopProjectPersistence.open(root, options("reopened"));
+  assert.deepEqual(reopened.history.sourceNumbering, expected);
+  assert.equal(reopened.history.canRedo, true);
+  reopened.history.commit({ type: "source.add", source: source("d") });
+  assert.equal(reopened.history.sourceNumbering.sources.find(s => s.sourceId === "d").number, 4);
+  const session = new DesktopSession({ history: reopened.history, persistence: reopened.persistence, mediaCapability: unavailable, transcriptionCapability: unavailable });
+  assert.deepEqual(session.state().sourceNumbering, reopened.history.sourceNumbering);
+  await reopened.persistence.checkpoint(reopened.history);
+  await reopened.persistence.close();
+  const final = await DesktopProjectPersistence.open(root, options());
+  assert.equal(final.history.sourceNumbering.sources.find(s => s.sourceId === "c").number, 3);
+  assert.equal(final.history.sourceNumbering.sources.find(s => s.sourceId === "b").number, 2);
+  assert.equal(final.history.sourceNumbering.nextNumber, 5);
+  await final.persistence.close();
+});
+
+test("opening a valid V2 checkpoint initializes numbers in memory without rewriting either saved file", async (t) => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options());
+  opened.history.commit({ type: "source.add", source: { id: "legacy-a", kind: "video", uri: "/offline/a.mov", displayName: "a.mov" } });
+  await opened.persistence.checkpoint(opened.history);
+  await opened.persistence.close();
+  const current = resolve(root, "active-project.current.cevra.json");
+  const previous = resolve(root, "active-project.previous.cevra.json");
+  const pkg = JSON.parse(await readFile(current, "utf8"));
+  const manifest = JSON.parse(pkg.files["manifest.json"]);
+  manifest.formatVersion = 2; delete manifest.sourceNumbering;
+  pkg.files["manifest.json"] = JSON.stringify(manifest);
+  const legacyBytes = JSON.stringify(pkg) + "\n";
+  await writeFile(current, legacyBytes);
+  const previousBytes = await readFile(previous, "utf8");
+  const reopened = await DesktopProjectPersistence.open(root, options());
+  assert.equal(reopened.history.sourceNumbering.sources[0].number, 1);
+  assert.equal(await readFile(current, "utf8"), legacyBytes);
+  assert.equal(await readFile(previous, "utf8"), previousBytes);
+  await reopened.persistence.close();
+});

@@ -9,7 +9,7 @@ interface TopBarProps {
   inspectorOpen: boolean;
   mediaOpen: boolean;
   exportAvailable: boolean;
-  status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable";
+  status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable" | "temporary-review";
   canUndo: boolean;
   canRedo: boolean;
   t: Translate;
@@ -73,10 +73,11 @@ export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpe
   );
 }
 
-function statusKey(status: TopBarProps["status"]): "top.demoNotPersisted" | "top.localUnsaved" | "top.saved" | "top.recovered" | "top.persistenceError" | "runtime.hostUnavailable" {
+function statusKey(status: TopBarProps["status"]): "top.demoNotPersisted" | "top.localUnsaved" | "top.saved" | "top.recovered" | "top.persistenceError" | "runtime.hostUnavailable" | "top.temporaryReview" {
   switch (status) {
     case "demo-not-persisted": return "top.demoNotPersisted";
     case "local-unsaved": return "top.localUnsaved";
+    case "temporary-review": return "top.temporaryReview";
     case "local-saved": return "top.saved";
     case "local-recovered": return "top.recovered";
     case "persistence-error": return "top.persistenceError";
