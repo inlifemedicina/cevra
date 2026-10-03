@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import { OFFLINE_POLICY, OFFLINE_OPERATIONS } from './v2-offline-experiment-plan.mjs';
 import { validateAdmittedFirstFaSession } from './v2-first-fa-session.mjs';
 import { validateTransportDiagnostic } from './transport-diagnostic.mjs';
+import { ISOLATED_FIRST_FA_ATTEMPT } from './v2-isolated-attempt.mjs';
 
 const CHECKPOINT = 'ledger-checkpoint.json';
 const STATE = 'ledger-state.json';
@@ -45,7 +46,7 @@ function closed(value, keys) {
       Object.keys(value).sort().join('|') !== [...keys].sort().join('|')) fail('LEDGER_SCHEMA_INVALID');
 }
 function experiment(id) {
-  if (id === OFFLINE_POLICY.proposedExperimentId) fail('REAL_EXPERIMENT_ID_FORBIDDEN_OFFLINE');
+  if ([OFFLINE_POLICY.proposedExperimentId, ISOLATED_FIRST_FA_ATTEMPT.candidateId].includes(id)) fail('REAL_EXPERIMENT_ID_FORBIDDEN_OFFLINE');
   if (id === OFFLINE_POLICY.historicalExperiment) fail('HISTORICAL_EXPERIMENT_CLOSED');
   if (typeof id !== 'string' || !/^synthetic-semantic-v2-ledger-[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(id)) fail('SYNTHETIC_EXPERIMENT_ID_REQUIRED');
 }
@@ -157,7 +158,10 @@ async function withLock(root, id, control, work, profile) {
 }
 function checkpoint(id, profile) {
   return { version: 1, experimentId: id, state: profile ? 'FIRST_FA_OPERATIONAL_LEDGER' : 'OFFLINE_INERT_LEDGER', liveAuthorized: false,
-    providerAuthority: 'NONE', maximumReservations: OFFLINE_POLICY.maxReservations, policyDigest: POLICY_DIGEST };
+    providerAuthority: 'NONE',
+    maximumReservations: profile?.candidateId === ISOLATED_FIRST_FA_ATTEMPT.candidateId ?
+      ISOLATED_FIRST_FA_ATTEMPT.maximumReservations : OFFLINE_POLICY.maxReservations,
+    policyDigest: profile?.candidateId === ISOLATED_FIRST_FA_ATTEMPT.candidateId ? digest(profile.policy) : POLICY_DIGEST };
 }
 function anchor(id, profile) {
   // Never a quota grant: the offline checkpoint alone bounds simulations.
@@ -210,7 +214,7 @@ async function inspect(root, id, ownedLock, profile) {
   const state = await readRecord(ledgerRoot, STATE);
   closed(state, ['version', 'experimentId', 'checkpointDigest', 'watermark', 'status']);
   if (state.version !== 1 || state.experimentId !== id || state.checkpointDigest !== digest(cp) ||
-      !Number.isInteger(state.watermark) || state.watermark < 0 || state.watermark > OFFLINE_POLICY.maxReservations) fail('LEDGER_INTEGRITY_BLOCKED');
+      !Number.isInteger(state.watermark) || state.watermark < 0 || state.watermark > cp.maximumReservations) fail('LEDGER_INTEGRITY_BLOCKED');
   const reservations = [], receipts = [], seen = new Set();
   if (files.filter(n => n.startsWith('reservation-')).length !== state.watermark) fail('LEDGER_INTEGRITY_BLOCKED');
   for (let number = 1; number <= state.watermark; number++) {
@@ -240,7 +244,7 @@ async function inspect(root, id, ownedLock, profile) {
     if (receipt.reservationNumber !== number) fail('LEDGER_INTEGRITY_BLOCKED');
     receipts.push(receipt);
   }
-  const expectedStatus = state.watermark < 4 ? 'OPEN_OFFLINE' : receipts.length === 4 ? 'CLOSED_OFFLINE' : 'EXHAUSTED_OFFLINE';
+  const expectedStatus = state.watermark < cp.maximumReservations ? 'OPEN_OFFLINE' : receipts.length === cp.maximumReservations ? 'CLOSED_OFFLINE' : 'EXHAUSTED_OFFLINE';
   if (state.status !== expectedStatus) fail('LEDGER_INTEGRITY_BLOCKED');
   // Readers never accept a mixed snapshot across a concurrent commit.
   if (JSON.stringify(await readRecord(ledgerRoot, STATE)) !== JSON.stringify(state) ||
@@ -248,7 +252,7 @@ async function inspect(root, id, ownedLock, profile) {
       JSON.stringify((await readdir(ledgerRoot)).sort()) !== JSON.stringify(files) ||
       JSON.stringify((await readdir(root)).sort()) !== JSON.stringify(names)) fail('LEDGER_INTEGRITY_BLOCKED');
   return freeze({ anchor: observedAnchor, checkpoint: cp, state, reservations, receipts, liveAuthorized: false, providerAuthority: 'NONE',
-    usedReservations: state.watermark, remainingReservations: OFFLINE_POLICY.maxReservations - state.watermark,
+    usedReservations: state.watermark, remainingReservations: cp.maximumReservations - state.watermark,
     unresolvedReservations: reservations.filter(r => !receipts.some(c => c.reservationNumber === r.number)).map(r => r.number) });
 }
 function validateReceipt(receipt, id, reservation, profile) {
@@ -337,7 +341,7 @@ async function reserveOperations(root, request, control, firstFaOnly, profile) {
   return withLock(root, id, control, async (test, lock) => {
     const current = await inspect(root, id, lock, profile);
     if (current.state.status === 'CLOSED_OFFLINE') fail('LEDGER_CLOSED');
-    if (current.usedReservations + operations.length > OFFLINE_POLICY.maxReservations) fail('LEDGER_RESERVATION_LIMIT');
+    if (current.usedReservations + operations.length > current.checkpoint.maximumReservations) fail('LEDGER_RESERVATION_LIMIT');
     if (firstFaOnly && current.reservations.some(r => r.operation === 'semantic-f-a-direct')) fail('LEDGER_FIRST_FA_ALREADY_RESERVED');
     if (operations.some(e => current.reservations.some(r => r.operationId === e.operationId))) fail('LEDGER_DUPLICATE_OPERATION_ID');
     const first = current.usedReservations + 1, created = [];
@@ -350,7 +354,7 @@ async function reserveOperations(root, request, control, firstFaOnly, profile) {
       if (fb && offset === 0) crash(test, 'after-fb-first-fsync');
     }
     const watermark = current.usedReservations + operations.length;
-    await writeState(join(root, LEDGER), { ...current.state, watermark, status: watermark === 4 ? 'EXHAUSTED_OFFLINE' : 'OPEN_OFFLINE' }, test);
+    await writeState(join(root, LEDGER), { ...current.state, watermark, status: watermark === current.checkpoint.maximumReservations ? 'EXHAUSTED_OFFLINE' : 'OPEN_OFFLINE' }, test);
     return freeze(created);
   }, profile);
 }
@@ -369,7 +373,7 @@ async function writeReceipt(root, receipt, control, profile) {
     validateReceipt(captured, captured.experimentId, current.reservations[captured.reservationNumber - 1], profile);
     if (current.receipts.some(r => r.reservationNumber === captured.reservationNumber)) fail('LEDGER_RECEIPT_ALREADY_EXISTS');
     await exclusiveRecord(join(root, LEDGER), recordName('receipt', captured.reservationNumber), captured);
-    if (current.usedReservations === 4 && current.receipts.length === 3) await writeState(join(root, LEDGER), { ...current.state, status: 'CLOSED_OFFLINE' }, test);
+    if (current.usedReservations === current.checkpoint.maximumReservations && current.receipts.length === current.checkpoint.maximumReservations - 1) await writeState(join(root, LEDGER), { ...current.state, status: 'CLOSED_OFFLINE' }, test);
     return freeze(captured);
   }, profile);
 }
@@ -385,10 +389,12 @@ export function createFirstFaLedgerFacade(assertAdmission, controls = {}) {
   const binding = () => {
     const scope = assertAdmission();
     validateAdmittedFirstFaSession(scope);
-    if (Object.keys(controls).length && scope.experimentId === OFFLINE_POLICY.proposedExperimentId) fail('LEDGER_TEST_CONTROL_INVALID');
+    const candidates = [OFFLINE_POLICY.proposedExperimentId, ISOLATED_FIRST_FA_ATTEMPT.candidateId];
+    if (Object.keys(controls).length && candidates.includes(scope.experimentId)) fail('LEDGER_TEST_CONTROL_INVALID');
     if (!scope || !Object.isFrozen(scope) || typeof scope.scopeDigest !== 'string' || !/^[a-f0-9]{64}$/.test(scope.scopeDigest)) fail('LEDGER_ADMISSION_REQUIRED');
-    if (scope.experimentId !== OFFLINE_POLICY.proposedExperimentId) experiment(scope.experimentId);
-    if (scope.candidateId !== OFFLINE_POLICY.proposedExperimentId) fail('LEDGER_ADMISSION_MISMATCH');
+    if (!candidates.includes(scope.experimentId)) experiment(scope.experimentId);
+    else if (scope.experimentId !== scope.candidateId) fail('LEDGER_ADMISSION_MISMATCH');
+    if (!candidates.includes(scope.candidateId)) fail('LEDGER_ADMISSION_MISMATCH');
     return scope;
   };
   const invoke = (root, id, work) => {

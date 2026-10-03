@@ -7,6 +7,7 @@ import { OFFLINE_POLICY } from './v2-offline-experiment-plan.mjs';
 import { LIMITS, childArguments, runClaudeProcess } from './transport.mjs';
 import { createHash } from 'node:crypto';
 import { captureTransportDiagnostic } from './transport-diagnostic.mjs';
+import { ISOLATED_FIRST_FA_ATTEMPT } from './v2-isolated-attempt.mjs';
 
 const frozen = value => {
   for (const child of Object.values(value)) if (child && typeof child === 'object') frozen(child);
@@ -32,11 +33,23 @@ export const FIRST_FA_POLICY = frozen({
   incrementalCost: 'R$0 REQUIRED / NOT ABSOLUTELY VERIFIED'
 });
 
+// Separate fixed preparation; the original policy stays unchanged so its
+// existing scopes, checkpoint digests and consumed slot remain identifiable.
+export const SECOND_FA_POLICY = frozen({ ...FIRST_FA_POLICY,
+  candidateId: ISOLATED_FIRST_FA_ATTEMPT.candidateId,
+  maximumReservations: ISOLATED_FIRST_FA_ATTEMPT.maximumReservations });
+export function firstFaPolicyForCandidate(id) {
+  if (id === OFFLINE_POLICY.historicalExperiment) fail('HISTORICAL_EXPERIMENT_CLOSED');
+  if (id === FIRST_FA_POLICY.candidateId) return FIRST_FA_POLICY;
+  if (id === SECOND_FA_POLICY.candidateId) return SECOND_FA_POLICY;
+  fail('CANDIDATE_ID_MISMATCH');
+}
+
 // Identity recognition is pure. Inert persistence still rejects the candidate
 // ID. Nothing here grants permission, initializes storage or creates a slot.
 export function describeFirstFaCandidate(id) {
   if (id === OFFLINE_POLICY.historicalExperiment) fail('HISTORICAL_EXPERIMENT_CLOSED');
-  if (id !== FIRST_FA_POLICY.candidateId) fail('CANDIDATE_ID_MISMATCH');
+  firstFaPolicyForCandidate(id);
   return frozen({ candidateId: id, liveAuthorized: false, activation: 'ABSENT',
     persistence: 'NOT INITIALIZED', reservation: 'NOT CREATED',
     blocker: 'LIVE_AUTHORIZATION_PRIMITIVE_MISSING' });
@@ -47,6 +60,7 @@ export function validateFirstFaFixture(value) {
     'argvClosed', 'reauthRequired', 'extraUsage', 'capabilities'])) fail('OFFLINE_AUTHORIZATION_ABSENT');
   if (value.authorization !== 'OFFLINE_FAKE_ONLY') fail('OFFLINE_AUTHORIZATION_ABSENT');
   describeFirstFaCandidate(value.candidateId);
+  if (value.candidateId !== FIRST_FA_POLICY.candidateId) fail('CANDIDATE_ID_MISMATCH'); // Legacy seam only.
   if (value.provider !== 'claude-cli' || value.route !== 'first-party-subscription') fail('ROUTE_PROVIDER_MISMATCH');
   if (value.model !== FIRST_FA_POLICY.expectedModel) fail('MODEL_MISMATCH');
   if (value.argvClosed !== true) fail('MODEL_ARGV_NOT_CLOSED');
@@ -77,8 +91,10 @@ export async function runOfflineFirstFa({
 // session composition. Execution dependencies are infrastructure, never model
 // request fields. No import-time provider or filesystem activity.
 export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization, history, request, fakeSpawn,
-  signal, clock, admissionDeadline, ledgerAdapter, execution }) {
-  const localDeadline = clock.now() + FIRST_FA_POLICY.totalDeadlineMs;
+  signal, clock, admissionDeadline, ledgerAdapter, execution, policy = FIRST_FA_POLICY }) {
+  if (policy !== firstFaPolicyForCandidate(policy?.candidateId)) fail('FIRST_FA_POLICY_MISMATCH');
+  if (!execution && policy !== FIRST_FA_POLICY) fail('FIRST_FA_POLICY_MISMATCH');
+  const localDeadline = clock.now() + policy.totalDeadlineMs;
   if (admissionDeadline !== undefined && !Number.isFinite(admissionDeadline)) fail('TIMEOUT');
   const deadline = admissionDeadline === undefined ? localDeadline : Math.min(localDeadline, admissionDeadline);
   const ledgerIo = { initialize: ledgerAdapter.initialize, inspect: ledgerAdapter.inspect, reserve: ledgerAdapter.reserve, receipt: ledgerAdapter.receipt };
@@ -98,7 +114,7 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
     validateFirstFaFixture(fixtureAuthorization); // Synchronous capture before I/O.
     if (typeof fakeSpawn !== 'function') fail('FAKE_PROVIDER_REQUIRED');
   }
-  childArguments('offline-session', undefined, FIRST_FA_POLICY.expectedModel);
+  childArguments('offline-session', undefined, policy.expectedModel);
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort, { once: true });
   const timer = clock.setTimeout(() => { timedOut = true; controller.abort(); }, Math.max(0, deadline - clock.now()));
@@ -109,7 +125,7 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
       guard();
       if (calls !== 0) fail('FIRST_FA_INVOCATION_LIMIT');
       if (typeof invocation.payload !== 'string' || invocation.payloadBytes !== Buffer.byteLength(invocation.payload) ||
-          invocation.payloadBytes > FIRST_FA_POLICY.applicationBytes.initialEnvelope) fail('INPUT_LIMIT');
+          invocation.payloadBytes > policy.applicationBytes.initialEnvelope) fail('INPUT_LIMIT');
       requestBytes = invocation.payloadBytes;
       contextId = JSON.parse(invocation.payload).context.contextId;
       // Admission/validation/preparation can fail before reservation: no fictitious
@@ -123,7 +139,7 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
       };
       const transport = await runClaudeProcess({ ...transportOptions,
         payload: invocation.payload, signal: context.signal,
-        expectedModel: FIRST_FA_POLICY.expectedModel, timeoutMs: deadline - clock.now()
+        expectedModel: policy.expectedModel, timeoutMs: deadline - clock.now()
       }, (binary, argv, options) => {
         guard(); calls++; // Guard inside the callback immediately before contact.
         const child = (execution?.spawn ?? fakeSpawn)(binary, argv, options);
@@ -158,9 +174,9 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
       // internal timer cannot extend admission: the outer timer and guards own
       // the exact remaining deadline, including the last sub-100ms interval.
       timeoutMs: Math.max(100, Math.floor(deadline - clock.now())), monotonicClock: clock.now,
-      initialContextMaxBytes: FIRST_FA_POLICY.applicationBytes.initialEnvelope,
-      totalEvidenceMaxBytes: FIRST_FA_POLICY.applicationBytes.cumulativeEnvelopes,
-      responseMaxBytes: FIRST_FA_POLICY.applicationBytes.response });
+      initialContextMaxBytes: policy.applicationBytes.initialEnvelope,
+      totalEvidenceMaxBytes: policy.applicationBytes.cumulativeEnvelopes,
+      responseMaxBytes: policy.applicationBytes.response });
     result = await app.analyze(request, controller.signal);
     guard();
   } catch (error) {
@@ -177,7 +193,7 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
     if (reservation) {
       const m = transportMetrics ?? transportFailure?.metrics;
       const diagnostic = transportFailure ? captureTransportDiagnostic(transportFailure) : undefined;
-      const wireUsage = transportMetrics?.usage?.[FIRST_FA_POLICY.expectedModel];
+      const wireUsage = transportMetrics?.usage?.[policy.expectedModel];
       const outcome = transportFailure?.childSettlement || transportFailure?.metrics?.settlementIncomplete ? 'crash-uncertain' :
         primary ? signal?.aborted || primary.code === 'CANCELLED' ? 'cancelled' : 'failure' :
         result?.kind === 'analysis-candidate' ? 'success' : 'failure';
@@ -189,8 +205,8 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
           live: execution?.mode === 'OWNED_CLI_ATTEMPT' && processStarted,
           ...(execution ? { scopeDigest: execution.scopeDigest, bindingDigests: execution.bindingDigests,
             transportObservation: { requestBytes: requestBytes ?? null, responseBytes: m?.responseBytes ?? null,
-              contextId: contextId ?? null, requestedModel: FIRST_FA_POLICY.expectedModel,
-              observedModel: transportMetrics?.model ?? null, requestedEffort: FIRST_FA_POLICY.requestedEffort,
+              contextId: contextId ?? null, requestedModel: policy.expectedModel,
+              observedModel: transportMetrics?.model ?? null, requestedEffort: policy.requestedEffort,
               stdoutBytes: m?.stdoutBytes ?? null, stderrBytes: m?.stderrBytes ?? null, events: m?.events ?? null,
               latencyMs: m?.latencyMs ?? null, inputTokens: wireUsage?.inputTokens ?? null, outputTokens: wireUsage?.outputTokens ?? null,
               errorCode: /^[A-Z][A-Z_]{0,79}$/.test(primary?.code ?? '') ? primary.code : null,
@@ -221,7 +237,7 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
     result.kind === 'analysis-candidate' ? 'OFFLINE_FAKE_PASS' : 'OFFLINE_PARTIAL',
     result, invocations: calls, reservation, transportMetrics,
     liveAuthorized: execution?.mode === 'OWNED_CLI_ATTEMPT', providerContact: execution?.mode === 'OWNED_CLI_ATTEMPT' ? 'UNKNOWN' : false,
-    deadlineMs: FIRST_FA_POLICY.totalDeadlineMs });
+    deadlineMs: policy.totalDeadlineMs });
   guard(); // Persistence is not extra inference time; no await before return.
   return accepted;
 }

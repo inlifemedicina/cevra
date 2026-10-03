@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { runPrivateFirstFa, validateCapturedFirstFaSession, validateAdmittedFirstFaSession } from '../v2-first-fa-session.mjs';
 import { createFirstFaSessionAdmissionController } from '../v2-first-fa-admission.mjs';
 import { createFirstFaLedgerFacade, initializeInertLedger, inspectInertLedger } from '../v2-inert-ledger.mjs';
-import { FIRST_FA_POLICY } from '../v2-first-fa-offline.mjs';
+import { FIRST_FA_POLICY, SECOND_FA_POLICY, firstFaPolicyForCandidate, describeFirstFaCandidate } from '../v2-first-fa-offline.mjs';
 import { CLAUDE_VERSION, CLAUDE_SHA256, LIMITS } from '../transport.mjs';
 import { captureTransportDiagnostic, validateTransportDiagnostic } from '../transport-diagnostic.mjs';
 import { fixture } from './fixtures.mjs';
@@ -509,4 +509,105 @@ test('runtime filesystem failure and cleanup failure do not leak paths or delete
   await assert.rejects(runPrivateFirstFa(s.input, deps(t, foreign)), code('FIRST_FA_CLEANUP_FAILED'));
   assert(existsSync(join(foreign.calls[0].options.cwd, 'foreign.json')));
   assert(!existsSync(foreign.settingsPaths[0]));
+});
+
+// The second preparation always uses synthetic ledger identities in tests.
+function isolated(s) {
+  s.input.candidateId = SECOND_FA_POLICY.candidateId;
+  s.input.policy = SECOND_FA_POLICY;
+  return s;
+}
+test('fixed second candidate is immutable recognition only; arbitrary third IDs stay closed', () => {
+  assert.equal(SECOND_FA_POLICY.candidateId, 'semantic-real-agent-roundtrip-v2-poc-02');
+  assert.equal(SECOND_FA_POLICY.maximumReservations, 1);
+  assert.equal(firstFaPolicyForCandidate(SECOND_FA_POLICY.candidateId), SECOND_FA_POLICY);
+  assert.equal(firstFaPolicyForCandidate(FIRST_FA_POLICY.candidateId), FIRST_FA_POLICY);
+  assert.equal(Object.hasOwn(FIRST_FA_POLICY, 'maximumReservations'), false);
+  assert(Object.isFrozen(SECOND_FA_POLICY)); assert(Object.isFrozen(SECOND_FA_POLICY.applicationBytes));
+  for (const key of ['expectedModel', 'requestedEffort', 'totalDeadlineMs', 'maxInvocations', 'retries', 'fallbacks'])
+    assert.equal(SECOND_FA_POLICY[key], FIRST_FA_POLICY[key]);
+  assert.equal(describeFirstFaCandidate(SECOND_FA_POLICY.candidateId).liveAuthorized, false);
+  assert.throws(() => firstFaPolicyForCandidate('semantic-real-agent-roundtrip-v2-poc-03'), code('CANDIDATE_ID_MISMATCH'));
+});
+for (const mode of ['success', 'plugins', 'needs']) test(`second candidate ${mode} closes exactly one reservation and cannot replay`, async t => {
+  const s = isolated(await setup(t)), fake = childFixture(s, { mode }); let prompt;
+  const attempt = runPrivateFirstFa(s.input, deps(t, fake, { consentIO: human(t, { observe: text => { prompt = text; } }) }));
+  if (mode !== 'success') await assert.rejects(attempt); else await attempt;
+  const cp = await read(join(s.root, 'ledger/ledger-checkpoint.json'));
+  const state = await read(join(s.root, 'ledger/ledger-state.json'));
+  const receipt = await read(join(s.root, 'ledger/receipt-0001.json'));
+  const reservation = await read(join(s.root, 'ledger/reservation-0001.json'));
+  assert.equal(cp.maximumReservations, 1); assert.equal(state.watermark, 1); assert.equal(state.status, 'CLOSED_OFFLINE');
+  assert.equal(receipt.reservationDigest, reservation.reservationDigest); assert.equal(receipt.scopeDigest, reservation.scopeDigest);
+  assert.deepEqual(receipt.bindingDigests, reservation.bindingDigests);
+  assert.equal(receipt.executionMode, 'CONTROLLED_FAKE'); assert.equal(receipt.providerContact, false);
+  assert(prompt.includes('tentativa isolada 02')); assert(prompt.includes('"maximumReservations":1'));
+  if (mode === 'plugins') assert.equal(receipt.transportObservation.diagnostic.reason, 'INIT_PLUGINS_NONEMPTY');
+  const before = await readFile(join(s.root, 'ledger/receipt-0001.json'));
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake)), code('LEDGER_RESERVATION_LIMIT'));
+  assert.equal(fake.calls.length, 1); assert.deepEqual(await readFile(join(s.root, 'ledger/receipt-0001.json')), before);
+  assert(!existsSync(join(s.root, 'ledger/reservation-0002.json')));
+  assert.equal(JSON.stringify(s.input.history.toArchive()), s.before);
+  assert.deepEqual(await readdir(s.runtime.scratchParent), []);
+});
+test('second candidate spawn failure consumes its one slot without a refund', async t => {
+  const s = isolated(await setup(t)); let calls = 0;
+  const d = { consentIO: human(t), verifyBinary: async () => {}, fakeSpawn() { calls++; throw Error('synthetic'); } };
+  await assert.rejects(runPrivateFirstFa(s.input, d));
+  const r = await read(join(s.root, 'ledger/receipt-0001.json'));
+  assert.equal(r.outcome, 'failure'); assert.equal(r.processStarted, false);
+  assert.equal((await read(join(s.root, 'ledger/ledger-state.json'))).status, 'CLOSED_OFFLINE');
+  await assert.rejects(runPrivateFirstFa(s.input, { ...d, consentIO: human(t) }), code('LEDGER_RESERVATION_LIMIT'));
+  assert.equal(calls, 1);
+});
+for (const answer of ['no', 'eof']) test(`second candidate ${answer} has zero reservation, verification or spawn`, async t => {
+  const s = isolated(await setup(t)), fake = childFixture(s); let verifies = 0;
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake, {
+    consentIO: human(t, { answer }), verifyBinary: async () => { verifies++; }
+  })), code('LOCAL_CONSENT_DENIED'));
+  assert.equal(verifies, 0); assert.equal(fake.calls.length, 0); assert.deepEqual(await readdir(s.root), []);
+});
+for (const invalid of ['policy-clone', 'old-policy', 'unknown-id', 'real-id-with-fake']) test(`second candidate rejects ${invalid} before I/O`, async t => {
+  const s = isolated(await setup(t)), fake = childFixture(s);
+  let expected = 'FIRST_FA_POLICY_MISMATCH';
+  if (invalid === 'policy-clone') s.input.policy = { ...SECOND_FA_POLICY };
+  if (invalid === 'old-policy') s.input.policy = FIRST_FA_POLICY;
+  if (invalid === 'unknown-id') { s.input.candidateId = 'semantic-real-agent-roundtrip-v2-poc-03'; expected = 'CANDIDATE_ID_MISMATCH'; }
+  if (invalid === 'real-id-with-fake') { s.input.experimentId = SECOND_FA_POLICY.candidateId; expected = 'REAL_EXPERIMENT_ID_FORBIDDEN_OFFLINE'; }
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake)), code(expected));
+  assert.equal(fake.calls.length, 0); assert.deepEqual(await readdir(s.root), []);
+});
+test('second candidate cannot reuse the previous candidate checkpoint', async t => {
+  const s = await setup(t), fake = childFixture(s);
+  await runPrivateFirstFa(s.input, deps(t, fake));
+  const before = await readFile(join(s.root, 'ledger/receipt-0001.json'));
+  isolated(s);
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake)), code('LEDGER_ANCHOR_MISMATCH'));
+  assert.equal(fake.calls.length, 1); assert.deepEqual(await readFile(join(s.root, 'ledger/receipt-0001.json')), before);
+  assert.deepEqual(await readdir(s.runtime.scratchParent), []);
+});
+test('public inert APIs reject the second real ID before creating storage', async t => {
+  const s = await setup(t);
+  await assert.rejects(initializeInertLedger(s.root, { experimentId: SECOND_FA_POLICY.candidateId }), code('REAL_EXPERIMENT_ID_FORBIDDEN_OFFLINE'));
+  assert.deepEqual(await readdir(s.root), []);
+});
+test('second candidate keeps cumulative timeout and failed reservation after transport starts', async t => {
+  const s = isolated(await setup(t)), clock = clockFixture(), fake = childFixture(s, { mode: 'timeout', clock });
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake, { clock })), code('TIMEOUT'));
+  const r = await read(join(s.root, 'ledger/receipt-0001.json'));
+  assert.equal(fake.calls.length, 1); assert.equal(r.outcome, 'failure'); assert.equal(r.childClosed, true);
+  assert.equal((await read(join(s.root, 'ledger/ledger-state.json'))).status, 'CLOSED_OFFLINE');
+  assert.equal(clock.pending(), 0); assert.deepEqual(await readdir(s.runtime.scratchParent), []);
+});
+
+test('second candidate quota cannot be enlarged through a modified checkpoint', async t => {
+  const s = isolated(await setup(t)), fake = childFixture(s);
+  await runPrivateFirstFa(s.input, deps(t, fake));
+  const checkpointPath = join(s.root, 'ledger/ledger-checkpoint.json');
+  const cp = await read(checkpointPath); cp.maximumReservations = 4;
+  await writeFile(checkpointPath, JSON.stringify(cp));
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake)), code('LEDGER_CHECKPOINT_MISMATCH'));
+  assert.equal(fake.calls.length, 1);
+  assert(!existsSync(join(s.root, 'ledger/reservation-0002.json')));
+  assert.deepEqual(await readdir(s.runtime.scratchParent), []);
 });
