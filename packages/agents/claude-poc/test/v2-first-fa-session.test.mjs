@@ -11,6 +11,7 @@ import { createFirstFaSessionAdmissionController } from '../v2-first-fa-admissio
 import { createFirstFaLedgerFacade, initializeInertLedger, inspectInertLedger } from '../v2-inert-ledger.mjs';
 import { FIRST_FA_POLICY } from '../v2-first-fa-offline.mjs';
 import { CLAUDE_VERSION, CLAUDE_SHA256, LIMITS } from '../transport.mjs';
+import { captureTransportDiagnostic, validateTransportDiagnostic } from '../transport-diagnostic.mjs';
 import { fixture } from './fixtures.mjs';
 
 const id = 'synthetic-semantic-v2-ledger-session';
@@ -88,7 +89,7 @@ function wire(session, envelope) {
       permission_denials: [], result: JSON.stringify(candidate), modelUsage: { [model]: { inputTokens: 1, outputTokens: 2 } } }
   ];
 }
-function childFixture(s, { mode = 'success', clock, abort, contact = () => {}, closeDeferred = false } = {}) {
+function childFixture(s, { mode = 'success', clock, abort, contact = () => {}, closeDeferred = false, mutateEvents = () => {} } = {}) {
   const children = [], calls = [], settingsPaths = [];
   const fakeSpawn = (binary, argv, options) => {
     const reservation = JSON.parse(readFileSync(join(s.root, 'ledger/reservation-0001.json'), 'utf8'));
@@ -127,6 +128,7 @@ function childFixture(s, { mode = 'success', clock, abort, contact = () => {}, c
         request: { type: 'text-context', sourceReference: 'S1', maxAdditionalBytes: 4096, reason: 'Fixture context' } });
       if (mode === 'timeout' || mode === 'ambiguous') { clock.advance(34000); return; }
       if (mode === 'cancel') { abort.abort(); return; }
+      mutateEvents(events);
       child.stdout.emit('data', Buffer.from(events.map(e => JSON.stringify(e)).join('\n') + '\n'));
       if (!closeDeferred) child.emit('close', 0, null);
     });
@@ -153,6 +155,7 @@ test('shared private entrypoint: fake human→issuer→cap→init→reservation�
   assert.deepEqual(r.bindingDigests, result.reservation.bindingDigests);
   assert.equal(r.transportObservation.inputTokens, 1); assert.equal(r.transportObservation.outputTokens, 2);
   assert.equal(r.transportObservation.observedModel, model); assert(r.transportObservation.requestBytes <= 65536);
+  assert.equal(Object.hasOwn(r.transportObservation, 'diagnostic'), false);
   assert.deepEqual(await readdir(s.runtime.scratchParent), []);
   assert(fake.settingsPaths.every(p => !existsSync(p)));
   // The generic inert API cannot treat an operational profile as offline.
@@ -297,6 +300,113 @@ test('diagnostics and receipts contain no private plugin names, paths, grant or 
   try { await runPrivateFirstFa(s.input, deps(t, fake)); } catch (e) { error = e; }
   const text = JSON.stringify({ error, receipt: await read(join(s.root, 'ledger/receipt-0001.json')) });
   for (const privateText of ['fixture-one', 'fixture-two', s.runtime.home, 'CONFIRM', 'Synthetic metadata']) assert(!text.includes(privateText));
+});
+
+const initFailures = [
+  ...[['tools', 'TOOLS'], ['mcp_servers', 'MCP'], ['plugins', 'PLUGINS']].flatMap(([field, name]) => [
+    [e => { delete e[field]; }, `INIT_${name}_MISSING`, field, 'missing', null],
+    [e => { e[field] = 'fixture-private-identity'; }, `INIT_${name}_WRONG_TYPE`, field, 'string', null],
+    [e => { e[field] = ['fixture-private-identity']; }, `INIT_${name}_NONEMPTY`, field, 'array', 1]
+  ]),
+  [e => { e.skills = { name: 'fixture-private-identity' }; }, 'INIT_SKILLS_WRONG_TYPE', 'skills', 'object', null],
+  [e => { e.skills = ['fixture-private-identity']; }, 'INIT_SKILLS_NONEMPTY', 'skills', 'array', 1],
+  [e => { e.permissionMode = 'bypassPermissions'; }, 'INIT_PERMISSION_BYPASS']
+];
+for (const [mutate, reason, field, kind, count] of initFailures) test(`operational fake receipt retains ${reason}, without private content or refund`, async t => {
+  const s = await setup(t), fake = childFixture(s, { mutateEvents: events => mutate(events[0]) });
+  let error;
+  try { await runPrivateFirstFa(s.input, deps(t, fake)); } catch (e) { error = e; }
+  assert.equal(error?.code, 'SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE');
+  assert.equal(error.transportCode, 'CONTAINMENT'); assert.equal(error.cause?.code, 'CONTAINMENT');
+  const r = await read(join(s.root, 'ledger/receipt-0001.json')), d = r.transportObservation.diagnostic;
+  assert.deepEqual(error.transportDiagnostic, d); assert.equal(r.transportObservation.errorCode, error.code);
+  assert.equal(d.transportCode, 'CONTAINMENT'); assert.equal(d.reason, reason);
+  assert.equal(d.event.type, 'system'); assert.equal(d.event.subtype, 'init');
+  if (field) assert.deepEqual(d.event[field], { present: kind !== 'missing', kind, count });
+  else assert.equal(d.event.permissionsBypassed, true);
+  assert(Object.isFrozen(error.transportDiagnostic)); assert(Object.isFrozen(error.transportDiagnostic.event));
+  assert.equal(validateTransportDiagnostic(d), d);
+  const text = JSON.stringify({ error, receipt: r });
+  for (const secret of ['fixture-private-identity', 'fixture-one', 'fixture-two', s.runtime.home, 'CONFIRM', 'Synthetic metadata']) assert(!text.includes(secret));
+  assert.equal(fake.calls.length, 1); assert.equal(r.childClosed, true); assert.equal(r.outcome, 'failure');
+  assert.equal(JSON.stringify(s.input.history.toArchive()), s.before); assert(s.input.history.canRedo);
+  assert.deepEqual(await readdir(s.runtime.scratchParent), []);
+  const second = childFixture(s);
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, second)), code('FIRST_FA_ALREADY_RESERVED'));
+  assert.equal(second.calls.length, 0); assert.equal((await read(join(s.root, 'ledger/ledger-state.json'))).watermark, 1);
+});
+for (const [event, reason] of [
+  [{ type: 'system', subtype: 'status', status: 'compacting' }, 'STATUS_COMPACTING'],
+  [{ type: 'system', subtype: 'status', status: null, permissionMode: 'bypassPermissions' }, 'STATUS_PERMISSION_BYPASS'],
+  [{ type: 'system', subtype: 'session_state_changed', state: 'requires_action' }, 'SESSION_REQUIRES_ACTION'],
+  [{ type: 'system', subtype: 'hook_started', private: 'fixture-private-content' }, 'FORBIDDEN_SYSTEM_EVENT'],
+  [{ type: 'control_request', private: 'fixture-private-content' }, 'FORBIDDEN_EVENT_TYPE']
+]) test(`post-init containment diagnostic retains ${reason}`, async t => {
+  const s = await setup(t), fake = childFixture(s, { mutateEvents: events => events.splice(1, 0, { ...event, session_id: events[0].session_id }) });
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake)), e => {
+    assert.equal(e.code, 'SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE'); assert.equal(e.transportDiagnostic.reason, reason);
+    return e.transportCode === 'CONTAINMENT';
+  });
+  const r = await read(join(s.root, 'ledger/receipt-0001.json'));
+  assert.equal(r.transportObservation.diagnostic.reason, reason); assert.equal(fake.calls.length, 1);
+  assert(!JSON.stringify(r).includes('fixture-private-content'));
+});
+test('diagnostic failure cannot replace the primary error when receipt persistence also fails', async t => {
+  const s = await setup(t), fake = childFixture(s, { mode: 'plugins' });
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake, { ledgerControl: {
+    receipt: { pauseAfterLock() { throw new Error('fixture-private-storage-failure'); } }
+  } })), e => e.code === 'SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE' && e.transportCode === 'CONTAINMENT' &&
+    e.transportDiagnostic.reason === 'INIT_PLUGINS_NONEMPTY' && typeof e.receiptCode === 'string' &&
+    !JSON.stringify(e).includes('fixture-private-storage-failure'));
+  assert.equal(fake.calls.length, 1); assert.equal((await read(join(s.root, 'ledger/ledger-state.json'))).watermark, 1);
+});
+test('failure diagnostic is optional for historical operational receipts; no rewrite or replay', async t => {
+  const s = await setup(t), fake = childFixture(s, { mode: 'plugins' });
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake)));
+  const path = join(s.root, 'ledger/receipt-0001.json'), r = await read(path);
+  delete r.transportObservation.diagnostic;
+  await writeFile(path, JSON.stringify(r)); // Synthetic backward-compatibility fixture only.
+  const before = await readFile(path, 'utf8'), second = childFixture(s);
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, second)), code('FIRST_FA_ALREADY_RESERVED'));
+  assert.equal(await readFile(path, 'utf8'), before); assert.equal(second.calls.length, 0);
+});
+test('unknown diagnostic strings are omitted; malformed summaries never become primary errors', () => {
+  const d = captureTransportDiagnostic({ code: 'PRIVATE_SECRET_CODE', reason: 'PRIVATE_SECRET_REASON',
+    metrics: { lastEventSummary: { type: 'private-event', payload: 'private-text' } } });
+  assert.deepEqual(d, { transportCode: null, reason: null, event: null });
+  assert.equal(validateTransportDiagnostic(d), d);
+  assert.deepEqual(captureTransportDiagnostic({ code: 'CONTAINMENT', reason: 'INIT_PLUGINS_NONEMPTY',
+    metrics: { lastEventSummary: {} } }), { transportCode: 'CONTAINMENT', reason: 'INIT_PLUGINS_NONEMPTY', event: null });
+});
+test('throwing diagnostic metadata cannot throw over the original failure', () => {
+  for (const key of ['code', 'reason', 'metrics']) {
+    const error = { code: 'CONTAINMENT', reason: 'INIT_PLUGINS_NONEMPTY' };
+    Object.defineProperty(error, key, { get() { throw new Error('fixture-private-metadata'); } });
+    let diagnostic;
+    assert.doesNotThrow(() => { diagnostic = captureTransportDiagnostic(error); });
+    validateTransportDiagnostic(diagnostic);
+    assert(!JSON.stringify(diagnostic).includes('fixture-private-metadata'));
+  }
+});
+for (const [name, mutate] of [
+  ['unknown code', d => { d.transportCode = 'PRIVATE_SECRET_CODE'; }],
+  ['unknown reason', d => { d.reason = 'PRIVATE_SECRET_REASON'; }],
+  ['raw event', d => { d.event.raw = 'private-text'; }],
+  ['plugin identity', d => { d.event.plugins.identity = 'private-plugin'; }],
+  ['unknown subtype', d => { d.event.subtype = 'private-subtype'; }],
+  ['negative count', d => { d.event.plugins.count = -1; }],
+  ['oversized count', d => { d.event.plugins.count = 1_000_001; }],
+  ['inconsistent presence', d => { d.event.plugins.present = false; }]
+]) test(`strict operational receipt rejects diagnostic ${name} before another fake process`, async t => {
+  const s = await setup(t), fake = childFixture(s, { mode: 'plugins' });
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, fake)));
+  const path = join(s.root, 'ledger/receipt-0001.json'), r = await read(path);
+  mutate(r.transportObservation.diagnostic);
+  assert.throws(() => validateTransportDiagnostic(r.transportObservation.diagnostic), code('TRANSPORT_DIAGNOSTIC_INVALID'));
+  await writeFile(path, JSON.stringify(r)); // Exact synthetic corruption fixture only.
+  const second = childFixture(s);
+  await assert.rejects(runPrivateFirstFa(s.input, deps(t, second)), code('LEDGER_RECEIPT_MISMATCH'));
+  assert.equal(second.calls.length, 0); assert.equal((await read(join(s.root, 'ledger/ledger-state.json'))).watermark, 1);
 });
 
 for (const [stage, point] of [['initialize', 'after-anchor-fsync'], ['reserve', 'after-reservation-fsync']]) {

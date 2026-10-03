@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-10-01, PR #62 merged and post-merge validated; real-agent V2 Phase A offline preparation is CLOSED at material checkpoint `9c6d9b8484d1c1e1be6f19c080baf22a42c9fc7f`; live V2 remains PAUSED / NOT AUTHORIZED. PR #61 documentary closeout is closed; Media Worker stdin/lifecycle fix is IMPLEMENTED / CLOSED. PRs #57/#58 merged and post-merge validated; bounded offline Claude CLI transport/evidence PoC V1 is IMPLEMENTED / CLOSED. PR #56 is CLOSED / MERGED and post-merge validated; INT-CLOUD-01–05 are incorporated into planning only. Slice A remains closed; real semantic round-trip is NOT DEMONSTRATED; the historical experiment remains terminal (8/8 used, zero balance). Codex diagnosis remains preserved and blocked.
+**Last decision reconciliation:** 2026-10-03, PR #69 merged and post-merge validated at `f80f423e997ddc6728d00016c5ed7b167d3e6d40`. The separately authorized first F-A on 2026-10-02 failed at init containment; its specific rejected field is INDETERMINATE, one durable slot is consumed, and no semantic result was accepted. Offline diagnostic persistence is IN DEVELOPMENT; no further live execution or merge is authorized by this correction. Slice A and V2 Phase A preparation remain closed; real semantic round-trip is NOT DEMONSTRATED. Historical V1 remains terminal (8/8, zero balance); the Codex diagnosis remains preserved and blocked.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1524,7 +1524,55 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 
 ## 24.1 `main`
 
-**First-F-A V2 end-to-end wiring — IN DEVELOPMENT, 2026-10-02:** PR #68
+**First-F-A V2 diagnostic correction — IN DEVELOPMENT, 2026-10-03:**
+PR #69 integrated reviewed wiring head
+`17e01a8e427a31c9d11864d050e9f640a7ba1a13` by normal merge at
+`f80f423e997ddc6728d00016c5ed7b167d3e6d40`. Post-merge push CI
+`37071736766` passed 5/5 and Exact Runtime `37071736903` passed 1/1
+on that exact merge. A separate local invocation harness rehydrated the
+reviewed synthetic inputs and called the integrated entrypoint once, with
+genuine owner TTY consent; it duplicated no containment/admission/transport
+authority. Its independent review and five negative offline tests passed.
+
+The one separately authorized real first F-A on 2026-10-02 committed
+reservation 1 and a correlated failure receipt. Bindings and record digests
+are intact, the owned child started and closed, and no semantic result was
+accepted. Transport observed one event, 911 stdout bytes, zero stderr bytes
+and approximately 1.353 seconds. Application reported
+`SEMANTIC_ANALYSIS_ANALYZER_UNAVAILABLE`; transport reported `CONTAINMENT`.
+One event plus the unchanged reader identifies rejection at `system/init`,
+but the rejected field/reason was not persisted and is **INDETERMINATE**.
+No plugin, skill, authentication or model cause is established. Provider
+contact remains `UNKNOWN`; observed model, tokens, remote cancellation and
+absence of billing are unproved. Scratch is empty, no lock remains, and the
+original inputs, local launcher and real records are preserved. The unique
+first-F-A slot is consumed without refund or replay; nominal remaining ledger
+capacity grants no new F-A authority.
+
+Branch `fix/first-fa-transport-diagnostics` corrects only the demonstrated
+loss of non-content evidence. The transport already keeps a closed reason
+and sanitized last-event summary in memory; the operational receipt discarded
+them. The correction adds optional strictly validated diagnostic metadata:
+closed transport code/reason, event type/subtype, capability presence/type/count
+and permission-bypass boolean. Unknown values stay unproven; no raw event,
+prompt, secret, private plugin identifier, path or reasoning content is retained.
+The same immutable diagnostic reaches the primary error and receipt, without
+replacing the Application error. Old receipts remain readable without rewrite;
+the historical failure cannot be retrospectively assigned a reason.
+Deterministic fake-only regressions cover all init containment reasons,
+post-init rejection, primary-error preservation, strict corruption/privacy,
+backward compatibility and no refund/replay. Independent review and draft-PR
+CI are required before closeout. No provider/CLI invocation, new operational
+experiment, reservation, retry or fallback is part of this correction.
+Containment/admission/model/cost rules and historical V1 remain unchanged.
+Director impact is a compatible diagnostic extension, with no change to
+Director/IR/History authority or the provider-neutral Application contract.
+Real semantic round-trip remains **NOT DEMONSTRATED**, complete analysis
+**NOT DELIVERED**, and progress **55%**. Any new real F-A requires a separate
+Product Owner decision; this branch must stay draft until its merge plan is
+approved.
+
+**Historical first-F-A V2 end-to-end wiring review checkpoint, 2026-10-02:** PR #68
 integrated the reviewed offline preparation at
 `46b62d37461bb039a64264ae1c29284a1dd8ea91`; post-merge push CI
 `37052463808` passed 5/5 and Exact Runtime `37052463706` passed 1/1

@@ -6,6 +6,7 @@ import { inspectInertLedger, reserveInertOperations, writeInertReceipt } from '.
 import { OFFLINE_POLICY } from './v2-offline-experiment-plan.mjs';
 import { LIMITS, childArguments, runClaudeProcess } from './transport.mjs';
 import { createHash } from 'node:crypto';
+import { captureTransportDiagnostic } from './transport-diagnostic.mjs';
 
 const frozen = value => {
   for (const child of Object.values(value)) if (child && typeof child === 'object') frozen(child);
@@ -175,6 +176,7 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
     }
     if (reservation) {
       const m = transportMetrics ?? transportFailure?.metrics;
+      const diagnostic = transportFailure ? captureTransportDiagnostic(transportFailure) : undefined;
       const wireUsage = transportMetrics?.usage?.[FIRST_FA_POLICY.expectedModel];
       const outcome = transportFailure?.childSettlement || transportFailure?.metrics?.settlementIncomplete ? 'crash-uncertain' :
         primary ? signal?.aborted || primary.code === 'CANCELLED' ? 'cancelled' : 'failure' :
@@ -191,7 +193,8 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
               observedModel: transportMetrics?.model ?? null, requestedEffort: FIRST_FA_POLICY.requestedEffort,
               stdoutBytes: m?.stdoutBytes ?? null, stderrBytes: m?.stderrBytes ?? null, events: m?.events ?? null,
               latencyMs: m?.latencyMs ?? null, inputTokens: wireUsage?.inputTokens ?? null, outputTokens: wireUsage?.outputTokens ?? null,
-              errorCode: /^[A-Z][A-Z_]{0,79}$/.test(primary?.code ?? '') ? primary.code : null }, executionMode: execution.mode,
+              errorCode: /^[A-Z][A-Z_]{0,79}$/.test(primary?.code ?? '') ? primary.code : null,
+              ...(diagnostic ? { diagnostic } : {}) }, executionMode: execution.mode,
             processStarted, childClosed: transportMetrics?.childClosed === true || transportFailure?.metrics?.childClosed === true,
             resultKind: result?.kind ?? 'none', responseDigest: responseDigest ?? null } : {}) });
       } catch (error) {
@@ -211,6 +214,7 @@ export async function evaluateFirstFa({ root, experimentId, fixtureAuthorization
     }
   }
   if (primary && transportFailure?.code) primary.transportCode = transportFailure.code;
+  if (primary && transportFailure) primary.transportDiagnostic = captureTransportDiagnostic(transportFailure);
   if (primary) throw primary;
   const accepted = Object.freeze({ state: execution?.mode === 'OWNED_CLI_ATTEMPT' ?
     result.kind === 'analysis-candidate' ? 'FIRST_FA_VALIDATED' : 'FIRST_FA_PARTIAL' :
