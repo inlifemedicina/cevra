@@ -262,5 +262,16 @@
   "semanticAnalysis.error.timeout": "The semantic analysis operation timed out.",
   "semanticAnalysis.error.analyzerUnavailable": "No semantic analyzer is currently available.",
   "semanticAnalysis.error.contextLimit": "The semantic analysis context limit was reached. Select a smaller scope.",
-  "semanticAnalysis.error.noProgress": "The analyzer requested evidence that cannot add new authorized context."
+  "semanticAnalysis.error.noProgress": "The analyzer requested evidence that cannot add new authorized context.",
+  "editorialDraft.title": "Editorial proposal",
+  "editorialDraft.block.theme": "Theme",
+  "editorialDraft.block.idea": "Idea",
+  "editorialDraft.block.caveat": "Condition or caveat",
+  "editorialDraft.block.possible-false-start": "Possible false start",
+  "editorialDraft.block.possible-repetition": "Possible repetition",
+  "editorialDraft.limit.proposal": "Review this proposal. No project changes, take selection, cuts or export have been applied.",
+  "editorialDraft.limit.order": "The initial order follows the analysis observations. It is not an editorial ranking.",
+  "editorialDraft.limit.timing": "Source references identify evidence, not cut boundaries or a planned duration.",
+  "editorialDraft.error.invalid": "The editorial proposal input or revision is invalid.",
+  "editorialDraft.error.stale": "The project, transcript or proposal revision changed. Review a current proposal."
 }

@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-10-03, PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
+**Last decision reconciliation:** 2026-10-03 UTC, bounded offline Editorial Draft V1 explicitly authorized and implemented in review (§24.1); wider strategy/takes/cuts remain outside that authorization.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1459,7 +1459,8 @@ Foundation / Media Runtime       [CLOSED]
 → Semantic Editorial Analysis V1 — Slice A analysis boundary [IMPLEMENTED / CLOSED]
 → bounded offline Claude CLI transport/evidence PoC V1 [IMPLEMENTED / CLOSED — PR #57]
 → real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED; WHOLE GATE OPEN; V1 CLOSED 8/8 / F-A02 EXHAUSTED 1/1]
-→ strategy / take selection / cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
+→ offline evidence-linked editorial draft [APPROVED BOUNDED SCOPE / IMPLEMENTED / IN REVIEW]
+→ broader strategy / take selection / cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 → missing typed Project IR edit commands
 → cut compiler
 → numeric QA
@@ -1524,6 +1525,24 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 # 24. Current repository state
 
 ## 24.1 `main`
+
+**Offline Editorial Draft V1 — APPROVED SCOPE / IMPLEMENTED / IN REVIEW:**
+The owner explicitly approved reusing the saved F-A02 candidate to create a
+source-linked editorial proposal offline. `EditorialDraftService` adds a
+process-local immutable proposal in Application, retaining all observations,
+caveats, relationships, uncertainty and prior review. Users may revise sequence,
+titles and notes, with expected-revision and project/transcript/journal staleness
+guards; no take selection, cut timing, command, Change Set or export is produced.
+The existing private result/history were used in a pure local demonstration:
+five blocks, E1/E2 links, both caveats, preserved history/redo and result hash,
+zero new analyzer/provider invocations. Citation support stays PARTIAL and the
+prior literal helper stays false/true/false/false. Details and limits:
+[Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md).
+This branch is based on reviewed context PR #74 and will remain a draft dependent
+on that documentation PR. Neither change is merged by this record; whole-gate
+completion and broader strategy/take/cut implementation remain unclaimed.
+Director impact is a compatible Application proposal extension; typed commands,
+Project IR, History, provider and engine authority are preserved. Progress 55%.
 
 **First-F-A V2 diagnostic correction — IMPLEMENTED / CLOSED, 2026-10-03:**
 PR #70 integrated exact reviewed head `c3b0960b8dd7ea37cd8387151667b60f20201dbb`
@@ -2635,7 +2654,7 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The smallest proposed advance is an offline evidence-linked logical editorial draft using the existing result, under D9 and a separate implementation-scope decision; do not invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
+1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The owner has now explicitly approved and the current branch implements the bounded offline evidence-linked editorial draft under D9 (§24.1); review/integration is pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.
 4. Re-run the descriptor/source history scalability gate before accepting timeline/Cut Compiler workflows that create many commits.

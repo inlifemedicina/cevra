@@ -31,7 +31,8 @@ CEVRA VIDS
 │   │   └─ real-agent semantic round-trip [F-A02 DIRECT PT-BR OBSERVED / WHOLE GATE OPEN]
 │   │       ├─ INT-CLOUD-01 official ChatGPT eligibility/capability review [RESEARCH / SCHEDULED]
 │   │       └─ INT-CLOUD-02 authorized official transport PoC [CONDITIONAL / NOT IMPLEMENTED]
-│   ├─ strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
+│   ├─ offline evidence-linked editorial draft [APPROVED BOUNDED SCOPE / IMPLEMENTED / IN REVIEW]
+│   ├─ broader strategy [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   ├─ take selection [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │   └─ cut planning [NOT STARTED / NOT AUTHORIZED IMPLICITLY]
 │
@@ -242,6 +243,23 @@ cut-planning authorization follows. The old experiment stays CLOSED at 8/8, zero
 and five original receipts remain unavailable.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.
+
+## Offline editorial proposal — explicitly approved bounded scope
+
+The owner approved reuse of the existing F-A02 result for an offline source-linked
+reviewable proposal. Application now implements a process-local draft with all
+observations/caveats, E1/E2 links, relationships, uncertainty and prior assessment.
+Users can revise sequence, titles and notes; current-project/transcript/journal
+and expected-revision guards protect review. The real saved-result demonstration
+produced five blocks with history/redo and original artifact preserved, zero new
+analyzer invocations, citations still PARTIAL and literal helper unchanged.
+No timing, take selection, applied commands, Change Set, preview or export.
+This remains IMPLEMENTED / IN REVIEW on the branch dependent on draft PR #74,
+not merged or a delivered editing UI. Wider strategy/take/cut authority and whole
+real-agent gate completion are not inferred. See
+[Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md) and
+[master §24.1](CEVRA_MASTER_CONTEXT.md#241-main). Director impact: compatible
+Application proposal extension only; progress 55%, F-A02 exhausted 1/1.
 
 ## Current first-F-A V2 checkpoint — 2026-10-03
 

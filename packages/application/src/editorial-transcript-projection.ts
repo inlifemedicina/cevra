@@ -5,6 +5,7 @@ import type {
   TranscriptSegment,
   TranscriptWord
 } from "@cevra/project-ir";
+import { normalizeStandaloneText, renderTokenText, tokenSeparator } from "./editorial-transcript-text.js";
 
 export const EDITORIAL_TRANSCRIPT_PROJECTION_VERSION = 1 as const;
 export const EDITORIAL_TRANSCRIPT_PROJECTION_PROFILE = "cevra.editorial-transcript.v1" as const;
@@ -591,24 +592,6 @@ function isCursorBinding(value: unknown): boolean {
 function coherentSpeaker(words: readonly TranscriptWord[]): string | undefined {
   const speaker = words[0]?.speakerId;
   return speaker !== undefined && words.every((word) => word.speakerId === speaker) ? speaker : undefined;
-}
-
-function renderTokenText(tokens: readonly string[]): string {
-  let output = "";
-  for (const token of tokens) {
-    const normalized = normalizeStandaloneText(token);
-    if (normalized.length === 0) continue;
-    output += `${tokenSeparator(output.length > 0, normalized)}${normalized}`;
-  }
-  return output;
-}
-
-function tokenSeparator(hasText: boolean, normalizedToken: string): "" | " " {
-  return !hasText || /^[,.;:!?%\])}]/u.test(normalizedToken) ? "" : " ";
-}
-
-function normalizeStandaloneText(value: string): string {
-  return value.trim().replace(/\s+/gu, " ");
 }
 
 function utf8Length(value: string): number {

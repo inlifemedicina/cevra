@@ -14,3 +14,4 @@ export * from "./source-technical-descriptor.js";
 export * from "./editorial-transcript-projection.js";
 export * from "./semantic-editorial-analysis-contract.js";
 export * from "./semantic-editorial-analysis.js";
+export * from "./editorial-draft.js";
