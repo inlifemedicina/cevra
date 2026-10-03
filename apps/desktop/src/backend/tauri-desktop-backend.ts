@@ -1,4 +1,5 @@
 import type { ProjectIR } from "@cevra/project-ir";
+import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   DesktopBackend,
@@ -29,6 +30,14 @@ export class TauriDesktopBackend implements DesktopBackend {
 
   async loadState(): Promise<DesktopBackendState> {
     return fromHostState(await this.call<HostState>("desktop_get_state"));
+  }
+
+  async loadEditorialDraft(): Promise<EditorialDraftState> {
+    return this.call("desktop_get_editorial_draft");
+  }
+
+  async reviseEditorialDraft(request: ReviseEditorialDraftRequest): Promise<EditorialDraftState> {
+    return this.call("desktop_revise_editorial_draft", { args: request });
   }
 
   async pickAndImportMedia(locale: "pt-BR" | "en-US"): Promise<ImportMediaResult> {

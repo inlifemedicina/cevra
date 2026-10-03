@@ -1,19 +1,18 @@
+import type { ReactNode } from "react";
 import { presetOptions, type Translate } from "../ui-model";
 import { Icon } from "./Icon";
 
 interface DirectorPanelProps {
   draft: string;
   preset: string;
-  reviewing: boolean;
   directorAvailable: boolean;
-  applyAvailable: boolean;
   t: Translate;
+  editorialPanel: ReactNode;
   onDraftChange(value: string): void;
   onPresetChange(value: string): void;
-  onReviewToggle(): void;
 }
 
-export function DirectorPanel({ draft, preset, reviewing, directorAvailable, applyAvailable, t, onDraftChange, onPresetChange, onReviewToggle }: DirectorPanelProps) {
+export function DirectorPanel({ draft, preset, directorAvailable, t, onDraftChange, onPresetChange, editorialPanel }: DirectorPanelProps) {
   return (
     <section className="director-panel" aria-labelledby="director-title">
       <div className="director-main">
@@ -33,10 +32,8 @@ export function DirectorPanel({ draft, preset, reviewing, directorAvailable, app
         </div>
       </div>
       <div className="change-set">
-        <div className="change-set-heading"><div><span>{t("changes.previewOnly")}</span><h3>{t("changes.title")}</h3></div><span className="change-count">12</span></div>
-        <ul><li><i className="cut-dot" />{t("changes.cuts")}</li><li><i className="caption-dot" />{t("changes.captions")}</li><li><i className="pace-dot" />{t("changes.pacing")}</li></ul>
-        {reviewing && <p className="review-note" role="status">{t("status.noChangesApplied")}</p>}
-        <div className="change-actions"><button type="button" className="secondary-button" onClick={onReviewToggle}>{t("action.review")}</button><button type="button" className="apply-button" disabled={!applyAvailable} title={applyAvailable ? undefined : t("changes.applyUnavailable")}>{t("action.apply")}</button></div>
+        {editorialPanel}
+        <div className="change-actions"><button type="button" className="apply-button" disabled title={t("changes.applyUnavailable")}>{t("action.apply")}</button></div>
       </div>
     </section>
   );

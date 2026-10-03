@@ -1,9 +1,11 @@
+import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import type { CevraLocale, TranslationKey } from "@cevra/i18n";
 import { translate } from "@cevra/i18n";
 import type { ProjectIR } from "@cevra/project-ir";
-import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { DesktopBackend, DesktopBackendState, DesktopOperationError } from "./backend/desktop-backend";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
+import { EditorialDraftPanel } from "./components/EditorialDraftPanel";
 import { DirectorPanel } from "./components/DirectorPanel";
 import { Inspector } from "./components/Inspector";
 import { MediaPanel } from "./components/MediaPanel";
@@ -16,6 +18,10 @@ import { capabilityReasonKey, workspaceKeys, type Workspace } from "./ui-model";
 const defaultBackend = new DemoDesktopBackend();
 
 export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) {
+  const [editorialState, setEditorialState] = useState<EditorialDraftState | null>(null);
+  const [editorialBusy, setEditorialBusy] = useState(false);
+  const [editorialError, setEditorialError] = useState(false);
+  const editorialGeneration = useRef(0);
   const [project, setProject] = useState<Readonly<ProjectIR> | null>(null);
   const [backendState, setBackendState] = useState<DesktopBackendState | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -32,7 +38,6 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [timelineHeight, setTimelineHeight] = useState(292);
   const [directorDraft, setDirectorDraft] = useState("");
   const [preset, setPreset] = useState("medical-consultation-clean");
-  const [reviewing, setReviewing] = useState(false);
   const [activeTool, setActiveTool] = useState("media");
   const [mediaOpen, setMediaOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
@@ -66,6 +71,41 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     }, 100);
     return () => window.clearInterval(interval);
   }, [playing, project]);
+
+  useEffect(() => {
+    if (!project) return;
+    void refreshEditorial();
+    return () => { editorialGeneration.current++; };
+  }, [backend, project, backendState?.status]);
+
+  async function refreshEditorial() {
+    const generation = ++editorialGeneration.current;
+    setEditorialBusy(true);
+    setEditorialError(false);
+    try {
+      const state = await backend.loadEditorialDraft();
+      if (generation === editorialGeneration.current) setEditorialState(state);
+    } catch {
+      if (generation === editorialGeneration.current) { setEditorialState({ status: "empty" }); setEditorialError(true); }
+    } finally {
+      if (generation === editorialGeneration.current) setEditorialBusy(false);
+    }
+  }
+
+  async function reviseEditorial(request: ReviseEditorialDraftRequest) {
+    if (editorialBusy || importBusy || transcriptionOperationId) return;
+    const generation = ++editorialGeneration.current;
+    setEditorialBusy(true);
+    setEditorialError(false);
+    try {
+      const state = await backend.reviseEditorialDraft(request);
+      if (generation === editorialGeneration.current) setEditorialState(state);
+    } catch {
+      if (generation === editorialGeneration.current) { setEditorialState({ status: "stale" }); setEditorialError(true); }
+    } finally {
+      if (generation === editorialGeneration.current) setEditorialBusy(false);
+    }
+  }
 
   function startTimelineResize(event: ReactPointerEvent<HTMLButtonElement>) {
     const startY = event.clientY;
@@ -113,7 +153,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function importMedia() {
-    if (importBusy || transcriptionOperationId) return;
+    if (importBusy || transcriptionOperationId || editorialBusy) return;
     setImportBusy(true);
     setRuntimeError(null);
     setRuntimeNotice(null);
@@ -129,7 +169,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function changeHistory(direction: "undo" | "redo") {
-    if (importBusy || transcriptionOperationId) return;
+    if (importBusy || transcriptionOperationId || editorialBusy) return;
     setRuntimeNotice(null);
     try {
       applyBackendState(await backend[direction]());
@@ -139,7 +179,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function transcribeSource() {
-    if (!activeSourceId || transcriptionOperationId || importBusy) return;
+    if (!activeSourceId || transcriptionOperationId || importBusy || editorialBusy) return;
     const operationId = typeof globalThis.crypto?.randomUUID === "function"
       ? globalThis.crypto.randomUUID()
       : `transcription-${Date.now()}`;
@@ -195,20 +235,20 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   if (!project || !backendState) return <main className="loading-screen"><span className="brand-mark">C</span><p>{runtimeError ? t(runtimeErrorKey(runtimeError)) : t("app.loadingProject")}</p></main>;
 
   const layoutStyle = { "--timeline-height": `${timelineHeight}px` } as CSSProperties;
-  const mutationBusy = importBusy || transcriptionOperationId !== null;
+  const mutationBusy = importBusy || transcriptionOperationId !== null || editorialBusy;
   return (
     <main className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${inspectorOpen ? " inspector-open" : " inspector-closed"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision} data-selected-project-item-id={selectedProjectItemId ?? undefined} data-active-source-id={activeSourceId ?? undefined}>
       <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} inspectorOpen={inspectorOpen} exportAvailable={backendState.capabilities["project.export"].available} status={backendState.status} canUndo={backendState.canUndo && !mutationBusy} canRedo={backendState.canRedo && !mutationBusy} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onInspectorToggle={() => setInspectorOpen((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={setActiveTool} />
-        {mediaOpen && <MediaPanel sources={project.sources} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !transcriptionOperationId} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
+        {mediaOpen && <MediaPanel sources={project.sources} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !transcriptionOperationId && !editorialBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
-            <WorkspaceStage workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />
+            <WorkspaceStage workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy || editorialBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />
           </div>
           {runtimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(runtimeError))}</div>}
           {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
-          {workspace === "edit" && <DirectorPanel draft={directorDraft} preset={preset} reviewing={reviewing} directorAvailable={backendState.capabilities["director.execute"].available} applyAvailable={backendState.capabilities["changes.apply"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} onReviewToggle={() => setReviewing((value) => !value)} />}
+          <div className="director-slot" hidden={workspace !== "edit"}><DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} busy={editorialBusy || mutationBusy} error={editorialError} t={t} onRefresh={() => void refreshEditorial()} onRevise={reviseEditorial} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} /></div>
         </div>
         {inspectorOpen && <Inspector project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />}
       </div>

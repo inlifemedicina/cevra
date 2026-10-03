@@ -1,6 +1,6 @@
 # Offline Editorial Draft V1
 
-**Status:** IMPLEMENTED / IN REVIEW; not integrated or a delivered editing UI.
+**Status:** Application service INTEGRATED via PR #75 after #74. Offline host/backend/UI review consumer IN DEVELOPMENT / NOT MERGED; scope below.
 
 The owner explicitly approved the smallest offline passage from the existing
 F-A02 analysis candidate to a source-linked, user-reviewable editorial proposal.
@@ -93,12 +93,37 @@ of editing or subjective narrative quality.
 D5-T1/D4-T2/D3-T2 inform preservation; D9-T1/T2 inform the reviewable proposal.
 The existing acceptance catalog remains the authority: integrated mounting and
 I1-T1's plan/Change Set remain blocked beyond this Application-only slice.
-The next gate is review/integration of this bounded proposal, followed by a
-separately scoped consumer/strategy decision; timing-backed take/cut planning
-retains its existing evidence and typed-command prerequisites. No new live
-scenario, model, feature, UI surface, engine, quota or merge is authorized here.
+The Application service is integrated; the owner subsequently approved the
+bounded offline consumer described below. Further strategy requires its own decision; timing-backed take/cut planning
+retains its existing evidence and typed-command prerequisites. The original Application-only approval authorized no new live scenario, model,
+UI surface, engine, quota or merge; the later consumer approval below is separately bounded.
 
 **Director impact:** compatible extension. A future Director/presentation
 consumer may request and display/revise this derived proposal; it receives no
 additional provider, engine, History or execution authority. Progress remains
 55%; the one real F-A02 allocation remains exhausted 1/1 with zero remaining.
+
+
+<a id="offline-review-consumer"></a>
+
+## Offline host/backend/UI review consumer — 2026-10-03
+
+**Status:** IN DEVELOPMENT / NOT MERGED. The owner approved the smallest proposed panel after the morning report. It occupies the existing Director review area, replacing its static 12-change fixture with accepted-analysis review or an honest empty/stale state. Preview and timeline remain the same project surface. PT-BR and EN-US localize controls/status/errors; original analysis text and user content retain their own language.
+
+`DesktopSession.acceptEditorialAnalysis` is a trusted **in-process Application handoff**, not a WebView/JSONL method, file importer, authentication mechanism or persisted record. The caller supplies an already accepted `CreateEditorialDraftRequest` and the matching history. `EditorialDraftService.create` revalidates the original closed contract, source citations, provenance fields and legacy binding. Admission is one-shot per host session: a second handoff is rejected, preventing a previous revision-0 client from editing a replacement context. Another accepted analysis requires a new host session with its matching history. The host keeps the accepted analysis and the exact service-issued revision privately; snapshot queries return a detached presentation copy. The existing first-ingestion limitation remains: no new historical full-journal witness, transport receipt authentication or semantic re-proof is invented.
+
+Only `editorial.snapshot` / `editorial.revise` and their corresponding `desktop_get_editorial_draft` / `desktop_revise_editorial_draft` commands are added to the main-window ACL. There is no generic invoke, admission, provider, shell, filesystem or network permission. Revision accepts the existing expected revision/title/block-order/block-edit contract; service identity never crosses the UI boundary. The same-history binding and service journal witness disable revisions after canonical changes, undo/redo changes or replaced journal branches. Rejected revisions retain the valid prior draft. Draft presentation revisions do not change Project IR, its journal/checkpoints or redo history. No persistent draft undo/recovery format is introduced.
+
+The panel exposes five source-linked blocks, original assertions, justifications, uncertainty, caveat badges, relations/limitations and unchanged prior checks/PARTIAL assessment. Source actions select the existing canonical source; they do not seek to fabricated cut timing. Moving a block preserves unsaved title/note edits in the same revision request. Unsaved fields survive workspace navigation and refresh of the same draft revision; a local discard action restores the current titles/notes without changing the service, project or saved order. Invalid or concurrent revisions require refresh; stale proposals expose no editable blocks. The original analysis/citations/caveats cannot be deleted or rewritten. Session-only retention is visible; apply remains unavailable.
+
+The production host starts empty until a trusted Application producer performs the handoff. This slice deliberately adds no saved-analysis picker, disk loading, analysis persistence, provider invocation or automatic recovery of drafts. These unavailable behaviors must not be implied by the fixture.
+
+### Offline verification and visible fixture
+
+One canonical synthetic fixture is `apps/desktop/src/fixtures/editorial-review.json`; it preserves the prior textual scenario, five observations, two caveats, two relations, explicit PARTIAL assessment and a redo branch. It contains synthetic identities/provenance only, not the private F-A02 result, receipt, ledger or paths. Host protocol tests use this same fixture. The explicit development URL `?editorial-fixture=1` selects a presentation adapter using the original Application service; it is excluded from production builds and is not proof of native saved-result admission. The browser-safe `@cevra/application/editorial-draft` export exposes the existing service without loading Node-only media URI code into this development fixture.
+
+Automated checks cover trusted admission, matching/foreign bindings, detached query copies, closed revisions, unsupported analysis/draft/command fields, immutable citations and prior assessment, title/note/order editing, retained redo, canonical staleness, UI source selection and locale parity. The full native host path and visible browser fixture have distinct evidence; neither calls a provider. Native compile/ACL and supported-Python runtime coverage are required CI gates. Review/CI do not replace subjective owner acceptance of the panel or narrative quality. D4-T2/D5-T1 and D9-T1/T2 inform this bounded source-linked review; strategy/mounting and I1-T1's plan/Change Set remain BLOCKED beyond this consumer.
+
+Local pre-publication verification passed TypeScript and the production Vite build, all 53 desktop tests and all eight new host protocol tests. The combined Application/host suite passed 319/321: two existing managed-transcription availability tests failed with the available Python 3.9 runtime, which does not satisfy the supported Python 3.12 gate. Their expectations were preserved; no runtime was installed or test skipped. Native Rust compilation is unavailable locally and remains a required CI check. The production bundle contains no synthetic-analysis/context markers or fixture selector. Controlled Chrome demonstration passed PT/EN display, five blocks/two caveats/PARTIAL, title/note editing and reorder without project revision changes, source selection, navigation, local discard and stale rejection after canonical redo. Screenshots and detailed local evidence remain outside the repository. Final independent review and remote CI evidence belong in the Draft PR; this record does not claim their completion in advance.
+
+**Director impact:** compatible proposal-review extension. No provider/engine, canonical edit, cut, timing, export or persistent admission authority is added. Progress remains 55%; F-A02 remains closed/exhausted 1/1 with zero remaining.

@@ -1,4 +1,5 @@
 import type { ProjectIR } from "@cevra/project-ir";
+import type { ReviseEditorialDraftRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
 export const DESKTOP_HOST_IDENTITY = "cevra.desktop-host" as const;
@@ -12,6 +13,8 @@ export type HostMethod =
   | "host.status"
   | "host.shutdown"
   | "project.snapshot"
+  | "editorial.snapshot"
+  | "editorial.revise"
   | "media.ingestLocal"
   | "transcription.transcribeSource"
   | "history.undo"
@@ -68,6 +71,8 @@ const METHODS = new Set<HostMethod>([
   "host.status",
   "host.shutdown",
   "project.snapshot",
+  "editorial.snapshot",
+  "editorial.revise",
   "media.ingestLocal",
   "transcription.transcribeSource",
   "history.undo",
@@ -114,6 +119,13 @@ export function parseRequest(line: string): HostRequest {
 
 export function validateNoParams(params: Record<string, unknown>, id: string): void {
   exactKeys(params, [], id);
+}
+
+export function validateEditorialRevisionParams(params: Record<string, unknown>, id: string): ReviseEditorialDraftRequest {
+  exactKeys(params, ["expectedRevision", "title", "blockOrder", "blockEdits"], id);
+  // The Application service validates the closed revision schema, sizes and IDs.
+  // No analysis, draft object, source, command or admission field is accepted here.
+  return params as unknown as ReviseEditorialDraftRequest;
 }
 
 export function validateIngestParams(params: Record<string, unknown>, id: string): {
