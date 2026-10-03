@@ -262,5 +262,16 @@
   "semanticAnalysis.error.timeout": "A operação de análise semântica excedeu o tempo limite.",
   "semanticAnalysis.error.analyzerUnavailable": "Nenhum analisador semântico está disponível no momento.",
   "semanticAnalysis.error.contextLimit": "O limite de contexto da análise semântica foi atingido. Selecione um escopo menor.",
-  "semanticAnalysis.error.noProgress": "O analisador solicitou evidência que não acrescenta novo contexto autorizado."
+  "semanticAnalysis.error.noProgress": "O analisador solicitou evidência que não acrescenta novo contexto autorizado.",
+  "editorialDraft.title": "Proposta editorial",
+  "editorialDraft.block.theme": "Tema",
+  "editorialDraft.block.idea": "Ideia",
+  "editorialDraft.block.caveat": "Condição ou ressalva",
+  "editorialDraft.block.possible-false-start": "Possível falso início",
+  "editorialDraft.block.possible-repetition": "Possível repetição",
+  "editorialDraft.limit.proposal": "Revise esta proposta. Nenhuma alteração do projeto, seleção de takes, corte ou exportação foi aplicada.",
+  "editorialDraft.limit.order": "A ordem inicial segue as observações da análise. Ela não representa um ranking editorial.",
+  "editorialDraft.limit.timing": "As referências às fontes identificam evidência, não limites de corte ou duração planejada.",
+  "editorialDraft.error.invalid": "A entrada ou revisão da proposta editorial é inválida.",
+  "editorialDraft.error.stale": "O projeto, a transcrição ou a revisão da proposta mudou. Revise uma proposta atual."
 }
