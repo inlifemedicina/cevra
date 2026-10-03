@@ -240,6 +240,27 @@ and five original receipts remain unavailable.
 Before future timeline/Cut Compiler workflows create many commits, remeasure
 descriptor/source repetition and decide deduplication only if evidence warrants.
 
+## Current first-F-A V2 checkpoint — 2026-10-03
+
+PR #69 wiring is integrated at `f80f423e997ddc6728d00016c5ed7b167d3e6d40`,
+with successful post-merge CI and Exact Runtime. The one separately authorized
+owner-TTY first F-A on 2026-10-02 failed at the first `system/init`
+containment gate, with one durable consumed slot and no accepted semantic
+result. The specific reason is **INDETERMINATE** because the receipt did not
+retain it; provider contact/consumption remains `UNKNOWN`. Original evidence
+is preserved and the same F-A cannot be replayed. Historical V1 remains CLOSED
+at 8/8, zero balance.
+
+`fix/first-fa-transport-diagnostics` is an **IN DEVELOPMENT, OFFLINE ONLY**
+correction of this diagnostic loss, preserving containment and execution
+authority. Its optional closed non-content diagnostic supports old receipts
+without rewrite; deterministic fake-only regressions, independent review and
+draft-PR CI do not demonstrate a real round-trip. The detailed evidence and
+Director impact are recorded in [master context §24.1](CEVRA_MASTER_CONTEXT.md#241-main).
+No further real F-A, new operational experiment, retry or merge is implied;
+each requires its separate approved scope. The real semantic round-trip stays
+**NOT DEMONSTRATED**, full analysis **NOT DELIVERED**, progress **55%**.
+
 ## Scheduling addition — 2026-09-30: official ChatGPT integration and cloud/mobile feasibility
 
 Research and dependency scheduling were requested by the Product Owner. Detailed dated findings, official sources, unresolved questions and proposed experiment checks are tracked in [issue #55](https://github.com/inlifemedicina/cevra/issues/55). These planning IDs are not a second behavioral acceptance catalog; implementation must reuse or extend the canonical Product Owner acceptance catalog explicitly.

@@ -10,6 +10,7 @@ import { isAbsolute, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { OFFLINE_POLICY, OFFLINE_OPERATIONS } from './v2-offline-experiment-plan.mjs';
 import { validateAdmittedFirstFaSession } from './v2-first-fa-session.mjs';
+import { validateTransportDiagnostic } from './transport-diagnostic.mjs';
 
 const CHECKPOINT = 'ledger-checkpoint.json';
 const STATE = 'ledger-state.json';
@@ -270,7 +271,13 @@ function validateReceipt(receipt, id, reservation, profile) {
     if (JSON.stringify(receipt.bindingDigests) !== JSON.stringify(reservation.bindingDigests)) fail('LEDGER_RECEIPT_MISMATCH');
     const o = receipt.transportObservation;
     closed(o, ['requestBytes', 'responseBytes', 'contextId', 'requestedModel', 'observedModel', 'requestedEffort',
-      'stdoutBytes', 'stderrBytes', 'events', 'latencyMs', 'inputTokens', 'outputTokens', 'errorCode']);
+      'stdoutBytes', 'stderrBytes', 'events', 'latencyMs', 'inputTokens', 'outputTokens', 'errorCode',
+      ...(Object.hasOwn(o, 'diagnostic') ? ['diagnostic'] : [])]);
+    if (Object.hasOwn(o, 'diagnostic')) {
+      if (receipt.outcome === 'success') fail('LEDGER_RECEIPT_MISMATCH');
+      try { validateTransportDiagnostic(o.diagnostic); }
+      catch { fail('LEDGER_RECEIPT_MISMATCH'); }
+    }
     for (const key of ['requestBytes', 'responseBytes', 'stdoutBytes', 'stderrBytes', 'events', 'inputTokens', 'outputTokens']) {
       if (o[key] !== null && (!Number.isSafeInteger(o[key]) || o[key] < 0)) fail('LEDGER_RECEIPT_MISMATCH');
     }
