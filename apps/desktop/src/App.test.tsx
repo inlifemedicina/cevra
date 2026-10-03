@@ -1,3 +1,4 @@
+import { SourcePresentationRegistry } from "./source-presentation";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { translate, translationKeys } from "@cevra/i18n";
@@ -179,7 +180,7 @@ describe("CEVRA Vids desktop shell", () => {
     await user.click(within(screen.getByTestId("workspace-transcription")).getByRole("button", { name: /Quando a explicação é clara/ }));
     expect(shell.dataset.selectedProjectItemId).toBe("source-main");
     await user.click(screen.getByRole("tab", { name: "Editar" }));
-    expect(screen.getByTestId("inspector-selection").textContent).toContain("Consulta_Original.mov");
+    expect(screen.getByTestId("inspector-selection").textContent).toContain("Vídeo 1");
     expect(screen.getByTestId("inspector-selection").textContent).not.toContain("segment-1");
   });
 
@@ -190,20 +191,20 @@ describe("CEVRA Vids desktop shell", () => {
     await user.click(screen.getByRole("button", { name: "Overlays 1" }));
     expect(shell.dataset.selectedProjectItemId).toBe("source-main");
     await user.click(screen.getByRole("tab", { name: "Editar" }));
-    expect(screen.getByTestId("inspector-selection").textContent).toContain("Consulta_Original.mov");
+    expect(screen.getByTestId("inspector-selection").textContent).toContain("Vídeo 1");
   });
 
   it("binds a selected B-roll clip to its source and shows the no-transcript state", async () => {
     const user = await renderApplication();
     const timeline = screen.getByLabelText("Linha do tempo");
-    await user.click(within(timeline).getByRole("button", { name: "B-roll_Detalhes.mp4" }));
+    await user.click(within(timeline).getByRole("button", { name: "Vídeo 2 · B-roll_Detalhes.mp4" }));
     const shell = screen.getByTestId("app-shell");
     expect(shell.dataset.selectedProjectItemId).toBe("clip-broll-1");
     expect(shell.dataset.activeSourceId).toBe("source-broll");
     await user.click(screen.getByRole("tab", { name: "Transcrição" }));
     expect(screen.getByText("Nenhuma transcrição disponível para esta fonte.")).toBeTruthy();
     expect(screen.queryByText("Quando a explicação é clara, a confiança cresce.")).toBeNull();
-    expect(screen.getByText(/Fonte selecionada: B-roll_Detalhes\.mp4/)).toBeTruthy();
+    expect(screen.getByText(/Fonte selecionada: Vídeo 2/)).toBeTruthy();
   });
 
   it("edits the local Director draft while execution stays unavailable", async () => {
@@ -279,7 +280,7 @@ describe("CEVRA Vids desktop shell", () => {
 
   it("renders a neutral inspector state for an unresolved selection", () => {
     const project = createDemoProject();
-    render(<Inspector project={project} selectedProjectItemId="segment-1" workspace="edit" t={(key, parameters = {}) => translate("pt-BR", key, parameters)} />);
+    render(<Inspector presentations={new SourcePresentationRegistry().present(project.project.id, project.sources, (key, parameters) => translate("pt-BR", key, parameters))} project={project} selectedProjectItemId="segment-1" workspace="edit" t={(key, parameters = {}) => translate("pt-BR", key, parameters)} />);
     expect(screen.getByText("Selecione um item do projeto para inspecionar suas propriedades.")).toBeTruthy();
     expect(screen.queryByText("Selecionado: segment-1")).toBeNull();
   });

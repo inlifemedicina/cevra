@@ -1,3 +1,4 @@
+import { SourcePresentationRegistry } from "./source-presentation";
 import { translate } from "@cevra/i18n";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -16,11 +17,11 @@ it("shows accepted blocks, sources, caveats, unchanged partial assessment and or
   expect(within(panel).getAllByLabelText("Título do bloco")).toHaveLength(5);
   expect(within(panel).getByText("Parcial", { selector: "strong" })).toBeTruthy();
   expect(within(panel).getAllByText(translate("pt-BR", "editorialDraft.block.caveat"))).toHaveLength(2);
-  expect(within(panel).getAllByText("E1")).toHaveLength(2);
-  expect(within(panel).getAllByText("E2")).toHaveLength(3);
+  expect(within(panel).getAllByText("Referência da análise: E1")).toHaveLength(2);
+  expect(within(panel).getAllByText("Referência da análise: E2")).toHaveLength(3);
   expect(within(panel).getByText(/Possible repetition/)).toBeTruthy();
   expect(within(panel).getByText(/compares E1 but cites only E2/)).toBeTruthy();
-  fireEvent.click(within(panel).getAllByRole("button", { name: "Selecionar fonte E2" })[0]);
+  fireEvent.click(within(panel).getAllByRole("button", { name: "Ver fonte no Vídeo 2" })[0]);
   expect(screen.getByTestId("app-shell").dataset.activeSourceId).toBe("source-2");
   expect(backend.history.toArchive()).toEqual(before);
   expect((screen.getByRole("button", { name: "Aplicar" }) as HTMLButtonElement).disabled).toBe(true);
@@ -100,9 +101,10 @@ it("blocks invalid blank titles locally and allows discard without a revision", 
 });
 
 it("resets local edits when analysis identity changes at the same draft id and revision", async () => {
-  const state = await new EditorialFixtureBackend().loadEditorialDraft();
+  const sourceBackend = new EditorialFixtureBackend();
+  const state = await sourceBackend.loadEditorialDraft();
   if (state.status !== "current") throw new Error("fixture unavailable");
-  const props = { busy: false, error: false, t: (key: Parameters<typeof translate>[1]) => translate("pt-BR", key), onRefresh() {}, async onRevise() {}, onSourceSelect() {} };
+  const props = { presentations: new SourcePresentationRegistry().present(sourceBackend.history.current.project.id, sourceBackend.history.current.sources, (key, parameters) => translate("pt-BR", key, parameters)), busy: false, error: false, t: (key: Parameters<typeof translate>[1]) => translate("pt-BR", key), onRefresh() {}, async onRevise() {}, onSourceSelect() {} };
   const { rerender } = render(<EditorialDraftPanel state={state} {...props} />);
   fireEvent.change(screen.getAllByLabelText("Título do bloco")[0], { target: { value: "Nota do contexto anterior" } });
   const draft = { ...state.draft, analysis: { ...state.draft.analysis, contextId: "another-synthetic-context", candidate: { ...state.draft.analysis.candidate, observations: state.draft.analysis.candidate.observations.map(item => ({ ...item, id: `next-${item.id}` })) } }, blocks: state.draft.blocks.map(item => ({ ...item, id: `next-${item.id}`, observationId: `next-${item.observationId}`, title: "Novo contexto" })) };

@@ -144,3 +144,39 @@ No new Tauri command, WebView filesystem permission, shell permission, CSP exemp
 Local verification has exercised the actual pair through the real host factory: five blocks, two caveats, PARTIAL, editing/reorder, unchanged project and unchanged original bytes, with zero provider calls. A production-frontend/real-JSONL-host rehearsal also passed PT/EN display, source selection, title/note editing, reorder, workspace navigation, unsaved discard and disabled canonical history controls; only the browser transport substituted the native invoke bridge. Screenshots and detailed evidence remain outside the repository. Twelve targeted host tests and 54 Desktop tests passed; TypeScript and production build passed. Local native Rust compilation/window proof remains unavailable because Cargo is absent and the installed binary predates the editorial commands. Native compilation and the startup-parser tests are required CI gates; a frontend/host rehearsal is not a claim of native-window or Product Owner acceptance.
 
 **Director impact:** compatible bounded offline admission/review extension. Product Owner visual/narrative acceptance remains pending; strategy/mounting/I1-T1 and other broader capabilities retain their original gates. Progress stays 55%; F-A02 stays closed/exhausted 1/1.
+
+## Editorial presentation clarity — owner approved 2026-10-03
+
+The offline review now separates blocks into bordered, spaced cards and distinguishes
+block position, editable title, original analysis, user note and source evidence.
+The heading is visually uppercase. The media name is secondary: numbered Video,
+Audio and Image labels are shared by media, transcript selection, inspector,
+source-derived timeline labels and editorial citations. Evidence references remain
+available as analysis traceability; they are not media identities. Source actions
+resolve the original source ID, never the block position or evidence label.
+
+One presentation registry per window reserves numbers independently for each
+project and source kind. Search/filter, block/source reordering, removing another
+source, undo/redo and switching between projects preserve seen identities and
+never reuse their numbers during that window. Original filenames remain in
+source details/tooltips and accessible labels. The old index-based decorative
+4K badge is removed because it did not represent verified source resolution.
+No thumbnail provider exists in this UI baseline; type icons remain type icons.
+
+**Durable numbering remains a decision gate.** Reopening the project cannot yet
+preserve historical retired-source numbers. The minimal proposed follow-up is a
+versioned registry plus monotonic counters in the existing history archive,
+independent of its undo cursor, with tested legacy compatibility. It needs an
+architectural decision and explicit format-change approval before implementation;
+this presentation delta does not introduce that persistence contract. Temporary
+F-A02 admission continues to keep all review changes in memory and preserves the
+original pair unchanged.
+
+Save/discard/move controls explain their disabled state. The original analysis,
+PARTIAL support, caveats, revision validation, typed review operation and all
+provider/apply/export restrictions remain authoritative. The owner's prior
+native-window reading/edit/reorder observations are limited acceptance evidence;
+saving, navigation, discard and overall visual acceptance remain pending. The
+active native window is preserved on its prior compiled head while this separate
+worktree is reviewed. Frontend/browser fixtures do not prove the new native UI.
+Director impact: compatible presentation only; no new context or execution authority.
