@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-10-03 UTC, bounded offline Editorial Draft V1 integrated by PR #75 after #74; the owner approved its smallest offline host/backend/UI review consumer on 2026-10-03, now IN DEVELOPMENT / NOT MERGED (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
+**Last decision reconciliation:** 2026-10-03 UTC, bounded offline Editorial Draft V1 integrated by PR #75 after #74; the owner approved its smallest offline host/backend/UI review consumer on 2026-10-03, integrated by PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b` (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -1540,8 +1540,8 @@ prior literal helper stays false/true/false/false. Details and limits:
 [Offline Editorial Draft V1](CEVRA_OFFLINE_EDITORIAL_DRAFT_V1.md).
 Context PR #74 and Application service PR #75 are merged; the service is integrated
 at `d8d93b7678e4b74a7b3ce034b60d7e2105b6a361`. The separately approved offline
-review consumer is in development on `feat/offline-editorial-panel` and is not
-merged by this record. Whole-gate completion and broader strategy/take/cut
+review consumer is integrated by PR #77 at
+`73f8427ac18337f779ceeda9c93f60edf35df33b`. Whole-gate completion and broader strategy/take/cut
 implementation remain unclaimed.
 Director impact is a compatible Application proposal extension; typed commands,
 Project IR, History, provider and engine authority are preserved. Progress 55%.
@@ -2678,9 +2678,9 @@ If ChatGPT again reports “maximum conversation length”:
 **The project must never rely on a single chat thread as its only memory.**
 
 
-### Offline editorial review consumer — owner approval and active implementation, 2026-10-03
+### Offline editorial review consumer — owner-approved integration, 2026-10-03
 
-**Status:** IN DEVELOPMENT / NOT MERGED on `feat/offline-editorial-panel`, based on integrated `main` `d8d93b7678e4b74a7b3ce034b60d7e2105b6a361`. PR #76 remains a separate Draft containing roadmap proposals; it is not a prerequisite or merged by this slice.
+**Status:** IMPLEMENTED / MERGED via [PR #77](https://github.com/inlifemedicina/cevra/pull/77). The owner authorized exact head `23054b716a4ec705905c37eb12929a9c885543c8`; the SHA-guarded normal merge is `73f8427ac18337f779ceeda9c93f60edf35df33b`, with the same reviewed tree `1166fc3f9979a18171cb6aeb7ee08073bc83748b`. Post-merge validation is recorded in the offline draft document. PR #76 remains a separate Draft containing roadmap proposals; it is not a prerequisite or merged by this slice.
 
 After the morning recommendation, the owner authorized the smallest offline panel to inspect the existing five-block proposal, consult sources/justifications/caveats, reorder blocks and edit presentation titles/user notes. The host admits one accepted analysis per session and owns it and its service-issued draft in memory, bound to the same ProjectHistory; the closed backend permits only query/revision. UI PT-BR/EN-US shares the existing Director surface and canonical project/timeline. This acceptance authorizes the two narrow local query/revision commands and does not grant provider, arbitrary filesystem/network, persistent admission, import, cut/timing or export authority.
 
