@@ -72,6 +72,32 @@ The expected Vids baseline includes:
 
 Essential baseline capability stays in the Vids core rather than being moved into Marketplace. A future implementation that intentionally differs from proven EDVID behavior records **DIVERGÊNCIA EDVID** and explains why its result is equivalent or better. CEVRA does not copy EDVID branding, trade dress or product names. Source reuse requires exact provenance, license verification and MIT attribution.
 
+## Silent montages and video reference — planning addition, 2026-10-03
+
+Vids must support videos without speech, including landscapes, travel footage
+and aesthetic compilations, with alternating clips and multiple videos visible
+simultaneously. Transcription is not a universal prerequisite for manual
+editing or these workflows. AI may help select and organize material only
+within available, permitted evidence; deterministic typed editing/composition
+engines execute cuts, layouts, transitions, color and music.
+
+A planned simple option, **Usar vídeo como referência / Use video as reference**,
+accepts an accessible public link or permitted file. The user chooses which
+aspects to apply to their own material: pacing, layout, transitions, color and
+the relationship with music. Access and analysis capabilities must be checked;
+this does not promise access to private/DRM content, universal downloads,
+copying source media/music or obtaining licenses. A reference is an input to
+user intent, not execution authority or replacement canonical project state.
+
+Normal remains direct with visual choices/presets and contextual controls;
+Advanced exposes detail on the same project/timeline. Manual alternatives,
+approval, reversibility and original-source quality remain required. These
+are planned requirements, not delivered capabilities or a new engine/provider
+choice. Existing roadmap order and the real semantic round-trip gate remain.
+Source, existing primitives, gaps and phase dependencies are recorded in the
+[dedicated planning record](CEVRA_VIDS_MONTAGE_REFERENCE_PLAN.md) and
+[issue #71](https://github.com/inlifemedicina/cevra/issues/71).
+
 ## Layered timeline
 
 The conceptual starting layout is:
