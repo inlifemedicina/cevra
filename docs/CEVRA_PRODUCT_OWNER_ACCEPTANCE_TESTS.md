@@ -254,3 +254,21 @@ contains the consolidated steps and evidence limits. PR #80's earlier functional
 acceptance remains valid; #80 is now integrated and its CI 5/5 plus Exact Runtime
 1/1 passed after merge. No full catalog ID, composition/export, native Windows,
 release or new provider acceptance follows from these bounded results.
+
+
+#### Owner feedback for direct trim — 2026-10-04
+
+On native PR #82 head `1f9389d3fadd3d3b86da4b89f1a86baac99cba2d`, cancellation,
+100/10 ms keyboard adjustments and undo/redo were accepted for this bounded
+variant. Pointer editing worked functionally; IN visual feedback was rejected
+because OUT appeared to move. Source/clip counter interpretation was questioned
+for IN 2.000 / OUT 3.990 s, so perceptual playback acceptance stays pending.
+The scoped correction preserves those passes and rechecks only IN visual drag
+and clarified playback clocks. UNIT/browser measurement complements that recheck;
+it does not promote full catalog IDs or native/frame-accurate decoding to PASS.
+[Diagnosis, limits and presentation contract](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#owner-feedback-and-bounded-correction--2026-10-04).
+
+The complete headless callback record contains 4.000/4.033333 s after OUT3.990,
+followed by corrective seek. Final `currentTime`3.990 alone is not a bounded-
+playback PASS. This case remains OPEN, and the UI states preview is approximate;
+precise derived-preview/runtime integration requires its own scoped decision.

@@ -2,7 +2,7 @@ import type { CreateManualVideoClipRequest, LocalVideoPreview } from "@cevra/app
 import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
 import { useEffect, useRef, useState } from "react";
 import type { DesktopBackend } from "../backend/desktop-backend";
-import { formatTime, type Translate } from "../ui-model";
+import { formatMilliseconds, type Translate } from "../ui-model";
 
 interface Props {
   backend: DesktopBackend;
@@ -139,12 +139,16 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
         const video = videoRef.current; if (!video) return;
         setSeeking(true); video.currentTime = Number(event.target.value) / 1000;
       }} />
-      <time data-testid="preview-timecode">{formatTime(currentMs)} / {formatTime(endMs)}</time>
+      <time data-testid="preview-timecode">{t("preview.sourcePosition", { time: formatMilliseconds(currentMs) })} / {formatMilliseconds(endMs)}</time>
     </div>
-    {timelineOccupied ? <p className="manual-preview-hint" role="status">{t(unsupportedClip ? "preview.unsupportedClip" : "preview.singleClip")}</p> : <>
+    {clip && <div className="manual-preview-timing">
+      <time data-testid="preview-clip-timecode">{t("preview.clipElapsed", { time: formatMilliseconds(currentMs - startMs), duration: formatMilliseconds(endMs - startMs) })}</time>
+      <output>{t("preview.clipBounds", { start: formatMilliseconds(startMs), end: formatMilliseconds(endMs) })}</output>
+    </div>}
+    {timelineOccupied ? <p className="manual-preview-hint" role="status">{t(unsupportedClip ? "preview.unsupportedClip" : clip ? "preview.approximateClip" : "preview.singleClip")}</p> : <>
       <div className="manual-preview-marks">
-        <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("in")}>{t("preview.markIn")}</button><output>IN {inMs === null ? "—" : formatTime(inMs)}</output>
-        <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("out")}>{t("preview.markOut")}</button><output>OUT {outMs === null ? "—" : formatTime(outMs)}</output>
+        <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("in")}>{t("preview.markIn")}</button><output>IN {inMs === null ? "—" : formatMilliseconds(inMs)}</output>
+        <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("out")}>{t("preview.markOut")}</button><output>OUT {outMs === null ? "—" : formatMilliseconds(outMs)}</output>
         <button type="button" className="manual-create-clip-button" disabled={!ready || seeking || busy || !validRange} onClick={() => {
           videoRef.current?.pause();
           if (source && validRange) void onCreate({ sourceId: source.id, expectedSnapshotId: snapshotId, sourceStartMs: inMs!, sourceEndMs: outMs! }).catch((cause: unknown) => fail(errorCode(cause)));

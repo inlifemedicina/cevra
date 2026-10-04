@@ -2752,3 +2752,27 @@ limits are in [Manual Timeline Trim V1](CEVRA_MANUAL_TIMELINE_TRIM_V1.md).
 Director impact is compatible direct editing through existing typed history;
 no IR/storage/engine direction or AI/provider authority changes. Global progress
 remains 55%; F-A02 remains exhausted 1/1.
+
+
+### PR #82 owner feedback — bounded trim presentation correction, 2026-10-04
+
+The owner tested native head `1f9389d3fadd3d3b86da4b89f1a86baac99cba2d` and
+confirmed cancellation, coarse/fine keyboard edits and undo/redo. Pointer trim
+worked functionally but IN shrank visually from the right; playback's fixed-30-fps
+counter was questioned for IN 2.000 / OUT 3.990 s. These supersede the prior
+NOT RUN checkpoint; visual IN and perceptual playback remain pending recheck.
+The bounded fix anchors measured visual OUT during IN drag until release and
+shows milliseconds, separately labeling source position and excerpt elapsed/
+duration. It changes no IR placement, trim/history/checkpoint or decoder logic.
+An isolated real-fixture Chrome headless check reports media clock 2.000→3.990 s,
+paused at OUT with playhead 1990 ms; the last frame sample is 3.966667 s. That
+explains the old 3:29 display but is not native/frame-accuracy certification.
+Inspection of all frame callbacks also found 4.000/4.033333 s beyond OUT before
+the final corrective seek. Bounded playback therefore remains OPEN, beyond the
+corrected display; browser-native fragment/cue experiments did not close it.
+The UI labels the excerpt preview approximate. A typed derived-preview follow-up
+requires its own scope/runtime integration decision; it is not implemented here.
+[Scoped diagnosis and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#owner-feedback-and-bounded-correction--2026-10-04).
+PR #82 remains Draft / NOT MERGED. No AI call, credentials, human-session change
+or broader acceptance; Director impact is compatible presentation correction,
+progress 55%, F-A02 exhausted 1/1. Recheck only the two reported presentation cases.

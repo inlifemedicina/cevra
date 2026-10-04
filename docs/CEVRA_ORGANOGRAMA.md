@@ -381,3 +381,19 @@ acceptance NOT RUN, isolated demo prepared without launching a window.
 and simple-clip X-T6; no duplicate acceptance IDs. Director impact is compatible
 direct editing. Progress stays 55%, F-A02 exhausted 1/1; composition/export,
 streaming/multi-clip and provider gates remain separate.
+
+
+## PR #82 owner feedback — 2026-10-04
+
+Owner cancellation, keyboard and undo/redo observations passed on the initial
+trim demo. IN drag feedback and confusing source/elapsed time display require
+bounded correction and recheck; previous NOT RUN wording is historical.
+[Diagnosis and scoped follow-up](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#owner-feedback-and-bounded-correction--2026-10-04).
+The correction is presentation-only on existing typed trim/history: OUT remains
+visually fixed during IN drag, then the confirmed duration reanchors at zero;
+source and excerpt clocks use milliseconds. Real-file headless evidence does
+not certify native/frame-accurate preview. It also reveals callback timestamps
+above OUT before corrective seek; bounded playback remains OPEN. The current UI
+labels preview approximate. Derived-preview integration is a separate proposed
+scope/runtime decision, not a completed fix. Draft PR #82 remains unmerged;
+Director impact compatible, progress 55%, F-A02 exhausted 1/1, no new AI call.

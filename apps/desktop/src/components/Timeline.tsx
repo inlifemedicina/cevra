@@ -2,7 +2,7 @@ import type { CaptionCue, GraphicItem, ProjectIR, TimelineClip, TimelineTrack } 
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { TrimManualVideoClipRequest } from "@cevra/application";
 import { supportsManualClipPreview } from "./ManualVideoPreview";
-import { formatTime, type Translate } from "../ui-model";
+import { formatMilliseconds, formatTime, type Translate } from "../ui-model";
 import { Icon } from "./Icon";
 
 import type { SourcePresentation } from "../source-presentation";
@@ -84,7 +84,7 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
         <div className="timeline-zoom"><label htmlFor="timeline-zoom">{t("timeline.zoom")}</label><span>−</span><input id="timeline-zoom" type="range" min="70" max="180" value={zoom} onChange={(event) => onZoomChange(Number(event.target.value))} /><span>＋</span><button type="button" onClick={() => onZoomChange(100)}><Icon name="fit" size={14} />{t("timeline.fit")}</button></div>
       </div>
       <div className="timeline-table">
-        <div className="timeline-corner"><span className="timecode">{formatTime(playheadMs)}</span></div>
+        <div className="timeline-corner"><span className="timecode">{trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs)}</span></div>
         <div
           className="timeline-ruler"
           role="slider"
@@ -93,7 +93,7 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
           aria-valuemin={0}
           aria-valuemax={canonicalDuration}
           aria-valuenow={playheadMs}
-          aria-valuetext={t("timeline.playhead", { time: formatTime(playheadMs) })}
+          aria-valuetext={t("timeline.playhead", { time: trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs) })}
           onPointerDown={setPlayheadFromPointer}
           onKeyDown={movePlayheadFromKeyboard}
         >
@@ -135,7 +135,7 @@ function TrimTimelineClip({ clip, label, fileName, duration, sourceDuration, sna
 }) {
   const [draft, setDraft] = useState<TrimRange | null>(null);
   const [pending, setPending] = useState(false);
-  const gesture = useRef<{ edge: TrimEdge; pointerId: number; startX: number; msPerPixel: number; target: HTMLButtonElement } | null>(null);
+  const gesture = useRef<{ edge: TrimEdge; pointerId: number; startX: number; msPerPixel: number; outRightPercent: number; target: HTMLButtonElement } | null>(null);
   const range = draft ?? clip;
 
   function cancel() {
@@ -165,10 +165,14 @@ function TrimTimelineClip({ clip, label, fileName, duration, sourceDuration, sna
   }
   function start(event: ReactPointerEvent<HTMLButtonElement>, edge: TrimEdge) {
     if (busy || pending || gesture.current || event.button !== 0 || !Number.isFinite(event.clientX)) return;
-    const width = event.currentTarget.closest(".timeline-width")!.getBoundingClientRect().width;
+    const contentBounds = event.currentTarget.closest(".timeline-width")!.getBoundingClientRect();
+    const width = contentBounds.width;
     if (width <= 0) return;
+    const clipBounds = event.currentTarget.closest(".timeline-trim-clip")!.getBoundingClientRect();
+    const outRightPercent = (contentBounds.right - clipBounds.right) / width * 100;
+    if (!Number.isFinite(outRightPercent)) return;
     event.preventDefault(); event.stopPropagation(); event.currentTarget.focus({ preventScroll: true });
-    gesture.current = { edge, pointerId: event.pointerId, startX: event.clientX, msPerPixel: duration / width, target: event.currentTarget };
+    gesture.current = { edge, pointerId: event.pointerId, startX: event.clientX, msPerPixel: duration / width, outRightPercent, target: event.currentTarget };
     event.currentTarget.setPointerCapture?.(event.pointerId);
     setDraft({ sourceStartMs: clip.sourceStartMs, sourceEndMs: clip.sourceEndMs });
   }
@@ -192,7 +196,15 @@ function TrimTimelineClip({ clip, label, fileName, duration, sourceDuration, sna
     const delta = event.key === "Home" ? -current : event.key === "End" ? sourceDuration - current : (event.key === "ArrowRight" ? 1 : -1) * (event.shiftKey ? 10 : 100);
     void commit(adjust(edge, delta));
   }
-  return <div className="timeline-trim-clip" style={{ left: `${clip.timelineStartMs / duration * 100}%`, width: `${(range.sourceEndMs - range.sourceStartMs) / duration * 100}%` }}>
+  // During IN drag anchor the presentation at the unchanged OUT. Canonical
+  // placement stays at zero; only release confirms and reanchors the new range.
+  // Right anchoring also preserves OUT when the minimum visual width applies.
+  const draggingIn = draft !== null && gesture.current?.edge === "in";
+  return <div className="timeline-trim-clip" style={{
+    left: draggingIn ? undefined : `${clip.timelineStartMs / duration * 100}%`,
+    right: draggingIn ? `${gesture.current!.outRightPercent}%` : undefined,
+    width: `${(range.sourceEndMs - range.sourceStartMs) / duration * 100}%`
+  }}>
     <button type="button" className="timeline-item item-clip selected" aria-pressed="true" aria-label={fileName ? `${label} · ${fileName}` : label} title={fileName} onClick={() => onSelect(clip.id)}><span>{label}</span></button>
     {(["in", "out"] as const).map((edge) => <button key={edge} type="button" role="slider" className={`timeline-trim-handle trim-${edge}`} aria-disabled={busy || pending} tabIndex={busy || pending ? -1 : 0}
       aria-label={t(edge === "in" ? "timeline.trimIn" : "timeline.trimOut")} aria-orientation="horizontal"

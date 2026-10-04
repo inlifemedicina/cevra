@@ -10,7 +10,9 @@ Composition, export or provider gates.
 
 Select the existing simple video clip in Edit. Its two timeline handles adjust
 source IN and OUT; the displayed range uses seconds with millisecond precision.
-Dragging changes only a temporary visual range. Release confirms one typed
+Dragging changes only a temporary visual range. An IN drag keeps the visual OUT
+anchored and removes/restores width at the left; release reanchors the new
+duration at timeline zero. OUT drags keep the left edge anchored. Release confirms one typed
 `clip.trim`; Escape, pointer cancellation/capture loss, window blur, selection,
 zoom or snapshot replacement discards the gesture. Arrow keys adjust 100 ms;
 Shift plus arrow adjusts 10 ms. Home/End clamp to valid source bounds. Held-key
@@ -83,9 +85,95 @@ it is not launched or substituted for the owner's existing session.
 
 Record observed ranges, build commit, locale and any visual/functional issue.
 Previous PR #80 original playback/create/undo evidence remains valid; no full
-repeat of that human round is requested. These steps remain NOT EXECUTED until
-an actual owner report. Automated tests do not provide perceptual acceptance.
+repeat of that human round is requested. These steps were NOT EXECUTED at that
+preparation checkpoint; the owner report below supersedes that pending status.
+Automated tests do not provide perceptual acceptance.
 
 Director impact: compatible direct-edit consumer of the existing typed
 `clip.trim`, canonical Project IR/History and narrow Desktop boundary. No new
 Director/provider execution authority, proposal application or engine direction.
+
+
+## Owner feedback and bounded correction — 2026-10-04
+
+The owner exercised the native PR #82 demo at `1f9389d3fadd3d3b86da4b89f1a86baac99cba2d`.
+Cancellation, coarse/fine keyboard adjustment and undo/redo were reported working.
+Pointer trimming worked functionally, but IN visually shortened from the right;
+that visual behavior is not accepted. Playback of an IN 2.000 / OUT 3.990 s clip
+was questioned because the displayed counter read approximately 2:01 to 3:29;
+perceptual playback acceptance remains unresolved for that report.
+
+The legacy formatter used `mm:ss:frames` with a fixed 30 fps calculation, without
+consulting the source's frame rate. At 3.990 s it displays 00:03:29, while exactly
+2.000 s displays 00:02:00. A visible 2:01 is compatible with an observation after
+the media clock advanced to about 2.034 s; the owner's report alone cannot establish
+when the decoder started or stopped. Floating-point division also displayed frame
+14 at exactly 1.500 s. This was a display defect, not evidence that IR bounds changed.
+The synthetic original is CFR 30/1, 180 frames, 6.000 s by ffprobe.
+
+An isolated production-component/real-file Chrome headless reproduction, before
+and after the display change, loaded the exact IN 2000 / OUT 3990 ms range. It
+reported `currentTime` 2.000 s initially and 3.990 s paused finally, with timeline
+playhead 1990 ms; the last captured presented-frame sample was 3.966667 s. These
+final clock and last sample do not prove that playback stayed inside OUT:
+inspection of all callbacks also found 4.000 and 4.033333 s timestamps above
+OUT 3.990 before the corrective seek back to the last 3.966667 s frame. The
+requestAnimationFrame/timeupdate guard pauses and clamps after observing OUT;
+it does not prevent the decoder from presenting ahead of that observation.
+This is a reproduced bounded-playback gap, not only counter ambiguity. These
+measurements do not identify every displayed frame or certify native WKWebView/
+audio timing. Wall-clock harness elapsed time is not clip duration.
+
+The bounded correction keeps OUT visually anchored during IN drag, using the
+actual measured visual edge captured at gesture start. That also prevents a jump
+when the clip already starts below the 48 px visual minimum. Release alone confirms
+the existing typed trim and reanchors the shorter/longer duration at timeline zero.
+Escape/cancellation restore the prior view and record no command. Extending IN
+before the temporary viewport origin can clip the left handle while capture remains
+active; no source-time clamp or canonical placement change is introduced to hide
+that viewport limitation. Very short handles retain their documented minimum
+visual width, which is not a time measurement.
+
+Local-video marks, source clock and the simple manual timeline clock now show
+`mm:ss.SSS`, independent of fps. Preview labels separately show source position/OUT,
+excerpt elapsed/duration, and explicit IN/OUT. For 2.000–3.990 s the elapsed
+counter starts 00:00.000 and ends 00:01.990. PT-BR and EN-US have matching labels.
+Playback/seek logic, project schema, host permissions, verification, history and
+checkpoint contracts are unchanged. The UI explicitly labels this as an approximate
+excerpt preview. No AI call or human session manipulation occurs.
+
+Only IN drag feedback and the clarified clip playback presentation require a
+bounded owner recheck on the corrected build; retain the accepted cancellation,
+keyboard and undo/redo observations. This does not close full I4-T1, X-T1/T7,
+composition/export, frame-accurate preview or provider gates. Director impact:
+compatible presentation correction on the existing typed editing boundary.
+
+
+Correction validation: 86/86 Desktop tests PASS, including 70%/180% IN geometry,
+initially minimum-width clips, source/elapsed millisecond labels, canonical OUT
+pause and preserved cancellation/focus/selection/undo/redo cases. PT-BR/EN-US
+catalog parity 2/2 PASS. Real-browser measurement preserves visual OUT for
+shrink/extend and short-range drafts; an initially 48 px clip remains within
+0.02 px of its captured edge (subpixel layout rounding), with no confirmation
+on cancel. Only release reanchors the confirmed clip. Evidence files remain
+outside the public repository. Native human recheck is still pending.
+
+
+The same isolated harness tested two browser-native alternatives off-tree:
+a temporal media fragment and a hidden metadata cue with pause-on-exit. Neither
+eliminated all callback timestamps above OUT in this fixture; neither is added
+to production. This does not establish native WKWebView behavior. The playback
+case remains OPEN / NOT ACCEPTED after correcting its display, rather than
+being promoted to a bounded playback PASS on the final clamped clock alone.
+
+A candidate follow-up is a derived, bounded preview generated through the
+existing typed MediaEngineAdapter `trim` operation, with source/snapshot/content
+verification, cancellation, bounded output admission and isolated temporary
+storage; Project IR/source originals/history must remain unchanged. The accurate
+trim primitive exists, but its integration into local-video preview and demo
+runtime packaging is absent; the current host returns the original's verified
+bytes and this demo has no media runtime configured. Integration, runtime/license
+validation and decoder/platform/EOF tests are required before that approach can
+be claimed available or approved. No arbitrary FFmpeg/host path control is proposed.
+This is a concrete next scope decision, not an implemented playback fix or a
+silent extension into composition/export. Retain prior accepted human steps.

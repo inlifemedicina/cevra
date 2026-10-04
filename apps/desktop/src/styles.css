@@ -318,6 +318,7 @@ h1, h2, h3, p { margin: 0; }
 .manual-preview-controls { display: flex; align-items: center; gap: 10px; }
 .manual-preview-controls input { flex: 1; min-width: 50px; accent-color: #a994ee; }
 .manual-preview-controls time { font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.manual-preview-timing { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; color: #b7c3d4; font-size: 11px; font-variant-numeric: tabular-nums; }
 .manual-preview-marks { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .manual-preview-marks output { font-size: 11px; font-variant-numeric: tabular-nums; color: #b7c3d4; }
 .manual-create-clip-button { height: 29px; padding: 0 9px; border: 1px solid var(--cevra-accent); border-radius: var(--cevra-radius-sm); background: var(--cevra-accent); color: var(--cevra-accent-contrast); font-size: 11px; font-weight: 700; cursor: pointer; }

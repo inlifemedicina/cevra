@@ -304,7 +304,7 @@ describe("CEVRA Vids desktop shell", () => {
     expect(screen.queryByText(/Clareza gera confiança/)).toBeNull();
     expect(screen.getAllByTestId(/^timeline-track-/)).toHaveLength(7);
     expect(screen.getByRole("slider", { name: "Régua e cursor da linha do tempo" }).getAttribute("aria-valuemax")).toBe("0");
-    expect(screen.getByTestId("preview-timecode").textContent).toContain("00:00:00 / 00:00:00");
+    expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:00.000 / 00:00.000");
     expect(screen.getByTestId("app-shell").dataset.activeSourceId).toBeUndefined();
   });
 

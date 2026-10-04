@@ -7,9 +7,10 @@ import type { DesktopBackend, DesktopBackendState } from "./backend/desktop-back
 import { App } from "./App";
 import { ManualVideoPreview, supportsManualClipPreview } from "./components/ManualVideoPreview";
 import { Timeline } from "./components/Timeline";
+import { formatMilliseconds } from "./ui-model";
 
 const source: SourceAsset = { id: "original-video", kind: "video", uri: "/tmp/fixture.mp4", displayName: "fixture.mp4", durationMs: 6000 };
-const t = (key: Parameters<typeof translate>[1]) => translate("pt-BR", key);
+const t = (key: Parameters<typeof translate>[1], parameters?: Parameters<typeof translate>[2]) => translate("pt-BR", key, parameters);
 const revoke = vi.fn();
 let urlSequence = 0;
 
@@ -130,6 +131,37 @@ it("clip playback starts at canonical IN, maps timeline seek and pauses at OUT",
   expect(video.pause).toHaveBeenCalled(); expect(video.currentTime).toBe(4); expect(onPlayheadChange).toHaveBeenLastCalledWith(3000);
 });
 
+it("shows source milliseconds separately from excerpt elapsed/duration for the reported 2.000–3.990 range", async () => {
+  const backend = new ManualBackend(); const onPlayheadChange = vi.fn();
+  const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 1990, sourceStartMs: 2000, sourceEndMs: 3990, speed: 1, volume: 1, opacity: 1 };
+  const props = { backend, source, snapshotId: "snapshot", timelineOccupied: true, busy: false, clip, onPlayheadChange, onCreate: vi.fn(), seek: { sequence: 0, timelineMs: 0 } };
+  const { container, rerender } = render(<ManualVideoPreview {...props} t={t} />);
+  const video = await metadata(container); fireEvent.seeked(video);
+  expect(video.currentTime).toBe(2);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:02.000 / 00:03.990");
+  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00.000 / 00:01.990");
+  expect(screen.getByText("IN 00:02.000 · OUT 00:03.990")).toBeTruthy();
+  expect(screen.getByText(t("preview.approximateClip"))).toBeTruthy();
+  video.currentTime = 2.034; fireEvent.timeUpdate(video);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:02.034 / 00:03.990");
+  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00.034 / 00:01.990");
+  video.currentTime = 4.01; fireEvent.timeUpdate(video);
+  expect(video.pause).toHaveBeenCalled(); expect(video.currentTime).toBe(3.99);
+  expect(onPlayheadChange).toHaveBeenLastCalledWith(1990);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:03.990 / 00:03.990");
+  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:01.990 / 00:01.990");
+  rerender(<ManualVideoPreview {...props} t={(key, parameters) => translate("en-US", key, parameters)} />);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Source 00:03.990 / 00:03.990");
+  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Excerpt 00:01.990 / 00:01.990");
+  expect(screen.getByText(translate("en-US", "preview.approximateClip"))).toBeTruthy();
+});
+
+it("formats media milliseconds without assuming fps or losing exact subsecond boundaries", () => {
+  expect([0, 1500, 2000, 2034, 3990, 60_001].map(formatMilliseconds)).toEqual([
+    "00:00.000", "00:01.500", "00:02.000", "00:02.034", "00:03.990", "01:00.001"
+  ]);
+});
+
 it("revokes old Blob URLs and ignores a late response from a replaced snapshot", async () => {
   const backend = new ManualBackend(); let finish!: (value: LocalVideoPreview) => void;
   const original = backend.previewLocalVideo.bind(backend);
@@ -186,9 +218,9 @@ it("preexisting speed/muted-track edits fall back explicitly to Original without
   expect(container.querySelector("video")!.currentTime).toBe(0);
 });
 
-async function selectedTrimApp() {
+async function selectedTrimApp(sourceStartMs = 1000, sourceEndMs = 4000) {
   const backend = new ManualBackend();
-  await backend.createManualVideoClip({ sourceId: source.id, expectedSnapshotId: backend.history.current.history.headSnapshotId!, sourceStartMs: 1000, sourceEndMs: 4000 });
+  await backend.createManualVideoClip({ sourceId: source.id, expectedSnapshotId: backend.history.current.history.headSnapshotId!, sourceStartMs, sourceEndMs });
   const rendered = render(<App backend={backend} />);
   await metadata(rendered.container);
   fireEvent.click(within(screen.getByTestId("timeline-track-track-v1")).getByRole("button", { name: "Vídeo 1 · fixture.mp4" }));
@@ -200,12 +232,57 @@ function pointer(target: Element, type: string, clientX: number, pointerId = 1) 
   const event = new MouseEvent(type, { bubbles: true, clientX, button: 0 });
   Object.defineProperty(event, "pointerId", { value: pointerId }); fireEvent(target, event);
 }
+function measureTrim(handle: Element, width: number, visualWidth = width / 2) {
+  vi.spyOn(handle.closest(".timeline-width")!, "getBoundingClientRect").mockReturnValue({ left: 0, right: width, width } as DOMRect);
+  vi.spyOn(handle.closest(".timeline-trim-clip")!, "getBoundingClientRect").mockReturnValue({ left: 0, right: visualWidth, width: visualWidth } as DOMRect);
+}
 for (const [zoom, width] of [[70, 700], [180, 1800]]) {
+  it(`keeps an initially minimum-width clip's visible OUT stationary at IN pointerdown and drag at zoom ${zoom}`, async () => {
+    const { backend } = await selectedTrimApp(2000, 2010);
+    fireEvent.change(screen.getByLabelText("Zoom da linha do tempo"), { target: { value: String(zoom) } });
+    const handle = screen.getByRole("slider", { name: "Ajustar IN do clip" });
+    const bar = handle.closest<HTMLElement>(".timeline-trim-clip")!;
+    measureTrim(handle, width, 48);
+    pointer(handle, "pointerdown", 100);
+    const expectedRight = 100 - 48 / width * 100;
+    expect(parseFloat(bar.style.right)).toBeCloseTo(expectedRight);
+    pointer(handle, "pointermove", 100 + width / 6000 * 2);
+    expect(parseFloat(bar.style.right)).toBeCloseTo(expectedRight);
+    expect(handle.getAttribute("aria-valuenow")).toBe("2002");
+    expect(screen.getByRole("slider", { name: "Ajustar OUT do clip" }).getAttribute("aria-valuenow")).toBe("2010");
+    fireEvent.keyDown(window, { key: "Escape" }); pointer(handle, "pointerup", 100 + width / 6000 * 2);
+    expect(bar.style.left).toBe("0%"); expect(bar.style.right).toBe("");
+    expect(backend.trims).toHaveLength(0);
+  });
+  it(`IN drag at zoom ${zoom} keeps OUT visually fixed until release without changing history`, async () => {
+    const { backend, container } = await selectedTrimApp();
+    fireEvent.change(screen.getByLabelText("Zoom da linha do tempo"), { target: { value: String(zoom) } });
+    const handle = screen.getByRole("slider", { name: "Ajustar IN do clip" });
+    const bar = handle.closest<HTMLElement>(".timeline-trim-clip")!;
+    measureTrim(handle, width);
+    const revision = backend.history.current.history.revision;
+    expect(bar.style.left).toBe("0%"); expect(bar.style.width).toBe("50%");
+    pointer(handle, "pointerdown", 100); pointer(handle, "pointermove", 100 + width / 6);
+    // Right anchoring also keeps OUT fixed when minimum visual handle width applies.
+    expect(bar.style.left).toBe(""); expect(bar.style.right).toBe("50%");
+    expect(parseFloat(bar.style.width)).toBeCloseTo(100 / 3);
+    expect(screen.getByRole("slider", { name: "Ajustar OUT do clip" }).getAttribute("aria-valuenow")).toBe("4000");
+    expect(backend.history.current.history.revision).toBe(revision); expect(backend.trims).toHaveLength(0);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(bar.style.left).toBe("0%"); expect(bar.style.right).toBe(""); expect(bar.style.width).toBe("50%");
+    pointer(handle, "pointerdown", 100); pointer(handle, "pointermove", 100 + width / 6); pointer(handle, "pointerup", 100 + width / 6);
+    await waitFor(() => expect(backend.trims).toHaveLength(1));
+    expect(backend.trims[0]).toMatchObject({ sourceStartMs: 2000, sourceEndMs: 4000 });
+    expect(backend.history.current.timeline.clips[0]?.timelineStartMs).toBe(0);
+    expect(bar.style.left).toBe("0%"); expect(bar.style.right).toBe("");
+    expect(parseFloat(bar.style.width)).toBeCloseTo(100 / 3);
+    expect((await metadata(container)).currentTime).toBe(2);
+  });
   it(`trim drag at zoom ${zoom} commits once at release and refreshes preview`, async () => {
     const { backend, container } = await selectedTrimApp();
     fireEvent.change(screen.getByLabelText("Zoom da linha do tempo"), { target: { value: String(zoom) } });
     const handle = screen.getByRole("slider", { name: "Ajustar OUT do clip" });
-    vi.spyOn(handle.closest(".timeline-width")!, "getBoundingClientRect").mockReturnValue({ width } as DOMRect);
+    measureTrim(handle, width);
     const initialRevision = backend.history.current.history.revision;
     pointer(handle, "pointerdown", 200); pointer(handle, "pointermove", 200 + width / 6);
     expect(handle.getAttribute("aria-valuenow")).toBe("5000");
@@ -242,7 +319,7 @@ it("IN keyboard trim supports fine adjustment, bounds and EN parity", async () =
 for (const cancellation of ["escape", "pointercancel", "captureloss", "zoom", "selection", "blur"]) {
   it(`cancels trim draft on ${cancellation} without a command`, async () => {
     const { backend } = await selectedTrimApp(); const handle = screen.getByRole("slider", { name: "Ajustar IN do clip" });
-    vi.spyOn(handle.closest(".timeline-width")!, "getBoundingClientRect").mockReturnValue({ width: 600 } as DOMRect);
+    measureTrim(handle, 600);
     pointer(handle, "pointerdown", 100); pointer(handle, "pointermove", 150); expect(handle.getAttribute("aria-valuenow")).toBe("1500");
     if (cancellation === "escape") fireEvent.keyDown(window, { key: "Escape" });
     if (cancellation === "pointercancel") pointer(handle, "pointercancel", 150);
