@@ -5,6 +5,8 @@ import {
   ResolvedAudioPlanApplicationService,
   SourceTechnicalDescriptorApplicationService,
   SourceTechnicalDescriptorResolver,
+  ManualVideoClipApplicationService,
+  resolveManualVideo,
   TranscriptionApplicationService
 } from "@cevra/application";
 import type {
@@ -16,6 +18,7 @@ import type {
   MediaExecutionIntentRepository
 } from "@cevra/application";
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
+import type { CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
   FfmpegMediaEngine,
@@ -42,6 +45,7 @@ import {
 } from "./media-execution-archive.js";
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
 import { readDesignatedFa02Pair } from "./fa02-review-admission.js";
+import { readLocalVideoPreview } from "./local-video-preview.js";
 
 type Locale = "pt-BR" | "en-US";
 
@@ -54,6 +58,7 @@ export interface DesktopSessionServices {
   transcriptionCapability: CapabilityState;
   persistence?: DesktopProjectPersistence;
   temporaryEditorialReview?: true;
+  manualVideoClip?: Pick<ManualVideoClipApplicationService, "create">;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
 }
@@ -163,6 +168,26 @@ export class DesktopSession {
       this.services.history.undo();
       if (changed) await this.persistMutation();
       return this.state();
+    });
+  }
+
+  async previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> {
+    if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
+    if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+    const stable = structuredClone(request);
+    const source = resolveManualVideo(this.services.history.current, stable);
+    const preview = await readLocalVideoPreview(source, stable.expectedSnapshotId);
+    if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+    resolveManualVideo(this.services.history.current, stable);
+    return preview;
+  }
+
+  async createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopHostState; clipId: string }> {
+    return this.runMutation(async () => {
+      if (!this.services.manualVideoClip) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+      const outcome = await this.services.manualVideoClip.create(structuredClone(request));
+      await this.persistMutation();
+      return { state: this.state(), clipId: outcome.clipId };
     });
   }
 
@@ -283,6 +308,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       : await createTranscriptionServices(history, environment, configuredMediaRuntime.paths?.root, sourceIdentity);
     return new DesktopSession({
       history,
+      manualVideoClip: new ManualVideoClipApplicationService({ history, identity: sourceIdentity }),
       ...(media?.ingest ? { ingest: media.ingest } : {}),
       ...(media?.sourceTechnicalDescriptor ? { sourceTechnicalDescriptor: media.sourceTechnicalDescriptor } : {}),
       ...(transcription.service ? { transcription: transcription.service } : {}),

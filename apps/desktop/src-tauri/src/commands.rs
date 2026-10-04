@@ -32,6 +32,55 @@ pub struct CancelArgs {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VideoPreviewArgs {
+    source_id: String,
+    expected_snapshot_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualVideoClipArgs {
+    source_id: String,
+    expected_snapshot_id: String,
+    source_start_ms: u64,
+    source_end_ms: u64,
+}
+
+#[tauri::command]
+pub async fn desktop_preview_local_video(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: VideoPreviewArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.source_id, "sourceId")?;
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    supervisor.ensure_started(&app).await?;
+    supervisor.request_control("video.previewLocal", json!({ "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id })).await
+}
+
+#[tauri::command]
+pub async fn desktop_create_manual_video_clip(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualVideoClipArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.source_id, "sourceId")?;
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    if args.source_start_ms >= args.source_end_ms || args.source_end_ms > 9_007_199_254_740_991 {
+        return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_RANGE", "The manual video range is invalid."));
+    }
+    supervisor.ensure_started(&app).await?;
+    match supervisor.request_immediate_mutation("video.createManualClip", json!({
+        "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id,
+        "sourceStartMs": args.source_start_ms, "sourceEndMs": args.source_end_ms
+    })).await {
+        Ok(result) => Ok(result),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EditorialBlockEdit {
     block_id: String,
     title: Option<String>,
@@ -292,4 +341,26 @@ fn file_name(path: &Path) -> Result<String, DesktopCommandError> {
                 "The selected media file name is invalid.",
             )
         })
+}
+
+#[cfg(test)]
+mod video_boundary_tests {
+    use super::*;
+
+    #[test]
+    fn local_video_args_reject_paths_commands_and_duration_overrides() {
+        for extra in ["uri", "path", "durationMs", "commands"] {
+            let mut preview = json!({ "sourceId": "source", "expectedSnapshotId": "snapshot" });
+            preview[extra] = json!("injected");
+            assert!(serde_json::from_value::<VideoPreviewArgs>(preview.clone()).is_err());
+            preview["sourceStartMs"] = json!(0);
+            preview["sourceEndMs"] = json!(1000);
+            assert!(serde_json::from_value::<ManualVideoClipArgs>(preview).is_err());
+        }
+        for start in [json!(-1), json!(0.5)] {
+            assert!(serde_json::from_value::<ManualVideoClipArgs>(json!({
+                "sourceId": "source", "expectedSnapshotId": "snapshot", "sourceStartMs": start, "sourceEndMs": 1000
+            })).is_err());
+        }
+    }
 }

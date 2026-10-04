@@ -15,3 +15,4 @@ export * from "./editorial-transcript-projection.js";
 export * from "./semantic-editorial-analysis-contract.js";
 export * from "./semantic-editorial-analysis.js";
 export * from "./editorial-draft.js";
+export * from "./manual-video-clip.js";

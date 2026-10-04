@@ -11,6 +11,8 @@ import {
   validateIngestParams,
   validateNoParams,
   validateTranscriptionParams,
+  validateVideoPreviewParams,
+  validateManualClipParams,
   type HostErrorPayload,
   type HostRequest,
   type HostResponse
@@ -109,6 +111,10 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       return { result: { shuttingDown: true }, shutdown: true };
     case "media.ingestLocal":
       return { result: await requireSession(session).ingestLocal(validateIngestParams(request.params, request.id)) };
+    case "video.previewLocal":
+      return { result: await requireSession(session).previewLocalVideo(validateVideoPreviewParams(request.params, request.id)) };
+    case "video.createManualClip":
+      return { result: await requireSession(session).createManualVideoClip(validateManualClipParams(request.params, request.id)) };
     case "transcription.transcribeSource":
       return { result: await requireSession(session).transcribeSource(validateTranscriptionParams(request.params, request.id)) };
     case "history.undo":

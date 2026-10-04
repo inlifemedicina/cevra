@@ -17,6 +17,8 @@ export class DemoDesktopBackend implements DesktopBackend {
   readonly presentationOnly = true;
   async loadEditorialDraft(): Promise<EditorialDraftState> { return { status: "empty" }; }
   async reviseEditorialDraft(_request: ReviseEditorialDraftRequest): Promise<EditorialDraftState> { throw { code: "EDITORIAL_DRAFT_UNAVAILABLE" }; }
+  async previewLocalVideo(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
+  async createManualVideoClip(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
 
   async loadState(): Promise<DesktopBackendState> {
     return demoState(structuredClone(createDemoProject()));

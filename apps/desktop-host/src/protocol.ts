@@ -1,5 +1,6 @@
 import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
+import type { LocalVideoPreviewRequest, CreateManualVideoClipRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
 export const DESKTOP_HOST_IDENTITY = "cevra.desktop-host" as const;
@@ -16,6 +17,8 @@ export type HostMethod =
   | "editorial.snapshot"
   | "editorial.revise"
   | "media.ingestLocal"
+  | "video.previewLocal"
+  | "video.createManualClip"
   | "transcription.transcribeSource"
   | "history.undo"
   | "history.redo"
@@ -76,6 +79,8 @@ const METHODS = new Set<HostMethod>([
   "editorial.snapshot",
   "editorial.revise",
   "media.ingestLocal",
+  "video.previewLocal",
+  "video.createManualClip",
   "transcription.transcribeSource",
   "history.undo",
   "history.redo",
@@ -161,6 +166,24 @@ export function validateTranscriptionParams(params: Record<string, unknown>, id:
 export function validateCancelParams(params: Record<string, unknown>, id: string): { operationId: string } {
   exactKeys(params, ["operationId"], id);
   return { operationId: operationId(params.operationId, id) };
+}
+
+export function validateVideoPreviewParams(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {
+  exactKeys(params, ["sourceId", "expectedSnapshotId"], id);
+  return videoBinding(params, id);
+}
+
+export function validateManualClipParams(params: Record<string, unknown>, id: string): CreateManualVideoClipRequest {
+  exactKeys(params, ["sourceId", "expectedSnapshotId", "sourceStartMs", "sourceEndMs"], id);
+  if (!Number.isSafeInteger(params.sourceStartMs) || !Number.isSafeInteger(params.sourceEndMs)
+    || (params.sourceStartMs as number) < 0 || (params.sourceEndMs as number) <= (params.sourceStartMs as number)) {
+    throw new ProtocolValidationError("HOST_INVALID_PARAMS", "The manual video range is invalid.", id);
+  }
+  return { ...videoBinding(params, id), sourceStartMs: params.sourceStartMs as number, sourceEndMs: params.sourceEndMs as number };
+}
+
+function videoBinding(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {
+  return { sourceId: boundedString(params.sourceId, 128, "sourceId", id), expectedSnapshotId: boundedString(params.expectedSnapshotId, 128, "expectedSnapshotId", id) };
 }
 
 function operationId(value: unknown, id: string): string {
