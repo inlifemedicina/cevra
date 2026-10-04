@@ -2774,7 +2774,8 @@ That presentation build labeled the excerpt preview approximate. The owner then
 approved the typed derived-preview integration; its implemented checkpoint is
 below. The old full-original polling path does not establish bounded playback.
 [Scoped diagnosis and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#owner-feedback-and-bounded-correction--2026-10-04).
-PR #82 remains Draft / NOT MERGED. No AI call, credentials, human-session change
+At the presentation checkpoint, PR #82 remained Draft / NOT MERGED. No AI call,
+credentials, human-session change
 or broader acceptance; Director impact is compatible presentation correction,
 progress 55%, F-A02 exhausted 1/1. Recheck only the two reported presentation cases.
 
@@ -2799,17 +2800,37 @@ samples. Six exact-runtime decoded frame/audio sentinel cases PASS, including
 nonaligned IN and 0–11 ms; full-original negative control and VFR are rejected.
 The original hash and canonical project remain unchanged in production-host
 integration. Chrome headless plays the real derivative 0→2.000 s with last frame
-callback 1.966667 s; this is separate from pending native perceptual acceptance.
+callback 1.966667 s; this is separate from the later bounded owner acceptance below.
 
 Worker 0.3.2 has an eight-file integrity inventory and retains approved pinned
 FFmpeg/upstream/provenance/license checks. The separate review app includes this
-managed runtime and is prepared unopened under a new identifier with an owned
-fixture checkpoint. Default release packaging, WKWebView/audio presentation and
-broader composition/export remain open. Desktop 88/88, Rust 28/28 and Python
+managed runtime and was initially prepared unopened under a new identifier with
+an owned fixture checkpoint. Default release packaging, generalized native frame/
+sample timing and broader composition/export remain open. Desktop 88/88,
+Rust 28/28 and Python
 Media 91/91 and affected Node/i18n regressions 527/527 PASS;
 independent exact-tree review and exact-head CI are
-tracked in Draft PR #82. [Profile, measurements and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
-Only IN visual drag and new excerpt playback require the consolidated owner
-recheck; preserve the accepted cancellation/keyboard/undo results. Director
+tracked in PR #82. [Profile, measurements and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
+The owner accepted the consolidated IN visual drag and corrected excerpt playback
+round, replying “perfeito” to that two-point script. Preserve the accepted
+cancellation/keyboard/undo results and do not repeat the human round. Director
 impact is a compatible typed Media/trim/history consumer, no additional provider
 or execution authority. Progress stays 55%, F-A02 exhausted 1/1, no real AI call.
+
+### PR #82 integrated after bounded owner acceptance — 2026-10-04
+
+Following the owner's explicit “sim” to merge and post-merge tests, PR #82 is
+integrated at `906eea695836fe2ae2b81ab0b50610b600748995`, from authorized head
+`3a685e431c1ff849dbd792a15c006aad5018e0c6`. Merge tree
+`3697c05f6a932cae7597b2ac086395761ba5a2fd` exactly matches the independent APPROVE.
+Pre-merge CI 37212884119 passed 5/5 and exact runtime 37212884040 passed 1/1.
+Post-merge [CI 37227087528](https://github.com/inlifemedicina/cevra/actions/runs/37227087528)
+is terminal SUCCESS, 5/5; [exact runtime 37227087529](https://github.com/inlifemedicina/cevra/actions/runs/37227087529)
+is terminal SUCCESS, 1/1, including the new preview content step; both attempt 1
+on the exact merge SHA.
+Native owner acceptance covers only IN feedback and corrected playback on the
+bounded fixture; it does not certify generalized frame/sample timing, full stable
+catalog IDs, composition/export, Windows/release or any agent gate. Historical
+Draft and PENDING observations remain earlier checkpoints. [Acceptance and integration](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#owner-acceptance-and-integration--2026-10-04).
+Director-compatible extension; progress 55%, F-A02 exhausted 1/1. Sessions are
+preserved and no additional provider call or human test round is part of closeout.

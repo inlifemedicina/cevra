@@ -273,8 +273,13 @@ followed by corrective seek. Final `currentTime`3.990 alone is not a bounded-
 playback PASS. That historical build left the case OPEN. The owner subsequently
 approved the bounded derivative: six decoded frame/audio cases, host integration
 and separate real-file Chrome EOF checks PASS with explicit frame/AAC
-quantization. The separate runtime-bearing native demo is prepared unopened;
-native perceptual acceptance remains PENDING. Recheck only visual IN drag and
-new excerpt playback together, preserving accepted cancellation, keyboard and
-undo/redo. This does not promote full I4-T1, X-T1/T7, X-T6, composition/export,
+quantization. The separate runtime-bearing native demo was initially prepared
+unopened, then opened for the consolidated owner round on head
+`3a685e431c1ff849dbd792a15c006aad5018e0c6`. The owner replied “perfeito” to the
+two-point recheck: IN drag with OUT visually fixed and placement updated on
+release, and playback with image/audio and chosen limits. Both bounded cases are
+ACCEPTED by owner report. Preserve the accepted cancellation, keyboard and undo/
+redo; no repeated round is required. PR #82 was explicitly authorized for merge
+and integrated at `906eea695836fe2ae2b81ab0b50610b600748995`. This does not promote
+full I4-T1, X-T1/T7, X-T6, composition/export,
 release or provider gates. [Current implemented profile and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).

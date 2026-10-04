@@ -395,7 +395,8 @@ source and excerpt clocks use milliseconds. Real-file headless evidence does
 not certify native/frame-accurate preview. It also reveals callback timestamps
 above OUT before corrective seek; bounded playback remains OPEN. The current UI
 labels preview approximate at that historical checkpoint. The subsequently
-approved derived-preview integration is implemented below. Draft PR #82 remains unmerged;
+approved derived-preview integration is implemented below. At that checkpoint
+PR #82 was unmerged;
 Director impact compatible, progress 55%, F-A02 exhausted 1/1, no new AI call.
 
 ## PR #82 approved bounded derived preview — 2026-10-04
@@ -409,9 +410,16 @@ unsupported/missing runtime fails visibly. Decoded frame/audio sentinel tests
 PASS in six cases at 30 and `30000/1001` fps, with original bytes unchanged and
 no pre-IN/post-OUT source content. Quantization remains explicit: the logical
 1.990 s interval may encode 2.000/2.002 s and hold the last admitted frame.
-Production-host and separate Chrome EOF evidence PASS; native perceptual
-acceptance is PENDING. The new runtime-bearing review app is prepared unopened
-under a separate identifier. Preserve accepted cancellation/keyboard/undo results;
-group only IN visual drag and new playback into the owner recheck. [Details](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
+Production-host and separate Chrome EOF evidence PASS. The owner accepted the
+consolidated native IN visual drag and corrected playback round, replying
+“perfeito”; these are bounded perceptual results, not generalized frame/sample
+timing certification. The review app was initially prepared unopened, then opened
+under its separate identifier. Preserve cancellation/keyboard/undo results and
+do not repeat the human round. [Details](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
 Director impact: compatible typed Media/manual-edit consumer; no new provider,
-proposal or execution authority. Draft #82 not merged, progress 55%, F-A02 1/1.
+proposal or execution authority. PR #82 is integrated at
+`906eea695836fe2ae2b81ab0b50610b600748995`, from approved head `3a685e4`, following
+explicit owner merge authorization. Tree exactly matches the reviewed tree.
+Post-merge CI 37227087528 is terminal SUCCESS, 5/5, and exact runtime 37227087529
+is terminal SUCCESS, 1/1; both attempt 1 on the merge SHA.
+Full catalog/release/composition/provider gates remain open; progress 55%, F-A02 1/1.
