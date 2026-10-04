@@ -35,6 +35,8 @@ pub struct CancelArgs {
 pub struct VideoPreviewArgs {
     source_id: String,
     expected_snapshot_id: String,
+    clip_id: Option<String>,
+    operation_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -54,8 +56,21 @@ pub async fn desktop_preview_local_video(
 ) -> Result<Value, DesktopCommandError> {
     validate_id(&args.source_id, "sourceId")?;
     validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    let mut params = json!({ "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id });
+    if let (Some(clip), Some(operation)) = (&args.clip_id, &args.operation_id) {
+        validate_id(clip, "clipId")?;
+        validate_id(operation, "operationId")?;
+        params["clipId"] = json!(clip);
+        params["operationId"] = json!(operation);
+    } else if args.clip_id.is_some() || args.operation_id.is_some() {
+        return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_REQUEST", "Clip and operation identifiers must be supplied together."));
+    }
     supervisor.ensure_started(&app).await?;
-    supervisor.request_control("video.previewLocal", json!({ "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id })).await
+    if let Some(operation) = args.operation_id {
+        supervisor.request_preparation("video.previewLocal", params, &operation).await
+    } else {
+        supervisor.request_control("video.previewLocal", params).await
+    }
 }
 
 #[tauri::command]
@@ -72,6 +87,36 @@ pub async fn desktop_create_manual_video_clip(
     supervisor.ensure_started(&app).await?;
     match supervisor.request_immediate_mutation("video.createManualClip", json!({
         "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id,
+        "sourceStartMs": args.source_start_ms, "sourceEndMs": args.source_end_ms
+    })).await {
+        Ok(result) => Ok(result),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualVideoTrimArgs {
+    clip_id: String,
+    expected_snapshot_id: String,
+    source_start_ms: u64,
+    source_end_ms: u64,
+}
+
+#[tauri::command]
+pub async fn desktop_trim_manual_video_clip(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualVideoTrimArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.clip_id, "clipId")?;
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    if args.source_start_ms >= args.source_end_ms || args.source_end_ms > 9_007_199_254_740_991 {
+        return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_RANGE", "The manual video range is invalid."));
+    }
+    supervisor.ensure_started(&app).await?;
+    match supervisor.request_immediate_mutation("video.trimManualClip", json!({
+        "clipId": args.clip_id, "expectedSnapshotId": args.expected_snapshot_id,
         "sourceStartMs": args.source_start_ms, "sourceEndMs": args.source_end_ms
     })).await {
         Ok(result) => Ok(result),
@@ -363,4 +408,18 @@ mod video_boundary_tests {
             })).is_err());
         }
     }
+    #[test]
+    fn manual_trim_args_accept_only_clip_binding_and_integer_source_range() {
+        let valid = json!({ "clipId": "clip", "expectedSnapshotId": "snapshot", "sourceStartMs": 1000, "sourceEndMs": 4000 });
+        assert!(serde_json::from_value::<ManualVideoTrimArgs>(valid.clone()).is_ok());
+        for extra in ["uri", "path", "sourceId", "durationMs", "commands", "timelineEndMs", "speed"] {
+            let mut injected = valid.clone(); injected[extra] = json!("injected");
+            assert!(serde_json::from_value::<ManualVideoTrimArgs>(injected).is_err());
+        }
+        for invalid in [json!(-1), json!(0.5), json!("1000")] {
+            let mut injected = valid.clone(); injected["sourceStartMs"] = invalid;
+            assert!(serde_json::from_value::<ManualVideoTrimArgs>(injected).is_err());
+        }
+    }
+
 }

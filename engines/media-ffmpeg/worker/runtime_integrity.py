@@ -55,6 +55,7 @@ SENSITIVE_ENVIRONMENT = frozenset({
 
 CRITICAL_WORKER_FILES = (
     "worker/cevra_audio_measurement.py",
+    "worker/cevra_bounded_preview.py",
     "worker/cevra_streaming_process.py",
     "worker/cevra_job_control.py",
     "worker/cevra_media_worker.py",

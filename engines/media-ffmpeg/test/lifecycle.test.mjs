@@ -115,7 +115,7 @@ test("cancellation kills only the active subprocess, cleans its new output and k
   const workerPid = runtime.transport.workerPid;
   assert.deepEqual(await runtime.transport.request("cevra/cancel", { jobId: "different-job" }), { cancelled: false, jobId: "different-job" });
   assert.equal(processExists(childPid), true);
-  assert.deepEqual(await runtime.transport.request("ping"), { activeJobId: "cancel-me" });
+  assert.deepEqual(await runtime.transport.request("ping"), { activeJobId: "cancel-me", jobThreadActive: true });
   controller.abort();
   const nextOutput = path.join(runtime.directory, "next.txt");
   const next = runtime.client.callTool("cut", cutArguments(nextOutput, path.join(runtime.directory, "next.pid"), 0.01), "after-cancel");
@@ -124,7 +124,7 @@ test("cancellation kills only the active subprocess, cleans its new output and k
   assert.equal(processExists(childPid), false);
   assert.equal(fs.existsSync(output), false);
   assert.equal(runtime.transport.workerPid, workerPid);
-  assert.deepEqual(await runtime.transport.request("ping"), { activeJobId: null });
+  assert.deepEqual(await runtime.transport.request("ping"), { activeJobId: null, jobThreadActive: false });
   assert.equal(fs.readFileSync(nextOutput, "utf8"), "completed");
   await runtime.client.close();
 });

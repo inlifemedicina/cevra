@@ -12,7 +12,7 @@ import {
   validateNoParams,
   validateTranscriptionParams,
   validateVideoPreviewParams,
-  validateManualClipParams,
+  validateManualClipParams, validateManualTrimParams,
   type HostErrorPayload,
   type HostRequest,
   type HostResponse
@@ -115,6 +115,8 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       return { result: await requireSession(session).previewLocalVideo(validateVideoPreviewParams(request.params, request.id)) };
     case "video.createManualClip":
       return { result: await requireSession(session).createManualVideoClip(validateManualClipParams(request.params, request.id)) };
+    case "video.trimManualClip":
+      return { result: await requireSession(session).trimManualVideoClip(validateManualTrimParams(request.params, request.id)) };
     case "transcription.transcribeSource":
       return { result: await requireSession(session).transcribeSource(validateTranscriptionParams(request.params, request.id)) };
     case "history.undo":

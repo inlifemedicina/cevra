@@ -2736,3 +2736,80 @@ Two narrow native commands expose bounded verified bytes and the closed manual r
 Automated baseline evidence: 346 Application/host tests and 66 UI tests PASS; independent code review APPROVE after size/zoom/legacy-preview corrections. PR #80 remains Draft / NOT MERGED. On 2026-10-04 UTC the owner tested the isolated macOS arm64 PT-BR demo built from `1855c445687eb22102bfb870773f74fca7d315e3` and confirmed original playback, manual IN/OUT, one visible clip, playback limited to the excerpt and undo/redo working. This closes the functional acceptance of that bounded variant, not the wider case catalog. The owner reported that the create-clip button looked inactive after OUT despite accepting the click; the scoped follow-up uses a dedicated enabled/disabled style without changing range validation or mutation behavior. Its 54 relevant UI tests and offscreen browser render PASS; the running owner session is preserved and the updated native demo is prepared separately, not substituted during testing. The [acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#manual-inout-macos-2026-10-04) records the fixture, narrow results and remaining visual/release limits. General composition/export, complete save/reopen, production distribution and real-agent gates remain open.
 
 **Director impact:** compatible manual-edit execution extension on the same canonical history/timeline. Director provider/context/permission responsibilities are unchanged; no command, engine or provider authority is admitted through a proposal or serialized result. Global roadmap progress stays 55%; F-A02 remains exhausted 1/1.
+
+### Direct timeline IN/OUT — approved bounded block, 2026-10-04
+
+PR #80 is integrated at `ddf1448f3c32bdd9f8c35c9ad25b668e00be4856`;
+post-merge CI `37166055533` SUCCESS 5/5 and Exact Runtime `37166055565`
+SUCCESS 1/1, attempt 1, supersede its earlier unmerged wording above.
+Its bounded original/manual excerpt functional owner acceptance remains valid.
+The owner approved the next block: pointer and keyboard IN/OUT controls on the
+same simple timeline clip, verified `clip.trim`, preview and undo/redo. The block
+on `feat/manual-timeline-trim` is IMPLEMENTED / NOT MERGED;
+one new isolated demo and one additional human round are prepared without
+activating a window. The scoped contract, automation/scale evidence and open
+limits are in [Manual Timeline Trim V1](CEVRA_MANUAL_TIMELINE_TRIM_V1.md).
+Director impact is compatible direct editing through existing typed history;
+no IR/storage/engine direction or AI/provider authority changes. Global progress
+remains 55%; F-A02 remains exhausted 1/1.
+
+
+### PR #82 owner feedback — bounded trim presentation correction, 2026-10-04
+
+The owner tested native head `1f9389d3fadd3d3b86da4b89f1a86baac99cba2d` and
+confirmed cancellation, coarse/fine keyboard edits and undo/redo. Pointer trim
+worked functionally but IN shrank visually from the right; playback's fixed-30-fps
+counter was questioned for IN 2.000 / OUT 3.990 s. These supersede the prior
+NOT RUN checkpoint; visual IN and perceptual playback remain pending recheck.
+The bounded fix anchors measured visual OUT during IN drag until release and
+shows milliseconds, separately labeling source position and excerpt elapsed/
+duration. It changes no IR placement, trim/history/checkpoint or decoder logic.
+An isolated real-fixture Chrome headless check reports media clock 2.000→3.990 s,
+paused at OUT with playhead 1990 ms; the last frame sample is 3.966667 s. That
+explains the old 3:29 display but is not native/frame-accuracy certification.
+Inspection of all frame callbacks also found 4.000/4.033333 s beyond OUT before
+the final corrective seek. Bounded playback therefore remains OPEN, beyond the
+corrected display; browser-native fragment/cue experiments did not close it.
+That presentation build labeled the excerpt preview approximate. The owner then
+approved the typed derived-preview integration; its implemented checkpoint is
+below. The old full-original polling path does not establish bounded playback.
+[Scoped diagnosis and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#owner-feedback-and-bounded-correction--2026-10-04).
+PR #82 remains Draft / NOT MERGED. No AI call, credentials, human-session change
+or broader acceptance; Director impact is compatible presentation correction,
+progress 55%, F-A02 exhausted 1/1. Recheck only the two reported presentation cases.
+
+### PR #82 approved bounded derived preview — 2026-10-04
+
+The approved integration now prepares a verified ephemeral excerpt through the
+existing MediaEngineAdapter typed `trim` profile, with source/clip/snapshot IDs
+and cancellable operation ID across UI/Tauri/host. The host resolves canonical
+bounds, privately copies descriptor/hash-verified originals, admits bounded
+frame/audio/hash evidence, rechecks source and snapshot, and waits for native
+retirement before owned cleanup. No Project IR source, history/checkpoint or
+durable Media execution is created. Stale/cancelled results cannot be admitted;
+missing/unsupported runtime fails visibly. Original mode remains available.
+
+The bounded profile covers zero-origin CFR ≤60 fps, ≤60 s, SDR/no rotation,
+≤1080p, source/output ≤8 MiB and optional contiguous 44.1/48 kHz mono/stereo audio.
+It selects only source frames in `[IN, OUT)` and the corresponding audio sample
+indices, rebases to zero and uses natural file EOF. Quantization is explicit:
+2.000–3.990 s produces 2.000 s at 30 fps or 2.002 s at `30000/1001`; the last
+admitted picture can remain for one frame, AAC padding is bounded below 1024
+samples. Six exact-runtime decoded frame/audio sentinel cases PASS, including
+nonaligned IN and 0–11 ms; full-original negative control and VFR are rejected.
+The original hash and canonical project remain unchanged in production-host
+integration. Chrome headless plays the real derivative 0→2.000 s with last frame
+callback 1.966667 s; this is separate from pending native perceptual acceptance.
+
+Worker 0.3.2 has an eight-file integrity inventory and retains approved pinned
+FFmpeg/upstream/provenance/license checks. The separate review app includes this
+managed runtime and is prepared unopened under a new identifier with an owned
+fixture checkpoint. Default release packaging, WKWebView/audio presentation and
+broader composition/export remain open. Desktop 88/88, Rust 28/28 and Python
+Media 91/91 and affected Node/i18n regressions 527/527 PASS;
+independent exact-tree review and exact-head CI are
+tracked in Draft PR #82. [Profile, measurements and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
+Only IN visual drag and new excerpt playback require the consolidated owner
+recheck; preserve the accepted cancellation/keyboard/undo results. Director
+impact is a compatible typed Media/trim/history consumer, no additional provider
+or execution authority. Progress stays 55%, F-A02 exhausted 1/1, no real AI call.

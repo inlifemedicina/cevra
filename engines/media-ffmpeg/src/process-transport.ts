@@ -54,6 +54,9 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
 
   get workerPid(): number | undefined { return this.child?.pid; }
 
+  /** Observe failure retirement before deleting caller-owned render inputs. */
+  async settle(): Promise<void> { await this.stopping; await this.retirement; }
+
   async start(): Promise<void> {
     if (this.stopping) await this.stopping;
     if (this.retirement) {
@@ -172,7 +175,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
           timer = undefined;
         }
         if (method === "tools/call" && typeof jobId === "string") {
-          void this.send("cevra/cancel", { jobId }).catch(() => settleError(error));
+          void this.send("cevra/cancel", { jobId }).catch(() => this.failWorker(child, error));
           return;
         }
         settleError(error);
@@ -188,8 +191,8 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       const checkLiveness = async () => {
         if (!this.pending.has(id)) return;
         try {
-          const status = await this.send<{ activeJobId?: string | null }>("ping");
-          if (status.activeJobId !== jobId) {
+          const status = await this.send<{ activeJobId?: string | null; jobThreadActive?: boolean }>("ping");
+          if (status.activeJobId !== jobId && status.jobThreadActive !== true) {
             const current = this.pending.get(id);
             if (current?.terminalError) {
               settleError(current.terminalError);

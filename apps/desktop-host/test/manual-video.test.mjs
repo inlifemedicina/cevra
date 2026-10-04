@@ -80,3 +80,53 @@ test("RPC rejects arbitrary paths, duration/commands and unsafe range fields", a
   }
   assert.equal(lines.length, 4); assert.ok(lines.every((line) => line.error.code === "HOST_INVALID_PARAMS")); assert.deepEqual(opened.history.toArchive(), before);
 });
+
+test("RPC trim checkpoints canonical state, undo/redo survives restart and source bytes stay intact", async (t) => {
+  const { session, opened, request, path, bytes, root } = await setup(t);
+  const created = await session.createManualVideoClip({ ...request, sourceStartMs: 1000, sourceEndMs: 4000 });
+  const initial = created.state.project.timeline.clips[0]; const numbering = opened.history.sourceNumbering; const lines = [];
+  const server = new DesktopHostProtocolServer(session, { writeProtocolLine(line) { lines.push(JSON.parse(line)); }, writeLog() {}, requestShutdown() {} });
+  const params = { clipId: created.clipId, expectedSnapshotId: session.state().project.history.headSnapshotId, sourceStartMs: 1500, sourceEndMs: 5000 };
+  await server.handleLine(JSON.stringify({ protocolVersion: 1, id: "trim", method: "video.trimManualClip", params }));
+  assert.equal(lines[0].result.state.status.persistence, "local-saved");
+  const trimmed = lines[0].result.state.project.timeline.clips[0];
+  assert.deepEqual([trimmed.sourceStartMs, trimmed.sourceEndMs, trimmed.timelineEndMs], [1500, 5000, 3500]);
+  assert.equal(opened.history.entries.at(-1).command.type, "clip.trim");
+  const preview = await session.previewLocalVideo({ ...request, expectedSnapshotId: session.state().project.history.headSnapshotId });
+  assert.deepEqual(Buffer.from(preview.base64, "base64"), bytes);
+  assert.deepEqual((await session.undo()).project.timeline.clips, [initial]);
+  await session.close();
+  const recovered = await DesktopProjectPersistence.open(join(root, "store")); t.after(() => recovered.persistence.close());
+  recovered.history.redo(); assert.deepEqual(recovered.history.current.timeline.clips, [trimmed]);
+  assert.deepEqual(recovered.history.sourceNumbering, numbering); assert.deepEqual(await readFile(path), bytes);
+});
+
+test("trim RPC rejects path, source, duration and command injections and temporary review denies mutation", async (t) => {
+  const { session, request, opened } = await setup(t);
+  const created = await session.createManualVideoClip({ ...request, sourceStartMs: 1000, sourceEndMs: 4000 });
+  const params = { clipId: created.clipId, expectedSnapshotId: session.state().project.history.headSnapshotId, sourceStartMs: 1500, sourceEndMs: 4500 };
+  const before = opened.history.toArchive(); const lines = [];
+  const server = new DesktopHostProtocolServer(session, { writeProtocolLine(line) { lines.push(JSON.parse(line)); }, writeLog() {}, requestShutdown() {} });
+  for (const key of ["uri", "sourceId", "durationMs", "commands", "timelineEndMs"]) {
+    await server.handleLine(JSON.stringify({ protocolVersion: 1, id: "invalid", method: "video.trimManualClip", params: { ...params, [key]: "injected" } }));
+  }
+  assert.ok(lines.every((line) => line.error.code === "HOST_INVALID_PARAMS"));
+  const review = new DesktopSession({ history: opened.history, temporaryEditorialReview: true, mediaCapability: unavailable, transcriptionCapability: unavailable });
+  await assert.rejects(review.trimManualVideoClip(params), { code: "EDITORIAL_REVIEW_READ_ONLY" });
+  assert.deepEqual(opened.history.toArchive(), before);
+});
+
+test("trim serializes identity work with undo, redo and another trim", async (t) => {
+  const { session, request, opened } = await setup(t);
+  const created = await session.createManualVideoClip({ ...request, sourceStartMs: 1000, sourceEndMs: 4000 });
+  let release; const block = new Promise((resolve) => { release = resolve; });
+  const identity = new NodeMediaArtifactStore();
+  const slow = new DesktopSession({ history: opened.history, mediaCapability: unavailable, transcriptionCapability: unavailable,
+    manualVideoClip: new ManualVideoClipApplicationService({ history: opened.history, identity: {
+      async captureSource(...args) { await block; return identity.captureSource(...args); }, identifySource: identity.identifySource.bind(identity), checkSource: identity.checkSource.bind(identity)
+    } }) });
+  const params = { clipId: created.clipId, expectedSnapshotId: opened.history.current.history.headSnapshotId, sourceStartMs: 2000, sourceEndMs: 4000 };
+  const task = slow.trimManualVideoClip(params);
+  for (const operation of [() => slow.undo(), () => slow.redo(), () => slow.trimManualVideoClip(params)]) await assert.rejects(operation(), { code: "PROJECT_MUTATION_BUSY" });
+  release(); await task; assert.equal(opened.history.entries.at(-1).command.type, "clip.trim");
+});

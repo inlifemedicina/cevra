@@ -24,7 +24,7 @@ if str(WORKER_DIRECTORY) not in sys.path:
 
 from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
-WORKER_VERSION = "0.3.1"
+WORKER_VERSION = "0.3.2"
 PROTOCOL_VERSION = 1
 UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
@@ -133,7 +133,7 @@ _UPSTREAM_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
     }, ["input", "output", "x", "y", "width", "height"]),
     "cut": _object_schema({
         "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "start": _NON_NEGATIVE_SCHEMA,
-        "end": _POSITIVE_SCHEMA, "accurate": {"type": "boolean"},
+        "end": _POSITIVE_SCHEMA, "accurate": {"type": "boolean"}, "bounded_preview": {"type": "boolean", "enum": [True]},
     }, ["input", "output", "start", "end", "accurate"]),
     "fit": _object_schema({
         "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "width": _WIDTH_SCHEMA,
@@ -934,7 +934,7 @@ def handle(method: str, params: Dict[str, Any]) -> Any:
     if method == "initialize":
         return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "cevra-media-worker", "version": WORKER_VERSION}}
     if method == "ping":
-        return {"activeJobId": job_control.active_job_id()}
+        return {"activeJobId": job_control.active_job_id(), "jobThreadActive": _JOB_THREAD is not None}
     if method == "cevra/info":
         return info()
     if method == "cevra/health":

@@ -25,6 +25,14 @@ export const presetOptions = [
 
 export type Translate = (key: TranslationKey, parameters?: Readonly<Record<string, string | number>>) => string;
 
+/** Source/clip milliseconds, independent of a presumed source frame rate. */
+export function formatMilliseconds(milliseconds: number): string {
+  const value = Math.max(0, Math.round(milliseconds));
+  const minutes = Math.floor(value / 60_000);
+  const seconds = Math.floor(value / 1000) % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(value % 1000).padStart(3, "0")}`;
+}
+
 export function formatTime(milliseconds: number): string {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   const minutes = Math.floor(totalSeconds / 60);

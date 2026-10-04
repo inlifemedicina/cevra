@@ -13,6 +13,7 @@
     "allow-desktop-get-editorial-draft",
     "allow-desktop-revise-editorial-draft",
     "allow-desktop-preview-local-video",
-    "allow-desktop-create-manual-video-clip"
+    "allow-desktop-create-manual-video-clip",
+    "allow-desktop-trim-manual-video-clip"
   ]
 }

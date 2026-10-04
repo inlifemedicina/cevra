@@ -7,6 +7,12 @@ import { extname } from "node:path";
 
 /** Hash exactly the bounded bytes served, from one regular descriptor. */
 export async function readLocalVideoPreview(source: SourceAsset & { durationMs: number }, snapshotId: string): Promise<LocalVideoPreview> {
+  const { bytes, mimeType } = await readVerifiedVideoBytes(source);
+  return { sourceId: source.id, snapshotId, durationMs: source.durationMs, mimeType, base64: bytes.toString("base64") };
+}
+
+export async function readVerifiedVideoBytes(source: SourceAsset, signal?: AbortSignal): Promise<{ bytes: Buffer; mimeType: LocalVideoPreview["mimeType"] }> {
+  signal?.throwIfAborted();
   const path = localSourceProbeInput(source.uri);
   if (!path) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
   const extension = extname(path).toLowerCase();
@@ -22,6 +28,7 @@ export async function readLocalVideoPreview(source: SourceAsset & { durationMs: 
     const bytes = Buffer.alloc(Number(initial.size));
     let offset = 0;
     while (offset < bytes.length) {
+      signal?.throwIfAborted();
       const read = await handle.read(bytes, offset, bytes.length - offset, offset);
       if (!read.bytesRead) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
       offset += read.bytesRead;
@@ -29,8 +36,10 @@ export async function readLocalVideoPreview(source: SourceAsset & { durationMs: 
     const final = await handle.stat({ bigint: true });
     if (initial.dev !== final.dev || initial.ino !== final.ino || initial.size !== final.size || initial.mtimeNs !== final.mtimeNs || initial.ctimeNs !== final.ctimeNs
       || createHash("sha256").update(bytes).digest("hex") !== source.technicalDescriptor!.content.sha256) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
-    return { sourceId: source.id, snapshotId, durationMs: source.durationMs, mimeType, base64: bytes.toString("base64") };
+    signal?.throwIfAborted();
+    return { bytes, mimeType };
   } catch (error) {
+    if (signal?.aborted) throw error;
     if (error instanceof Error && "code" in error && String(error.code).startsWith("MANUAL_VIDEO_")) throw error;
     throw manualVideoError("MANUAL_VIDEO_UNAVAILABLE");
   } finally {

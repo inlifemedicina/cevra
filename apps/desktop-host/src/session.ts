@@ -18,7 +18,7 @@ import type {
   MediaExecutionIntentRepository
 } from "@cevra/application";
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
-import type { CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
+import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
   FfmpegMediaEngine,
@@ -46,6 +46,7 @@ import {
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
 import { readDesignatedFa02Pair } from "./fa02-review-admission.js";
 import { readLocalVideoPreview } from "./local-video-preview.js";
+import { DerivedVideoPreview, resolvePreviewClip } from "./derived-video-preview.js";
 
 type Locale = "pt-BR" | "en-US";
 
@@ -58,7 +59,8 @@ export interface DesktopSessionServices {
   transcriptionCapability: CapabilityState;
   persistence?: DesktopProjectPersistence;
   temporaryEditorialReview?: true;
-  manualVideoClip?: Pick<ManualVideoClipApplicationService, "create">;
+  manualVideoClip?: Pick<ManualVideoClipApplicationService, "create" | "trim">;
+  derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare">;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
 }
@@ -70,6 +72,8 @@ export class DesktopSession {
   private readonly operations = new Map<string, AbortController>();
   private readonly activeTasks = new Map<string, Promise<unknown>>();
   private activeMutationTask: Promise<unknown> | null = null;
+  private previewTask: Promise<LocalVideoPreview> | null = null;
+  private previewOperationId: string | null = null;
 
   constructor(private readonly services: DesktopSessionServices) {
     this.editorial = new EditorialDraftService(services.history);
@@ -175,6 +179,33 @@ export class DesktopSession {
     if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     const stable = structuredClone(request);
+    if (Object.keys(stable).some((key) => !["sourceId", "expectedSnapshotId", "clipId", "operationId"].includes(key))
+      || (stable.clipId === undefined) !== (stable.operationId === undefined)
+      || (stable.clipId !== undefined && (!stable.clipId || !stable.operationId))) throw safeError("MANUAL_VIDEO_INVALID_REQUEST");
+    if (stable.clipId !== undefined) {
+      if (this.operations.has(stable.operationId!)) throw safeError("OPERATION_DUPLICATE");
+      resolvePreviewClip(this.services.history, stable);
+      if (!this.services.derivedVideoPreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+      // Only the latest preview prepares bytes. Cancellation is scoped to this
+      // read-only operation; ingest/transcription keep their own controllers.
+      const previous = this.previewTask;
+      if (this.previewOperationId) this.cancel(this.previewOperationId);
+      const task = this.runOperation(stable.operationId!, async (signal) => {
+        await previous?.catch(() => undefined);
+        signal.throwIfAborted();
+        resolvePreviewClip(this.services.history, stable);
+        const preview = await this.services.derivedVideoPreview!.prepare(stable, signal);
+        signal.throwIfAborted();
+        if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+        resolvePreviewClip(this.services.history, stable);
+        return preview;
+      });
+      this.previewTask = task;
+      this.previewOperationId = stable.operationId!;
+      try { return await task; } finally {
+        if (this.previewTask === task) { this.previewTask = null; this.previewOperationId = null; }
+      }
+    }
     const source = resolveManualVideo(this.services.history.current, stable);
     const preview = await readLocalVideoPreview(source, stable.expectedSnapshotId);
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
@@ -187,6 +218,16 @@ export class DesktopSession {
       if (!this.services.manualVideoClip) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
       const outcome = await this.services.manualVideoClip.create(structuredClone(request));
       await this.persistMutation();
+      return { state: this.state(), clipId: outcome.clipId };
+    });
+  }
+
+  async trimManualVideoClip(request: TrimManualVideoClipRequest): Promise<{ state: DesktopHostState; clipId: string }> {
+    return this.runMutation(async () => {
+      if (!this.services.manualVideoClip) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+      const snapshot = this.services.history.current.history.headSnapshotId;
+      const outcome = await this.services.manualVideoClip.trim(structuredClone(request));
+      if (snapshot !== this.services.history.current.history.headSnapshotId) await this.persistMutation();
       return { state: this.state(), clipId: outcome.clipId };
     });
   }
@@ -316,6 +357,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       transcriptionCapability: transcription.capability,
       persistence: opened.persistence,
       ...(media?.resolvedAudioPlan ? { resolvedAudioPlan: media.resolvedAudioPlan } : {}),
+      ...(media?.engine && media.settle ? { derivedVideoPreview: new DerivedVideoPreview({ history, engine: media.engine, settle: media.settle }) } : {}),
       close: async () => {
         await media?.close?.();
       }
@@ -335,6 +377,8 @@ async function createMediaServices(
   sourceIdentity: NodeMediaArtifactStore
 ): Promise<{
   capability: CapabilityState;
+  engine?: MediaEngineAdapter;
+  settle?: () => Promise<void>;
   ingest?: LocalSourceIngestService;
   sourceTechnicalDescriptor?: SourceTechnicalDescriptorApplicationService;
   application: MediaApplicationService;
@@ -368,6 +412,8 @@ async function createMediaServices(
     const services = composeMediaApplicationServices(history, executions, engine, sourceIdentity);
     return {
       capability: available(),
+      engine,
+      settle: () => transport.settle(),
       ingest: new LocalSourceIngestService({ media: services.application, history, identity: services.artifacts }),
       sourceTechnicalDescriptor: new SourceTechnicalDescriptorApplicationService({
         media: services.application,

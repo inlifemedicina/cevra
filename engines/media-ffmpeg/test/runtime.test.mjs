@@ -230,3 +230,20 @@ test("persistent client close is terminal, stops before start, and aborts queued
   await neverStarted.close();
   assert.equal(stops, 2);
 });
+
+test('cancelled preview health and tool waits settle without cancelling an active unrelated job', async () => {
+  let finish; const active = new Promise(resolve => { finish = resolve; }); const calls = [];
+  const transport = { async start() {}, async stop() {}, async request(method, params) {
+    if (method === 'tools/call') { calls.push(params.jobId); if (params.jobId === 'ingest') await active; return {}; }
+    if (method === 'cevra/health') { calls.push('health'); return { effectiveDeliveries: [] }; }
+  } };
+  const worker = new PersistentMediaWorkerClient(transport);
+  const ingest = worker.callTool('probe', {}, 'ingest');
+  await new Promise(resolve => setImmediate(resolve));
+  const healthAbort = new AbortController(), toolAbort = new AbortController();
+  const health = assert.rejects(worker.health(healthAbort.signal), { name: 'AbortError' });
+  const preview = assert.rejects(worker.callTool('cut', {}, 'preview', toolAbort.signal), { name: 'AbortError' });
+  healthAbort.abort(); toolAbort.abort(); await Promise.all([health, preview]);
+  assert.deepEqual(calls, ['ingest']); finish(); await ingest;
+  await worker.callTool('probe', {}, 'after'); assert.deepEqual(calls, ['ingest', 'after']); await worker.close();
+});

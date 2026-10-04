@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 import cevra_job_control as job_control
 import cevra_audio_measurement as audio_measurement
+import cevra_bounded_preview as bounded_preview
 
 CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio", "cevra-render-audio-sequence", "cevra-measure-audio"}
 
@@ -1053,7 +1054,7 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Optional[Dict[str, Any]]:
-    if name not in CUSTOM_TOOLS:
+    if name not in CUSTOM_TOOLS and not (name == "cut" and args.get("bounded_preview") is True):
         return None
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -1063,6 +1064,8 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
         if hasattr(common, "STATE") and hasattr(common.STATE, "reset"):
             common.STATE.reset()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            if name == "cut" and args.get("bounded_preview") is True:
+                return bounded_preview.run(common, args)
             if name == "cevra-extract-frame":
                 return _run_extract_frame(common, args)
             if name == "cevra-scale":

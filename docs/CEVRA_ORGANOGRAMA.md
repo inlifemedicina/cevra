@@ -367,3 +367,51 @@ provider gates are unchanged. PR #76 remains the separate documentation track.
 
 
 Manual first-video excerpt is now an approved active slice on `feat/manual-inout-preview`, based on integrated #78 `182081e6a9e6c1b7849a099ebd3f6bba13663415` (post-merge CI `37151631882`, SUCCESS 5/5). Real local original playback, manual IN/OUT, one canonical clip and existing undo/redo are implemented for an initial small-fixture test; the 8 MiB/one-clip limits are not the final product contract. Application/host 346 and UI 66 tests PASS, code review APPROVE; native playback/Owner acceptance remain NOT EXECUTED pending one consolidated round. No AI, invented F-A02 timing, automatic alignment, composition/export or brief/profile implementation. Director impact is a compatible execution extension on the same history/timeline; progress stays 55%. Details are the scoped manual-excerpt checkpoint in the master and existing acceptance IDs, not a new acceptance catalog.
+
+## Direct timeline IN/OUT — approved block, 2026-10-04
+
+PR #80 is integrated at `ddf1448f3c32bdd9f8c35c9ad25b668e00be4856`,
+with post-merge CI 5/5 and Exact Runtime 1/1 SUCCESS on that SHA. Its bounded
+functional owner round passed; the preceding pending-native statement is historical.
+The approved next block on `feat/manual-timeline-trim` adds pointer/keyboard
+handles through existing `clip.trim`, source verification, checkpoint, preview
+and undo/redo. IMPLEMENTED / NOT MERGED; current owner trim
+acceptance NOT RUN, isolated demo prepared without launching a window.
+[Contract and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md). Reuse I4-T1, X-T1/T7
+and simple-clip X-T6; no duplicate acceptance IDs. Director impact is compatible
+direct editing. Progress stays 55%, F-A02 exhausted 1/1; composition/export,
+streaming/multi-clip and provider gates remain separate.
+
+
+## PR #82 owner feedback — 2026-10-04
+
+Owner cancellation, keyboard and undo/redo observations passed on the initial
+trim demo. IN drag feedback and confusing source/elapsed time display require
+bounded correction and recheck; previous NOT RUN wording is historical.
+[Diagnosis and scoped follow-up](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#owner-feedback-and-bounded-correction--2026-10-04).
+The correction is presentation-only on existing typed trim/history: OUT remains
+visually fixed during IN drag, then the confirmed duration reanchors at zero;
+source and excerpt clocks use milliseconds. Real-file headless evidence does
+not certify native/frame-accurate preview. It also reveals callback timestamps
+above OUT before corrective seek; bounded playback remains OPEN. The current UI
+labels preview approximate at that historical checkpoint. The subsequently
+approved derived-preview integration is implemented below. Draft PR #82 remains unmerged;
+Director impact compatible, progress 55%, F-A02 exhausted 1/1, no new AI call.
+
+## PR #82 approved bounded derived preview — 2026-10-04
+
+The existing typed Media trim now supplies a privately prepared, verified
+ephemeral excerpt with canonical bounds and cancellation across UI/Tauri/host.
+It adds no source/history/checkpoint or durable Media execution. Worker 0.3.2
+retains the pinned approved runtime and eight-file integrity inventory. The
+profile admits bounded zero-origin CFR/SDR video and covered contiguous audio;
+unsupported/missing runtime fails visibly. Decoded frame/audio sentinel tests
+PASS in six cases at 30 and `30000/1001` fps, with original bytes unchanged and
+no pre-IN/post-OUT source content. Quantization remains explicit: the logical
+1.990 s interval may encode 2.000/2.002 s and hold the last admitted frame.
+Production-host and separate Chrome EOF evidence PASS; native perceptual
+acceptance is PENDING. The new runtime-bearing review app is prepared unopened
+under a separate identifier. Preserve accepted cancellation/keyboard/undo results;
+group only IN visual drag and new playback into the owner recheck. [Details](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
+Director impact: compatible typed Media/manual-edit consumer; no new provider,
+proposal or execution authority. Draft #82 not merged, progress 55%, F-A02 1/1.

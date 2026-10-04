@@ -240,3 +240,41 @@ Preparação comum: build/commit identificados, macOS arm64 e Windows x64 avalia
 Para cada ID e variante registrar: data/responsável, versão + commit da build, OS/arquitetura/locale, fixture + hash/proveniência, precondições/capabilities, passos realizados, esperado versus observado, resultado objetivo, julgamento humano quando aplicável e link da evidência/issue. Evidência técnica automatizada deve ficar rotulada `CI/UNIT/FAKE/RUNTIME`; homologação deve identificar `APP/BUILD REAL`.
 
 Não promover um fluxo a PASS se só parte foi executada. Registrar PARTIAL com os IDs/variantes faltantes; BLOCKED conserva o teste planejado e a dependência concreta. Publicar somente artefatos sintéticos/redigidos, com licença e sem mídia/conta pessoal. Não adicionar dumps, exports pesados ou logs temporários ao repositório. Esta lista prepara a homologação futura; não autoriza provider, gasto, nova feature, engine ou mudança de escopo.
+
+### Direct timeline trim — additional bounded round, 2026-10-04
+
+I4-T1, X-T1/T7 and simple-clip X-T6 are reused for the owner-approved follow-up.
+UNIT/RUNTIME: pointer/keyboard range adjustment, one `clip.trim` per confirmed
+edit, cancellation/no-op, descriptor/snapshot/busy guards, checkpoint/reopen and
+preview/undo/redo PASS in the bounded fixture. APP/OWNER: NOT EXECUTED for this
+new block. One prepared isolated demo reuses the earlier synthetic original,
+with an initial 1.500–4.500 s clip, without replacing or activating existing
+windows. [The scoped record](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#one-additional-owner-round)
+contains the consolidated steps and evidence limits. PR #80's earlier functional
+acceptance remains valid; #80 is now integrated and its CI 5/5 plus Exact Runtime
+1/1 passed after merge. No full catalog ID, composition/export, native Windows,
+release or new provider acceptance follows from these bounded results.
+
+
+#### Owner feedback for direct trim — 2026-10-04
+
+On native PR #82 head `1f9389d3fadd3d3b86da4b89f1a86baac99cba2d`, cancellation,
+100/10 ms keyboard adjustments and undo/redo were accepted for this bounded
+variant. Pointer editing worked functionally; IN visual feedback was rejected
+because OUT appeared to move. Source/clip counter interpretation was questioned
+for IN 2.000 / OUT 3.990 s, so perceptual playback acceptance stays pending.
+The scoped correction preserves those passes and rechecks only IN visual drag
+and clarified playback clocks. UNIT/browser measurement complements that recheck;
+it does not promote full catalog IDs or native/frame-accurate decoding to PASS.
+[Diagnosis, limits and presentation contract](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#owner-feedback-and-bounded-correction--2026-10-04).
+
+The complete headless callback record contains 4.000/4.033333 s after OUT3.990,
+followed by corrective seek. Final `currentTime`3.990 alone is not a bounded-
+playback PASS. That historical build left the case OPEN. The owner subsequently
+approved the bounded derivative: six decoded frame/audio cases, host integration
+and separate real-file Chrome EOF checks PASS with explicit frame/AAC
+quantization. The separate runtime-bearing native demo is prepared unopened;
+native perceptual acceptance remains PENDING. Recheck only visual IN drag and
+new excerpt playback together, preserving accepted cancellation, keyboard and
+undo/redo. This does not promote full I4-T1, X-T1/T7, X-T6, composition/export,
+release or provider gates. [Current implemented profile and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).

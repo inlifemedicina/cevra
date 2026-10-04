@@ -1,4 +1,4 @@
-import type { EditorialDraftState, ReviseEditorialDraftRequest, CreateManualVideoClipRequest } from "@cevra/application";
+import type { EditorialDraftState, ReviseEditorialDraftRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
 import type { CevraLocale, TranslationKey } from "@cevra/i18n";
 import { translate } from "@cevra/i18n";
 import type { ProjectIR } from "@cevra/project-ir";
@@ -32,12 +32,15 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [importBusy, setImportBusy] = useState(false);
   const [manualMutationBusy, setManualMutationBusy] = useState(false);
   const manualMutationInFlight = useRef(false);
+  const selectionEpoch = useRef(0);
+  const latestSelection = useRef<{ selectedId: string | null; sourceId: string | null }>({ selectedId: null, sourceId: null });
   const [previewSeek, setPreviewSeek] = useState({ sequence: 0, timelineMs: 0 });
   const [transcriptionOperationId, setTranscriptionOperationId] = useState<string | null>(null);
   const [locale, setLocale] = useState<CevraLocale>("pt-BR");
   const [workspace, setWorkspace] = useState<Workspace>("edit");
   const [selectedProjectItemId, setSelectedProjectItemId] = useState<string | null>(null);
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
+  latestSelection.current = { selectedId: selectedProjectItemId, sourceId: activeSourceId };
   const [playheadMs, setPlayheadMs] = useState(24300);
   const [playing, setPlaying] = useState(false);
   const [timelineZoom, setTimelineZoom] = useState(100);
@@ -130,7 +133,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   function selectProjectItem(id: string) {
-    if (!project) return;
+    if (!project || !resolvesProjectItem(project, id)) return;
+    selectionEpoch.current++;
     const source = project.sources.find((item) => item.id === id);
     if (source) {
       setSelectedProjectItemId(source.id);
@@ -150,16 +154,17 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     }
   }
 
-  function applyBackendState(value: DesktopBackendState, preferredSourceId?: string) {
+  function applyBackendState(value: DesktopBackendState, preferredSourceId?: string, preserveSelection = false) {
     setBackendState(value);
     setProject(value.project);
     setRuntimeError(null);
     setPlayheadMs((current) => Math.min(current, value.project.timeline.durationMs));
-    const selectedStillExists = selectedProjectItemId !== null && resolvesProjectItem(value.project, selectedProjectItemId);
-    const sourceStillExists = activeSourceId !== null && value.project.sources.some((source) => source.id === activeSourceId);
-    const nextSourceId = preferredSourceId ?? (sourceStillExists ? activeSourceId : resolveInitialSourceId(value.project));
+    const selection = preserveSelection ? latestSelection.current : { selectedId: selectedProjectItemId, sourceId: activeSourceId };
+    const selectedStillExists = selection.selectedId !== null && resolvesProjectItem(value.project, selection.selectedId);
+    const sourceStillExists = selection.sourceId !== null && value.project.sources.some((source) => source.id === selection.sourceId);
+    const nextSourceId = preferredSourceId ?? (sourceStillExists ? selection.sourceId : resolveInitialSourceId(value.project));
     setActiveSourceId(nextSourceId);
-    setSelectedProjectItemId(preferredSourceId ?? (selectedStillExists ? selectedProjectItemId : nextSourceId));
+    setSelectedProjectItemId(preferredSourceId ?? (selectedStillExists ? selection.selectedId : nextSourceId));
   }
 
   async function importMedia() {
@@ -213,6 +218,29 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     }
   }
 
+  async function trimManualClip(request: TrimManualVideoClipRequest) {
+    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current) return;
+    manualMutationInFlight.current = true;
+    setManualMutationBusy(true);
+    setRuntimeError(null); setRuntimeNotice(null);
+    const startedSelection = selectionEpoch.current;
+    try {
+      const result = await backend.trimManualVideoClip(request);
+      const selectionChanged = startedSelection !== selectionEpoch.current;
+      applyBackendState(result.state, undefined, selectionChanged);
+      if (!selectionChanged) {
+        setSelectedProjectItemId(result.clipId);
+        setPlayheadMs(0);
+        setPreviewSeek({ sequence: 0, timelineMs: 0 });
+      }
+    } catch (cause) {
+      handleRuntimeError(cause, startedSelection !== selectionEpoch.current);
+    } finally {
+      manualMutationInFlight.current = false;
+      setManualMutationBusy(false);
+    }
+  }
+
   function seekTimeline(value: number) {
     if (!backend.presentationOnly && project?.timeline.clips.length === 1) selectProjectItem(project.timeline.clips[0]!.id);
     setPlayheadMs(value);
@@ -247,10 +275,10 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     }
   }
 
-  function handleRuntimeError(cause: unknown) {
+  function handleRuntimeError(cause: unknown, preserveSelection = false) {
     const operationError = desktopOperationError(cause);
     const code = operationError.code;
-    if (operationError.reconciledState) applyBackendState(operationError.reconciledState);
+    if (operationError.reconciledState) applyBackendState(operationError.reconciledState, undefined, preserveSelection);
     if (code === "HOST_RECOVERED") {
       setRuntimeError(null);
       setRuntimeNotice("runtime.sessionRecovered");
@@ -296,7 +324,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
         </div>
         {inspectorOpen && <Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />}
       </div>
-      <Timeline presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} />
+      <Timeline presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} trimAvailable={realPreview} trimBusy={mutationBusy} onTrim={trimManualClip} />
     </main>
   );
 }
