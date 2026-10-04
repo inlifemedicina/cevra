@@ -63,13 +63,17 @@ async function metadata(container: HTMLElement, duration = 6) {
 
 it("marks from the actual media clock, creates a visible clip and verifies undo/redo in the same UI", async () => {
   const backend = new ManualBackend(); const { container } = render(<App backend={backend} />);
+  const create = () => screen.getByRole("button", { name: "Criar clip do trecho" }) as HTMLButtonElement;
+  expect((await screen.findByRole("button", { name: "Criar clip do trecho" }) as HTMLButtonElement).disabled).toBe(true);
   const video = await metadata(container);
   await waitFor(() => expect((screen.getByRole("button", { name: "Marcar IN" }) as HTMLButtonElement).disabled).toBe(false));
   video.currentTime = 1.25; fireEvent.timeUpdate(video);
   fireEvent.click(screen.getByRole("button", { name: "Marcar IN" }));
+  expect(create().disabled).toBe(true);
   video.currentTime = 3.75; fireEvent.timeUpdate(video);
   fireEvent.click(screen.getByRole("button", { name: "Marcar OUT" }));
-  fireEvent.click(screen.getByRole("button", { name: "Criar clip do trecho" }));
+  expect(create().disabled).toBe(false);
+  fireEvent.click(create());
   await waitFor(() => expect(backend.creates).toHaveLength(1));
   expect(backend.creates[0]).toMatchObject({ sourceId: source.id, sourceStartMs: 1250, sourceEndMs: 3750 });
   const track = await screen.findByTestId("timeline-track-track-v1");
@@ -85,8 +89,10 @@ it("marks from the actual media clock, creates a visible clip and verifies undo/
 });
 
 it("requires metadata and completed seek before marking and rejects inverted marks locally", async () => {
-  const backend = new ManualBackend(); const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId="snapshot" timelineOccupied={false} busy={false}
-    seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={() => {}} onCreate={vi.fn()} />);
+  const backend = new ManualBackend();
+  const props = { backend, source, snapshotId: "snapshot", timelineOccupied: false, busy: false,
+    seek: { sequence: 0, timelineMs: 0 }, t, onPlayheadChange: vi.fn(), onCreate: vi.fn() };
+  const { container, rerender } = render(<ManualVideoPreview {...props} />);
   expect((screen.getByRole("button", { name: "Marcar IN" }) as HTMLButtonElement).disabled).toBe(true);
   const video = await metadata(container);
   video.currentTime = 4; fireEvent.seeking(video);
@@ -95,6 +101,14 @@ it("requires metadata and completed seek before marking and rejects inverted mar
   video.currentTime = 2; fireEvent.timeUpdate(video); fireEvent.click(screen.getByRole("button", { name: "Marcar OUT" }));
   expect((screen.getByRole("button", { name: "Criar clip do trecho" }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText(t("preview.rangeInvalid"))).toBeTruthy();
+  video.currentTime = 5; fireEvent.timeUpdate(video); fireEvent.click(screen.getByRole("button", { name: "Marcar OUT" }));
+  const create = screen.getByRole("button", { name: "Criar clip do trecho" }) as HTMLButtonElement;
+  expect(create.disabled).toBe(false);
+  fireEvent.seeking(video); expect(create.disabled).toBe(true);
+  fireEvent.seeked(video); expect(create.disabled).toBe(false);
+  rerender(<ManualVideoPreview {...props} busy />); expect(create.disabled).toBe(true);
+  rerender(<ManualVideoPreview {...props} />); expect(create.disabled).toBe(false);
+  expect(props.onCreate).not.toHaveBeenCalled();
 });
 
 it("clip playback starts at canonical IN, maps timeline seek and pauses at OUT", async () => {

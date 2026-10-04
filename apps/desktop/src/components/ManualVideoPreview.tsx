@@ -145,7 +145,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
       <div className="manual-preview-marks">
         <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("in")}>{t("preview.markIn")}</button><output>IN {inMs === null ? "—" : formatTime(inMs)}</output>
         <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("out")}>{t("preview.markOut")}</button><output>OUT {outMs === null ? "—" : formatTime(outMs)}</output>
-        <button type="button" className="import-button" disabled={!ready || seeking || busy || !validRange} onClick={() => {
+        <button type="button" className="manual-create-clip-button" disabled={!ready || seeking || busy || !validRange} onClick={() => {
           videoRef.current?.pause();
           if (source && validRange) void onCreate({ sourceId: source.id, expectedSnapshotId: snapshotId, sourceStartMs: inMs!, sourceEndMs: outMs! }).catch((cause: unknown) => fail(errorCode(cause)));
         }}>{t(busy ? "preview.creatingClip" : "preview.createClip")}</button>
