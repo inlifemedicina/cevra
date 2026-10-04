@@ -243,11 +243,33 @@ subjective audio/visual acceptance. IN visual OUT remains anchored in the browse
 geometry checks, including the existing minimum-width case.
 
 The separate macOS arm64 review app uses a new application identifier and an
-owned fixture checkpoint at IN 2.000 / OUT 3.990 s. It is prepared without
-launching or replacing the owner's windows. Native human acceptance remains
-PENDING. Request one consolidated owner recheck of only visual IN drag and this
-new excerpt playback, preserving accepted cancellation, keyboard and undo/redo.
+owned fixture checkpoint at IN 2.000 / OUT 3.990 s. It was initially prepared
+unopened, then opened for the authorized consolidated round. The owner replied
+“perfeito” to the two-point recheck: IN drag with OUT visually fixed and placement
+updated on release, and corrected excerpt playback with image/audio and chosen
+limits. These two bounded native cases are ACCEPTED by owner report; this is not
+an automated native frame/sample timing measurement. Preserve the previous
+cancellation, keyboard and undo/redo passes; do not repeat the human round.
 Reuse I4-T1, X-T1/T7 and the bounded part of X-T6; no whole catalog, composition,
 export, release, Windows or provider gate is promoted. Director impact is a
 compatible consumer of typed Media and canonical trim/history; progress stays
 55%, F-A02 exhausted 1/1 and real model calls zero.
+
+## Owner acceptance and integration — 2026-10-04
+
+The accepted demo head is `3a685e431c1ff849dbd792a15c006aad5018e0c6`, with
+independently reviewed tree `3697c05f6a932cae7597b2ac086395761ba5a2fd`.
+Exact-head CI [37212884119](https://github.com/inlifemedicina/cevra/actions/runs/37212884119)
+passed 5/5; exact runtime [37212884040](https://github.com/inlifemedicina/cevra/actions/runs/37212884040)
+passed 1/1, including the bounded-preview content oracle. The owner subsequently
+replied “sim” to explicit authorization to merge PR #82 into main and check
+post-merge tests. PR #82 is integrated at
+`906eea695836fe2ae2b81ab0b50610b600748995`; its tree exactly matches the reviewed
+tree. Post-merge [CI 37227087528](https://github.com/inlifemedicina/cevra/actions/runs/37227087528)
+is terminal SUCCESS, 5/5; [exact runtime 37227087529](https://github.com/inlifemedicina/cevra/actions/runs/37227087529)
+is terminal SUCCESS, 1/1, including the bounded-preview decoded frame/audio step.
+Both are attempt 1 on this exact merge SHA.
+Historical Draft/unopened/PENDING observations above describe earlier checkpoints.
+The two accepted cases do not close the complete catalog or release/composition/
+export/provider gates. Quantization, unsupported-input and small-fixture limits
+remain in force; Director-compatible impact, 55% and F-A02 1/1 are unchanged.
