@@ -187,17 +187,17 @@ def _hash_stable(path: Path, initial: os.stat_result, limit: int) -> str:
 def _scan_video(common: Any, path: str) -> tuple[list[Fraction], list[Fraction], Fraction, dict[str, Any]]:
     result = jobs.run([common.require_tool("ffprobe"), "-v", "error", "-select_streams", "v:0",
         "-read_intervals", "%+#7201", "-show_frames", "-show_streams", "-show_entries",
-        "stream=time_base,nb_frames,width,height,sample_aspect_ratio:stream_side_data=rotation,displaymatrix:frame=best_effort_timestamp,duration",
+        "stream=time_base,nb_frames,duration_ts,width,height,sample_aspect_ratio:stream_side_data=rotation,displaymatrix:frame=best_effort_timestamp,duration",
         "-of", "json", path], stdout=-1, stderr=-1, text=True, timeout=10, check=True)
     if len(result.stdout) > 1024 * 1024:
         raise ValueError("preview frame evidence exceeds budget")
     data = json.loads(result.stdout)
     streams, frames = data.get("streams", []), data.get("frames", [])
-    if len(streams) != 1 or not 1 <= len(frames) <= MAX_FRAMES or int(streams[0].get("nb_frames", 0)) != len(frames):
+    if len(streams) != 1 or not 1 <= len(frames) <= MAX_FRAMES:
         raise ValueError("preview frame scan is incomplete")
     stream = streams[0]
     tick = Fraction(stream["time_base"])
-    if not 0 < tick <= Fraction(1, 1000) or stream.get("sample_aspect_ratio", "1:1") not in ("1:1", "N/A"):
+    if not 0 < tick <= Fraction(1, 600) or stream.get("sample_aspect_ratio", "1:1") not in ("1:1", "N/A"):
         raise ValueError("preview requires square pixels and a precise time base")
     times, durations = [], []
     for frame in frames:
@@ -210,7 +210,37 @@ def _scan_video(common: Any, path: str) -> tuple[list[Fraction], list[Fraction],
         raise ValueError("preview source timestamps exceed budget")
     if any(not Fraction(1, 60) - tick <= b - a <= Fraction(1, 10) for a, b in zip(times, times[1:])) or any(d > Fraction(1, 10) for d in durations):
         raise ValueError("preview frame cadence exceeds budget")
+    if int(stream.get("nb_frames", 0)) != len(frames):
+        _verify_discarded_tail(common, path, stream, times, tick)
     return times, durations, tick, stream
+
+
+def _verify_discarded_tail(common: Any, path: str, stream: dict[str, Any], times: list[Fraction], tick: Fraction) -> None:
+    # QuickTime edit lists can leave encoded packets beyond the visible track.
+    # Admit only an explicitly discarded tail, never an unaccounted decoder loss.
+    declared, end = int(stream.get("nb_frames", 0)), stream.get("duration_ts")
+    if not len(times) < declared <= MAX_FRAMES or declared - len(times) > 2 or not isinstance(end, int) or end <= 0:
+        raise ValueError("preview frame scan is incomplete")
+    result = jobs.run([common.require_tool("ffprobe"), "-v", "error", "-select_streams", "v:0", "-read_intervals", "%+#7201",
+        "-show_packets", "-show_entries", "packet=pts,flags", "-of", "json", path], stdout=-1, stderr=-1, text=True, timeout=10, check=True)
+    if len(result.stdout) > 1024 * 1024:
+        raise ValueError("preview packet evidence exceeds budget")
+    packets = json.loads(result.stdout).get("packets", [])
+    if len(packets) != declared:
+        raise ValueError("preview packet scan is incomplete")
+    visible, discarded = [], []
+    for packet in packets:
+        pts = packet.get("pts")
+        if not isinstance(pts, int) or isinstance(pts, bool):
+            raise ValueError("preview packet timestamps are unavailable")
+        if "D" in packet.get("flags", ""):
+            if not end <= pts or pts * tick > end * tick + Fraction(1, 10):
+                raise ValueError("preview discard is inside the visible track")
+            discarded.append(pts * tick)
+        else:
+            visible.append(pts * tick)
+    if len(discarded) != declared - len(times) or sorted(visible) != times or any(time < times[-1] for time in discarded):
+        raise ValueError("preview has unaccounted missing frames")
 
 
 def _scan_audio(common: Any, path: str, sample_rate: int) -> tuple[int, int]:
@@ -253,8 +283,16 @@ def _rotation(stream: dict[str, Any], fallback: int) -> int:
         if "displaymatrix" in side:
             rows = [line.split(":", 1)[1].split() for line in side["displaymatrix"].strip().splitlines()]
             matrix = [int(value) for row in rows for value in row]
-            if len(matrix) != 9 or matrix[2] or matrix[5] or matrix[6:9] != [0, 0, 1073741824] or matrix[0] * matrix[4] - matrix[1] * matrix[3] != 65536 ** 2 or any(value not in (-65536, 0, 65536) for value in matrix[:6]):
+            cardinal = {0: (65536, 0, 0, 65536), 90: (0, -65536, 65536, 0), 180: (-65536, 0, 0, -65536), 270: (0, 65536, -65536, 0)}
+            if len(matrix) != 9 or matrix[2] or matrix[5] or matrix[8] != 1073741824 or tuple(matrix[i] for i in (0, 1, 3, 4)) != cardinal.get(rotation % 360):
                 raise ValueError("preview display matrix is unsupported")
+            width, height = stream.get("width", 0), stream.get("height", 0)
+            if not isinstance(width, int) or not isinstance(height, int) or min(width, height) <= 0:
+                raise ValueError("preview display geometry is missing")
+            tx = -min(matrix[0] * x + matrix[3] * y for x, y in ((0, 0), (width, 0), (0, height), (width, height)))
+            ty = -min(matrix[1] * x + matrix[4] * y for x, y in ((0, 0), (width, 0), (0, height), (width, height)))
+            if (matrix[6], matrix[7]) not in ((0, 0), (tx, ty)):
+                raise ValueError("preview display translation is unsupported")
     if rotation % 90:
         raise ValueError("preview rotation must be a quarter turn")
     return rotation % 360

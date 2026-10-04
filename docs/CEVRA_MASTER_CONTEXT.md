@@ -2835,3 +2835,21 @@ real-file orientation/voice sync and save/reopen; preserve prior accepted checks
 Director impact compatible, progress 55%, F-A02 1/1 unchanged. Full composition,
 export, release and provider gates remain open. [Canonical profile, measurements,
 limits and acceptance status](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-take-local-preview-expansion--2026-10-04).
+
+
+### Real Take recording technical validation — 2026-10-04
+
+The owner designated the transferred 45,593,687-byte Take MOV; its identity was
+verified locally. Preflight/import/Original proxy/5–10 s clip/close/reopen PASS
+with unchanged original/project/numbering/undo. Three real QuickTime metadata
+cases required a bounded correction: 1/600 time base, exact bounds-normalizing
+cardinal matrix translation, and two explicitly discarded packets beyond track
+end. Visible packet PTS must exactly account for decoded frames; arbitrary
+transforms and unaccounted frame loss remain rejected. New negative Python tests
+and a synthetic exact-runtime edit-list regression PASS. Decoded pixels and PCM
+confirm orientation and zero measured audio lag; this is technical evidence, not
+subjective native acceptance. No media leaves the Mac or enters the repository.
+Real-file preflight is no longer blocked; the consolidated human round stays
+PENDING. Draft #84/head CI/native receipt track the correction. Director impact
+compatible; 55%/F-A02 1/1 unchanged, no AI/device/session operation or next-block
+implementation. [Canonical real evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).

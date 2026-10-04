@@ -433,3 +433,16 @@ Mac file. The isolated package and Draft PR are tracked in the final receipt;
 no session/device access or AI call. Director impact is compatible with unchanged
 execution authority; progress 55%, F-A02 exhausted 1/1. Broader composition/export,
 acceptance, provider and release gates remain open. [Canonical evidence and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-take-local-preview-expansion--2026-10-04).
+
+
+### Real Take recording technical validation — 2026-10-04
+
+The designated transferred recording now passes local hash/preflight, production
+host import/Original proxy/clip/reopen, with immutable original and unchanged
+canonical project/numbering/undo. Media's bounded QuickTime correction preserves
+the typed adapter and privilege boundary; packet/PTS and affine-transform
+negatives remain closed. No media enters GitHub/external services. Real preflight
+is complete; subjective native orientation/voice sync/reopen acceptance stays
+PENDING in one new round. Draft #84 final-head/runtime/native receipts record
+the correction. Director impact compatible, progress 55%, F-A02 1/1 unchanged;
+no AI/device/session operation or `clip.remove` implementation. [Real evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).

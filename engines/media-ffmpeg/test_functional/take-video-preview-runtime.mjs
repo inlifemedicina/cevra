@@ -107,6 +107,30 @@ try {
   const mae = expected.reduce((sum, value, i) => sum + Math.abs(value - actual[i]), 0) / expected.length;
   const wrong = picture(base), wrongMae = wrong.reduce((sum, value, i) => sum + Math.abs(value - actual[i]), 0) / wrong.length;
   assert.ok(mae < 20 && wrongMae > mae + 10, `orientation MAE ${mae}, unrotated negative control ${wrongMae}`);
+  const quicktime = join(root, 'quicktime-edit-list.mov');
+  run(['-y', '-display_rotation', '-90', '-i', base, '-c', 'copy', '-video_track_timescale', '600', quicktime]);
+  // Reproduce Apple's origin-normalized matrix and a track edit list hiding
+  // exactly two encoded tail packets. Only this generated fixture is modified.
+  const movie = readFileSync(quicktime);
+  function atom(start, end, type) {
+    for (let offset = start; offset < end;) {
+      const size = movie.readUInt32BE(offset); assert.ok(size >= 8 && offset + size <= end);
+      if (movie.toString('ascii', offset + 4, offset + 8) === type) return { start: offset, end: offset + size };
+      offset += size;
+    }
+    throw new Error(`Missing fixture atom ${type}`);
+  }
+  const moov = atom(0, movie.length, 'moov'), trak = atom(moov.start + 8, moov.end, 'trak');
+  const tkhd = atom(trak.start + 8, trak.end, 'tkhd'), edts = atom(trak.start + 8, trak.end, 'edts');
+  const elst = atom(edts.start + 8, edts.end, 'elst'), mvhd = atom(moov.start + 8, moov.end, 'mvhd');
+  assert.equal(movie[tkhd.start + 8], 0); assert.equal(movie[elst.start + 8], 0); assert.equal(movie[mvhd.start + 8], 0);
+  movie.writeInt32BE(1080 * 65536, tkhd.start + 8 + 40 + 6 * 4);
+  const movieScale = movie.readUInt32BE(mvhd.start + 8 + 12);
+  movie.writeUInt32BE(Math.floor(1.929 * movieScale), elst.start + 8 + 8);
+  writeFileSync(quicktime, movie);
+  assert.equal(times(quicktime).length, 58, 'edit list must hide exactly two encoded packets');
+  const { result: edited } = await preview(quicktime, 0, 1900);
+  assert.equal(edited.boundedPreview.sourceRotation, 270); assert.equal(edited.probe.width, 404); assert.equal(edited.probe.height, 720);
   const longest = join(root, 'maximum-duration.mov');
   run(['-y', '-f', 'lavfi', '-i', 'testsrc2=s=128x96:r=30:d=60', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=60', '-c:v', 'mpeg4', '-q:v', '5', '-c:a', 'pcm_s16le', longest]);
   await preview(longest, 0, 60000);

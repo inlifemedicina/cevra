@@ -300,3 +300,19 @@ is designated. Reserve one consolidated round for only the new points:
 Do not repeat accepted keyboard/cancel/undo or IN drag checks. Synthetic fixtures
 are technical control evidence, never human acceptance. HDR/composition/export
 and broader release gates stay BLOCKED. [Profile and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-take-local-preview-expansion--2026-10-04).
+
+
+#### Real Take technical follow-up — 2026-10-04
+
+Same X-T6/T9, I13-T3 and K3-T2 bounded variant: designated recording local
+preflight/import/Original proxy/5–10 s clip/host close/reopen AUTO PASS. Original
+hash, canonical project, numbering and undo unchanged. Decoded pixels confirm
+orientation against an unrotated control; PCM correlation shows zero measured
+sample lag. QuickTime time-base/matrix/edit-list regression and negatives PASS.
+No recording/derived media is committed or transferred externally.
+
+The earlier file-designation BLOCKED state is resolved. APP/OWNER native
+orientation/voice sync, excerpt perception and save/close/reopen remain PENDING,
+using only the same three new consolidated steps above. Technical automation is
+not human acceptance; preserve already accepted keyboard/cancel/undo/IN results.
+[Real evidence and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).

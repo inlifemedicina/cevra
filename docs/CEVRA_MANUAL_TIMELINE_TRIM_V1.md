@@ -306,3 +306,47 @@ Director impact: compatible typed Media/manual-history consumer, unchanged
 permissions/proposal/execution authority. Progress stays 55%, F-A02 exhausted
 1/1, real AI calls zero. Multi-clip composition, full acceptance/export/release
 and provider gates remain open.
+
+
+## Real Take technical validation — 2026-10-04
+
+The owner subsequently designated the transferred Take MOV. Its hash and
+45,593,687-byte size were verified before and after local work. Preflight confirms
+29.928333 s, H.264/yuv420p SDR BT.709, 1920×1080 with −90° display rotation,
+nominal 30 fps and contiguous AAC mono/48 kHz. No recording, image or audio is
+committed or sent to GitHub, AI or external services; receipts and media stay local.
+
+The real MOV revealed three bounded QuickTime cases absent from the original
+synthetic controls: a 1/600 video time base, cardinal display rotation translated
+by the exact frame bounds, and two encoded tail packets marked discard by the
+track edit list. Initial import passed but preview admission rejected this file.
+The correction admits time bases no coarser than 1/600 while retaining ≤2 ms
+PTS evidence tolerance; rotation must still be a matching cardinal unit matrix,
+with only zero or exact bounds-normalizing translation. Scale, reflection, shear,
+perspective and arbitrary translation remain rejected. A metadata/decoded-count
+difference requires a bounded packet scan, at most two explicitly discarded
+packets after track end within 100 ms, and exact equality of all visible packet
+PTS and decoded frame PTS. Missing/interior/unflagged frames remain rejected.
+
+Real recording production-host import→Original proxy→5–10 s/150-frame clip→
+close/reopen PASS. Original's 898 visible frames produce a 2,221,576-byte proxy
+with physical duration 29,933 ms versus canonical source duration 29,928 ms;
+marks retain canonical time and the original remains unchanged. Project, source
+numbering, undo availability and clip bounds survive reopen; proxy preparation
+adds no mutation. Local decoded-pixel comparison at the clip start has MAE 1.711
+versus 64.347 for the unrotated negative control. PCM correlations are 0.9916 for
+Original and 0.9900 for the excerpt, with best measured lag zero samples in both.
+These deterministic measurements do not certify subjective native playback.
+
+Python Media 96/96 PASS includes negative coverage for lost/interior frames,
+missing packet evidence, excessive discarded tail, arbitrary affine transforms
+and wrong rotation angle. The exact-runtime synthetic oracle additionally
+reproduces the 1/600 matrix/edit-list case with two hidden tail packets; previous
+VFR, audio and size controls remain PASS. Final tree review, updated Draft #84
+head CI and new isolated native package receipt are PENDING at this checkpoint.
+
+Real-file access/preflight is no longer blocked. APP/OWNER orientation/voice sync,
+excerpt perception and native save/close/reopen remain PENDING for one consolidated
+new round; preserve prior accepted checks. No device/sensor or existing human
+session is operated, no AI/provider call, no next `clip.remove` implementation.
+Director impact compatible; progress 55%, F-A02 exhausted 1/1 unchanged.
