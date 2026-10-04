@@ -1047,3 +1047,10 @@ test("restart reconciliation preserves non-exclusive foreign output without curr
   assert.deepEqual((await repository.get("restart-foreign-trim")).attempts[0].cleanupFailedOutputUris, [trim.outputUri]);
   assert.equal(engine.calls.length, 0);
 });
+
+test('ephemeral bounded preview cannot create a durable execution record or call an engine', async () => {
+  const history = new ProjectHistory(createEmptyProject({ id: 'ephemeral' })); let created = 0, executed = 0;
+  const service = new MediaApplicationService({ history, executions: { async create() { created++; } }, engine: { async execute() { executed++; } } });
+  await assert.rejects(service.execute({ id: 'preview', operation: { ...trim, boundedPreview: true }, mutation: { type: 'none' } }), { code: 'MEDIA_INVALID_REQUEST' });
+  assert.equal(created, 0); assert.equal(executed, 0);
+});

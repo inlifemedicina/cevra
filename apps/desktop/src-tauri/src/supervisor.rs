@@ -151,6 +151,27 @@ impl SupervisorCore {
         self.request_timed(method, params, timeout, true).await
     }
 
+    async fn request_preparation(&self, method: &str, params: Value, operation_id: &str) -> Result<Value, DesktopCommandError> {
+        let (id, mut receiver) = self.begin_request(method, params, false)?;
+        match tokio::time::timeout(self.timeouts.control, &mut receiver).await {
+            Ok(Ok(outcome)) => return outcome,
+            Ok(Err(_)) => return Err(DesktopCommandError::new("HOST_UNAVAILABLE", "Desktop host response channel closed.")),
+            Err(_) => {}
+        }
+        let _ = self.request_internal("operation.cancel", json!({ "operationId": operation_id }), self.timeouts.control).await;
+        // Discard even a late successful preparation after the admission deadline.
+        // Await settlement before allowing owned temporary cleanup to be considered complete.
+        match tokio::time::timeout(self.timeouts.reconciliation, &mut receiver).await {
+            Ok(_) => Err(DesktopCommandError::new("MANUAL_VIDEO_PREVIEW_TIMEOUT", "The preview timed out and its preparation settled.")),
+            Err(_) => {
+                self.pending.lock().map_err(lock_error)?.remove(&id);
+                let error = DesktopCommandError::new("HOST_UNAVAILABLE", "The preview did not settle after cancellation; the session was stopped.");
+                self.fail(error.clone());
+                Err(error)
+            }
+        }
+    }
+
     async fn request_immediate_mutation(
         &self,
         method: &str,
@@ -510,6 +531,9 @@ impl DesktopHostSupervisor {
         params: Value,
     ) -> Result<Value, DesktopCommandError> {
         self.core.request_immediate_mutation(method, params).await
+    }
+    pub async fn request_preparation(&self, method: &str, params: Value, operation_id: &str) -> Result<Value, DesktopCommandError> {
+        self.core.request_preparation(method, params, operation_id).await
     }
     pub async fn request_mutating(
         &self,
@@ -1070,6 +1094,25 @@ mod tests {
                 .unwrap()["project"]["history"]["revision"],
             0
         );
+    }
+
+    #[tokio::test]
+    async fn preview_timeout_cancels_its_operation_and_discards_late_success_after_settlement() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move { supervisor.request_preparation("video.previewLocal", json!({ "operationId": "preview" }), "preview").await })
+        };
+        let original = wait_for_write(&control, "video.previewLocal").await;
+        wait_for_write(&control, "operation.cancel").await;
+        control.send_result(original["id"].as_str().unwrap(), json!({ "late": true }));
+        assert_eq!(operation.await.unwrap().unwrap_err().code, "MANUAL_VIDEO_PREVIEW_TIMEOUT");
+        assert_eq!(control.request("operation.cancel")["params"]["operationId"], "preview");
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
+        assert!(!control.writes.lock().unwrap().iter().any(|request| request["method"] == "project.snapshot"));
     }
 
     #[tokio::test]

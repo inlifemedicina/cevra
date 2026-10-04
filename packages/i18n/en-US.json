@@ -342,6 +342,7 @@
   "preview.sourcePosition": "Source {time}",
   "preview.clipElapsed": "Excerpt {time} / {duration}",
   "preview.clipBounds": "IN {start} · OUT {end}",
+  "preview.boundedClip": "Locally prepared excerpt. Boundaries between frames are adjusted inside the excerpt.",
   "preview.approximateClip": "Approximate excerpt preview; the ending may vary slightly.",
   "preview.singleClip": "The timeline already contains items. This initial test supports one clip; select the simple clip to play and verify undo/redo.",
   "preview.rangeInvalid": "Mark IN before OUT, within the video duration.",

@@ -342,6 +342,7 @@
   "preview.sourcePosition": "Fonte {time}",
   "preview.clipElapsed": "Trecho {time} / {duration}",
   "preview.clipBounds": "IN {start} · OUT {end}",
+  "preview.boundedClip": "Trecho preparado localmente. Bordas entre quadros são ajustadas para dentro do trecho.",
   "preview.approximateClip": "Preview aproximado do trecho; o fim pode variar ligeiramente.",
   "preview.singleClip": "A timeline já contém itens. Este teste inicial admite um clip; selecione o clip simples para reproduzir e conferir desfazer/refazer.",
   "preview.rangeInvalid": "Marque IN antes de OUT, dentro da duração do vídeo.",

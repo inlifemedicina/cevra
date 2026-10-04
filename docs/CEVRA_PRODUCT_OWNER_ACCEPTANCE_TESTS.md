@@ -270,5 +270,11 @@ it does not promote full catalog IDs or native/frame-accurate decoding to PASS.
 
 The complete headless callback record contains 4.000/4.033333 s after OUT3.990,
 followed by corrective seek. Final `currentTime`3.990 alone is not a bounded-
-playback PASS. This case remains OPEN, and the UI states preview is approximate;
-precise derived-preview/runtime integration requires its own scoped decision.
+playback PASS. That historical build left the case OPEN. The owner subsequently
+approved the bounded derivative: six decoded frame/audio cases, host integration
+and separate real-file Chrome EOF checks PASS with explicit frame/AAC
+quantization. The separate runtime-bearing native demo is prepared unopened;
+native perceptual acceptance remains PENDING. Recheck only visual IN drag and
+new excerpt playback together, preserving accepted cancellation, keyboard and
+undo/redo. This does not promote full I4-T1, X-T1/T7, X-T6, composition/export,
+release or provider gates. [Current implemented profile and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).

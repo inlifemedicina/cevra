@@ -394,6 +394,24 @@ visually fixed during IN drag, then the confirmed duration reanchors at zero;
 source and excerpt clocks use milliseconds. Real-file headless evidence does
 not certify native/frame-accurate preview. It also reveals callback timestamps
 above OUT before corrective seek; bounded playback remains OPEN. The current UI
-labels preview approximate. Derived-preview integration is a separate proposed
-scope/runtime decision, not a completed fix. Draft PR #82 remains unmerged;
+labels preview approximate at that historical checkpoint. The subsequently
+approved derived-preview integration is implemented below. Draft PR #82 remains unmerged;
 Director impact compatible, progress 55%, F-A02 exhausted 1/1, no new AI call.
+
+## PR #82 approved bounded derived preview — 2026-10-04
+
+The existing typed Media trim now supplies a privately prepared, verified
+ephemeral excerpt with canonical bounds and cancellation across UI/Tauri/host.
+It adds no source/history/checkpoint or durable Media execution. Worker 0.3.2
+retains the pinned approved runtime and eight-file integrity inventory. The
+profile admits bounded zero-origin CFR/SDR video and covered contiguous audio;
+unsupported/missing runtime fails visibly. Decoded frame/audio sentinel tests
+PASS in six cases at 30 and `30000/1001` fps, with original bytes unchanged and
+no pre-IN/post-OUT source content. Quantization remains explicit: the logical
+1.990 s interval may encode 2.000/2.002 s and hold the last admitted frame.
+Production-host and separate Chrome EOF evidence PASS; native perceptual
+acceptance is PENDING. The new runtime-bearing review app is prepared unopened
+under a separate identifier. Preserve accepted cancellation/keyboard/undo results;
+group only IN visual drag and new playback into the owner recheck. [Details](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
+Director impact: compatible typed Media/manual-edit consumer; no new provider,
+proposal or execution authority. Draft #82 not merged, progress 55%, F-A02 1/1.

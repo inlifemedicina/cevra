@@ -166,14 +166,88 @@ to production. This does not establish native WKWebView behavior. The playback
 case remains OPEN / NOT ACCEPTED after correcting its display, rather than
 being promoted to a bounded playback PASS on the final clamped clock alone.
 
-A candidate follow-up is a derived, bounded preview generated through the
-existing typed MediaEngineAdapter `trim` operation, with source/snapshot/content
-verification, cancellation, bounded output admission and isolated temporary
-storage; Project IR/source originals/history must remain unchanged. The accurate
-trim primitive exists, but its integration into local-video preview and demo
-runtime packaging is absent; the current host returns the original's verified
-bytes and this demo has no media runtime configured. Integration, runtime/license
-validation and decoder/platform/EOF tests are required before that approach can
-be claimed available or approved. No arbitrary FFmpeg/host path control is proposed.
-This is a concrete next scope decision, not an implemented playback fix or a
-silent extension into composition/export. Retain prior accepted human steps.
+The owner subsequently approved the bounded derived-preview integration below.
+The earlier presentation build and its unconfigured Media runtime remain
+historical evidence; they do not supply the new preview behavior.
+
+## Approved bounded derived preview — 2026-10-04
+
+PR #82 now implements an ephemeral excerpt through the existing typed
+MediaEngineAdapter `trim` operation, with a closed `boundedPreview: true` profile.
+The UI sends canonical source/clip/snapshot IDs and an operation ID. The host
+resolves the range; no client path, range, raw arguments or filtergraph is
+accepted. Original mode keeps verified original bytes. Clip mode requires a
+verified derivative and cannot silently admit the full original as the excerpt.
+Missing or unsupported runtime/media fails visibly. The separate review bundle
+includes the managed runtime; default release distribution remains a separate gate.
+
+The profile admits one simple clip, source/output at most 8 MiB, source at most
+60 s, zero-origin CFR at most 60 fps, SDR, no rotation and at most 1920×1080.
+Optional audio must be contiguous from zero, cover OUT and use 44.1/48 kHz mono
+or stereo. VFR and unsupported inputs are rejected. Source frame PTS are measured
+as rational values. The internal filter selects measured frame indices whose
+source PTS are in `[IN, OUT)`, then rebases timestamps to zero without seeking or
+resynthesizing a CFR sequence. Audio selects sample indices from `ceil(IN×rate)`
+through `ceil(OUT×rate)-1`. This is preview re-encoding, never an original asset
+replacement or final-quality export source (ADR 0013).
+
+Frame/sample quantization is explicit: an IN between frames advances to the next
+admitted source frame. The last admitted picture can remain visible for its frame
+period; AAC decoding may add fewer than 1024 padding samples. The encoded
+duration can differ from the logical duration within the verified frame/audio
+quantization bound. For the requested 2.000–3.990 s interval, exact runtime tests
+measured 2.000 s at 30 fps and 2.002 s at `30000/1001`, with source frames 60–119,
+60 frames total and 95,520 decoded audio samples (zero padding in these fixtures).
+The 2.010–3.990 s cases selected frames 61–119; 0–11 ms selected one frame.
+This is verified source-content exclusion, not a claim of exact millisecond
+container duration, lossless output or native frame/sample presentation timing.
+
+The host reads originals through a bounded no-follow descriptor and SHA-256,
+copies verified bytes into a private owned directory, and verifies the output
+descriptor, inode, bounds, video/audio evidence and output hash before serving
+bytes. It rechecks original content and canonical source/snapshot/clip after
+rendering. Source changes, trim, undo/redo, selection changes, newer previews,
+cancellation, timeout and shutdown invalidate stale results. Queue cancellation
+does not cancel another operation. Cleanup waits for worker/native retirement
+and deletes only its owned directory; if retirement cannot be proved, files are
+retained and the operation fails with its primary error preserved. This read-only
+profile creates no Project IR source, journal, checkpoint or durable Media execution.
+
+The UI plays the derivative from media time zero to its natural EOF. Source and
+excerpt labels project the logical canonical range in milliseconds; these labels
+are not decoded-frame identity measurements. Pending preparations are cancelled
+on changes, old responses are ignored, and old decoders/Blob URLs are released.
+Tauri reconciles cancellation before reuse; an unsettled timeout fails closed.
+
+Runtime worker 0.3.2 retains protocol/runtime format 1 and pins an eight-file
+worker inventory. FFmpeg 9.0.1, upstream ffmpeg-skill 1.4.2 and their existing
+approved license/provenance/signature checks are retained. No dependency,
+framework, permission or engine replacement is introduced. The local release
+runtime was assembled with the repository's unchanged signature verification.
+
+Validation: decoded barcode frame identities and PCM audio sentinels PASS for all
+six 30/`30000/1001` cases, including nonaligned IN/OUT and a short clip; the
+full-original negative control and VFR input are rejected. The real H.264/AAC
+owned fixture passes production-host integration with original hash and project
+unchanged by preview. Desktop tests 88/88, Rust tests 28/28 and Python Media tests
+91/91 PASS. Host/contract/application/Media/i18n regressions pass 527/527 with
+managed Python 3.12 and sequential test files. A process-death test failed during
+the concurrent native build, then passed isolated and in that full rerun; this
+does not establish the cause of the transient failure. At this prepublication
+checkpoint, exact-head CI remains PENDING; terminal evidence will be recorded
+in the PR. An isolated production-component Chrome headless check
+plays the actual derivative at media time 0→2.000 s, naturally paused at EOF,
+with last callback timestamp 1.966667 s (source projection 3.966667 s), below OUT.
+This complements the decoded-content oracle and does not certify WKWebView or
+subjective audio/visual acceptance. IN visual OUT remains anchored in the browser
+geometry checks, including the existing minimum-width case.
+
+The separate macOS arm64 review app uses a new application identifier and an
+owned fixture checkpoint at IN 2.000 / OUT 3.990 s. It is prepared without
+launching or replacing the owner's windows. Native human acceptance remains
+PENDING. Request one consolidated owner recheck of only visual IN drag and this
+new excerpt playback, preserving accepted cancellation, keyboard and undo/redo.
+Reuse I4-T1, X-T1/T7 and the bounded part of X-T6; no whole catalog, composition,
+export, release, Windows or provider gate is promoted. Director impact is a
+compatible consumer of typed Media and canonical trim/history; progress stays
+55%, F-A02 exhausted 1/1 and real model calls zero.

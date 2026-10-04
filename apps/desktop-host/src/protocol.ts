@@ -171,8 +171,9 @@ export function validateCancelParams(params: Record<string, unknown>, id: string
 }
 
 export function validateVideoPreviewParams(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {
-  exactKeys(params, ["sourceId", "expectedSnapshotId"], id);
-  return videoBinding(params, id);
+  exactKeys(params, ["sourceId", "expectedSnapshotId", "clipId", "operationId"], id);
+  if (params.clipId === undefined && params.operationId === undefined) return videoBinding(params, id);
+  return { ...videoBinding(params, id), clipId: boundedString(params.clipId, 128, "clipId", id), operationId: operationId(params.operationId, id) };
 }
 
 export function validateManualClipParams(params: Record<string, unknown>, id: string): CreateManualVideoClipRequest {

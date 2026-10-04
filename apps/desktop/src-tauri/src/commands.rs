@@ -35,6 +35,8 @@ pub struct CancelArgs {
 pub struct VideoPreviewArgs {
     source_id: String,
     expected_snapshot_id: String,
+    clip_id: Option<String>,
+    operation_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -54,8 +56,21 @@ pub async fn desktop_preview_local_video(
 ) -> Result<Value, DesktopCommandError> {
     validate_id(&args.source_id, "sourceId")?;
     validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    let mut params = json!({ "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id });
+    if let (Some(clip), Some(operation)) = (&args.clip_id, &args.operation_id) {
+        validate_id(clip, "clipId")?;
+        validate_id(operation, "operationId")?;
+        params["clipId"] = json!(clip);
+        params["operationId"] = json!(operation);
+    } else if args.clip_id.is_some() || args.operation_id.is_some() {
+        return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_REQUEST", "Clip and operation identifiers must be supplied together."));
+    }
     supervisor.ensure_started(&app).await?;
-    supervisor.request_control("video.previewLocal", json!({ "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id })).await
+    if let Some(operation) = args.operation_id {
+        supervisor.request_preparation("video.previewLocal", params, &operation).await
+    } else {
+        supervisor.request_control("video.previewLocal", params).await
+    }
 }
 
 #[tauri::command]

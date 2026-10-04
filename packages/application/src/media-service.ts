@@ -98,6 +98,7 @@ export class MediaApplicationService {
     try {
       candidate = clone(request);
       stableRequest = snapshotExecutionRequest(candidate, defaultLocale, this.idGenerator);
+      if (stableRequest.operation.type === "trim" && stableRequest.operation.boundedPreview) throw new Error("Ephemeral preview preparation cannot enter the durable Media execution service.");
     } catch (cause) {
       const locale = candidate?.locale === "en-US" ? "en-US" : defaultLocale;
       const executionId = typeof candidate?.id === "string" ? candidate.id : "invalid-media-execution";

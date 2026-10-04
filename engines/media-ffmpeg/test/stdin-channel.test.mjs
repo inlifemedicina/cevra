@@ -365,3 +365,13 @@ test("group kill failure still terminates direct child and preserves prior abort
   await assert.rejects(transport.stop(), error => error === cleanup);
   assert.equal(worker.kills, 1);
 });
+
+test('settle observes native failure retirement without stopping a healthy unrelated worker', async t => {
+  const { transport, workers: [worker] } = setup(t);
+  await transport.start(); await transport.settle(); assert.equal(worker.kills, 0);
+  worker.autoClose = false; worker.onWrite = () => {};
+  const request = transport.request('tools/call', { jobId: 'preview-drain' }); const failed = assert.rejects(request, WorkerProcessExitedError);
+  await tick(); worker.stdin.emit('error', pipe()); await failed;
+  let settled = false; const drain = transport.settle().then(() => { settled = true; });
+  await tick(); assert.equal(settled, false); worker.finish(); await drain; assert.equal(settled, true);
+});

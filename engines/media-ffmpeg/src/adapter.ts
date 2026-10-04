@@ -76,7 +76,7 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     const signal = context.signal;
     if (signal?.aborted) throw abortError();
     const plannedDelivery = operationDelivery(operation);
-    if (plannedDelivery) await this.assertDeliveryAvailable(plannedDelivery);
+    if (plannedDelivery) await this.assertDeliveryAvailable(plannedDelivery, signal);
     const call = (name: string, args: Record<string, unknown>) => this.call(name, args, context.jobId, signal);
     switch (operation.type) {
       case "measure-audio": {
@@ -86,7 +86,7 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
       case "probe":
         return { type: "probe", probe: parseProbe(await call("probe", { inputs: [operation.inputUri] }), operation.inputUri) };
       case "trim":
-        return fileResult(await call("cut", { input: operation.inputUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), accurate: true }), operation.outputUri);
+        return fileResult(await call("cut", { input: operation.inputUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), accurate: true, ...(operation.boundedPreview ? { bounded_preview: true } : {}) }), operation.outputUri);
       case "concat":
         return fileResult(await call("join", { inputs: operation.inputUris, output: operation.outputUri }), operation.outputUri);
       case "fit":
@@ -211,8 +211,9 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     if (evidence.hasVideo) validateCopyCompatibility(delivery, evidence);
   }
 
-  private async assertDeliveryAvailable(delivery: ResolvedMediaDelivery): Promise<void> {
-    const health = await this.worker.health();
+  private async assertDeliveryAvailable(delivery: ResolvedMediaDelivery, signal?: AbortSignal): Promise<void> {
+    const health = await this.worker.health(signal);
+    if (signal?.aborted) throw abortError();
     const available = health.effectiveDeliveries.some((candidate) => candidate.container === delivery.container
       && candidate.audioOnly === delivery.audioOnly
       && candidate.audioCodec === delivery.audioCodec
@@ -340,6 +341,7 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
   const audioSequence = parseAudioSequenceEvidence(payload.audioSequence);
   const publication = parsePublicationEvidence(payload.publication);
   const muxDuration = parseMuxDurationEvidence(payload.muxDuration);
+  const boundedPreview = parseBoundedPreviewEvidence(payload.boundedPreview);
   return {
     type: "file",
     outputUri: typeof payload.output === "string" ? payload.output : fallbackUri,
@@ -348,8 +350,28 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
     effectiveProfile,
     ...(audioSequence ? { audioSequence } : {}),
     ...(publication ? { publication } : {}),
-    ...(muxDuration ? { muxDuration } : {})
+    ...(muxDuration ? { muxDuration } : {}),
+    ...(boundedPreview ? { boundedPreview } : {})
   };
+}
+
+function parseBoundedPreviewEvidence(value: unknown) {
+  if (value === undefined) return undefined;
+  if (!isRecord(value) || value.version !== 1 || Object.keys(value).some((key) => !["version", "sourceStartMs", "sourceEndMs", "firstFrameMs", "lastFrameMs", "frameCount", "frameRate", "outputSha256", "audio"].includes(key))
+    || typeof value.outputSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.outputSha256)
+    || ![value.sourceStartMs, value.sourceEndMs, value.firstFrameMs, value.lastFrameMs, value.frameRate].every(finite)
+    || !Number.isSafeInteger(value.sourceStartMs) || !Number.isSafeInteger(value.sourceEndMs)
+    || (value.sourceStartMs as number) < 0 || (value.sourceEndMs as number) > 60_000 || (value.sourceStartMs as number) >= (value.sourceEndMs as number)
+    || (value.firstFrameMs as number) < (value.sourceStartMs as number) || (value.lastFrameMs as number) < (value.firstFrameMs as number) || (value.lastFrameMs as number) >= (value.sourceEndMs as number)
+    || !Number.isSafeInteger(value.frameCount) || (value.frameCount as number) < 1 || (value.frameCount as number) > 3600 || (value.frameRate as number) <= 0 || (value.frameRate as number) > 60) throw new Error("Media worker bounded preview evidence is invalid.");
+  if (value.audio !== undefined) {
+    const audio = value.audio;
+    if (!isRecord(audio) || Object.keys(audio).some((key) => !["sampleRate", "channels", "inputSamples", "decodedSamples"].includes(key))
+      || ![44100, 48000].includes(audio.sampleRate as number) || ![1, 2].includes(audio.channels as number)
+      || !Number.isSafeInteger(audio.inputSamples) || (audio.inputSamples as number) <= 0 || (audio.inputSamples as number) > 2_880_000
+      || !Number.isSafeInteger(audio.decodedSamples) || (audio.decodedSamples as number) < (audio.inputSamples as number) || (audio.decodedSamples as number) >= (audio.inputSamples as number) + 1024) throw new Error("Media worker bounded preview audio evidence is invalid.");
+  }
+  return value as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["boundedPreview"]>;
 }
 
 function parsePublicationEvidence(value: unknown) {
@@ -416,12 +438,13 @@ function parseEffectiveProfile(value: unknown): EffectiveMediaProfile {
 
 function operationDelivery(operation: MediaOperation): ResolvedMediaDelivery | undefined {
   switch (operation.type) {
+    case "trim": return resolveStandardAvDelivery(operation.outputUri, !operation.boundedPreview);
     case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
     case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
     case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
     case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);
     case "mux-audio": { const container = resolveMediaContainer(operation.outputUri); const rule = MEDIA_DELIVERY_MATRIX[container]; return { container, audioOnly: false, videoCodec: "copy", audioCodec: rule.defaultAudioCodec }; }
-    default: return resolveStandardAvDelivery(operation.outputUri, operation.type === "trim" || operation.type === "concat");
+    default: return resolveStandardAvDelivery(operation.outputUri, operation.type === "concat");
   }
 }
 

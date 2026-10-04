@@ -38,7 +38,10 @@ class ManualBackend implements DesktopBackend {
   async loadEditorialDraft() { return { status: "empty" as const }; }
   async reviseEditorialDraft(): Promise<never> { throw { code: "EDITORIAL_DRAFT_UNAVAILABLE" }; }
   async previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> {
-    return { sourceId: request.sourceId, snapshotId: request.expectedSnapshotId, durationMs: 6000, mimeType: "video/mp4", base64: btoa("transport-test-only") };
+    const clip = request.clipId ? this.history.current.timeline.clips.find(item => item.id === request.clipId) : undefined;
+    const start = clip?.sourceStartMs ?? (request.clipId ? 1000 : 0), end = clip?.sourceEndMs ?? (request.clipId ? 4000 : 6000);
+    return { sourceId: request.sourceId, snapshotId: request.expectedSnapshotId, durationMs: request.clipId ? end - start : 6000, mimeType: "video/mp4", base64: btoa("transport-test-only"),
+      ...(request.clipId ? { clip: { id: request.clipId, sourceStartMs: start, sourceEndMs: end, firstFrameMs: start, lastFrameMs: Math.max(start, end - 1000 / 30), frameCount: Math.ceil((end - start) * 30 / 1000) } } : {}) };
   }
   async createManualVideoClip(request: CreateManualVideoClipRequest) {
     this.creates.push(request);
@@ -61,10 +64,12 @@ class ManualBackend implements DesktopBackend {
   async cancelOperation(operationId: string) { return { operationId, cancelled: false }; }
 }
 
-async function metadata(container: HTMLElement, duration = 6) {
+async function metadata(container: HTMLElement, duration?: number) {
   await waitFor(() => expect(container.querySelector("video")?.getAttribute("src")).toMatch(/^blob:/));
   const video = container.querySelector("video")!;
-  Object.defineProperty(video, "duration", { configurable: true, value: duration });
+  const excerpt = screen.queryByTestId("preview-clip-timecode")?.textContent?.match(/\/ (\d+):(\d+)\.(\d+)/);
+  const effectiveDuration = duration ?? (excerpt ? Number(excerpt[1]) * 60 + Number(excerpt[2]) + Number(excerpt[3]) / 1000 : 6);
+  Object.defineProperty(video, "duration", { configurable: true, value: effectiveDuration });
   fireEvent.loadedMetadata(video);
   return video;
 }
@@ -119,41 +124,42 @@ it("requires metadata and completed seek before marking and rejects inverted mar
   expect(props.onCreate).not.toHaveBeenCalled();
 });
 
-it("clip playback starts at canonical IN, maps timeline seek and pauses at OUT", async () => {
+it("derived clip playback starts at zero, maps timeline seek and ends at the bounded media duration", async () => {
   const backend = new ManualBackend(); const onPlayheadChange = vi.fn();
   const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
   const props = { backend, source, snapshotId: "snapshot", timelineOccupied: true, busy: false, clip, t, onPlayheadChange, onCreate: vi.fn() };
   const { container, rerender } = render(<ManualVideoPreview {...props} seek={{ sequence: 0, timelineMs: 0 }} />);
-  const video = await metadata(container); expect(video.currentTime).toBe(1); fireEvent.seeked(video);
+  const video = await metadata(container); expect(video.currentTime).toBe(0); fireEvent.seeked(video);
   rerender(<ManualVideoPreview {...props} seek={{ sequence: 1, timelineMs: 1500 }} />);
-  expect(video.currentTime).toBe(2.5); fireEvent.seeked(video); expect(onPlayheadChange).toHaveBeenLastCalledWith(1500);
-  video.currentTime = 4.1; fireEvent.timeUpdate(video);
-  expect(video.pause).toHaveBeenCalled(); expect(video.currentTime).toBe(4); expect(onPlayheadChange).toHaveBeenLastCalledWith(3000);
+  expect(video.currentTime).toBe(1.5); fireEvent.seeked(video); expect(onPlayheadChange).toHaveBeenLastCalledWith(1500);
+  video.currentTime = 3.1; fireEvent.timeUpdate(video);
+  expect(video.pause).toHaveBeenCalled(); expect(video.currentTime).toBe(3); expect(onPlayheadChange).toHaveBeenLastCalledWith(3000);
 });
 
 it("shows source milliseconds separately from excerpt elapsed/duration for the reported 2.000–3.990 range", async () => {
   const backend = new ManualBackend(); const onPlayheadChange = vi.fn();
   const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 1990, sourceStartMs: 2000, sourceEndMs: 3990, speed: 1, volume: 1, opacity: 1 };
   const props = { backend, source, snapshotId: "snapshot", timelineOccupied: true, busy: false, clip, onPlayheadChange, onCreate: vi.fn(), seek: { sequence: 0, timelineMs: 0 } };
-  const { container, rerender } = render(<ManualVideoPreview {...props} t={t} />);
-  const video = await metadata(container); fireEvent.seeked(video);
-  expect(video.currentTime).toBe(2);
+  backend.previewLocalVideo = vi.fn(async (request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> => ({ sourceId: request.sourceId, snapshotId: request.expectedSnapshotId, durationMs: 2000, mimeType: "video/mp4", base64: btoa("transport-test-only"), clip: { id: "clip", sourceStartMs: 2000, sourceEndMs: 3990, firstFrameMs: 2000, lastFrameMs: 3966.666667, frameCount: 60 } }));
+  const { container, rerender } = render(<ManualVideoPreview {...props} snapshotId="quantized" t={t} />);
+  const video = await metadata(container, 2); fireEvent.seeked(video);
+  expect(video.currentTime).toBe(0);
   expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:02.000 / 00:03.990");
   expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00.000 / 00:01.990");
   expect(screen.getByText("IN 00:02.000 · OUT 00:03.990")).toBeTruthy();
-  expect(screen.getByText(t("preview.approximateClip"))).toBeTruthy();
-  video.currentTime = 2.034; fireEvent.timeUpdate(video);
+  expect(screen.getByText(t("preview.boundedClip"))).toBeTruthy();
+  video.currentTime = 0.034; fireEvent.timeUpdate(video);
   expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:02.034 / 00:03.990");
   expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00.034 / 00:01.990");
-  video.currentTime = 4.01; fireEvent.timeUpdate(video);
-  expect(video.pause).toHaveBeenCalled(); expect(video.currentTime).toBe(3.99);
+  video.currentTime = 2.01; fireEvent.timeUpdate(video);
+  expect(video.pause).toHaveBeenCalled(); expect(video.currentTime).toBe(2);
   expect(onPlayheadChange).toHaveBeenLastCalledWith(1990);
   expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:03.990 / 00:03.990");
   expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:01.990 / 00:01.990");
-  rerender(<ManualVideoPreview {...props} t={(key, parameters) => translate("en-US", key, parameters)} />);
+  rerender(<ManualVideoPreview {...props} snapshotId="quantized" t={(key, parameters) => translate("en-US", key, parameters)} />);
   expect(screen.getByTestId("preview-timecode").textContent).toBe("Source 00:03.990 / 00:03.990");
   expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Excerpt 00:01.990 / 00:01.990");
-  expect(screen.getByText(translate("en-US", "preview.approximateClip"))).toBeTruthy();
+  expect(screen.getByText(translate("en-US", "preview.boundedClip"))).toBeTruthy();
 });
 
 it("formats media milliseconds without assuming fps or losing exact subsecond boundaries", () => {
@@ -276,7 +282,7 @@ for (const [zoom, width] of [[70, 700], [180, 1800]]) {
     expect(backend.history.current.timeline.clips[0]?.timelineStartMs).toBe(0);
     expect(bar.style.left).toBe("0%"); expect(bar.style.right).toBe("");
     expect(parseFloat(bar.style.width)).toBeCloseTo(100 / 3);
-    expect((await metadata(container)).currentTime).toBe(2);
+    expect((await metadata(container)).currentTime).toBe(0);
   });
   it(`trim drag at zoom ${zoom} commits once at release and refreshes preview`, async () => {
     const { backend, container } = await selectedTrimApp();
@@ -291,22 +297,22 @@ for (const [zoom, width] of [[70, 700], [180, 1800]]) {
     await waitFor(() => expect(backend.trims).toHaveLength(1));
     expect(backend.trims[0]).toMatchObject({ clipId: "manual-clip", sourceStartMs: 1000, sourceEndMs: 5000 });
     expect(backend.history.current.history.revision).toBe(initialRevision + 1);
-    const video = await metadata(container); expect(video.currentTime).toBe(1);
-    video.currentTime = 5.2; fireEvent.timeUpdate(video); expect(video.currentTime).toBe(5);
+    const video = await metadata(container); expect(video.currentTime).toBe(0);
+    video.currentTime = 4.2; fireEvent.timeUpdate(video); expect(video.currentTime).toBe(4);
     await waitFor(() => expect((screen.getByRole("button", { name: "Desfazer" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
     await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(4000)); await metadata(container);
     await waitFor(() => expect((screen.getByRole("button", { name: "Refazer" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "Refazer" }));
     await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(5000));
-    expect((await metadata(container)).currentTime).toBe(1);
+    expect((await metadata(container)).currentTime).toBe(0);
   });
 }
 it("IN keyboard trim supports fine adjustment, bounds and EN parity", async () => {
   const { backend, container } = await selectedTrimApp(); const initial = backend.history.entries.length;
   fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar IN do clip" }), { key: "ArrowRight", shiftKey: true });
   await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceStartMs).toBe(1010));
-  expect((await metadata(container)).currentTime).toBe(1.01);
+  expect((await metadata(container)).currentTime).toBe(0);
   await waitFor(() => expect(screen.getByRole("slider", { name: "Ajustar IN do clip" }).getAttribute("aria-disabled")).toBe("false"));
   fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar IN do clip" }), { key: "Home" });
   await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceStartMs).toBe(0)); await metadata(container);
@@ -335,7 +341,7 @@ it("rejected trim reports canonical error and preserves preview/history", async 
   backend.trimManualVideoClip = async () => { throw { code: "MANUAL_VIDEO_SOURCE_CHANGED" }; };
   fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar OUT do clip" }), { key: "ArrowRight" });
   await screen.findByRole("alert"); expect(backend.history.toArchive()).toEqual(before);
-  expect(screen.getByRole("slider", { name: "Ajustar OUT do clip" }).getAttribute("aria-valuenow")).toBe("4000"); expect(container.querySelector("video")!.currentTime).toBe(1);
+  expect(screen.getByRole("slider", { name: "Ajustar OUT do clip" }).getAttribute("aria-valuenow")).toBe("4000"); expect(container.querySelector("video")!.currentTime).toBe(0);
 });
 
 it("a pending trim disables handles and history until canonical confirmation", async () => {
@@ -396,4 +402,29 @@ it("preserves a newer Original selection while reconciling a rejected trim's can
   expect(screen.getByTestId("app-shell").getAttribute("data-project-revision")).toBe(String(backend.history.current.history.revision));
   expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(source.id);
   expect(screen.queryByRole("slider", { name: "Ajustar OUT do clip" })).toBeNull(); expect(screen.getByText("Original")).toBeTruthy();
+});
+
+it("trim invalidates pending derived preparation, cancels its operation and ignores the late old range", async () => {
+  const backend = new ManualBackend(); let finish!: (value: LocalVideoPreview) => void;
+  const clip = { id: "clip", trackId: "v1", sourceId: source.id, sourceStartMs: 2000, sourceEndMs: 3990, timelineStartMs: 0, timelineEndMs: 1990, speed: 1, volume: 1, opacity: 1 };
+  const answer = (request: LocalVideoPreviewRequest, start: number): LocalVideoPreview => ({ sourceId: source.id, snapshotId: request.expectedSnapshotId, durationMs: 3990 - start, mimeType: "video/mp4", base64: btoa("derived"), clip: { id: "clip", sourceStartMs: start, sourceEndMs: 3990, firstFrameMs: start, lastFrameMs: 3966, frameCount: 40 } });
+  const requests: LocalVideoPreviewRequest[] = [];
+  backend.previewLocalVideo = async request => { requests.push(request); return request.expectedSnapshotId === "old" ? new Promise(resolve => { finish = resolve; }) : answer(request, 2500); };
+  backend.cancelOperation = vi.fn(async operationId => ({ operationId, cancelled: true }));
+  const props = { backend, source, timelineOccupied: true, busy: false, clip, t, onPlayheadChange: vi.fn(), onCreate: vi.fn(), seek: { sequence: 0, timelineMs: 0 } };
+  const { container, rerender } = render(<ManualVideoPreview {...props} snapshotId="old" />);
+  rerender(<ManualVideoPreview {...props} clip={{ ...clip, sourceStartMs: 2500, timelineEndMs: 1490 }} snapshotId="new" />);
+  await metadata(container, 1.49); const current = container.querySelector("video")!.getAttribute("src");
+  expect(backend.cancelOperation).toHaveBeenCalledWith(requests[0]!.operationId); expect(requests[1]!.operationId).not.toBe(requests[0]!.operationId);
+  finish(answer(requests[0]!, 2000)); await waitFor(() => expect(container.querySelector("video")!.getAttribute("src")).toBe(current));
+  expect(screen.getByText("IN 00:02.500 · OUT 00:03.990")).toBeTruthy();
+});
+
+it("selected clip never admits original bytes or a mismatched range as its derived preview", async () => {
+  const backend = new ManualBackend();
+  backend.previewLocalVideo = async request => ({ sourceId: source.id, snapshotId: request.expectedSnapshotId, durationMs: 6000, mimeType: "video/mp4", base64: btoa("original") });
+  const clip = { id: "clip", trackId: "v1", sourceId: source.id, sourceStartMs: 2000, sourceEndMs: 3990, timelineStartMs: 0, timelineEndMs: 1990, speed: 1, volume: 1, opacity: 1 };
+  const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId="snapshot" clip={clip} timelineOccupied busy={false} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  await screen.findByText(t("preview.localChanged")); expect(container.querySelector("video")!.hasAttribute("src")).toBe(false);
+  expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(true);
 });

@@ -7,6 +7,9 @@ export const MANUAL_VIDEO_MAX_BYTES = 8 * 1024 * 1024;
 export interface LocalVideoPreviewRequest {
   sourceId: string;
   expectedSnapshotId: string;
+  /** Together, request an ephemeral derivative of this canonical clip. */
+  clipId?: string;
+  operationId?: string;
 }
 
 export interface LocalVideoPreview {
@@ -15,6 +18,7 @@ export interface LocalVideoPreview {
   durationMs: number;
   mimeType: "video/mp4" | "video/quicktime" | "video/webm";
   base64: string;
+  clip?: { id: string; sourceStartMs: number; sourceEndMs: number; firstFrameMs: number; lastFrameMs: number; frameCount: number };
 }
 
 export interface CreateManualVideoClipRequest extends LocalVideoPreviewRequest {

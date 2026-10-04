@@ -26,8 +26,10 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
     return this.request<MediaWorkerInfo>("cevra/info");
   }
 
-  async health(): Promise<MediaWorkerHealth> {
-    return this.enqueue(() => this.request<MediaWorkerHealth>("cevra/health"));
+  async health(signal?: AbortSignal): Promise<MediaWorkerHealth> {
+    // Health never reads a caller's input. Keep its queue slot until settled,
+    // while allowing a cancelled caller to stop waiting behind another job.
+    return this.enqueue(() => this.request<MediaWorkerHealth>("cevra/health"), signal, true);
   }
 
   async configureRuntime(profile: MediaWorkerRuntimeProfile): Promise<void> {
@@ -56,7 +58,7 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
         if (signal?.aborted) throw abortError();
         throw error;
       }
-    });
+    }, signal);
   }
 
   async close(): Promise<void> {
@@ -83,10 +85,21 @@ export class PersistentMediaWorkerClient implements MediaWorkerClient {
     return this.transport.request<T>(method, params, signal);
   }
 
-  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
-    const run = this.jobQueue.then(operation);
+  private enqueue<T>(operation: () => Promise<T>, signal?: AbortSignal, abortWhileRunning = false): Promise<T> {
+    let started = false;
+    const run = this.jobQueue.then(() => {
+      if (signal?.aborted) throw abortError();
+      started = true;
+      return operation();
+    });
     this.jobQueue = run.then(() => undefined, () => undefined);
-    return run;
+    if (!signal) return run;
+    return new Promise<T>((resolve, reject) => {
+      const abort = () => { if (!started || abortWhileRunning) reject(abortError()); };
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+      void run.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
+    });
   }
 
   private ensureStarted(): Promise<void> {

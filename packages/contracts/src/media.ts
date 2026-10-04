@@ -241,6 +241,19 @@ export interface MediaPublicationEvidenceV1 {
   inode: string;
 }
 
+/** Closed, bounded, ephemeral preview profile; never a final export source. */
+export interface BoundedVideoPreviewEvidenceV1 {
+  version: 1;
+  sourceStartMs: number;
+  sourceEndMs: number;
+  firstFrameMs: number;
+  lastFrameMs: number;
+  frameCount: number;
+  frameRate: number;
+  outputSha256: string;
+  audio?: { sampleRate: number; channels: number; inputSamples: number; decodedSamples: number };
+}
+
 export interface MuxAudioDurationValidationV1 {
   version: 1;
   videoDurationMs: number;
@@ -273,7 +286,7 @@ export interface EffectiveMediaProfile {
 export type MediaOperation =
   | MeasureAudioOperationV1
   | { type: "probe"; inputUri: string }
-  | { type: "trim"; inputUri: string; outputUri: string; startMs: number; endMs: number }
+  | { type: "trim"; inputUri: string; outputUri: string; startMs: number; endMs: number; boundedPreview?: true }
   | { type: "concat"; inputUris: string[]; outputUri: string }
   | { type: "transcode"; inputUri: string; outputUri: string; container?: MediaContainer; videoCodec?: VideoCodec; audioCodec?: AudioCodec; width?: number; height?: number; fps?: number }
   | { type: "fit"; inputUri: string; outputUri: string; width: number; height: number; mode: FitMode; backgroundColor?: string }
@@ -293,7 +306,7 @@ export type MediaOperationResult =
   | { type: "measure-audio"; report: AudioMeasurementReportV1 }
   | { type: "probe"; probe: MediaProbeResult }
   | { type: "detect-silence"; ranges: SilenceRange[] }
-  | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence; publication?: MediaPublicationEvidenceV1; muxDuration?: MuxAudioDurationEvidenceV1 };
+  | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence; publication?: MediaPublicationEvidenceV1; muxDuration?: MuxAudioDurationEvidenceV1; boundedPreview?: BoundedVideoPreviewEvidenceV1 };
 
 export interface MediaEngineAdapter extends EngineAdapter {
   execute(operation: MediaOperation, context: ExecutionContext): Promise<MediaOperationResult>;
@@ -306,7 +319,7 @@ const AUDIO_CODECS = new Set(["aac", "opus", "pcm", "copy"]);
 const OPERATION_FIELDS: Readonly<Record<MediaOperation["type"], ReadonlySet<string>>> = {
   "measure-audio": new Set(["type", "version", "inputUri", "streamIndex", "startMs", "endMs"]),
   probe: new Set(["type", "inputUri"]),
-  trim: new Set(["type", "inputUri", "outputUri", "startMs", "endMs"]),
+  trim: new Set(["type", "inputUri", "outputUri", "startMs", "endMs", "boundedPreview"]),
   concat: new Set(["type", "inputUris", "outputUri"]),
   transcode: new Set(["type", "inputUri", "outputUri", "container", "videoCodec", "audioCodec", "width", "height", "fps"]),
   fit: new Set(["type", "inputUri", "outputUri", "width", "height", "mode", "backgroundColor"]),
@@ -366,7 +379,9 @@ export function validateMediaOperation(value: unknown): MediaOperation {
       if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs.");
       break;
     case "probe": requireUri("inputUri"); break;
-    case "trim": requireUri("inputUri"); requireUri("outputUri"); requireTimestamp("startMs"); requireTimestamp("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); resolveStandardAvDelivery(value.outputUri as string, true); break;
+    case "trim": requireUri("inputUri"); requireUri("outputUri"); requireTimestamp("startMs"); requireTimestamp("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs.");
+      if (value.boundedPreview !== undefined && (value.boundedPreview !== true || !/\.mp4$/iu.test(value.outputUri as string) || (value.endMs as number) > 60_000)) throw new Error("boundedPreview requires the closed MP4 preview profile and a range within 60 seconds.");
+      resolveStandardAvDelivery(value.outputUri as string, value.boundedPreview !== true); break;
     case "concat": if (!Array.isArray(value.inputUris) || value.inputUris.length < 1 || value.inputUris.length > MAX_MEDIA_INPUTS || value.inputUris.some((uri) => !isSafeMediaUri(uri))) throw new Error(`inputUris must contain 1-${MAX_MEDIA_INPUTS} safe media URIs.`); requireUri("outputUri"); resolveStandardAvDelivery(value.outputUri as string, true); break;
     case "transcode": {
       requireUri("inputUri"); requireUri("outputUri");

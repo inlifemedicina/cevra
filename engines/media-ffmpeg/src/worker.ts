@@ -73,7 +73,7 @@ export interface MediaWorkerToolResult {
 
 export interface MediaWorkerClient {
   info(): Promise<MediaWorkerInfo>;
-  health(): Promise<MediaWorkerHealth>;
+  health(signal?: AbortSignal): Promise<MediaWorkerHealth>;
   configureRuntime(profile: MediaWorkerRuntimeProfile): Promise<void>;
   benchmarkVideoEncoders(codec: WorkerVideoCodec, encoders: string[]): Promise<MediaWorkerEncoderBenchmark[]>;
   listTools(): Promise<Array<{ name: string; inputSchema?: Record<string, unknown> }>>;
