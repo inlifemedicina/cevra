@@ -1,6 +1,6 @@
 import { assertValidSourceNumbering, SourceNumberRegistry, type ProjectIR, type SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
-import type { CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
+import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   DesktopBackend,
@@ -44,6 +44,11 @@ export class TauriDesktopBackend implements DesktopBackend {
 
   async createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }> {
     const result = await this.call<{ state: HostState; clipId: string }>("desktop_create_manual_video_clip", { args: request });
+    return { state: fromHostState(result.state), clipId: result.clipId };
+  }
+
+  async trimManualVideoClip(request: TrimManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }> {
+    const result = await this.call<{ state: HostState; clipId: string }>("desktop_trim_manual_video_clip", { args: request });
     return { state: fromHostState(result.state), clipId: result.clipId };
   }
 

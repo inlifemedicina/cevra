@@ -341,5 +341,9 @@
   "preview.clipMode": "Clip do trecho",
   "preview.singleClip": "A timeline já contém itens. Este teste inicial admite um clip; selecione o clip simples para reproduzir e conferir desfazer/refazer.",
   "preview.rangeInvalid": "Marque IN antes de OUT, dentro da duração do vídeo.",
-  "preview.unsupportedClip": "Reproduzindo o original. O preview das alterações deste clip ainda não está disponível neste teste inicial."
+  "preview.unsupportedClip": "Reproduzindo o original. O preview das alterações deste clip ainda não está disponível neste teste inicial.",
+  "timeline.trimIn": "Ajustar IN do clip",
+  "timeline.trimOut": "Ajustar OUT do clip",
+  "timeline.trimRange": "Trecho do clip",
+  "timeline.trimHint": "Arraste IN/OUT · setas: 0,1 s · Shift: 0,01 s · Esc: cancelar"
 }

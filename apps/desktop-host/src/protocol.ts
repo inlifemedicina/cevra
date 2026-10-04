@@ -1,6 +1,6 @@
 import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
-import type { LocalVideoPreviewRequest, CreateManualVideoClipRequest } from "@cevra/application";
+import type { LocalVideoPreviewRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
 export const DESKTOP_HOST_IDENTITY = "cevra.desktop-host" as const;
@@ -18,6 +18,7 @@ export type HostMethod =
   | "editorial.revise"
   | "media.ingestLocal"
   | "video.previewLocal"
+  | "video.trimManualClip"
   | "video.createManualClip"
   | "transcription.transcribeSource"
   | "history.undo"
@@ -81,6 +82,7 @@ const METHODS = new Set<HostMethod>([
   "media.ingestLocal",
   "video.previewLocal",
   "video.createManualClip",
+  "video.trimManualClip",
   "transcription.transcribeSource",
   "history.undo",
   "history.redo",
@@ -180,6 +182,17 @@ export function validateManualClipParams(params: Record<string, unknown>, id: st
     throw new ProtocolValidationError("HOST_INVALID_PARAMS", "The manual video range is invalid.", id);
   }
   return { ...videoBinding(params, id), sourceStartMs: params.sourceStartMs as number, sourceEndMs: params.sourceEndMs as number };
+}
+
+export function validateManualTrimParams(params: Record<string, unknown>, id: string): TrimManualVideoClipRequest {
+  exactKeys(params, ["clipId", "expectedSnapshotId", "sourceStartMs", "sourceEndMs"], id);
+  if (!Number.isSafeInteger(params.sourceStartMs) || !Number.isSafeInteger(params.sourceEndMs)
+    || (params.sourceStartMs as number) < 0 || (params.sourceEndMs as number) <= (params.sourceStartMs as number)) {
+    throw new ProtocolValidationError("HOST_INVALID_PARAMS", "The manual video range is invalid.", id);
+  }
+  return { clipId: boundedString(params.clipId, 128, "clipId", id),
+    expectedSnapshotId: boundedString(params.expectedSnapshotId, 128, "expectedSnapshotId", id),
+    sourceStartMs: params.sourceStartMs as number, sourceEndMs: params.sourceEndMs as number };
 }
 
 function videoBinding(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {

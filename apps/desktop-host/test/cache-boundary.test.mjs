@@ -81,7 +81,7 @@ test("trusted cache root stays host-internal and adds no protocol or WebView com
     "allow-desktop-cancel-operation", "allow-desktop-get-state", "allow-desktop-pick-and-ingest-media",
     "allow-desktop-redo", "allow-desktop-transcribe-source", "allow-desktop-undo",
     "allow-desktop-get-editorial-draft", "allow-desktop-revise-editorial-draft",
-    "allow-desktop-preview-local-video", "allow-desktop-create-manual-video-clip"
+    "allow-desktop-preview-local-video", "allow-desktop-create-manual-video-clip", "allow-desktop-trim-manual-video-clip"
   ].sort());
 });
 

@@ -1,5 +1,5 @@
 import { createEmptyProject, ProjectHistory, type SourceAsset } from "@cevra/project-ir";
-import type { CreateManualVideoClipRequest, LocalVideoPreview, LocalVideoPreviewRequest } from "@cevra/application";
+import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreview, LocalVideoPreviewRequest } from "@cevra/application";
 import { translate } from "@cevra/i18n";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
@@ -45,6 +45,13 @@ class ManualBackend implements DesktopBackend {
     this.history.commit({ type: "clip.add", clip: { id: "manual-clip", sourceId: request.sourceId, trackId: "track-v1", sourceStartMs: request.sourceStartMs, sourceEndMs: request.sourceEndMs,
       timelineStartMs: 0, timelineEndMs: request.sourceEndMs - request.sourceStartMs, speed: 1, volume: 1, opacity: 1 } });
     return { state: await this.loadState(), clipId: "manual-clip" };
+  }
+  readonly trims: TrimManualVideoClipRequest[] = [];
+  async trimManualVideoClip(request: TrimManualVideoClipRequest) {
+    this.trims.push(request);
+    this.history.commit({ type: "clip.trim", clipId: request.clipId, timelineStartMs: 0, timelineEndMs: request.sourceEndMs - request.sourceStartMs,
+      sourceStartMs: request.sourceStartMs, sourceEndMs: request.sourceEndMs });
+    return { state: await this.loadState(), clipId: request.clipId };
   }
   async pickAndImportMedia() { return { outcome: "cancelled" as const }; }
   async transcribeSource() { return this.loadState(); }
@@ -177,4 +184,139 @@ it("preexisting speed/muted-track edits fall back explicitly to Original without
   expect(screen.getByText(t("preview.unsupportedClip"))).toBeTruthy();
   expect(screen.getByText("Original")).toBeTruthy();
   expect(container.querySelector("video")!.currentTime).toBe(0);
+});
+
+async function selectedTrimApp() {
+  const backend = new ManualBackend();
+  await backend.createManualVideoClip({ sourceId: source.id, expectedSnapshotId: backend.history.current.history.headSnapshotId!, sourceStartMs: 1000, sourceEndMs: 4000 });
+  const rendered = render(<App backend={backend} />);
+  await metadata(rendered.container);
+  fireEvent.click(within(screen.getByTestId("timeline-track-track-v1")).getByRole("button", { name: "Vídeo 1 · fixture.mp4" }));
+  await metadata(rendered.container);
+  await waitFor(() => expect(screen.getByRole("slider", { name: "Ajustar OUT do clip" }).getAttribute("aria-disabled")).toBe("false"));
+  return { backend, ...rendered };
+}
+function pointer(target: Element, type: string, clientX: number, pointerId = 1) {
+  const event = new MouseEvent(type, { bubbles: true, clientX, button: 0 });
+  Object.defineProperty(event, "pointerId", { value: pointerId }); fireEvent(target, event);
+}
+for (const [zoom, width] of [[70, 700], [180, 1800]]) {
+  it(`trim drag at zoom ${zoom} commits once at release and refreshes preview`, async () => {
+    const { backend, container } = await selectedTrimApp();
+    fireEvent.change(screen.getByLabelText("Zoom da linha do tempo"), { target: { value: String(zoom) } });
+    const handle = screen.getByRole("slider", { name: "Ajustar OUT do clip" });
+    vi.spyOn(handle.closest(".timeline-width")!, "getBoundingClientRect").mockReturnValue({ width } as DOMRect);
+    const initialRevision = backend.history.current.history.revision;
+    pointer(handle, "pointerdown", 200); pointer(handle, "pointermove", 200 + width / 6);
+    expect(handle.getAttribute("aria-valuenow")).toBe("5000");
+    expect(backend.trims).toHaveLength(0); expect(backend.history.current.history.revision).toBe(initialRevision);
+    pointer(handle, "pointerup", 200 + width / 6);
+    await waitFor(() => expect(backend.trims).toHaveLength(1));
+    expect(backend.trims[0]).toMatchObject({ clipId: "manual-clip", sourceStartMs: 1000, sourceEndMs: 5000 });
+    expect(backend.history.current.history.revision).toBe(initialRevision + 1);
+    const video = await metadata(container); expect(video.currentTime).toBe(1);
+    video.currentTime = 5.2; fireEvent.timeUpdate(video); expect(video.currentTime).toBe(5);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Desfazer" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
+    await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(4000)); await metadata(container);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Refazer" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Refazer" }));
+    await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(5000));
+    expect((await metadata(container)).currentTime).toBe(1);
+  });
+}
+it("IN keyboard trim supports fine adjustment, bounds and EN parity", async () => {
+  const { backend, container } = await selectedTrimApp(); const initial = backend.history.entries.length;
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar IN do clip" }), { key: "ArrowRight", shiftKey: true });
+  await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceStartMs).toBe(1010));
+  expect((await metadata(container)).currentTime).toBe(1.01);
+  await waitFor(() => expect(screen.getByRole("slider", { name: "Ajustar IN do clip" }).getAttribute("aria-disabled")).toBe("false"));
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar IN do clip" }), { key: "Home" });
+  await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceStartMs).toBe(0)); await metadata(container);
+  await waitFor(() => expect(screen.getByRole("slider", { name: "Ajustar IN do clip" }).getAttribute("aria-disabled")).toBe("false"));
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar IN do clip" }), { key: "ArrowLeft" });
+  expect(backend.history.entries.length).toBe(initial + 2); expect(backend.trims).toHaveLength(2);
+  fireEvent.click(screen.getByRole("button", { name: translate("pt-BR", "top.switchLanguage") }));
+  expect(screen.getByRole("slider", { name: "Adjust clip IN" })).toBeTruthy(); expect(screen.getByRole("slider", { name: "Adjust clip OUT" })).toBeTruthy();
+});
+for (const cancellation of ["escape", "pointercancel", "captureloss", "zoom", "selection", "blur"]) {
+  it(`cancels trim draft on ${cancellation} without a command`, async () => {
+    const { backend } = await selectedTrimApp(); const handle = screen.getByRole("slider", { name: "Ajustar IN do clip" });
+    vi.spyOn(handle.closest(".timeline-width")!, "getBoundingClientRect").mockReturnValue({ width: 600 } as DOMRect);
+    pointer(handle, "pointerdown", 100); pointer(handle, "pointermove", 150); expect(handle.getAttribute("aria-valuenow")).toBe("1500");
+    if (cancellation === "escape") fireEvent.keyDown(window, { key: "Escape" });
+    if (cancellation === "pointercancel") pointer(handle, "pointercancel", 150);
+    if (cancellation === "captureloss") pointer(handle, "lostpointercapture", 150);
+    if (cancellation === "zoom") fireEvent.change(screen.getByLabelText("Zoom da linha do tempo"), { target: { value: "180" } });
+    if (cancellation === "selection") fireEvent.click(within(screen.getByRole("complementary", { name: "Mídia do projeto" })).getByRole("button", { name: /Vídeo 1/ }));
+    if (cancellation === "blur") fireEvent.blur(window);
+    pointer(handle, "pointerup", 150); expect(backend.trims).toHaveLength(0); expect(backend.history.current.timeline.clips[0]?.sourceStartMs).toBe(1000);
+  });
+}
+it("rejected trim reports canonical error and preserves preview/history", async () => {
+  const { backend, container } = await selectedTrimApp(); const before = backend.history.toArchive();
+  backend.trimManualVideoClip = async () => { throw { code: "MANUAL_VIDEO_SOURCE_CHANGED" }; };
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar OUT do clip" }), { key: "ArrowRight" });
+  await screen.findByRole("alert"); expect(backend.history.toArchive()).toEqual(before);
+  expect(screen.getByRole("slider", { name: "Ajustar OUT do clip" }).getAttribute("aria-valuenow")).toBe("4000"); expect(container.querySelector("video")!.currentTime).toBe(1);
+});
+
+it("a pending trim disables handles and history until canonical confirmation", async () => {
+  const { backend } = await selectedTrimApp();
+  const trim = backend.trimManualVideoClip.bind(backend); let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  backend.trimManualVideoClip = async (request) => { await pending; return trim(request); };
+  const handle = screen.getByRole("slider", { name: "Ajustar OUT do clip" });
+  fireEvent.keyDown(handle, { key: "ArrowRight" });
+  expect(handle.getAttribute("aria-disabled")).toBe("true");
+  expect((screen.getByRole("button", { name: "Desfazer" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.keyDown(handle, { key: "ArrowRight" });
+  expect(backend.trims).toHaveLength(0);
+  release(); await waitFor(() => expect(backend.trims).toHaveLength(1));
+  expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(4100);
+});
+
+
+it("keeps keyboard focus on the same edge after confirmation without stealing another control's focus", async () => {
+  const { backend } = await selectedTrimApp();
+  const handle = screen.getByRole("slider", { name: "Ajustar OUT do clip" }) as HTMLButtonElement;
+  handle.focus(); fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+  await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(4100));
+  await waitFor(() => expect(handle.getAttribute("aria-disabled")).toBe("false"));
+  expect(document.activeElement).toBe(handle);
+  fireEvent.keyDown(document.activeElement!, { key: "ArrowRight", shiftKey: true });
+  await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(4110));
+  expect(document.activeElement).toBe(handle);
+  let release!: () => void; const pending = new Promise<void>((resolve) => { release = resolve; });
+  const original = backend.trimManualVideoClip.bind(backend); backend.trimManualVideoClip = async (request) => { await pending; return original(request); };
+  await waitFor(() => expect(handle.getAttribute("aria-disabled")).toBe("false"));
+  fireEvent.keyDown(handle, { key: "ArrowLeft" });
+  const zoom = screen.getByLabelText("Zoom da linha do tempo"); zoom.focus(); release();
+  await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(4010));
+  expect(document.activeElement).toBe(zoom);
+});
+
+it("preserves a newly selected Original while a trim is awaiting canonical confirmation", async () => {
+  const { backend } = await selectedTrimApp(); let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; }); const original = backend.trimManualVideoClip.bind(backend);
+  backend.trimManualVideoClip = async (request) => { await pending; return original(request); };
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar OUT do clip" }), { key: "ArrowRight" });
+  fireEvent.click(within(screen.getByRole("complementary", { name: "Mídia do projeto" })).getByRole("button", { name: /Vídeo 1/ }));
+  expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(source.id);
+  release(); await waitFor(() => expect(backend.history.current.timeline.clips[0]?.sourceEndMs).toBe(4100));
+  expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(source.id);
+  expect(screen.queryByRole("slider", { name: "Ajustar OUT do clip" })).toBeNull();
+  expect(screen.getByText("Original")).toBeTruthy();
+});
+
+it("preserves a newer Original selection while reconciling a rejected trim's canonical state", async () => {
+  const { backend } = await selectedTrimApp(); let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; }); const trim = backend.trimManualVideoClip.bind(backend);
+  backend.trimManualVideoClip = async (request) => { await pending; const result = await trim(request); throw { code: "PROJECT_PERSISTENCE_FAILED", reconciledState: result.state }; };
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Ajustar OUT do clip" }), { key: "ArrowRight" });
+  fireEvent.click(within(screen.getByRole("complementary", { name: "Mídia do projeto" })).getByRole("button", { name: /Vídeo 1/ }));
+  release(); await screen.findByRole("alert");
+  expect(screen.getByTestId("app-shell").getAttribute("data-project-revision")).toBe(String(backend.history.current.history.revision));
+  expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(source.id);
+  expect(screen.queryByRole("slider", { name: "Ajustar OUT do clip" })).toBeNull(); expect(screen.getByText("Original")).toBeTruthy();
 });
