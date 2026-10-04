@@ -367,3 +367,17 @@ provider gates are unchanged. PR #76 remains the separate documentation track.
 
 
 Manual first-video excerpt is now an approved active slice on `feat/manual-inout-preview`, based on integrated #78 `182081e6a9e6c1b7849a099ebd3f6bba13663415` (post-merge CI `37151631882`, SUCCESS 5/5). Real local original playback, manual IN/OUT, one canonical clip and existing undo/redo are implemented for an initial small-fixture test; the 8 MiB/one-clip limits are not the final product contract. Application/host 346 and UI 66 tests PASS, code review APPROVE; native playback/Owner acceptance remain NOT EXECUTED pending one consolidated round. No AI, invented F-A02 timing, automatic alignment, composition/export or brief/profile implementation. Director impact is a compatible execution extension on the same history/timeline; progress stays 55%. Details are the scoped manual-excerpt checkpoint in the master and existing acceptance IDs, not a new acceptance catalog.
+
+## Direct timeline IN/OUT — approved block, 2026-10-04
+
+PR #80 is integrated at `ddf1448f3c32bdd9f8c35c9ad25b668e00be4856`,
+with post-merge CI 5/5 and Exact Runtime 1/1 SUCCESS on that SHA. Its bounded
+functional owner round passed; the preceding pending-native statement is historical.
+The approved next block on `feat/manual-timeline-trim` adds pointer/keyboard
+handles through existing `clip.trim`, source verification, checkpoint, preview
+and undo/redo. IMPLEMENTED / NOT MERGED; current owner trim
+acceptance NOT RUN, isolated demo prepared without launching a window.
+[Contract and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md). Reuse I4-T1, X-T1/T7
+and simple-clip X-T6; no duplicate acceptance IDs. Director impact is compatible
+direct editing. Progress stays 55%, F-A02 exhausted 1/1; composition/export,
+streaming/multi-clip and provider gates remain separate.

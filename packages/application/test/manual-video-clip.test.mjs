@@ -94,3 +94,78 @@ test("existing unlocked video track is reused and a second clip is rejected", as
   await assert.rejects(service.create({ ...request, expectedSnapshotId: history.current.history.headSnapshotId }), { code: "MANUAL_VIDEO_TIMELINE_OCCUPIED" });
   assert.deepEqual(history.toArchive(), before);
 });
+
+async function trimSetup(identityOverrides = {}) {
+  const context = setup({}, identityOverrides);
+  const created = await context.service.create(context.request);
+  return { ...context, trimRequest: { clipId: created.clipId, expectedSnapshotId: context.history.current.history.headSnapshotId, sourceStartMs: 1500, sourceEndMs: 4500 } };
+}
+
+test("trim records one user command, survives archive recovery and preserves source/numbering", async () => {
+  const { history, service, trimRequest } = await trimSetup();
+  const before = history.current; const numbering = history.sourceNumbering; const count = history.entries.length;
+  const result = await service.trim(trimRequest);
+  assert.equal(history.entries.length, count + 1);
+  assert.equal(history.entries.at(-1).command.type, "clip.trim"); assert.equal(history.entries.at(-1).actor.type, "user");
+  assert.deepEqual(result.project.timeline.clips[0], { ...before.timeline.clips[0], sourceStartMs: 1500, sourceEndMs: 4500, timelineEndMs: 3000 });
+  assert.deepEqual(result.project.sources, before.sources); assert.deepEqual(history.sourceNumbering, numbering);
+  history.undo(); assert.deepEqual(history.current.timeline.clips, before.timeline.clips);
+  const restored = ProjectHistory.fromArchive(history.toArchive()); restored.redo();
+  assert.deepEqual(restored.current.timeline.clips, result.project.timeline.clips);
+});
+
+test("no-op trim preserves redo and every snapshot", async () => {
+  const { history, service, trimRequest } = await trimSetup();
+  history.commit({ type: "project.rename", name: "Later" }); history.undo();
+  const before = history.toArchive(); const clip = history.current.timeline.clips[0];
+  await service.trim({ ...trimRequest, expectedSnapshotId: history.current.history.headSnapshotId, sourceStartMs: clip.sourceStartMs, sourceEndMs: clip.sourceEndMs });
+  assert.deepEqual(history.toArchive(), before); assert.equal(history.canRedo, true);
+});
+
+for (const range of [[-1, 100], [1000, 1000], [0.5, 2000], [0, 6001], [0, Number.MAX_SAFE_INTEGER + 1]]) {
+  test(`trim rejects unsafe source range ${range} without mutation`, async () => {
+    const { history, service, trimRequest } = await trimSetup(); const before = history.toArchive();
+    await assert.rejects(service.trim({ ...trimRequest, sourceStartMs: range[0], sourceEndMs: range[1] }), { code: "MANUAL_VIDEO_INVALID_RANGE" });
+    assert.deepEqual(history.toArchive(), before);
+  });
+}
+
+test("trim rejects stale, path and source overrides without reading media", async () => {
+  let deny = false;
+  const { history, service, trimRequest } = await trimSetup({ async captureSource() { if (deny) assert.fail("must not read"); return { version: 1, uri: "/tmp/fixture.mp4", canonicalPath: "/tmp/fixture.mp4", device: "1", inode: "1", sizeBytes: 10, mtimeNs: "1", ctimeNs: "1" }; } });
+  deny = true; const before = history.toArchive();
+  await assert.rejects(service.trim({ ...trimRequest, expectedSnapshotId: "old" }), { code: "MANUAL_VIDEO_STALE" });
+  for (const key of ["uri", "sourceId", "timelineStartMs", "commands"]) await assert.rejects(service.trim({ ...trimRequest, [key]: "injected" }), { code: "MANUAL_VIDEO_INVALID_REQUEST" });
+  assert.deepEqual(history.toArchive(), before);
+});
+
+for (const change of ["locked", "speed", "overlay", "second-clip"]) {
+  test(`trim rejects unsupported ${change} instead of silently losing composition`, async () => {
+    const initial = await trimSetup(); const project = structuredClone(initial.history.current); const clip = project.timeline.clips[0];
+    if (change === "locked") project.timeline.tracks[0].locked = true;
+    if (change === "speed") clip.speed = 2;
+    if (change === "overlay") project.captions.push({ id: "caption", text: "overlay", startMs: 0, endMs: 1000 });
+    if (change === "second-clip") { project.timeline.clips.push({ ...clip, id: "second", timelineStartMs: 3000, timelineEndMs: 6000 }); project.timeline.durationMs = 6000; }
+    const history = new ProjectHistory(project);
+    const service = new ManualVideoClipApplicationService({ history, identity: { async captureSource() { assert.fail("must not read unsupported edit"); } } });
+    const trimRequest = initial.trimRequest;
+    const before = history.toArchive();
+    await assert.rejects(service.trim({ ...trimRequest, expectedSnapshotId: history.current.history.headSnapshotId }), { code: "MANUAL_VIDEO_UNSUPPORTED" });
+    assert.deepEqual(history.toArchive(), before);
+  });
+}
+
+test("changed identity and stale async work cannot record a trim", async () => {
+  let changed = false;
+  const { history, service, trimRequest } = await trimSetup({ async checkSource() { return changed ? "changed" : "match"; } });
+  changed = true; const before = history.toArchive();
+  await assert.rejects(service.trim(trimRequest), { code: "MANUAL_VIDEO_SOURCE_CHANGED" }); assert.deepEqual(history.toArchive(), before);
+  changed = false;
+  let release; const blocked = new Promise((resolve) => { release = resolve; });
+  const slow = new ManualVideoClipApplicationService({ history, identity: {
+    async captureSource() { await blocked; return { sizeBytes: 10 }; },
+    async identifySource() { return { version: 1, content: { sha256: "a".repeat(64), sizeBytes: 10 }, stamp: {}, bytesRead: 10 }; }, async checkSource() { return "match"; }
+  } });
+  const task = slow.trim(trimRequest); history.commit({ type: "project.rename", name: "New snapshot" }); release();
+  await assert.rejects(task, { code: "MANUAL_VIDEO_STALE" }); assert.equal(history.entries.at(-1).command.type, "project.rename");
+});

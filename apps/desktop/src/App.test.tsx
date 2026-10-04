@@ -71,6 +71,7 @@ class FunctionalDesktopBackend implements DesktopBackend {
   async loadEditorialDraft() { return { status: "empty" as const }; }
   async reviseEditorialDraft(): Promise<never> { throw { code: "EDITORIAL_DRAFT_UNAVAILABLE" }; }
   async previewLocalVideo(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
+  async trimManualVideoClip(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
   async createManualVideoClip(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
   async loadState(): Promise<DesktopBackendState> { return this.state(); }
   async pickAndImportMedia(): Promise<ImportMediaResult> {

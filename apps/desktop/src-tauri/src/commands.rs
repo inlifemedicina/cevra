@@ -81,6 +81,36 @@ pub async fn desktop_create_manual_video_clip(
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualVideoTrimArgs {
+    clip_id: String,
+    expected_snapshot_id: String,
+    source_start_ms: u64,
+    source_end_ms: u64,
+}
+
+#[tauri::command]
+pub async fn desktop_trim_manual_video_clip(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualVideoTrimArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.clip_id, "clipId")?;
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    if args.source_start_ms >= args.source_end_ms || args.source_end_ms > 9_007_199_254_740_991 {
+        return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_RANGE", "The manual video range is invalid."));
+    }
+    supervisor.ensure_started(&app).await?;
+    match supervisor.request_immediate_mutation("video.trimManualClip", json!({
+        "clipId": args.clip_id, "expectedSnapshotId": args.expected_snapshot_id,
+        "sourceStartMs": args.source_start_ms, "sourceEndMs": args.source_end_ms
+    })).await {
+        Ok(result) => Ok(result),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EditorialBlockEdit {
     block_id: String,
     title: Option<String>,
@@ -363,4 +393,18 @@ mod video_boundary_tests {
             })).is_err());
         }
     }
+    #[test]
+    fn manual_trim_args_accept_only_clip_binding_and_integer_source_range() {
+        let valid = json!({ "clipId": "clip", "expectedSnapshotId": "snapshot", "sourceStartMs": 1000, "sourceEndMs": 4000 });
+        assert!(serde_json::from_value::<ManualVideoTrimArgs>(valid.clone()).is_ok());
+        for extra in ["uri", "path", "sourceId", "durationMs", "commands", "timelineEndMs", "speed"] {
+            let mut injected = valid.clone(); injected[extra] = json!("injected");
+            assert!(serde_json::from_value::<ManualVideoTrimArgs>(injected).is_err());
+        }
+        for invalid in [json!(-1), json!(0.5), json!("1000")] {
+            let mut injected = valid.clone(); injected["sourceStartMs"] = invalid;
+            assert!(serde_json::from_value::<ManualVideoTrimArgs>(injected).is_err());
+        }
+    }
+
 }

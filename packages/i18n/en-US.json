@@ -341,5 +341,9 @@
   "preview.clipMode": "Excerpt clip",
   "preview.singleClip": "The timeline already contains items. This initial test supports one clip; select the simple clip to play and verify undo/redo.",
   "preview.rangeInvalid": "Mark IN before OUT, within the video duration.",
-  "preview.unsupportedClip": "Playing the original. A preview of this clip’s edits is not available in this initial test."
+  "preview.unsupportedClip": "Playing the original. A preview of this clip’s edits is not available in this initial test.",
+  "timeline.trimIn": "Adjust clip IN",
+  "timeline.trimOut": "Adjust clip OUT",
+  "timeline.trimRange": "Clip excerpt",
+  "timeline.trimHint": "Drag IN/OUT · arrows: 0.1 s · Shift: 0.01 s · Esc: cancel"
 }

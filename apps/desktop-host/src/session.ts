@@ -18,7 +18,7 @@ import type {
   MediaExecutionIntentRepository
 } from "@cevra/application";
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
-import type { CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
+import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
   FfmpegMediaEngine,
@@ -58,7 +58,7 @@ export interface DesktopSessionServices {
   transcriptionCapability: CapabilityState;
   persistence?: DesktopProjectPersistence;
   temporaryEditorialReview?: true;
-  manualVideoClip?: Pick<ManualVideoClipApplicationService, "create">;
+  manualVideoClip?: Pick<ManualVideoClipApplicationService, "create" | "trim">;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
 }
@@ -187,6 +187,16 @@ export class DesktopSession {
       if (!this.services.manualVideoClip) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
       const outcome = await this.services.manualVideoClip.create(structuredClone(request));
       await this.persistMutation();
+      return { state: this.state(), clipId: outcome.clipId };
+    });
+  }
+
+  async trimManualVideoClip(request: TrimManualVideoClipRequest): Promise<{ state: DesktopHostState; clipId: string }> {
+    return this.runMutation(async () => {
+      if (!this.services.manualVideoClip) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+      const snapshot = this.services.history.current.history.headSnapshotId;
+      const outcome = await this.services.manualVideoClip.trim(structuredClone(request));
+      if (snapshot !== this.services.history.current.history.headSnapshotId) await this.persistMutation();
       return { state: this.state(), clipId: outcome.clipId };
     });
   }

@@ -2736,3 +2736,19 @@ Two narrow native commands expose bounded verified bytes and the closed manual r
 Automated baseline evidence: 346 Application/host tests and 66 UI tests PASS; independent code review APPROVE after size/zoom/legacy-preview corrections. PR #80 remains Draft / NOT MERGED. On 2026-10-04 UTC the owner tested the isolated macOS arm64 PT-BR demo built from `1855c445687eb22102bfb870773f74fca7d315e3` and confirmed original playback, manual IN/OUT, one visible clip, playback limited to the excerpt and undo/redo working. This closes the functional acceptance of that bounded variant, not the wider case catalog. The owner reported that the create-clip button looked inactive after OUT despite accepting the click; the scoped follow-up uses a dedicated enabled/disabled style without changing range validation or mutation behavior. Its 54 relevant UI tests and offscreen browser render PASS; the running owner session is preserved and the updated native demo is prepared separately, not substituted during testing. The [acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#manual-inout-macos-2026-10-04) records the fixture, narrow results and remaining visual/release limits. General composition/export, complete save/reopen, production distribution and real-agent gates remain open.
 
 **Director impact:** compatible manual-edit execution extension on the same canonical history/timeline. Director provider/context/permission responsibilities are unchanged; no command, engine or provider authority is admitted through a proposal or serialized result. Global roadmap progress stays 55%; F-A02 remains exhausted 1/1.
+
+### Direct timeline IN/OUT — approved bounded block, 2026-10-04
+
+PR #80 is integrated at `ddf1448f3c32bdd9f8c35c9ad25b668e00be4856`;
+post-merge CI `37166055533` SUCCESS 5/5 and Exact Runtime `37166055565`
+SUCCESS 1/1, attempt 1, supersede its earlier unmerged wording above.
+Its bounded original/manual excerpt functional owner acceptance remains valid.
+The owner approved the next block: pointer and keyboard IN/OUT controls on the
+same simple timeline clip, verified `clip.trim`, preview and undo/redo. The block
+on `feat/manual-timeline-trim` is IMPLEMENTED / NOT MERGED;
+one new isolated demo and one additional human round are prepared without
+activating a window. The scoped contract, automation/scale evidence and open
+limits are in [Manual Timeline Trim V1](CEVRA_MANUAL_TIMELINE_TRIM_V1.md).
+Director impact is compatible direct editing through existing typed history;
+no IR/storage/engine direction or AI/provider authority changes. Global progress
+remains 55%; F-A02 remains exhausted 1/1.

@@ -240,3 +240,17 @@ Preparação comum: build/commit identificados, macOS arm64 e Windows x64 avalia
 Para cada ID e variante registrar: data/responsável, versão + commit da build, OS/arquitetura/locale, fixture + hash/proveniência, precondições/capabilities, passos realizados, esperado versus observado, resultado objetivo, julgamento humano quando aplicável e link da evidência/issue. Evidência técnica automatizada deve ficar rotulada `CI/UNIT/FAKE/RUNTIME`; homologação deve identificar `APP/BUILD REAL`.
 
 Não promover um fluxo a PASS se só parte foi executada. Registrar PARTIAL com os IDs/variantes faltantes; BLOCKED conserva o teste planejado e a dependência concreta. Publicar somente artefatos sintéticos/redigidos, com licença e sem mídia/conta pessoal. Não adicionar dumps, exports pesados ou logs temporários ao repositório. Esta lista prepara a homologação futura; não autoriza provider, gasto, nova feature, engine ou mudança de escopo.
+
+### Direct timeline trim — additional bounded round, 2026-10-04
+
+I4-T1, X-T1/T7 and simple-clip X-T6 are reused for the owner-approved follow-up.
+UNIT/RUNTIME: pointer/keyboard range adjustment, one `clip.trim` per confirmed
+edit, cancellation/no-op, descriptor/snapshot/busy guards, checkpoint/reopen and
+preview/undo/redo PASS in the bounded fixture. APP/OWNER: NOT EXECUTED for this
+new block. One prepared isolated demo reuses the earlier synthetic original,
+with an initial 1.500–4.500 s clip, without replacing or activating existing
+windows. [The scoped record](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#one-additional-owner-round)
+contains the consolidated steps and evidence limits. PR #80's earlier functional
+acceptance remains valid; #80 is now integrated and its CI 5/5 plus Exact Runtime
+1/1 passed after merge. No full catalog ID, composition/export, native Windows,
+release or new provider acceptance follows from these bounded results.

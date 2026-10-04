@@ -10,6 +10,7 @@ pub const APPLICATION_COMMANDS: &[&str] = &[
     "desktop_revise_editorial_draft",
     "desktop_preview_local_video",
     "desktop_create_manual_video_clip",
+    "desktop_trim_manual_video_clip",
 ];
 
 #[cfg(test)]

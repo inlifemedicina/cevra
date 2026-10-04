@@ -18,6 +18,7 @@ export class DemoDesktopBackend implements DesktopBackend {
   async loadEditorialDraft(): Promise<EditorialDraftState> { return { status: "empty" }; }
   async reviseEditorialDraft(_request: ReviseEditorialDraftRequest): Promise<EditorialDraftState> { throw { code: "EDITORIAL_DRAFT_UNAVAILABLE" }; }
   async previewLocalVideo(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
+  async trimManualVideoClip(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
   async createManualVideoClip(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
 
   async loadState(): Promise<DesktopBackendState> {
