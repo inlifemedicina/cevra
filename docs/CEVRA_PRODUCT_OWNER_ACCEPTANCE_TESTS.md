@@ -278,3 +278,25 @@ native perceptual acceptance remains PENDING. Recheck only visual IN drag and
 new excerpt playback together, preserving accepted cancellation, keyboard and
 undo/redo. This does not promote full I4-T1, X-T1/T7, X-T6, composition/export,
 release or provider gates. [Current implemented profile and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
+
+
+### Take preview expansion — 2026-10-04
+
+Reuse X-T6/T9, I13-T3 and K3-T2; this is another bounded variant of the same
+preview/sync rows. AUTO PASS: measured CFR/VFR frame-content/PTS, Full HD portrait,
+quarter-turn orientation negative control, source >8 MiB/payload ≤8 MiB, aligned
+PCM offset/edge silence/interior-gap rejection, ≤60 s, original identity and
+production-host close/reopen. Legacy v1 evidence remains PASS.
+
+APP/OWNER real Take footage: BLOCKED until the authorized transferred Mac file
+is designated. Reserve one consolidated round for only the new points:
+
+1. Import the designated recording; confirm correct upright picture and voice
+   sync in Original's explicitly labelled lightweight local preview.
+2. Create/review an excerpt; confirm orientation, voice sync and intended content.
+3. Save, close and reopen the isolated review session; confirm the same project,
+   source numbering, clip and regenerated playback.
+
+Do not repeat accepted keyboard/cancel/undo or IN drag checks. Synthetic fixtures
+are technical control evidence, never human acceptance. HDR/composition/export
+and broader release gates stay BLOCKED. [Profile and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-take-local-preview-expansion--2026-10-04).

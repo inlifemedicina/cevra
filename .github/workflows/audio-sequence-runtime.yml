@@ -88,6 +88,12 @@ jobs:
           CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
           CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
         run: node engines/media-ffmpeg/test_functional/bounded-video-preview-runtime.mjs
+      - name: Verify Take preview PTS, portrait geometry and immutable large source
+        env:
+          CEVRA_AUDIO_SEQUENCE_RELEASE: "1"
+          CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
+          CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
+        run: node engines/media-ffmpeg/test_functional/take-video-preview-runtime.mjs
       - name: Characterize native audio measurement candidate
         run: >-
           python3 engines/media-ffmpeg/test_functional/audio-measurement-feasibility.py

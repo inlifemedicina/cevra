@@ -415,3 +415,21 @@ under a separate identifier. Preserve accepted cancellation/keyboard/undo result
 group only IN visual drag and new playback into the owner recheck. [Details](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
 Director impact: compatible typed Media/manual-edit consumer; no new provider,
 proposal or execution authority. Draft #82 not merged, progress 55%, F-A02 1/1.
+
+
+## Approved Take local preview expansion — 2026-10-04
+
+The owner approved extending local preview for Take recordings after PR #82
+merged at `906eea695836fe2ae2b81ab0b50610b600748995`. Media owns the closed ephemeral
+proxy/profile and measured timestamps; application/host own source identity,
+canonical clip bounds, cancellation/admission and reopen; UI keeps source-clock
+marks and labels lightweight quality. Project IR/history, permissions and final
+original-source policy remain unchanged. Runtime 0.3.3 preserves the pinned
+approved engine and legacy v1 profile.
+
+Synthetic runtime and production-host reopen controls pass. Real Take preflight
+and one consolidated new owner round remain BLOCKED by the missing designated
+Mac file. The isolated package and Draft PR are tracked in the final receipt;
+no session/device access or AI call. Director impact is compatible with unchanged
+execution authority; progress 55%, F-A02 exhausted 1/1. Broader composition/export,
+acceptance, provider and release gates remain open. [Canonical evidence and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-take-local-preview-expansion--2026-10-04).

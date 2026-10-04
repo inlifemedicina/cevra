@@ -168,6 +168,20 @@ it("formats media milliseconds without assuming fps or losing exact subsecond bo
   ]);
 });
 
+it("Original proxy keeps marks in the logical source clock despite physical duration padding", async () => {
+  const backend = new ManualBackend(), onCreate = vi.fn(async () => {});
+  backend.previewLocalVideo = vi.fn(async (request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> => ({ sourceId: source.id, snapshotId: request.expectedSnapshotId, durationMs: 6033,
+    proxy: { profile: "take-v1", sourceDurationMs: 6000 }, mimeType: "video/mp4", base64: btoa("proxy") }));
+  const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId="proxy" timelineOccupied={false} busy={false} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={onCreate} />);
+  const video = await metadata(container, 6.033);
+  expect(backend.previewLocalVideo).toHaveBeenCalledWith(expect.objectContaining({ operationId: expect.stringMatching(/^video-preview-/) }));
+  expect(screen.getByText(t("preview.proxyHint"))).toBeTruthy();
+  video.currentTime = 1.01; fireEvent.click(screen.getByRole("button", { name: "Marcar IN" }));
+  video.currentTime = 6.02; fireEvent.click(screen.getByRole("button", { name: "Marcar OUT" }));
+  fireEvent.click(screen.getByRole("button", { name: "Criar clip do trecho" }));
+  expect(onCreate).toHaveBeenCalledWith({ sourceId: source.id, expectedSnapshotId: "proxy", sourceStartMs: 1010, sourceEndMs: 6000 });
+});
+
 it("revokes old Blob URLs and ignores a late response from a replaced snapshot", async () => {
   const backend = new ManualBackend(); let finish!: (value: LocalVideoPreview) => void;
   const original = backend.previewLocalVideo.bind(backend);

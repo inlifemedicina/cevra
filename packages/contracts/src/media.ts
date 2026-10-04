@@ -254,6 +254,20 @@ export interface BoundedVideoPreviewEvidenceV1 {
   audio?: { sampleRate: number; channels: number; inputSamples: number; decodedSamples: number };
 }
 
+/** Measured PTS in the source clock; the preview is never a durable asset. */
+export interface BoundedVideoPreviewEvidenceV2 extends Omit<BoundedVideoPreviewEvidenceV1, "version"> {
+  version: 2;
+  inputSha256: string;
+  sourceTimesMs: number[];
+  outputTimesMs: number[];
+  timeBaseToleranceMs: number;
+  durationToleranceMs: number;
+  width: number;
+  height: number;
+  sourceRotation: number;
+  audioPadding?: { leadingSamples: number; trailingSamples: number };
+}
+
 export interface MuxAudioDurationValidationV1 {
   version: 1;
   videoDurationMs: number;
@@ -286,7 +300,7 @@ export interface EffectiveMediaProfile {
 export type MediaOperation =
   | MeasureAudioOperationV1
   | { type: "probe"; inputUri: string }
-  | { type: "trim"; inputUri: string; outputUri: string; startMs: number; endMs: number; boundedPreview?: true }
+  | { type: "trim"; inputUri: string; outputUri: string; startMs: number; endMs: number; boundedPreview?: true; previewProfile?: "take-v1" }
   | { type: "concat"; inputUris: string[]; outputUri: string }
   | { type: "transcode"; inputUri: string; outputUri: string; container?: MediaContainer; videoCodec?: VideoCodec; audioCodec?: AudioCodec; width?: number; height?: number; fps?: number }
   | { type: "fit"; inputUri: string; outputUri: string; width: number; height: number; mode: FitMode; backgroundColor?: string }
@@ -306,7 +320,7 @@ export type MediaOperationResult =
   | { type: "measure-audio"; report: AudioMeasurementReportV1 }
   | { type: "probe"; probe: MediaProbeResult }
   | { type: "detect-silence"; ranges: SilenceRange[] }
-  | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence; publication?: MediaPublicationEvidenceV1; muxDuration?: MuxAudioDurationEvidenceV1; boundedPreview?: BoundedVideoPreviewEvidenceV1 };
+  | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence; publication?: MediaPublicationEvidenceV1; muxDuration?: MuxAudioDurationEvidenceV1; boundedPreview?: BoundedVideoPreviewEvidenceV1 | BoundedVideoPreviewEvidenceV2 };
 
 export interface MediaEngineAdapter extends EngineAdapter {
   execute(operation: MediaOperation, context: ExecutionContext): Promise<MediaOperationResult>;
@@ -319,7 +333,7 @@ const AUDIO_CODECS = new Set(["aac", "opus", "pcm", "copy"]);
 const OPERATION_FIELDS: Readonly<Record<MediaOperation["type"], ReadonlySet<string>>> = {
   "measure-audio": new Set(["type", "version", "inputUri", "streamIndex", "startMs", "endMs"]),
   probe: new Set(["type", "inputUri"]),
-  trim: new Set(["type", "inputUri", "outputUri", "startMs", "endMs", "boundedPreview"]),
+  trim: new Set(["type", "inputUri", "outputUri", "startMs", "endMs", "boundedPreview", "previewProfile"]),
   concat: new Set(["type", "inputUris", "outputUri"]),
   transcode: new Set(["type", "inputUri", "outputUri", "container", "videoCodec", "audioCodec", "width", "height", "fps"]),
   fit: new Set(["type", "inputUri", "outputUri", "width", "height", "mode", "backgroundColor"]),
@@ -381,6 +395,7 @@ export function validateMediaOperation(value: unknown): MediaOperation {
     case "probe": requireUri("inputUri"); break;
     case "trim": requireUri("inputUri"); requireUri("outputUri"); requireTimestamp("startMs"); requireTimestamp("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs.");
       if (value.boundedPreview !== undefined && (value.boundedPreview !== true || !/\.mp4$/iu.test(value.outputUri as string) || (value.endMs as number) > 60_000)) throw new Error("boundedPreview requires the closed MP4 preview profile and a range within 60 seconds.");
+      if (value.previewProfile !== undefined && (value.previewProfile !== "take-v1" || value.boundedPreview !== true)) throw new Error("previewProfile requires the closed bounded Take profile.");
       resolveStandardAvDelivery(value.outputUri as string, value.boundedPreview !== true); break;
     case "concat": if (!Array.isArray(value.inputUris) || value.inputUris.length < 1 || value.inputUris.length > MAX_MEDIA_INPUTS || value.inputUris.some((uri) => !isSafeMediaUri(uri))) throw new Error(`inputUris must contain 1-${MAX_MEDIA_INPUTS} safe media URIs.`); requireUri("outputUri"); resolveStandardAvDelivery(value.outputUri as string, true); break;
     case "transcode": {

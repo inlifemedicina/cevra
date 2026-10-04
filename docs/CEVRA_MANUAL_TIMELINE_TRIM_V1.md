@@ -251,3 +251,58 @@ Reuse I4-T1, X-T1/T7 and the bounded part of X-T6; no whole catalog, composition
 export, release, Windows or provider gate is promoted. Director impact is a
 compatible consumer of typed Media and canonical trim/history; progress stays
 55%, F-A02 exhausted 1/1 and real model calls zero.
+
+
+## Approved Take local preview expansion — 2026-10-04
+
+After PR #82 merged at `906eea695836fe2ae2b81ab0b50610b600748995`, the owner approved
+expanding the local preview for a real Take recording. The previous IN/playback
+owner acceptance and post-merge CI remain valid; the acceptance record is also
+proposed in Draft #83. This expansion does not declare the real recording tested.
+
+The closed `take-v1` typed trim profile prepares an ephemeral H.264/AAC MP4 for
+Original and the canonical single clip. Source admission is ≤256 MiB, ≤60 s,
+SDR, square pixels, Full HD in either orientation, quarter-turn display rotation
+and measured monotonic VFR/CFR PTS (≤60 fps, gaps/frame durations ≤100 ms).
+The IPC/result remains ≤8 MiB; longest side ≤720 pixels, bitrate 700 kbit/s video
+and 96 kbit/s audio. The UI identifies this lightweight preview and keeps marks
+in the logical source clock rather than the physical proxy duration. Sources
+remain immutable and final-quality work continues to use originals under ADR 0013.
+
+Source verification/copy uses one no-follow regular FD and 64 KiB chunks; only a
+private descriptor/hash-verified copy reaches the existing Media adapter. Evidence
+v2 binds input/output hashes, each source/output PTS, measured quantization,
+geometry and decoded audio samples. Video subtracts logical IN from the source
+clock; audio preserves its measured sample origin. Only measured leading/trailing
+silence ≤100 ms is permitted, with no interior gaps or overlaps. AAC padding is
+<1024 samples. Output size, publication inode and hash are admitted before bytes
+cross IPC. Cancellation waits for retirement before owned cleanup. The proxy is
+regenerated on reopen, never persisted as a Project IR source or durable execution.
+Worker/runtime 0.3.3 retains the eight-file integrity inventory, pinned approved
+FFmpeg/vendor/Python, licenses and strict provenance. Legacy evidence/profile v1
+remains available and its six decoded frame/audio cases still pass.
+
+Exact-runtime synthetic evidence passes actual frame barcodes and PTS for CFR/VFR
+and non-aligned IN, Full HD portrait, quarter-turn rotation versus an unrotated
+negative control, sources >8 MiB, PCM audio offset/boundary sentinels and edge
+silence, interior audio-gap rejection, and 60 s/1800-frame output within 8 MiB.
+Production-host ingest→Original proxy→5–10 s clip→close/reopen passes for a 40,370,307
+byte 1080×1920 synthetic MOV, with source hash, canonical project, numbering and
+undo state unchanged. This is technical control evidence, not Take footage or
+human acceptance. Regression checks: final affected Node 530/530; host/contracts 137/137;
+Desktop 89/89; Rust 28/28; Python Media 91/91. At this implementation checkpoint,
+exact final-tree review, Draft PR publication and terminal CI are PENDING;
+their later outcomes belong in the exact-head PR receipt.
+
+Real Take preflight is BLOCKED until its authorized, already-transferred Mac
+file is designated. No iPhone, Take/Xcode session or app container is accessed.
+HDR, >Full HD, >60 s, arbitrary rotation, missing/incomplete frame evidence,
+non-square pixels and unsupported audio cadence remain unsupported visibly;
+there is no silent tone mapping or original-file fallback for a clip.
+Only the new human points are needed together with Take: real-file import,
+orientation/voice sync in Original and excerpt, then save/close/reopen and
+regenerated playback. Preserve previous keyboard/cancel/undo and IN acceptance.
+Director impact: compatible typed Media/manual-history consumer, unchanged
+permissions/proposal/execution authority. Progress stays 55%, F-A02 exhausted
+1/1, real AI calls zero. Multi-clip composition, full acceptance/export/release
+and provider gates remain open.

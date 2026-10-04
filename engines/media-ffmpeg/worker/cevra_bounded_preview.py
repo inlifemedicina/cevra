@@ -163,3 +163,195 @@ def run(common: Any, args: dict[str, Any]) -> dict[str, Any]:
     if os.name == "posix":
         payload["publication"] = {"version": 1, "scheme": "posix-dev-inode", "device": str(published.st_dev), "inode": str(published.st_ino)}
     return {"content": [{"type": "text", "text": json.dumps(payload)}], "structuredContent": payload}
+
+
+def _stamp(value: os.stat_result) -> tuple[int, ...]:
+    return value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns
+
+
+def _hash_stable(path: Path, initial: os.stat_result, limit: int) -> str:
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+    with os.fdopen(fd, "rb") as handle:
+        before = os.fstat(handle.fileno())
+        if not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= limit or _stamp(before) != _stamp(initial):
+            raise ValueError("preview file identity changed")
+        digest = hashlib.sha256()
+        while chunk := handle.read(65536):
+            jobs.check_cancelled()
+            digest.update(chunk)
+        if _stamp(before) != _stamp(os.fstat(handle.fileno())) or _stamp(before) != _stamp(path.lstat()):
+            raise ValueError("preview file changed during hashing")
+        return digest.hexdigest()
+
+
+def _scan_video(common: Any, path: str) -> tuple[list[Fraction], list[Fraction], Fraction, dict[str, Any]]:
+    result = jobs.run([common.require_tool("ffprobe"), "-v", "error", "-select_streams", "v:0",
+        "-read_intervals", "%+#7201", "-show_frames", "-show_streams", "-show_entries",
+        "stream=time_base,nb_frames,width,height,sample_aspect_ratio:stream_side_data=rotation,displaymatrix:frame=best_effort_timestamp,duration",
+        "-of", "json", path], stdout=-1, stderr=-1, text=True, timeout=10, check=True)
+    if len(result.stdout) > 1024 * 1024:
+        raise ValueError("preview frame evidence exceeds budget")
+    data = json.loads(result.stdout)
+    streams, frames = data.get("streams", []), data.get("frames", [])
+    if len(streams) != 1 or not 1 <= len(frames) <= MAX_FRAMES or int(streams[0].get("nb_frames", 0)) != len(frames):
+        raise ValueError("preview frame scan is incomplete")
+    stream = streams[0]
+    tick = Fraction(stream["time_base"])
+    if not 0 < tick <= Fraction(1, 1000) or stream.get("sample_aspect_ratio", "1:1") not in ("1:1", "N/A"):
+        raise ValueError("preview requires square pixels and a precise time base")
+    times, durations = [], []
+    for frame in frames:
+        pts, duration = frame.get("best_effort_timestamp"), frame.get("duration")
+        if not isinstance(pts, int) or isinstance(pts, bool) or not isinstance(duration, int) or isinstance(duration, bool) or duration <= 0:
+            raise ValueError("preview requires measured PTS and frame durations")
+        times.append(pts * tick)
+        durations.append(duration * tick)
+    if not 0 <= times[0] <= Fraction(1, 10) or times[-1] + durations[-1] > Fraction(60001, 1000):
+        raise ValueError("preview source timestamps exceed budget")
+    if any(not Fraction(1, 60) - tick <= b - a <= Fraction(1, 10) for a, b in zip(times, times[1:])) or any(d > Fraction(1, 10) for d in durations):
+        raise ValueError("preview frame cadence exceeds budget")
+    return times, durations, tick, stream
+
+
+def _scan_audio(common: Any, path: str, sample_rate: int) -> tuple[int, int]:
+    result = jobs.run([common.require_tool("ffprobe"), "-v", "error", "-select_streams", "a:0",
+        "-read_intervals", "%+#7201", "-show_frames", "-show_streams", "-show_entries",
+        "stream=time_base,sample_rate:frame=best_effort_timestamp,nb_samples", "-of", "json", path],
+        stdout=-1, stderr=-1, text=True, timeout=10, check=True)
+    if len(result.stdout) > 1024 * 1024:
+        raise ValueError("preview audio evidence exceeds budget")
+    data = json.loads(result.stdout)
+    streams, frames = data.get("streams", []), data.get("frames", [])
+    if len(streams) != 1 or int(streams[0]["sample_rate"]) != sample_rate or not 1 <= len(frames) <= 3600:
+        raise ValueError("preview decoded audio is unsupported")
+    tick, first, count = Fraction(streams[0]["time_base"]), None, 0
+    for frame in frames:
+        pts, samples = frame.get("best_effort_timestamp"), frame.get("nb_samples")
+        if not isinstance(pts, int) or isinstance(pts, bool) or not isinstance(samples, int) or isinstance(samples, bool) or samples <= 0:
+            raise ValueError("preview audio sample evidence is missing")
+        index = pts * tick * sample_rate
+        if first is None:
+            if index.denominator != 1 or not 0 <= index <= sample_rate / 10:
+                raise ValueError("preview audio origin exceeds budget")
+            first = int(index)
+        if index != first + count:
+            raise ValueError("preview audio has a gap or overlap")
+        count += samples
+    if count > 61 * sample_rate:
+        raise ValueError("preview audio exceeds budget")
+    return first, count
+
+
+def _rotation(stream: dict[str, Any], fallback: int) -> int:
+    rotation = fallback
+    for side in stream.get("side_data_list", []):
+        if "rotation" in side:
+            value = float(side["rotation"])
+            if not math.isfinite(value) or abs(value - round(value / 90) * 90) > 0.001:
+                raise ValueError("preview rotation must be a quarter turn")
+            rotation = int(round(value))
+        if "displaymatrix" in side:
+            rows = [line.split(":", 1)[1].split() for line in side["displaymatrix"].strip().splitlines()]
+            matrix = [int(value) for row in rows for value in row]
+            if len(matrix) != 9 or matrix[2] or matrix[5] or matrix[6:9] != [0, 0, 1073741824] or matrix[0] * matrix[4] - matrix[1] * matrix[3] != 65536 ** 2 or any(value not in (-65536, 0, 65536) for value in matrix[:6]):
+                raise ValueError("preview display matrix is unsupported")
+    if rotation % 90:
+        raise ValueError("preview rotation must be a quarter turn")
+    return rotation % 360
+
+
+def run_take(common: Any, args: dict[str, Any]) -> dict[str, Any]:
+    """Closed SDR phone profile: immutable source, one clock, bounded proxy."""
+    source, output = Path(args["input"]), Path(args["output"])
+    if args.get("preview_profile") != "take-v1" or args.get("bounded_preview") is not True or args.get("accurate") is not True or not source.is_absolute() or not output.is_absolute() or output.suffix.lower() != ".mp4":
+        raise ValueError("invalid Take preview profile")
+    original = source.lstat()
+    input_digest = _hash_stable(source, original, 256 * 1024 * 1024)
+    if output.exists() or output.is_symlink() or output.parent.is_symlink() or not output.parent.is_dir():
+        raise ValueError("preview output must be new in an owned directory")
+    start, end = Fraction(str(args["start"])), Fraction(str(args["end"]))
+    if not 0 <= start < end <= 60:
+        raise ValueError("preview range exceeds budget")
+    meta = common.probe(str(source))
+    video, audio = meta.get("video") or {}, meta.get("audio")
+    duration = Fraction(str(meta.get("duration") or 0))
+    if not 0 < duration <= 60 or end > duration + Fraction(1, 1000) or not video or video.get("hdr"):
+        raise ValueError("Take preview requires bounded SDR video")
+    width, height = video.get("width", 0), video.get("height", 0)
+    if not 2 <= min(width, height) <= 1080 or max(width, height) > 1920:
+        raise ValueError("preview resolution exceeds Full HD budget")
+    times, durations, tick, stream = _scan_video(common, str(source))
+    rotation = _rotation(stream, video.get("rotation", 0))
+    if abs(times[-1] + durations[-1] - duration) > Fraction(1, 10):
+        raise ValueError("preview video coverage is incomplete")
+    indexes = [i for i, time in enumerate(times) if start <= time < end]
+    if not indexes:
+        raise ValueError("preview range contains no video frame")
+    selected = [times[i] for i in indexes]
+    shown_width, shown_height = (height, width) if rotation in (90, 270) else (width, height)
+    scale = min(Fraction(1), Fraction(720, max(shown_width, shown_height)))
+    target_width, target_height = int(shown_width * scale) // 2 * 2, int(shown_height * scale) // 2 * 2
+    # FFmpeg autorotation is the only orientation transform. -copyts retains
+    # the common source/container clock; both streams subtract the same IN.
+    filters = f"trim=start_frame={indexes[0]}:end_frame={indexes[-1] + 1},setpts=PTS-{start.numerator}/{start.denominator}/TB,scale={target_width}:{target_height},setsar=1"
+    command = common.ffmpeg_base() + ["-copyts", "-threads", "2", "-i", str(source), "-map", "0:v:0", "-vf", filters, "-fps_mode", "passthrough"]
+    command += common.video_args(meta) + ["-enc_time_base:v", "1:60000", "-b:v", "700k", "-maxrate", "700k", "-bufsize", "1400k", "-bf", "0", "-pix_fmt", "yuv420p"]
+    padding = None
+    if audio:
+        sr, channels = audio.get("sample_rate"), audio.get("channels")
+        if sr not in (44100, 48000) or channels not in (1, 2):
+            raise ValueError("preview audio format is unsupported")
+        first, count = _scan_audio(common, str(source), sr)
+        source_samples = math.ceil(duration * sr)
+        tail = max(0, source_samples - first - count)
+        if tail > sr // 10 or first + count > source_samples + 1024:
+            raise ValueError("preview audio coverage exceeds edge budget")
+        begin, finish = math.ceil(start * sr), math.ceil(end * sr)
+        leading = max(0, min(finish, first) - begin)
+        trailing = max(0, finish - max(begin, first + count))
+        if leading + trailing >= finish - begin:
+            raise ValueError("preview range contains no recorded audio")
+        padding = {"leadingSamples": leading, "trailingSamples": trailing}
+        command += ["-map", "0:a:0", "-af", f"asetpts=PTS-STARTPTS,adelay={first}S:all=1,apad=whole_len={max(source_samples, finish)},atrim=start_sample={begin}:end_sample={finish},asetpts=PTS-STARTPTS"] + common.aac_args("96k")
+    else:
+        command += ["-an"]
+    command += ["-threads", "2", "-avoid_negative_ts", "disabled", "-video_track_timescale", "60000", "-fs", str(MAX_BYTES), "-movflags", "+faststart", str(output)]
+    jobs.run(command, stdout=-1, stderr=-1, text=True, timeout=20, check=True, artifact_paths=[str(output)])
+    published = output.lstat()
+    output_times, output_durations, output_tick, output_stream = _scan_video(common, str(output))
+    tolerance = output_tick + tick
+    if len(output_times) != len(selected) or any(abs(actual - (expected - start)) > tolerance for actual, expected in zip(output_times, selected)):
+        raise ValueError("preview changed measured source timestamps")
+    probe = common.verify_output(str(output))
+    output_video = probe.get("video") or {}
+    if output_video.get("codec") != "h264" or output_video.get("width") != target_width or output_video.get("height") != target_height or _rotation(output_stream, output_video.get("rotation", 0)) != 0 or bool(probe.get("audio")) != bool(audio):
+        raise ValueError("preview output geometry or streams mismatch")
+    audio_evidence = None
+    if audio:
+        output_audio = probe["audio"]
+        if output_audio.get("codec") != "aac" or output_audio.get("sample_rate") != sr or output_audio.get("channels") != channels:
+            raise ValueError("preview audio profile mismatch")
+        output_first, decoded = _scan_audio(common, str(output), sr)
+        expected_samples = finish - begin
+        if output_first != 0 or not expected_samples <= decoded < expected_samples + 1024:
+            raise ValueError("preview audio is shifted or truncated")
+        audio_evidence = {"sampleRate": sr, "channels": channels, "inputSamples": expected_samples, "decodedSamples": decoded}
+    measured_gap = max(durations + [b - a for a, b in zip(times, times[1:])])
+    duration_tolerance = max(measured_gap, Fraction(1024, sr) if audio else Fraction(0)) + Fraction(2, 1000)
+    if not isinstance(probe.get("duration"), (int, float)) or not math.isfinite(probe["duration"]) or abs(Fraction(str(probe["duration"])) - (end - start)) > duration_tolerance:
+        raise ValueError("preview duration exceeds measured quantization")
+    if _hash_stable(source, original, 256 * 1024 * 1024) != input_digest:
+        raise ValueError("preview input changed")
+    output_digest = _hash_stable(output, published, MAX_BYTES)
+    evidence = {"version": 2, "sourceStartMs": round(start * 1000), "sourceEndMs": round(end * 1000),
+        "firstFrameMs": float(selected[0] * 1000), "lastFrameMs": float(selected[-1] * 1000), "frameCount": len(selected),
+        "frameRate": float(1 / measured_gap), "inputSha256": input_digest, "outputSha256": output_digest,
+        "sourceTimesMs": [float(time * 1000) for time in selected], "outputTimesMs": [float(time * 1000) for time in output_times],
+        "timeBaseToleranceMs": float(tolerance * 1000), "durationToleranceMs": float(duration_tolerance * 1000),
+        "width": target_width, "height": target_height, "sourceRotation": rotation}
+    if audio_evidence:
+        evidence["audio"], evidence["audioPadding"] = audio_evidence, padding
+    payload = {"status": "completed", "output": str(output), "probe": probe, "boundedPreview": evidence}
+    if os.name == "posix":
+        payload["publication"] = {"version": 1, "scheme": "posix-dev-inode", "device": str(published.st_dev), "inode": str(published.st_ino)}
+    return {"content": [{"type": "text", "text": json.dumps(payload)}], "structuredContent": payload}

@@ -11,9 +11,9 @@ import { DesktopSession, DesktopHostProtocolServer } from '../dist/index.js';
 import { DerivedVideoPreview } from '../dist/derived-video-preview.js';
 const unavailable = { available: false, reason: 'runtime-not-configured' };
 
-async function setup(t, execute, settle) {
+async function setup(t, execute, settle, fixtureBytes = Buffer.from('bounded original transport fixture')) {
   const root = await mkdtemp(join(tmpdir(), 'cevra-derived-preview-test-')); t.after(() => rm(root, { recursive: true, force: true }));
-  const sourcePath = join(root, 'original.mp4'), bytes = Buffer.from('bounded original transport fixture'); await writeFile(sourcePath, bytes);
+  const sourcePath = join(root, 'original.mp4'), bytes = fixtureBytes; await writeFile(sourcePath, bytes);
   const history = new ProjectHistory(createEmptyProject({ id: 'derived-preview' }));
   const source = { id: 'source', kind: 'video', uri: sourcePath, displayName: 'original.mp4', durationMs: 6000, sampleRate: 48000, channels: 1,
     technicalDescriptor: { version: 1, basis: 'ingest', content: { sha256: createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length },
@@ -34,9 +34,9 @@ async function result(op, mutate) {
   await writeFile(op.outputUri, Buffer.from('derived transport fixture'), { flag: 'wx' });
   const metadata = await lstat(op.outputUri, { bigint: true });
   const response = { type: 'file', outputUri: op.outputUri, durationMs: op.endMs - op.startMs,
-    probe: { uri: op.outputUri, hasVideo: true, hasAudio: true, audioCodec: 'aac' }, effectiveProfile: { container: 'mp4', videoCodec: 'h264', audioCodec: 'aac' },
+    probe: { uri: op.outputUri, hasVideo: true, hasAudio: true, audioCodec: 'aac', width: 128, height: 96, rotationDegrees: 0 }, effectiveProfile: { container: 'mp4', videoCodec: 'h264', audioCodec: 'aac' },
     publication: { version: 1, scheme: 'posix-dev-inode', device: String(metadata.dev), inode: String(metadata.ino) },
-    boundedPreview: { version: 1, sourceStartMs: op.startMs, sourceEndMs: op.endMs, firstFrameMs: op.startMs, lastFrameMs: op.endMs - 1000 / 30, frameCount: Math.round((op.endMs - op.startMs) * 30 / 1000), frameRate: 30, outputSha256: createHash('sha256').update(await readFile(op.outputUri)).digest('hex'), audio: { sampleRate: 48000, channels: 1, inputSamples: (op.endMs - op.startMs) * 48, decodedSamples: (op.endMs - op.startMs) * 48 } } };
+    boundedPreview: { version: 2, inputSha256: createHash('sha256').update(await readFile(op.inputUri)).digest('hex'), sourceTimesMs: Array.from({ length: Math.round((op.endMs - op.startMs) * 30 / 1000) }, (_, i) => op.startMs + i * 1000 / 30), outputTimesMs: Array.from({ length: Math.round((op.endMs - op.startMs) * 30 / 1000) }, (_, i) => i * 1000 / 30), timeBaseToleranceMs: 0.1, durationToleranceMs: 35, width: 128, height: 96, sourceRotation: 0, audioPadding: { leadingSamples: 0, trailingSamples: 0 }, sourceStartMs: op.startMs, sourceEndMs: op.endMs, firstFrameMs: op.startMs, lastFrameMs: op.endMs - 1000 / 30, frameCount: Math.round((op.endMs - op.startMs) * 30 / 1000), frameRate: 30, outputSha256: createHash('sha256').update(await readFile(op.outputUri)).digest('hex'), audio: { sampleRate: 48000, channels: 1, inputSamples: (op.endMs - op.startMs) * 48, decodedSamples: (op.endMs - op.startMs) * 48 } } };
   return mutate ? mutate(response) : response;
 }
 async function noTemporaryFiles(root) { assert.deepEqual((await readdir(root)).filter(name => name.startsWith('cevra-video-preview-')), []); }
@@ -46,7 +46,7 @@ test('derived preview consumes a private verified copy and leaves original, IR, 
   const fixture = await setup(t, async (op, context, f) => {
     assert.notEqual(op.inputUri, f.sourcePath); assert.deepEqual(await readFile(op.inputUri), f.bytes);
     assert.equal((await lstat(dirname(op.inputUri))).mode & 0o777, 0o700); assert.equal((await lstat(op.inputUri)).mode & 0o777, 0o600);
-    assert.deepEqual(Object.keys(op).sort(), ['boundedPreview', 'endMs', 'inputUri', 'outputUri', 'startMs', 'type']); assert.equal(op.boundedPreview, true);
+    assert.deepEqual(Object.keys(op).sort(), ['boundedPreview', 'endMs', 'inputUri', 'outputUri', 'previewProfile', 'startMs', 'type']); assert.equal(op.boundedPreview, true);
     return result(op);
   });
   const before = fixture.history.toArchive(); const preview = await fixture.session.previewLocalVideo(fixture.request);
@@ -85,11 +85,13 @@ test('new preview cancels only previous preview and admits the current binding a
   assert.equal(current.clip.id, f.request.clipId); assert.equal(f.session.cancel('preview-test').cancelled, false); await noTemporaryFiles(f.root);
 });
 
-for (const attack of ['inode', 'rewrite', 'audio', 'range', 'duration', 'symlink', 'oversized']) test(`derived admission rejects ${attack} and cleans only its owned namespace`, async t => {
+for (const attack of ['inode', 'rewrite', 'input-hash', 'pts', 'audio', 'range', 'duration', 'symlink', 'oversized']) test(`derived admission rejects ${attack} and cleans only its owned namespace`, async t => {
   const f = await setup(t, async (op, context, f) => {
     const output = await result(op);
     if (attack === 'inode') output.publication.inode = '0';
     if (attack === 'rewrite') await writeFile(op.outputUri, 'same inode rewritten');
+    if (attack === 'input-hash') output.boundedPreview.inputSha256 = '0'.repeat(64);
+    if (attack === 'pts') output.boundedPreview.outputTimesMs[10] += 100;
     if (attack === 'audio') output.boundedPreview.audio.decodedSamples = 100;
     if (attack === 'range') output.boundedPreview.sourceEndMs++;
     if (attack === 'duration') output.durationMs = 6000;
@@ -98,6 +100,21 @@ for (const attack of ['inode', 'rewrite', 'audio', 'range', 'duration', 'symlink
     return output;
   });
   await assert.rejects(f.session.previewLocalVideo(f.request)); assert.deepEqual(await readFile(f.sourcePath), f.bytes); await noTemporaryFiles(f.root);
+});
+
+test('Original prepares a cancellable proxy with logical duration and no clip, journal or persisted source', async t => {
+  const f = await setup(t), before = f.history.toArchive();
+  const preview = await f.session.previewLocalVideo({ sourceId: f.request.sourceId, expectedSnapshotId: f.request.expectedSnapshotId, operationId: 'original-proxy' });
+  assert.equal(preview.clip, undefined); assert.deepEqual(preview.proxy, { profile: 'take-v1', sourceDurationMs: 6000 });
+  assert.equal(f.calls[0].startMs, 0); assert.equal(f.calls[0].endMs, 6000);
+  assert.deepEqual(f.history.toArchive(), before); await noTemporaryFiles(f.root);
+});
+
+test('verified source above the IPC ceiling is copied privately and admitted only as a small proxy', async t => {
+  const f = await setup(t, undefined, undefined, Buffer.alloc(9 * 1024 * 1024, 37));
+  const before = f.history.toArchive(), preview = await f.session.previewLocalVideo(f.request);
+  assert.equal(f.calls[0].previewProfile, 'take-v1'); assert.ok(Buffer.from(preview.base64, 'base64').length < 8 * 1024 * 1024);
+  assert.deepEqual(await readFile(f.sourcePath), f.bytes); assert.deepEqual(f.history.toArchive(), before); await noTemporaryFiles(f.root);
 });
 
 test('RPC requires a complete canonical clip/operation binding and rejects time/path/raw engine overrides', async t => {
