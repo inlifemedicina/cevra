@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-10-03
+**Updated:** 2026-10-04
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 **Current global weighted roadmap progress:** 55%.
 
@@ -44,7 +44,7 @@ CEVRA VIDS
 ├─ 5. UX SURFACE CONTRACT
 │   ├─ NORMAL
 │   │   ├─ EDVID-level directness/simplicity
-│   │   ├─ preview — first-video manual IN/OUT [APPROVED / IN DEVELOPMENT; HUMAN ROUND PENDING]
+│   │   ├─ preview — first-video manual IN/OUT [#80 INTEGRATED / BOUNDED FUNCTIONAL OWNER PASS]
 │   │   ├─ visible directly editable timeline
 │   │   ├─ contextual inspector
 │   │   ├─ presets / visual choices
@@ -366,4 +366,4 @@ The draft/notes remain in memory; the bounded card/source-label review was accep
 provider gates are unchanged. PR #76 remains the separate documentation track.
 
 
-Manual first-video excerpt is now an approved active slice on `feat/manual-inout-preview`, based on integrated #78 `182081e6a9e6c1b7849a099ebd3f6bba13663415` (post-merge CI `37151631882`, SUCCESS 5/5). Real local original playback, manual IN/OUT, one canonical clip and existing undo/redo are implemented for an initial small-fixture test; the 8 MiB/one-clip limits are not the final product contract. Application/host 346 and UI 66 tests PASS, code review APPROVE; native playback/Owner acceptance remain NOT EXECUTED pending one consolidated round. No AI, invented F-A02 timing, automatic alignment, composition/export or brief/profile implementation. Director impact is a compatible execution extension on the same history/timeline; progress stays 55%. Details are the scoped manual-excerpt checkpoint in the master and existing acceptance IDs, not a new acceptance catalog.
+**IMPLEMENTED / CLOSED — bounded manual first-video excerpt:** PR #80 integrated reviewed head `05dc5ff7675e77dfcb65386e5778433b1651b275` and tree `8e9b5e37cb80dcbf88b229e8072445abcd474d0a` at `ddf1448f3c32bdd9f8c35c9ad25b668e00be4856` on 2026-10-04 UTC. Post-merge [CI 37166055533](https://github.com/inlifemedicina/cevra/actions/runs/37166055533) is SUCCESS 5/5 and [Exact Runtime 37166055565](https://github.com/inlifemedicina/cevra/actions/runs/37166055565) SUCCESS 1/1, both attempt 1, without rerun or correction. The owner confirmed real original playback, manual IN/OUT, one visible canonical clip, playback limited to the excerpt and undo/redo on the baseline native demo. The reported inactive-looking create button is corrected with a dedicated enabled/disabled style; 54 pertinent UI tests, offscreen visual rendering and independent exact-tree review PASS. This does not claim a new native visual acceptance of the updated demo, and no complete functional round needs repeating. The 8 MiB/one-clip limits remain initial fixture constraints, not the final product contract. Existing windows, project data and original source were preserved; the updated native demo remains prepared separately. No AI, invented F-A02 timing, automatic alignment, composition/export or brief/profile implementation. Director impact remains a compatible execution extension on the same history/timeline; progress stays 55%, F-A02 exhausted 1/1. Fixture, human evidence and wider limits stay in the existing [acceptance record](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#manual-inout-macos-2026-10-04).
