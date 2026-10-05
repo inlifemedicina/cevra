@@ -2664,12 +2664,18 @@ the Product Owner approved complete workflow blocks. Foundation and manual G1
 are IN DEVELOPMENT, with automated G1/G5/G6 before grouped subjective review.
 The [G1 plan](CEVRA_MANUAL_SEQUENCE_G1.md) records baselines, milestones, pending
 material choices and gates. It grants no advanced catalog, dependency/provider
-or app/human-media/device action. Prepare reviewed #84 then #85; both remain
-Draft/unmerged, and explicit merge authorization is pending after automatic
-approval review rejected #84. Do not retry/bypass that rejection. Preserve all
+or app/human-media/device action. The owner explicitly approved the two exact
+heads; #84 then #85 merged at `6e2cce16a8506bb5a3816aeb04281a7698abc471` and
+`60345a7db3fcfc1b78e6cc878cdbb217b1dac7a4`. That new approval resolved the earlier
+automatic-review rejection. Post-#85 exact runtime passed; general CI needs its
+requested rerun after hosted-runner acquisition failures. Insert before selection,
+duplicate after selection and explicit Retry after failed save are also approved.
+Preserve all
 scoped R3/Take evidence. The plan records the isolated technical M0 implementation,
-published as [Draft #86](https://github.com/inlifemedicina/cevra/pull/86) over #85,
-bounded tests/exact-tree reviews and remaining sequence/render prerequisites.
+published as [Draft #86](https://github.com/inlifemedicina/cevra/pull/86) now targeting
+main, bounded tests/exact-tree reviews, the corrected private-Node CI close
+handshake and remaining sequence/render prerequisites. #86 is not authorized
+for merge; fresh exact-head CI remains required after the smoke correction.
 Naming: Creator=Lite, Studio=Full, Vids=Desktop; I19's Full visual workspace/final
 output remains independent of Vids. No G1 PASS is implied; F-A02 and progress
 remain unchanged. Historical actions below retain their scope and evidence.
