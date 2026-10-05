@@ -12,18 +12,21 @@ Do not install/open an app or use human media/Take/devices without coordination.
 
 ## Baseline and preparation
 
-Main before preparation is `906eea695836fe2ae2b81ab0b50610b600748995`.
-Integrate reviewed PR #84 `a36d8ba4d85ab103d96cfa6309a5c53c7eb6d5c4`, then
-#85 `370e86b18599cd78c8dee3e4325caf9a0d05d6d3`, only after effective review/checks
-and base reconciliation. Running R3 product `7d4e66776fbfc112429d333e5d8883221c2851fb`
-and its limited owner acceptance remain historical evidence, not G1 PASS.
-The automatic approval reviewer rejected the attempted #84 merge: it recognized
-authorization for a draft PR and the earlier #78 merge, not #84. #84 was restored
-to Draft; both #84 and #85 remain unmerged. Explicit authorization for the two
-exact heads is pending. Do not retry or bypass the rejection without that answer.
-Rule 36 also pauses unresolved material choices. Record actual merge SHAs and
-post-merge results when authorized. New work uses `feat/vids-g1-foundation`,
-preserving the reviewed PR heads until integration.
+Main before preparation was `906eea695836fe2ae2b81ab0b50610b600748995`.
+After the owner explicitly answered SIM to integration of the two exact reviewed
+heads, PR #84 `a36d8ba4d85ab103d96cfa6309a5c53c7eb6d5c4` merged normally at
+`6e2cce16a8506bb5a3816aeb04281a7698abc471`; #85
+`370e86b18599cd78c8dee3e4325caf9a0d05d6d3` was retargeted to that main and merged
+normally at `60345a7db3fcfc1b78e6cc878cdbb217b1dac7a4`. Each exact feature head had
+11 successful checks and independent review; each merge tree equals its reviewed
+feature tree. The earlier automatic approval rejection is retained in history;
+the new explicit authorization resolved it. Post-#84 runs were cancelled when
+#85 advanced main. Post-#85 Audio Sequence Exact Runtime `37371249881` passed;
+general CI `37371249855` ended with four unacquired/cancelled jobs and one passing
+alignment job; a failed-job rerun was requested. This is not a complete CI PASS.
+Running R3 product `7d4e66776fbfc112429d333e5d8883221c2851fb` and its limited owner
+acceptance remain historical evidence, not G1 PASS. M0 Draft #86 now targets main;
+its feature history preserves the reviewed baseline. No #86 merge is authorized.
 
 ## Milestones
 
@@ -61,13 +64,14 @@ intermediates. Preview remains disposable; export reads originals and avoids
 unnecessary generational encoding. Video/audio use source IN and cumulative
 canonical placement, not independently reset stream clocks.
 
-Before affected implementation, resolve:
+The owner also answered SIM to insert before the selected clip, duplicate
+immediately after it, and failed save keeping the app open with explicit Retry
+and a new close request. No automatic discard or automatic close follows retry.
+These choices are approved, alongside the initial continuous track, append at
+the end, ripple delete/trim, contiguous reorder and one action per Undo.
 
-- Proposed insert is before the selected clip; duplicate immediately follows
-  it. Playhead insertion with automatic split is a different alternative.
-- Unsaved close may retry save as part of the request, or require explicit
-  Retry then a new close request. Both preserve memory; no automatic discard
-  or force-stop on uncertain save.
+Before affected render implementation, resolve:
+
 - Fix simple-export quality/profile, compatible-source envelope, frame/sample
   mapping/tolerances (fractional CFR/VFR included), canvas/orientation/audio
   coverage/no-audio and aggregate budgets against real runtime feasibility.
@@ -77,13 +81,13 @@ The approved M1 direction already fixes one initial continuous track, append at
 the end, ripple delete/trim with no gap, contiguous reorder, one action per Undo
 and immutable originals. These decisions are not pending. Independent M1 work
 may continue while unresolved choices pause only the affected behavior.
-Safe M0 work proceeds while those choices remain pending. Independent source
+Safe M0/M1 editing work proceeds while render choices remain pending. Independent source
 reviews establish feasibility boundaries, not runtime execution.
 
 ## M0 technical checkpoint — 2026-10-05
 
 Published technical Draft: [PR #86](https://github.com/inlifemedicina/cevra/pull/86),
-stacked on #85. The independently reviewed implementation commit is
+now targeting main after #84/#85 integration. The independently reviewed implementation commit is
 `1566d83a60983951815ddbf8f37699e144db76ca`, tree
 `691f3a216361361bbbd14b1aeeb2fb236a9bc6e6`. The PR records remote checks for its
 current head; publication is not merge or functional acceptance.
@@ -149,7 +153,20 @@ no code, test, permission or generated manifest from that validated tree.
 Unavailable acceptance variants remain BLOCKED on pending material choices and
 actual sequence/render consumers; independent approved M1 edits may proceed.
 Preserve R3/Take evidence, F-A02 allocation 1/1 and roadmap 55%. A technical Draft
-publication does not authorize merging #84/#85 or establish a functional G1 PASS.
+publication does not authorize merging #86 or establish a functional G1 PASS.
+
+Remote M0 PR CI `37369117129`, attempt 1, failed because hosted jobs were not
+acquired (GitHub's annotation also reports an internal server error); a rerun
+was requested. Push run `37369112248` acquired its desktop runner and exposed a
+separate harness regression: the old private-Node smoke sent bare shutdown,
+which the new production close guard correctly rejects. The smoke now performs
+sequential hello → prepareClose → shutdown with one attempt ID, validates each
+acknowledgement and zero exit, bounds total waiting/output and reaps only its
+owned empty-store child before removing that store. Production close admission
+is unchanged. Targeted smoke regression tests cover the actual bundled Host,
+an unresponsive child that ignores TERM and a mismatched close acknowledgement
+with a foreign directory preserved. Fresh exact-head remote checks remain
+required; cancelled/failed attempts are not reclassified as passing.
 
 ## M1 independent preparation — 2026-10-05
 
