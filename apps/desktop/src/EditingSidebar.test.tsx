@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -17,7 +17,7 @@ async function setup() {
   return { backend, before, draft, user };
 }
 
-it("collapses the whole column explicitly and restores unsaved editorial/Director state, selection and playhead", async () => {
+it("switches to compact tabs and back while preserving unsaved editorial/Director state, selection and playhead", async () => {
   const { backend, before, draft, user } = await setup();
   const shell = screen.getByTestId("app-shell"), selected = shell.dataset.selectedProjectItemId;
   const playhead = screen.getByRole("slider", { name: "Régua e cursor da linha do tempo" }).getAttribute("aria-valuenow");
@@ -29,11 +29,12 @@ it("collapses the whole column explicitly and restores unsaved editorial/Directo
   fireEvent.change(instruction, { target: { value: "Rever a abertura" } });
   await user.selectOptions(screen.getByLabelText("Preset"), "dynamic-reels");
   await user.click(screen.getByRole("button", { name: "Modo compacto" }));
-  expect(screen.queryByRole("complementary", { name: "Painel de edição" })).toBeNull();
-  const reopen = screen.getByRole("button", { name: "Reabrir coluna" });
-  expect(reopen.getAttribute("aria-expanded")).toBe("false");
-  await waitFor(() => expect(document.activeElement).toBe(reopen));
-  await user.click(reopen);
+  expect(screen.getByRole("complementary", { name: "Painel de edição" })).toBeTruthy();
+  expect(screen.getByRole("tab", { name: "Diretor" }).getAttribute("aria-selected")).toBe("true");
+  expect(shell.style.getPropertyValue("--sidebar-width")).toBe("286px");
+  await user.click(screen.getByRole("tab", { name: "Controles" }));
+  await user.click(screen.getByRole("tab", { name: "Diretor" }));
+  await user.click(screen.getByRole("button", { name: "Modo aberto" }));
   await nextPaints();
   expect(screen.getAllByLabelText("Título do bloco")[0]).toBe(title);
   expect(title.value).toBe("Título ainda não guardado");
@@ -46,7 +47,7 @@ it("collapses the whole column explicitly and restores unsaved editorial/Directo
   expect(await backend.loadEditorialDraft()).toEqual(draft);
 });
 
-it("restores independent editorial and contextual scroll offsets after collapsed layout loses its boxes", async () => {
+it("restores independent editorial and contextual scroll offsets after mode and tab layout changes", async () => {
   const { user } = await setup();
   const editorial = document.querySelector<HTMLElement>('[data-sidebar-scroll="editorial"]')!;
   const context = document.querySelector<HTMLElement>('[data-sidebar-scroll="context"]')!;
@@ -54,7 +55,13 @@ it("restores independent editorial and contextual scroll offsets after collapsed
   fireEvent.scroll(editorial); fireEvent.scroll(context);
   await user.click(screen.getByRole("button", { name: "Modo compacto" }));
   editorial.scrollTop = 0; context.scrollTop = 0;
-  await user.click(screen.getByRole("button", { name: "Reabrir coluna" }));
+  await user.click(screen.getByRole("tab", { name: "Controles" }));
+  await nextPaints();
+  expect(context.scrollTop).toBe(76);
+  await user.click(screen.getByRole("tab", { name: "Diretor" }));
+  await nextPaints();
+  expect(editorial.scrollTop).toBe(440);
+  await user.click(screen.getByRole("button", { name: "Modo aberto" }));
   await nextPaints();
   expect(editorial.scrollTop).toBe(440);
   expect(context.scrollTop).toBe(76);
@@ -79,19 +86,22 @@ it("bounds keyboard width/height changes without automatically collapsing or mut
   expect(split.getAttribute("aria-valuenow")).toBe(split.getAttribute("aria-valuemax"));
   expect(screen.getByRole("complementary", { name: "Painel de edição" })).toBeTruthy();
   await user.click(screen.getByRole("button", { name: "Modo compacto" }));
-  await user.click(screen.getByRole("button", { name: "Reabrir coluna" }));
+  expect(screen.getByTestId("app-shell").style.getPropertyValue("--sidebar-width")).toBe("286px");
+  await user.click(screen.getByRole("button", { name: "Modo aberto" }));
   expect(width.getAttribute("aria-valuenow")).toBe("480");
   expect(split.getAttribute("aria-valuenow")).toBe(split.getAttribute("aria-valuemax"));
   expect(backend.history.toArchive()).toEqual(before);
 });
 
-it("keeps the explicit reopen action available in English and returns to the same editable draft", async () => {
+it("provides compact Director/Controls tabs and return to open mode in English", async () => {
   const { user } = await setup();
   const title = screen.getAllByLabelText("Título do bloco")[0] as HTMLInputElement;
   fireEvent.change(title, { target: { value: "Texto preservado" } });
   await user.click(screen.getByRole("button", { name: "Modo compacto" }));
   await user.click(screen.getByRole("button", { name: "Trocar idioma" }));
-  await user.click(screen.getByRole("button", { name: "Reopen column" }));
+  expect(screen.getByRole("tab", { name: "Director" })).toBeTruthy();
+  await user.click(screen.getByRole("tab", { name: "Controls" }));
+  await user.click(screen.getByRole("button", { name: "Expanded mode" }));
   expect(screen.getByRole("complementary", { name: "Editing panel" })).toBeTruthy();
   expect(screen.getAllByLabelText("Block title")[0]).toBe(title);
   expect(title.value).toBe("Texto preservado");
@@ -116,5 +126,55 @@ it("starts divider dragging at the visible height after an enlarged editorial ar
   fireEvent.keyDown(window, { key: "Escape" });
   expect(split.getAttribute("aria-valuenow")).toBe("320");
   expect(backend.history.toArchive()).toEqual(before);
+  measurement.mockRestore();
+});
+
+it("supports keyboard tab selection and remembers it plus expanded width across mode transitions", async () => {
+  const { backend, before, user } = await setup();
+  const width = screen.getByRole("separator", { name: "Ajustar largura da coluna de edição" });
+  fireEvent.keyDown(width, { key: "End" });
+  await user.click(screen.getByRole("button", { name: "Modo compacto" }));
+  const director = screen.getByRole("tab", { name: "Diretor" });
+  director.focus();
+  fireEvent.keyDown(director, { key: "ArrowRight" });
+  const controls = screen.getByRole("tab", { name: "Controles" });
+  expect(controls.getAttribute("aria-selected")).toBe("true");
+  expect(document.activeElement).toBe(controls);
+  expect(screen.getByRole("tabpanel", { name: "Controles" })).toBeTruthy();
+  expect(screen.queryByRole("tabpanel", { name: "Diretor" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Modo aberto" }));
+  expect(screen.getByTestId("app-shell").style.getPropertyValue("--sidebar-width")).toBe("480px");
+  await user.click(screen.getByRole("button", { name: "Modo compacto" }));
+  expect(controls.getAttribute("aria-selected")).toBe("true");
+  fireEvent.keyDown(controls, { key: "Home" });
+  expect(director.getAttribute("aria-selected")).toBe("true");
+  expect(document.activeElement).toBe(director);
+  expect(backend.history.toArchive()).toEqual(before);
+});
+
+it("restores a contextual offset after compact clamping and a delayed open-mode geometry measurement", async () => {
+  const { user } = await setup();
+  const context = document.querySelector<HTMLElement>('[data-sidebar-scroll="context"]')!;
+  let actual = 76, maximum = 1000;
+  Object.defineProperty(context, "scrollTop", { configurable: true, get: () => actual, set: value => { actual = Math.min(maximum, value); } });
+  fireEvent.scroll(context);
+  const body = document.querySelector<HTMLElement>(".editing-sidebar-body")!;
+  let height = 444;
+  const measurement = vi.spyOn(body, "getBoundingClientRect").mockImplementation(() => ({ height } as DOMRect));
+  maximum = 0;
+  await user.click(screen.getByRole("button", { name: "Modo compacto" }));
+  fireEvent(window, new Event("resize"));
+  await user.click(screen.getByRole("tab", { name: "Controles" }));
+  await nextPaints();
+  expect(context.scrollTop).toBe(0);
+  fireEvent.scroll(context);
+  await user.click(screen.getByRole("button", { name: "Modo aberto" }));
+  await nextPaints();
+  expect(context.scrollTop).toBe(0);
+  fireEvent.scroll(context);
+  maximum = 1000; height = 772;
+  fireEvent(window, new Event("resize"));
+  await nextPaints();
+  expect(context.scrollTop).toBe(76);
   measurement.mockRestore();
 });

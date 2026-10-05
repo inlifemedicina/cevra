@@ -355,8 +355,11 @@
   "sidebar.title": "Painel de edição",
   "sidebar.expanded": "Modo aberto",
   "sidebar.compact": "Modo compacto",
-  "sidebar.collapse": "Recolher coluna",
-  "sidebar.open": "Reabrir coluna",
   "sidebar.resizeWidth": "Ajustar largura da coluna de edição",
-  "sidebar.resizeSplit": "Dividir espaço entre Diretor e controles"
+  "sidebar.resizeSplit": "Dividir espaço entre Diretor e controles",
+  "sidebar.activateOpen": "Ativar modo aberto",
+  "sidebar.activateCompact": "Ativar modo compacto",
+  "sidebar.tabs": "Conteúdo da coluna de edição",
+  "sidebar.directorTab": "Diretor",
+  "sidebar.controlsTab": "Controles"
 }

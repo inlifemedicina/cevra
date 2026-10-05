@@ -22,7 +22,10 @@ interface Props {
 /** Original bytes or a bounded, ephemeral derivative of the canonical clip. */
 export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, clip, unsupportedClip, timelineOccupied, busy, seek, t, onPlayheadChange, onCreate }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const metadataVerified = useRef(false);
+  const capturedFrame = useRef(false);
+  const [initialFrame, setInitialFrame] = useState<{ url: string; image: string } | null>(null);
   const [preview, setPreview] = useState<LocalVideoPreview | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +45,8 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     let objectUrl: string | null = null;
     const operationId = `video-preview-${crypto.randomUUID()}`;
     metadataVerified.current = false;
+    capturedFrame.current = false;
+    setInitialFrame(null);
     setPreview(null); setUrl(null); setReady(false); setError(null); setPlaying(false); setSeeking(false); setInMs(null); setOutMs(null); setCurrentMs(0);
     if (source?.kind === "video") {
       void backend.previewLocalVideo({ sourceId: source.id, expectedSnapshotId: snapshotId, operationId, ...(clip ? { clipId: clip.id } : {}) }).then((result) => {
@@ -91,6 +96,8 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
 
   function fail(code: string) {
     metadataVerified.current = false;
+    capturedFrame.current = false;
+    setInitialFrame(null);
     const video = videoRef.current;
     video?.pause();
     if (video) { video.removeAttribute("src"); video.load(); }
@@ -105,7 +112,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     }
     metadataVerified.current = true;
     setCurrentMs(startMs);
-    video.currentTime = 0;
+    if (video.currentTime !== 0) video.currentTime = 0;
     frameReady();
   }
 
@@ -113,7 +120,22 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     const video = videoRef.current;
     // Metadata alone does not guarantee a decoded frame in WKWebView.
     if (!metadataVerified.current || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking) return;
-    setReady(true);
+    if (!clip) { setReady(true); return; }
+    if (capturedFrame.current || !url || video.currentTime !== 0) return;
+    // A decoded paused frame need not be painted by the native video layer.
+    // Render the admitted excerpt frame through an ephemeral image until Play/seek.
+    if (video.videoWidth <= 0 || video.videoHeight <= 0) return;
+    try {
+      const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("frame image unavailable");
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      capturedFrame.current = true;
+      setInitialFrame({ url, image: canvas.toDataURL("image/png") });
+    } catch { fail("MANUAL_VIDEO_UNSUPPORTED"); }
   }
 
   function updateClock() {
@@ -148,8 +170,11 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   return <section className="manual-video-preview" aria-label={t("preview.localVideo")}>
     <div className="manual-preview-heading"><strong>{sourceLabel ?? t("preview.localVideo")}</strong><span>{t(clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
     <div className="manual-video-stage">
-      <video ref={videoRef} src={url ?? undefined} preload="auto" playsInline onLoadedMetadata={metadataReady} onLoadedData={frameReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
+      <video ref={videoRef} src={url ?? undefined} preload="auto" playsInline onLoadedMetadata={event => { if (event.currentTarget === videoRef.current && url) metadataReady(); }} onLoadedData={frameReady} onCanPlay={frameReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
         onSeeking={() => setSeeking(true)} onSeeked={() => { frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); updateClock(); }} />
+      {clip && initialFrame && initialFrame.url === url && <img key={url} ref={imageRef} className="manual-initial-frame" src={initialFrame.image} alt="" aria-hidden="true" hidden={playing || seeking || currentMs !== startMs}
+        onLoad={event => { if (event.currentTarget === imageRef.current && metadataVerified.current && videoRef.current?.getAttribute("src") === initialFrame.url) setReady(true); }}
+        onError={event => { if (event.currentTarget === imageRef.current) fail("MANUAL_VIDEO_UNSUPPORTED"); }} />}
       {!ready && <p role="status">{error ? t(errorKey) : source?.kind === "video" ? t("preview.localLoading") : t("preview.localEmpty")}</p>}
     </div>
     <div className="manual-preview-controls">

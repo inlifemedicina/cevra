@@ -355,8 +355,11 @@
   "sidebar.title": "Editing panel",
   "sidebar.expanded": "Expanded mode",
   "sidebar.compact": "Compact mode",
-  "sidebar.collapse": "Collapse column",
-  "sidebar.open": "Reopen column",
   "sidebar.resizeWidth": "Resize editing column",
-  "sidebar.resizeSplit": "Divide space between Director and controls"
+  "sidebar.resizeSplit": "Divide space between Director and controls",
+  "sidebar.activateOpen": "Activate open mode",
+  "sidebar.activateCompact": "Activate compact mode",
+  "sidebar.tabs": "Editing column content",
+  "sidebar.directorTab": "Director",
+  "sidebar.controlsTab": "Controls"
 }

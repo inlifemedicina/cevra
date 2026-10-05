@@ -340,24 +340,35 @@ This evidence does not replace the pending point-specific owner check.
 Reuse the Normal manual-editing variant (I4-T1, D14-T2, X-T1/T7/T10) and the
 point-specific Original/simple V1 preview check above. The owner approved the
 full-height right column with Director/editorial draft above context, adjustable
-height/width and independent scroll. Compact collapses the entire column;
-the earlier narrow-column/tabs proposal is superseded. One replacement native
-package combines this layout with the reviewed #84 initial-frame correction.
-It is prepared closed and is not a release or merged build.
+height/width and independent scroll. After testing Draft #85 `f4ea20f`, the owner
+explicitly replaced whole-column collapse with a 286 px upper-only compact
+column, Director/Controls tabs and a full-width timeline below. Open retains
+its full-height adjustable layout. The follow-up package combines this layout
+with a bounded V1 paused-frame correction; prepare it closed while Take testing
+continues. It is not a release or merged build.
 
 1. After normally quitting the previous review app, open the designated new
-   package and select Original and the existing V1 excerpt before Play. Confirm
-   each initial frame appears paused, with the central IN/OUT and excerpt intact.
+   package when the owner authorizes that session transition, select the existing
+   V1 excerpt before Play. Confirm its initial frame appears paused, with the
+   central IN/OUT and excerpt intact. Original's initial-frame PASS at `f4ea20f`
+   is preserved; do not repeat it without a new regression.
 2. Read the Director/editorial draft and contextual controls; resize the width
    and divider and scroll the two areas independently. Enter a temporary title,
-   note or instruction, switch to compact, then use the visible reopen button.
-   Confirm the whole column collapses, the timeline expands, and text, scroll,
+   note or instruction, switch to compact, use Director/Controls tabs and return
+   to open. Confirm the compact column occupies only the upper editing area,
+   the timeline spans the full lower width, and text, independent scroll,
    selection and playhead survive. Assess legibility in both modes and PT/EN;
    window/source aspect changes must not switch modes automatically.
 
-Status: UNIT PASS (Desktop 98/98 including five sidebar regressions; i18n 2/2).
-Synthetic native geometry, state preservation and painted initial frames PASS
-with zero Play/AI events. APP/OWNER of these two grouped points remains PENDING.
+Status: UNIT PASS (Desktop 102/102, including seven sidebar regressions and
+bounded excerpt-image lifecycle cases; i18n 2/2). Earlier whole-collapse native
+geometry/state/initial-frame PASS applies only to `f4ea20f` technical fixtures.
+At that head APP/OWNER Original initial frame is PASS and V1 initial frame is
+FAIL; the revised compact layout is newly approved and PENDING. Native technical
+verification of the correction remains in progress and cannot promote owner
+acceptance. The isolated derived fixture has not reproduced the human V1
+failure; the follow-up displays its decoded paused frame as an ephemeral image
+until Play/seek, without storing or transmitting it.
 Preserve the earlier real Take orientation/voice/excerpt/save/reopen PASS at
 `b57c649`; no repeated full round or promotion of broader catalog IDs. Final
 exact review, CI and package identity are reported in the dependent Draft and

@@ -459,7 +459,7 @@ controls is approved for preparation only; product layout is not implemented.
 
 ### 2026-10-05 — Approved editing column follow-up
 
-The owner subsequently approved and the Desktop now implements the full-height
+At Draft #85 `f4ea20f`, the owner-approved Desktop implemented the full-height
 right column: Director/editorial draft above contextual controls, independent
 scrolling, adjustable divider and 320–480 px width. Open is the default; compact
 collapses the whole column and shows an explicit PT/EN reopen button. Preview,
@@ -475,3 +475,23 @@ remains unmerged. The replacement native package stays closed pending one
 The earlier accepted Take orientation/voice/content/save/reopen round remains
 valid. Subjective legibility and the real Take initial frame remain PENDING;
 progress 55%, F-A02 exhausted 1/1, no new AI call or device/session operation.
+
+### 2026-10-05 — Revised compact and V1 initial-frame follow-up
+
+The owner confirmed Original's initial frame PASS at `f4ea20f`, but rejected
+the existing V1 excerpt's paused initial frame: APP/OWNER FAIL. Earlier synthetic
+PASS does not override that failure. The bounded follow-up on Draft #85 adds
+an ephemeral image of the admitted decoded excerpt frame before Play/seek;
+Original keeps its accepted playback path. The exact failure in the human
+window has not been reproduced by the isolated technical fixture.
+
+The owner explicitly superseded whole-column collapse with a 286 px compact
+column confined to the upper editing area, Director/Controls tabs and a full-width
+timeline below. Open retains its full-height adjustable column. Text, selection,
+playhead and independent scroll must survive mode/tab changes. Desktop 102/102
+and i18n 2/2 PASS; native verification, exact review/CI and a fresh closed package
+remain in progress. Recheck only V1's initial frame and the revised layout;
+preserve the real Take orientation/voice/content/save/reopen PASS at `b57c649`.
+Draft #85 remains unmerged on reviewed parent #84 `a36d8ba`; no AI, device or
+human-session operation, project/persistence/provider authority is added.
+Director impact is compatible; progress 55%, F-A02 exhausted 1/1 are unchanged.

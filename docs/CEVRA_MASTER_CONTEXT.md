@@ -2909,3 +2909,40 @@ with zero Play events. These checks do not certify subjective legibility or
 the point-specific real Take check. The replacement native package is prepared
 closed; the accepted human session and its project are preserved. Canonical
 owner steps: [grouped sidebar/first-frame check](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#editing-column-and-paused-frame-owner-check--2026-10-05).
+
+### 2026-10-05 — Owner V1 failure and revised compact approval
+
+At Draft #85 `f4ea20f`, the owner confirmed the Original initial frame PASS,
+but the existing V1 excerpt still has no initial frame before Play: APP/OWNER
+FAIL. Synthetic technical PASS does not supersede that failure. The authorized
+follow-up diagnoses/corrects this exact behavior while preserving the saved
+project and accepted orientation/voice/content/save/reopen round.
+
+The owner explicitly replaced whole-column collapse with a revised compact
+mode: a 286 px column (the measured original width) confined to the upper editing
+area, with Director/Controls tabs; the timeline spans the entire lower width.
+Open keeps the approved full-height adjustable column. Preview/excerpt/IN/OUT
+stay centrally; tab/mode transitions preserve text, selection and scroll.
+Implementation and exact review/CI are active on Draft #85. No merge, AI call,
+provider/engine/project schema/persistence extension or Take device operation
+is authorized. Director impact is a compatible presentation/lifecycle extension.
+
+The bounded correction admits one decoded excerpt frame as an in-memory PNG
+(maximum 720 px on its longer side), waits for image decoding before enabling
+controls, and hides it during Play/seek. It is released with preview identity or
+failure; no image/media enters history, storage or external services. Original
+retains its accepted video path. Isolated raw WKWebView Original/excerpt media
+decoded and painted at zero without Play, so the exact failure in the human
+window remains unreproduced; this follow-up must not claim a proven native
+compositor cause or an APP/OWNER V1 PASS.
+
+Desktop 102/102 and i18n 2/2 PASS, including delayed compact-clamp/layout scroll
+restoration, tab keyboard/selection/text preservation, bounded image admission
+and image error/Play/seek lifecycle. Independent review and exact CI remain
+pending. Initial native layout measurements confirm compact width 286 px and a
+1435 px timeline at a 1435×868 client. The follow-up native probe then expired
+three times in its background window; final scroll and actual-UI V1 image checks
+remain BLOCKED/PENDING, not PASS. The saved human project, existing review app
+and Take testing are preserved. The owner asked to continue approved technical
+work overnight and accumulate one reviewed package/minimal shared Vids/Take
+round for the morning, with no intermediate human tests or app installation/open.
