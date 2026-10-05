@@ -2946,3 +2946,32 @@ remain BLOCKED/PENDING, not PASS. The saved human project, existing review app
 and Take testing are preserved. The owner asked to continue approved technical
 work overnight and accumulate one reviewed package/minimal shared Vids/Take
 round for the morning, with no intermediate human tests or app installation/open.
+
+### 2026-10-05 — WKWebView environment and premature image correction
+
+Further isolated diagnosis distinguishes two concrete findings. The Mac display
+is asleep/inactive; a nonpersistent WKWebView continues native messages/timers
+but executes zero rendering callbacks while occluded. No display wake, human
+session operation, screenshot or recording was performed. Native painting and
+render-dependent scroll verification remain BLOCKED by that environment.
+
+At reviewed Draft #85 `ce53f81`, the actual Original → existing 5–10 s V1
+transition also exposed a premature canvas capture: the initially admitted PNG
+was black (mean 0), whereas the same paused clip at time zero was later readable
+(mean 0.489). The early image correction therefore cannot be treated as native
+PASS, even though Chromium passed. The bounded follow-up waits through a
+rendering turn before sampling, rechecks media identity/data/seek/time, cancels
+both callbacks on selection, seek, failure or disposal, and still requires image
+decoding before controls. It never auto-plays, advances time or rejects legitimate
+black content by brightness. Original's accepted path remains unchanged.
+
+Desktop 105/105 PASS includes a regression red against `ce53f81`'s immediate
+capture and cancellation of both queued stages after selecting Original. The
+full offline compact audit also preserves context-only workspace/tab memory,
+unsaved fields, intentional user scroll after clamping, expanded width and
+minimum-window geometry. Final exact review/CI/package outcomes are PENDING at
+this checkpoint; results will be recorded in Draft #85 and its local technical
+receipt. Awake native image/painting and
+owner acceptance remain pending; this does not claim the exact human-window
+cause fully reproduced. Director impact remains compatible; no engine/provider,
+history, schema or persistence extension, progress 55%, F-A02 exhausted 1/1.

@@ -360,7 +360,7 @@ continues. It is not a release or merged build.
    selection and playhead survive. Assess legibility in both modes and PT/EN;
    window/source aspect changes must not switch modes automatically.
 
-Status: UNIT PASS (Desktop 102/102, including seven sidebar regressions and
+Status: UNIT PASS (Desktop 105/105, including seven sidebar regressions and
 bounded excerpt-image lifecycle cases; i18n 2/2). Earlier whole-collapse native
 geometry/state/initial-frame PASS applies only to `f4ea20f` technical fixtures.
 At that head APP/OWNER Original initial frame is PASS and V1 initial frame is
@@ -368,7 +368,12 @@ FAIL; the revised compact layout is newly approved and PENDING. Native technical
 verification of the correction remains in progress and cannot promote owner
 acceptance. The isolated derived fixture has not reproduced the human V1
 failure; the follow-up displays its decoded paused frame as an ephemeral image
-until Play/seek, without storing or transmitting it.
+until Play/seek, without storing or transmitting it. The follow-up at `ce53f81`
+then exposed premature black canvas pixels in WKWebView before a rendering turn;
+current code defers capture and cancels stale tasks, with a red-before regression.
+The display is asleep/inactive and suspends native rendering callbacks. Thus
+awake native painting/scroll and the point-specific owner check remain PENDING;
+the environment was not awakened or replaced to manufacture a native PASS.
 Preserve the earlier real Take orientation/voice/excerpt/save/reopen PASS at
 `b57c649`; no repeated full round or promotion of broader catalog IDs. Final
 exact review, CI and package identity are reported in the dependent Draft and

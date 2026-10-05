@@ -495,3 +495,14 @@ preserve the real Take orientation/voice/content/save/reopen PASS at `b57c649`.
 Draft #85 remains unmerged on reviewed parent #84 `a36d8ba`; no AI, device or
 human-session operation, project/persistence/provider authority is added.
 Director impact is compatible; progress 55%, F-A02 exhausted 1/1 are unchanged.
+
+The overnight WKWebView follow-up confirms the display is asleep/inactive:
+messages/timers continue but rendering callbacks are suspended while occluded.
+It also reproduced a black premature PNG in the actual Original → existing V1
+transition at `ce53f81`. The bounded correction now defers sampling through a
+rendering turn and cancels stale/seek/disposed tasks; Original is unchanged.
+Desktop 105/105 PASS, including the red-before regression and both queued-stage
+cancellations. Awake native painting/scroll and owner acceptance remain PENDING;
+no display wake, human-session/device operation or synthetic promotion to PASS.
+Final exact review/CI/package identity is PENDING at this checkpoint; results
+will be recorded in Draft #85 and its local receipt.

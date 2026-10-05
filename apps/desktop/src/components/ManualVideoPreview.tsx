@@ -25,6 +25,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   const imageRef = useRef<HTMLImageElement>(null);
   const metadataVerified = useRef(false);
   const capturedFrame = useRef(false);
+  const frameTask = useRef<{ first: number; second: number } | null>(null);
   const [initialFrame, setInitialFrame] = useState<{ url: string; image: string } | null>(null);
   const [preview, setPreview] = useState<LocalVideoPreview | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -44,6 +45,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     let settled = false;
     let objectUrl: string | null = null;
     const operationId = `video-preview-${crypto.randomUUID()}`;
+    cancelFrameTask();
     metadataVerified.current = false;
     capturedFrame.current = false;
     setInitialFrame(null);
@@ -66,6 +68,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     const video = videoRef.current;
     return () => {
       active = false;
+      cancelFrameTask();
       if (operationId && !settled) void backend.cancelOperation(operationId).catch(() => undefined);
       // Release decoder before revoking; never retain an old source/snapshot URL.
       if (video && objectUrl) { video.pause(); video.removeAttribute("src"); video.load(); }
@@ -95,6 +98,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   }, [playing, ready, clip?.id]);
 
   function fail(code: string) {
+    cancelFrameTask();
     metadataVerified.current = false;
     capturedFrame.current = false;
     setInitialFrame(null);
@@ -116,15 +120,35 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     frameReady();
   }
 
+  function cancelFrameTask() {
+    const pending = frameTask.current;
+    frameTask.current = null;
+    if (pending) { cancelAnimationFrame(pending.first); cancelAnimationFrame(pending.second); }
+  }
+
   function frameReady() {
     const video = videoRef.current;
     // Metadata alone does not guarantee a decoded frame in WKWebView.
     if (!metadataVerified.current || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking) return;
     if (!clip) { setReady(true); return; }
-    if (capturedFrame.current || !url || video.currentTime !== 0) return;
-    // A decoded paused frame need not be painted by the native video layer.
-    // Render the admitted excerpt frame through an ephemeral image until Play/seek.
+    if (capturedFrame.current || frameTask.current || !url || video.currentTime !== 0) return;
+    // WKWebView can report loadeddata before its frame is readable by canvas.
+    // Let one rendering turn finish, then admit the same paused frame identity.
     if (video.videoWidth <= 0 || video.videoHeight <= 0) return;
+    const pending = { first: 0, second: 0 };
+    frameTask.current = pending;
+    pending.first = requestAnimationFrame(() => {
+      if (frameTask.current !== pending) return;
+      pending.second = requestAnimationFrame(() => {
+        if (frameTask.current !== pending) return;
+        frameTask.current = null;
+        if (!metadataVerified.current || videoRef.current !== video || video.getAttribute("src") !== url || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking || video.currentTime !== 0) return;
+        captureFrame(video, url);
+      });
+    });
+  }
+
+  function captureFrame(video: HTMLVideoElement, frameUrl: string) {
     try {
       const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
       const canvas = document.createElement("canvas");
@@ -134,7 +158,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
       if (!context) throw new Error("frame image unavailable");
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       capturedFrame.current = true;
-      setInitialFrame({ url, image: canvas.toDataURL("image/png") });
+      setInitialFrame({ url: frameUrl, image: canvas.toDataURL("image/png") });
     } catch { fail("MANUAL_VIDEO_UNSUPPORTED"); }
   }
 
@@ -171,7 +195,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     <div className="manual-preview-heading"><strong>{sourceLabel ?? t("preview.localVideo")}</strong><span>{t(clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
     <div className="manual-video-stage">
       <video ref={videoRef} src={url ?? undefined} preload="auto" playsInline onLoadedMetadata={event => { if (event.currentTarget === videoRef.current && url) metadataReady(); }} onLoadedData={frameReady} onCanPlay={frameReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
-        onSeeking={() => setSeeking(true)} onSeeked={() => { frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); updateClock(); }} />
+        onSeeking={() => { cancelFrameTask(); setSeeking(true); }} onSeeked={() => { frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); updateClock(); }} />
       {clip && initialFrame && initialFrame.url === url && <img key={url} ref={imageRef} className="manual-initial-frame" src={initialFrame.image} alt="" aria-hidden="true" hidden={playing || seeking || currentMs !== startMs}
         onLoad={event => { if (event.currentTarget === imageRef.current && metadataVerified.current && videoRef.current?.getAttribute("src") === initialFrame.url) setReady(true); }}
         onError={event => { if (event.currentTarget === imageRef.current) fail("MANUAL_VIDEO_UNSUPPORTED"); }} />}

@@ -1,7 +1,7 @@
 import { createEmptyProject, ProjectHistory, type SourceAsset } from "@cevra/project-ir";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreview, LocalVideoPreviewRequest } from "@cevra/application";
 import { translate } from "@cevra/i18n";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import type { DesktopBackend, DesktopBackendState } from "./backend/desktop-backend";
 import { App } from "./App";
@@ -79,6 +79,7 @@ async function metadata(container: HTMLElement, duration?: number, initialFrame 
   if (initialFrame) {
     Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
     fireEvent.loadedData(video);
+    if (excerpt) await waitFor(() => expect(container.querySelector(".manual-initial-frame")).not.toBeNull());
     const image = container.querySelector<HTMLImageElement>(".manual-initial-frame");
     if (image) fireEvent.load(image);
   }
@@ -103,6 +104,7 @@ for (const excerpt of [false, true]) {
     fireEvent.loadedData(video);
     if (excerpt) {
       expect(play.disabled).toBe(true);
+      await waitFor(() => expect(container.querySelector(".manual-initial-frame")).not.toBeNull());
       const image = container.querySelector<HTMLImageElement>(".manual-initial-frame")!;
       expect(image.getAttribute("src")).toBe("data:image/png;base64,decoded-frame");
       fireEvent.load(image);
@@ -151,6 +153,48 @@ it("uses a bounded ephemeral decoded excerpt image until playback or a seek leav
   expect(backend.history.toArchive()).toEqual(before);
 });
 
+it("does not sample WKWebView loadeddata before a rendering turn or enable controls before image decoding", async () => {
+  const callbacks = new Map<number, FrameRequestCallback>(); let sequence = 0;
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation(callback => { callbacks.set(++sequence, callback); return sequence; });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation(id => { callbacks.delete(id); });
+  const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
+  const { container } = render(<ManualVideoPreview backend={new ManualBackend()} source={source} snapshotId="render-turn" clip={clip} timelineOccupied busy={false}
+    seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  const video = await metadata(container, 3, false), play = screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement;
+  Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
+  fireEvent.loadedData(video); fireEvent.canPlay(video);
+  expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  expect(callbacks.size).toBe(1); expect(play.disabled).toBe(true);
+  act(() => { callbacks.get(1)!(0); callbacks.delete(1); });
+  expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  act(() => { callbacks.get(2)!(16); callbacks.delete(2); });
+  expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledTimes(1);
+  expect(play.disabled).toBe(true);
+  fireEvent.load(container.querySelector(".manual-initial-frame")!);
+  expect(play.disabled).toBe(false); expect(video.play).not.toHaveBeenCalled(); expect(video.currentTime).toBe(0);
+});
+
+for (const phase of ["first", "second"]) it(`discards a stale excerpt's ${phase} rendering callback after selecting Original`, async () => {
+  const callbacks = new Map<number, FrameRequestCallback>(); let sequence = 0;
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation(callback => { callbacks.set(++sequence, callback); return sequence; });
+  const cancel = vi.spyOn(window, "cancelAnimationFrame").mockImplementation(id => { callbacks.delete(id); });
+  const backend = new ManualBackend(), clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
+  const props = { backend, source, timelineOccupied: true, busy: false, seek: { sequence: 0, timelineMs: 0 }, t, onPlayheadChange: vi.fn(), onCreate: vi.fn() };
+  const { container, rerender } = render(<ManualVideoPreview {...props} snapshotId="old-clip" clip={clip} />);
+  const video = await metadata(container, 3, false);
+  Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA }); fireEvent.loadedData(video);
+  if (phase === "second") act(() => { callbacks.get(1)!(0); callbacks.delete(1); });
+  const id = phase === "first" ? 1 : 2, stale = callbacks.get(id)!;
+  rerender(<ManualVideoPreview {...props} snapshotId="new-original" />);
+  expect(cancel).toHaveBeenCalledWith(id);
+  act(() => stale(32));
+  expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  expect(container.querySelector(".manual-initial-frame")).toBeNull();
+  await metadata(container, 6);
+  expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(container.querySelector(".manual-initial-frame")).toBeNull();
+});
+
 it("keeps the excerpt unavailable if its initial image cannot decode and releases the media", async () => {
   const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
   const { container } = render(<ManualVideoPreview backend={new ManualBackend()} source={source} snapshotId="bad-frame-image" clip={clip} timelineOccupied busy={false}
@@ -158,6 +202,7 @@ it("keeps the excerpt unavailable if its initial image cannot decode and release
   const video = await metadata(container, 3, false);
   Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
   fireEvent.loadedData(video);
+  await waitFor(() => expect(container.querySelector(".manual-initial-frame")).not.toBeNull());
   const play = screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement;
   expect(play.disabled).toBe(true);
   fireEvent.error(container.querySelector(".manual-initial-frame")!);
