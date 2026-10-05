@@ -82,6 +82,12 @@ reviews establish feasibility boundaries, not runtime execution.
 
 ## M0 technical checkpoint — 2026-10-05
 
+Published technical Draft: [PR #86](https://github.com/inlifemedicina/cevra/pull/86),
+stacked on #85. The independently reviewed implementation commit is
+`1566d83a60983951815ddbf8f37699e144db76ca`, tree
+`691f3a216361361bbbd14b1aeeb2fb236a9bc6e6`. The PR records remote checks for its
+current head; publication is not merge or functional acceptance.
+
 The technical M0 work is isolated on `feat/vids-g1-foundation`, based on exact head
 `370e86b18599cd78c8dee3e4325caf9a0d05d6d3`. The implementation adds responsive
 history/import/save controls and real tab focus, plus the closed atomic
@@ -136,8 +142,10 @@ outside the tracked repository.
 Independent read-only reviews APPROVE the atomic IR and Host persistence/close
 paths. Launcher review found startup/exit and feedback/selection races; those
 were fixed and its final reading APPROVE covers retry/native close. These are
-scoped source reviews, not an exact committed-tree or grouped G1/G5/G6 approval.
-Exact-tree review and publication belong to the technical foundation closeout.
+scoped source reviews. Final independent readings APPROVE the exact implementation
+tree above for IR/Store, Host persistence/close and native/UI integration; they
+do not establish grouped G1/G5/G6 approval. This closeout documentation changes
+no code, test, permission or generated manifest from that validated tree.
 Unavailable acceptance variants remain BLOCKED on pending material choices and
 actual sequence/render consumers; independent approved M1 edits may proceed.
 Preserve R3/Take evidence, F-A02 allocation 1/1 and roadmap 55%. A technical Draft

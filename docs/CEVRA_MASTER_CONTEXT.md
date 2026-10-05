@@ -2668,7 +2668,8 @@ or app/human-media/device action. Prepare reviewed #84 then #85; both remain
 Draft/unmerged, and explicit merge authorization is pending after automatic
 approval review rejected #84. Do not retry/bypass that rejection. Preserve all
 scoped R3/Take evidence. The plan records the isolated technical M0 implementation,
-bounded tests/source reviews and remaining sequence/render prerequisites.
+published as [Draft #86](https://github.com/inlifemedicina/cevra/pull/86) over #85,
+bounded tests/exact-tree reviews and remaining sequence/render prerequisites.
 Naming: Creator=Lite, Studio=Full, Vids=Desktop; I19's Full visual workspace/final
 output remains independent of Vids. No G1 PASS is implied; F-A02 and progress
 remain unchanged. Historical actions below retain their scope and evidence.

@@ -11,7 +11,8 @@ recovery accompany each available flow; automation precedes grouped owner review
 [Milestones and pending material choices](CEVRA_MANUAL_SEQUENCE_G1.md).
 Reviewed #84→#85 preparation continues; both are Draft/unmerged and explicit
 merge authorization remains pending after automatic review rejected #84.
-M0 has bounded automated/source-review evidence, recorded in the plan;
+M0 is published as [technical Draft #86](https://github.com/inlifemedicina/cevra/pull/86)
+over #85, with bounded automated/exact-tree-review evidence recorded in the plan;
 continuous sequence/render consumers remain blocked. Historical R3/Take PASS
 remains limited. No G1 PASS, real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,
