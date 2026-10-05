@@ -456,3 +456,22 @@ selection of Original and the V1 excerpt requires a point-specific recheck.
 Director/state boundaries, progress 55% and F-A02 exhausted 1/1 are unchanged.
 A neutral visual proposal for a taller preview with lateral Director/context
 controls is approved for preparation only; product layout is not implemented.
+
+### 2026-10-05 — Approved editing column follow-up
+
+The owner subsequently approved and the Desktop now implements the full-height
+right column: Director/editorial draft above contextual controls, independent
+scrolling, adjustable divider and 320–480 px width. Open is the default; compact
+collapses the whole column and shows an explicit PT/EN reopen button. Preview,
+excerpt and IN/OUT stay centrally. Width/source aspect never changes modes.
+Local presentation state survives toggling; no project schema, engine, provider,
+history or persistence authority changes. Director impact is compatible.
+
+Desktop 98/98 and i18n 2/2 PASS; synthetic WKWebView checks cover geometry,
+unsaved text/scroll/selection preservation and paused Original/excerpt initial
+frames without Play. The layout Draft depends on reviewed #84 `a36d8ba` and
+remains unmerged. The replacement native package stays closed pending one
+[grouped owner check](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#editing-column-and-paused-frame-owner-check--2026-10-05).
+The earlier accepted Take orientation/voice/content/save/reopen round remains
+valid. Subjective legibility and the real Take initial frame remain PENDING;
+progress 55%, F-A02 exhausted 1/1, no new AI call or device/session operation.

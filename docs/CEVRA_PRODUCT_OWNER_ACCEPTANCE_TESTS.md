@@ -334,3 +334,32 @@ Focused UNIT cases cover Original/excerpt, buffered data and stale selection
 events. Native WKWebView synthetic evidence distinguishes metadata-only blank
 output from visible initial-frame output at zero time with no play events.
 This evidence does not replace the pending point-specific owner check.
+
+#### Editing column and paused-frame owner check — 2026-10-05
+
+Reuse the Normal manual-editing variant (I4-T1, D14-T2, X-T1/T7/T10) and the
+point-specific Original/simple V1 preview check above. The owner approved the
+full-height right column with Director/editorial draft above context, adjustable
+height/width and independent scroll. Compact collapses the entire column;
+the earlier narrow-column/tabs proposal is superseded. One replacement native
+package combines this layout with the reviewed #84 initial-frame correction.
+It is prepared closed and is not a release or merged build.
+
+1. After normally quitting the previous review app, open the designated new
+   package and select Original and the existing V1 excerpt before Play. Confirm
+   each initial frame appears paused, with the central IN/OUT and excerpt intact.
+2. Read the Director/editorial draft and contextual controls; resize the width
+   and divider and scroll the two areas independently. Enter a temporary title,
+   note or instruction, switch to compact, then use the visible reopen button.
+   Confirm the whole column collapses, the timeline expands, and text, scroll,
+   selection and playhead survive. Assess legibility in both modes and PT/EN;
+   window/source aspect changes must not switch modes automatically.
+
+Status: UNIT PASS (Desktop 98/98 including five sidebar regressions; i18n 2/2).
+Synthetic native geometry, state preservation and painted initial frames PASS
+with zero Play/AI events. APP/OWNER of these two grouped points remains PENDING.
+Preserve the earlier real Take orientation/voice/excerpt/save/reopen PASS at
+`b57c649`; no repeated full round or promotion of broader catalog IDs. Final
+exact review, CI and package identity are reported in the dependent Draft and
+local technical receipt. No private project-store inspection/copy or media
+publication is part of this check.

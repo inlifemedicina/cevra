@@ -16,7 +16,7 @@ export function Inspector({ project, presentations, selectedProjectItemId, works
   const selectedName = (selectedSource && presentations.get(selectedSource.id)?.label) ?? caption?.text ?? graphic?.text ?? graphic?.styleToken ?? null;
   const isAudioSelection = source?.kind === "audio" || clipTrack?.kind === "audio";
   return (
-    <aside className="inspector" aria-label={t("inspector.title")}>
+    <aside className="inspector" aria-label={t("inspector.title")} data-sidebar-scroll="context">
       <div className="inspector-heading"><div><span className="eyebrow">{t("inspector.context")}</span><h2>{t("inspector.title")}</h2></div><span className="workspace-context">{t(workspaceKeys[workspace])}</span></div>
       {selectedName ? <p className="selection-label" data-testid="inspector-selection">{t("inspector.selected", { name: selectedName })}</p> : <div className="inspector-empty" role="status"><span aria-hidden="true">◇</span><p>{t("inspector.emptySelection")}</p></div>}
       {selectedSource && <details className="source-file-details"><summary>{t("sourcePresentation.fileDetails")}</summary><p>{selectedSource.displayName}</p></details>}

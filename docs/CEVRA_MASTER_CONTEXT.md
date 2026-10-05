@@ -2873,3 +2873,39 @@ preview and lateral Director/context controls is a presentation proposal for
 comparison in both orientations. Selected-media aspect does not set project or
 export aspect. No layout code, new output behavior or identity redesign is authorized
 by that proposal approval. The visual artifact uses neutral synthetic content.
+
+### 2026-10-05 — Approved editing sidebar implementation
+
+After reviewing the synthetic open/compact proposals, the owner approved the
+full-height right editing column: Director and editorial draft above contextual
+controls, an adjustable height divider, independent scrolling and adjustable
+width. Open is the default. The final compact mode collapses the entire column
+and exposes an explicit reopen button; the earlier narrow-column/tabs mockup is
+superseded. Width dragging or source aspect never changes modes automatically.
+Preview, excerpt and IN/OUT remain together centrally; text, selection and scroll
+positions must survive collapse/reopen. This is authorized presentation work,
+with no Project IR/history, engine, provider, permission or persistence change.
+
+Implementation is prepared on `feat/vids-right-sidebar`, based on Draft #84 head
+`a36d8ba` (the independently reviewed initial-frame correction, with PR/push CI
+5/5 and exact runtime 1/1 SUCCESS). The new Draft is stacked on #84 so its diff
+contains only the approved layout. It remains unmerged pending final review/CI
+and one consolidated owner layout/initial-frame check. Preserve the accepted Take orientation/voice/excerpt/save/reopen
+round; no full repeated acceptance, human-session manipulation, personal-media
+publication or real AI call. Director impact: compatible presentation extension;
+execution/state boundaries, progress 55% and exhausted F-A02 1/1 are unchanged.
+
+Local Desktop 98/98 and i18n 2/2 PASS, including five new sidebar cases for
+unsaved text, independent scroll, selection/playhead, explicit PT/EN reopening,
+resize limits and the divider after a reduced window. Independent review found
+one bounded divider issue: dragging now starts from its visible clamped height,
+with Escape restoring the initial proportion. Native WKWebView synthetic checks
+confirm the whole column collapses, timeline width changes from 1075 to 1435 px
+at a 1435×868 client, and text/scroll/selection/history survive. The Original
+video box is 707×359 px with the column open, versus the previous 781×192 px;
+portrait content is fitted, never used to select a mode or export aspect.
+Both synthetic Original and excerpt paint their initial frame paused at zero,
+with zero Play events. These checks do not certify subjective legibility or
+the point-specific real Take check. The replacement native package is prepared
+closed; the accepted human session and its project are preserved. Canonical
+owner steps: [grouped sidebar/first-frame check](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#editing-column-and-paused-frame-owner-check--2026-10-05).

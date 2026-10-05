@@ -351,5 +351,12 @@
   "timeline.trimIn": "Ajustar IN do clip",
   "timeline.trimOut": "Ajustar OUT do clip",
   "timeline.trimRange": "Trecho do clip",
-  "timeline.trimHint": "Arraste IN/OUT · setas: 0,1 s · Shift: 0,01 s · Esc: cancelar"
+  "timeline.trimHint": "Arraste IN/OUT · setas: 0,1 s · Shift: 0,01 s · Esc: cancelar",
+  "sidebar.title": "Painel de edição",
+  "sidebar.expanded": "Modo aberto",
+  "sidebar.compact": "Modo compacto",
+  "sidebar.collapse": "Recolher coluna",
+  "sidebar.open": "Reabrir coluna",
+  "sidebar.resizeWidth": "Ajustar largura da coluna de edição",
+  "sidebar.resizeSplit": "Dividir espaço entre Diretor e controles"
 }

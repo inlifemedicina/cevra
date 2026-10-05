@@ -59,7 +59,7 @@ export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpe
 
       <div className="top-actions">
         <button type="button" className={mediaOpen ? "icon-button toggled" : "icon-button"} onClick={onMediaToggle} aria-label={t("top.mediaPanel")} title={t("top.mediaPanel")}><Icon name="panel" /></button>
-        <button type="button" className={inspectorOpen ? "icon-button toggled" : "icon-button"} onClick={onInspectorToggle} aria-label={t("top.inspector")} title={t("top.inspector")}><Icon name="inspect" /></button>
+        <button type="button" data-sidebar-toggle className={inspectorOpen ? "icon-button toggled sidebar-toggle" : "sidebar-reopen sidebar-toggle"} onClick={onInspectorToggle} aria-label={t(inspectorOpen ? "sidebar.collapse" : "sidebar.open")} title={t(inspectorOpen ? "sidebar.collapse" : "sidebar.open")} aria-expanded={inspectorOpen} aria-controls="editing-sidebar"><Icon name="inspect" />{!inspectorOpen && <span>{t("sidebar.open")}</span>}</button>
         <button type="button" className="icon-button" disabled={!canUndo} onClick={onUndo} aria-label={t("action.undo")} title={canUndo ? t("action.undo") : t("history.undoUnavailable")}><Icon name="undo" /></button>
         <button type="button" className="icon-button" disabled={!canRedo} onClick={onRedo} aria-label={t("action.redo")} title={canRedo ? t("action.redo") : t("history.redoUnavailable")}><Icon name="redo" /></button>
         <span className={`save-status ${status === "demo-not-persisted" ? "demo-status" : status === "host-unavailable" || status === "persistence-error" ? "failed-status" : "local-status"}`}><i aria-hidden="true" />{t(statusKey(status))}</span>
