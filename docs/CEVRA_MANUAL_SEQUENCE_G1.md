@@ -60,7 +60,8 @@ effects and full journal identity before committing; no-op/failure preserve
 redo. Prove archive compatibility and history/transcript scaling. No generic
 IR, paths, scripts or arbitrary command endpoint is exposed to WebView.
 
-Current preview guards reject multi-clip. Generic trim/concat does not express
+Baseline preview guards rejected multi-clip; the bounded consumer below now
+admits canonical occurrences through the existing clip route. Generic trim/concat does not express
 a proved sequence clock/profile; owned intermediates and final artifact admission
 need bounded extensions. Do not create fake source/export records for those
 intermediates. Preview remains disposable; export reads originals and avoids
@@ -211,9 +212,10 @@ The working UI now connects all seven intents, reusable source-clock IN/OUT and
 numeric source ranges, insert before selection, adjacent moves and ripple trim
 handles on the selected montage clip. It uses the existing mutation/close/save
 gates, preserves newer selections on late confirmation and reconciles committed
-save errors without replay. PT/EN have the same controls. Montage playback is
-explicitly pending; multi-clip selection shows the original source, not a composed
-preview. Seven focused UI tests passed using the production Application service
+save errors without replay. PT/EN have the same controls. At that UI checkpoint
+montage playback was explicitly pending; multi-clip selection showed Original.
+The later consumer below expands playback within its existing Take envelope.
+Seven focused UI tests passed using the production Application service
 with controlled offline identity/transport fixtures; the complete Desktop suite
 passed 125/125, i18n 2/2 and the production build passed. Both independent
 read-only reviews approved UI tree `71c7ceb96883ef163e08752b54314af6dd15389b`.
@@ -287,6 +289,104 @@ its nine steps and passed; this is a terminal post-merge receipt, distinct from
 the equivalent unchanged contracts passed on M0. Attempts 1–3 remain failures.
 These are separate receipts;
 remote success on M0 is not CI or functional acceptance for this local M1 tree.
+
+## Canonical sequence playback — 2026-10-05 technical preparation
+
+The production app now exposes Sequence and Original on the same manual surface.
+Sequence walks canonical occurrences through the existing closed
+video.previewLocal command. The Host resolves the whole contiguous sequence,
+prepares an immutable plan bound to full journal identity and verifies every
+unique original before and after asynchronous clip preparation. Edit/Undo ABA,
+other-source replacement, cancellation and superseding seeks cannot publish the
+old result. No IR/history/checkpoint/export record is written by playback.
+
+The UI owns one admitted clip Blob/decoder at a time. Program seek selects the
+following occurrence at a join; exact program OUT hides the picture and stops.
+Play can continue into the next prepared clip, explicit repeat returns to zero,
+and Original remains available for reusable source-clock marks. Preparing joins
+may wait: this is sequential bounded playback, not proved gapless/synchronized
+montage delivery. A mutation/close/save gate clears playback intent, pending
+operations cancel on a snapshot/mode change and late responses/events are
+ignored. A paused mode round-trip preserves its actual program position; fresh
+snapshots respect a selected Original. Only the existing Take source/decoded
+frame/AAC envelope is admitted. No new exact-edge policy, export profile,
+dependency, native route or ACL is introduced. The existing frame/AAC
+quantization and native decoding/perceptual limits still apply.
+
+UNIT/FAKE: Host 149/149, Application 296/296, Desktop 134/134, offline Rust 38/38
+and i18n 2/2 passed; Host and Desktop builds passed. Eight new UI cases cover
+joins/OUT, seek, repeat, snapshot edits, gating, mode round-trip, active-mode
+clicks, late ended events and production App exposure. Four new Host cases
+drive real sequence RPC/identity with controlled transport/engine fixtures,
+including original continuity, retained redo, other-source replacement and
+retirement. The first full UI run failed one obsolete assertion that sequence
+playback was pending; that assertion now checks the available mode controls.
+Independent reviews requested fixes for lost paused position, false pause
+intent and late ended clocks. Both approved corrected source tree
+047206a0671aa2ee550669d8bc1437398f4830b8 with regressions. Current-head CI is
+separate; prior recovery head 230c3ff passed push 37383941620 (5/5), PR
+37383945568 (5/5) and exact runtime 37383945606 (1/1), attempt 1.
+Twelve owned headless layout cases passed at 900/1120/1440 pixels, PT/EN and
+open/compact inspector: Sequence/Original, repeat, retry, play and seek controls
+remain visible and hit-testable, with video space and timeline clips retained.
+These controlled transport fixtures exercise layout, not native media playback.
+No APP/OWNER, native decoder, end-to-end G1/G5/G6 or export acceptance follows.
+
+### B-frame fixture diagnosis and temporal recommendation
+
+Owned fixture diagnosis isolated the earlier VideoToolbox -12908 failure.
+Identical bounded commands for H.264 with and without B-frames failed inside
+the execution sandbox and succeeded under approved execution outside it; the
+specific blocked platform service was not inspected. The available software
+MPEG-4 fixture also succeeded inside the sandbox. No installation, dependency,
+production encoder fallback or profile change was made. Failed receipts remain
+retained outside the tracked repository.
+
+The H.264 B-frame fixture has 60 decoded pictures and reports has_b_frames=2,
+monotonic display PTS and packet/display timestamp bijection; packet order
+differs from display order. The active picture at source IN901 ms begins at
+900000 us and covers OUT908 ms. A separately labelled technical 1080p H.264
+experiment emits one picture at PTS0 with 7000-us exposure, compressed payload
+unchanged by duration normalization and original hash intact. Its measured rate
+is 1000/7, not strict 30 fps. This proves that bounded display-order/active-frame
+handling is feasible; it does not adopt production cuts, prove colour/audio
+quality or complete export admission. Private evidence:
+bframe-diagnosis-zzv6ws9l/receipt.json (sandbox),
+bframe-diagnosis-b6hrbpoq/receipt.json (approved execution), and
+bframe-clock-lflcvn12/receipt.json under the owned prototype directory.
+
+Recommendation for owner decision: keep every canonical IN/OUT exact in Project
+IR; prioritize those approved editorial cuts in the initial output by using
+nominal 30-fps cadence with clipped boundary picture exposures, clearly described
+as variable boundary durations. That option needs explicit approval and
+compatibility/quality admission before production. If strict CFR30 delivery is
+required, use a separately reviewed disposable export mapping to the global
+1/30-second grid, disclose changed joins and reject a collapsed subframe clip
+instead of silently dropping or stretching it. Never rewrite Project IR for
+either export option.
+
+| Real output alternative | Exact requested cuts | Perceptible/compatibility consequence |
+|---|---|---|
+| Nominal 30-fps interior with variable boundary exposure | Preserves arbitrary millisecond joins/OUT within the admitted output clock | A 7-ms occurrence remains 7 ms; very short pictures may be difficult to perceive. The file is VFR at boundaries and strict-CFR workflows need separate validation. |
+| Strict CFR30 with explicit export-only quantization | Project stays exact; file joins move to the output frame grid | Nearest rounding alone moves a boundary by at most 16.667 ms; an interval's duration can change by 33.333 ms. Enforcing one picture per tiny clip can exceed those bounds. Present/reject that conflict rather than silently modifying cuts. |
+| Exact container terminal duration only | Can address final duration; cannot express every arbitrary internal join on one fixed picture grid | Does not solve the multi-clip/subframe conflict; no portable edit-list solution is proved. |
+
+A 7-ms cut cannot contain an integer number of constant 1/30-second exposures.
+For the proposed exact-edge option, display the picture already active at IN
+until the next source picture or OUT; OUT is half-open and contributes no later
+source content. For strict CFR, frame-grid quantization belongs to the output
+mapping, while source IN/OUT and undo/redo remain unchanged in the project.
+This is a recommendation and mathematical/fixture finding, not owner consent.
+FFmpeg documents CFR duplication/drop and timestamp-preserving passthrough in
+its [video synchronization options](https://ffmpeg.org/ffmpeg.html#Advanced-video-options);
+the [fps filter](https://ffmpeg.org/ffmpeg-filters.html#fps) exposes explicit
+rounding. These mechanisms do not resolve the product choice automatically.
+
+Director impact: compatible read-only consumer on the same typed operations,
+Project IR and History. Remaining work includes whole-flow latency/resource
+proof, source/display/colour/audio admission, final export/publication and the
+grouped human tests. The owner-approved 512-MiB/2-GiB render limits are still
+requirements awaiting enforcement/whole-process measurement, not PASS receipts.
 
 ## Original-master export prototype and proposed choices
 
@@ -380,22 +480,27 @@ are approved targets, not proved across the envelope or adopted production limit
 Retained owned-file totals are not sampled peak disk; preflight must account for
 source sizes and any private input copies before enforcing a total-job budget.
 
-The three policies and their proof limits remain in this same plan:
+The proposed temporal choice and approved initial profile/resource requirements,
+with their proof limits, remain in this same plan:
 
-- **Off-grid cuts:** show the original frame already active at requested IN,
+- **Proposed off-grid cuts, pending owner decision:** show the original frame already active at requested IN,
   beginning at local zero, preserve later frame times and end exactly at OUT.
   For a 30-fps frame spanning 900–933.333 ms, IN 901/OUT 908 displays that active
   picture for exactly 7 ms; audio uses the requested source range. The alternative
   is snapping requested boundaries to a frame grid, which changes timing and can
-  expand or empty a sub-frame excerpt. Production uses decoded display-frame
-  coverage, including B-frame order; it must reject unproved gaps/tails visibly.
-- **Default quality/size:** the approved initial candidate is MP4/H264 VideoToolbox,
-  SDR 8-bit yuv420p, 20 Mb/s at 1920×1080/30 fps, plus one AAC192k encode.
+  expand or empty a sub-frame excerpt. The proposed implementation would use
+  decoded display-frame coverage, including B-frame order, and reject unproved
+  gaps/tails visibly. No production temporal policy is adopted by this prototype.
+- **Default quality/size:** the approved initial requirements are MP4/H264/AAC,
+  SDR, 20 Mb/s target and 1920×1080/30 fps. Whether that cadence permits variable
+  boundary exposures or requires strict CFR is the pending temporal decision. The measured
+  candidate uses VideoToolbox, 8-bit yuv420p and one AAC192k encode; those
+  implementation details still require technical admission.
   The alternative 4.98-Mb/s candidate makes smaller files at the measured lower
   fidelity. This test selects no HDR/4K or Windows export promise. Other admitted
   canvases/cadences/rotation/colour/audio layouts need measured compatibility;
   bitrate scaling is engineering work under the chosen quality priority.
-- **Bounded failure policy:** one streaming render job, provisionally 512 MiB
+- **Approved resource requirements:** one streaming render job, 512 MiB
   resident memory for its owned renderer subtree and 2 GiB of owned job files,
   including private input copies, intermediates and the new output. Existing
   original files outside the job remain immutable. These numbers give headroom
@@ -405,20 +510,23 @@ The three policies and their proof limits remain in this same plan:
   longer programs consume more resources. Preflight rejects an over-budget plan
   visibly; a measured overrun cancels only the owned render, preserves project/
   unsaved Host/originals/prior final output and reports the limit, without silently
-  truncating ranges or lowering quality. The thresholds are provisional tuning,
-  not certified limits for the full envelope.
+  truncating ranges or lowering quality. The approved thresholds still require
+  enforcement and measured proof across the full envelope.
 
 Packet timescales, flags, sampling, copy checks and exact threshold tuning are
-technical validation, not separate owner protocols. Approval of these policies
-does not certify the unmeasured envelope or close G1/G5/G6.
+technical validation, not separate owner protocols. Approval of the initial
+profile/resource requirements does not approve the proposed temporal choice,
+certify the unmeasured envelope or close G1/G5/G6.
 
 Minimum remaining integration: typed Contracts/Runtime plan and packet evidence,
 source/display/colour admission and full clock oracle, owned-file publication/
 cancel/recovery, Application export journal binding, native/Host/backend/UI
 consumers, then grouped automated G1/G5/G6 and independent exact-tree review.
-The 0.3.4 integration, Original preview eligibility fallback outside Take and
-workload-derived preview deadline also remain FIX NOW prerequisites. No real
-AI/provider/account request or human media/app/device action occurred.
+The 0.3.4 integration remains a prerequisite. Original preview eligibility
+fallback outside Take and the workload-derived preview deadline were integrated
+on recovery head 230c3ff in Draft #87; their bounded technical evidence does not
+close final export admission. No real AI/provider/account request or human
+media/app/device action occurred.
 
 ## Automated acceptance package
 

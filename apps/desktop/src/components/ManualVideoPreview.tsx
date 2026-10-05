@@ -18,15 +18,26 @@ interface Props {
   t: Translate;
   onPlayheadChange(value: number): void;
   onCreate(request: CreateManualVideoClipRequest): Promise<void>;
+  program?: {
+    durationMs: number;
+    resume: boolean;
+    onPlaybackIntent(value: boolean): void;
+    onSeek(value: number, resume?: boolean): void;
+    onClipEnd(): void;
+  };
 }
 
 /** Original bytes or a bounded, ephemeral derivative of the canonical clip. */
-export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, clip, unsupportedClip, timelineOccupied, sequenceEditing, busy, seek, t, onPlayheadChange, onCreate }: Props) {
+export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, clip, unsupportedClip, timelineOccupied, sequenceEditing, busy, seek, t, onPlayheadChange, onCreate, program }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const metadataVerified = useRef(false);
   const imageVerified = useRef<string | null>(null);
   const activePreviewUrl = useRef<string | null>(null);
+  const programRef = useRef(program);
+  programRef.current = program;
+  const completed = useRef(false);
+  const pendingSeek = useRef(false);
   const [initialFrame, setInitialFrame] = useState<{ url: string; image: string; width: number; height: number } | null>(null);
   const [preview, setPreview] = useState<LocalVideoPreview | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -48,6 +59,8 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     let objectUrl: string | null = null;
     const operationId = `video-preview-${crypto.randomUUID()}`;
     activePreviewUrl.current = null;
+    completed.current = false;
+    pendingSeek.current = false;
     metadataVerified.current = false;
     imageVerified.current = null;
     setInitialFrame(null);
@@ -80,7 +93,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
         setInitialFrame(frame ? { url: objectUrl, image: `data:image/png;base64,${frame.base64}`, width: frame.width, height: frame.height } : null);
         // Metadata remains in React; transport bytes belong only to the Blob/image.
         setPreview({ ...result, base64: "", ...(frame ? { initialFrame: { ...frame, base64: "" } } : {}) }); setUrl(objectUrl);
-      }).catch((cause: unknown) => { settled = true; if (active) setError(errorCode(cause)); });
+      }).catch((cause: unknown) => { settled = true; if (active) { setError(errorCode(cause)); programRef.current?.onPlaybackIntent(false); } });
     }
     const video = videoRef.current;
     return () => {
@@ -94,17 +107,27 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   }, [backend, source?.id, snapshotId, clip?.id, clip?.sourceStartMs, clip?.sourceEndMs, retry]);
 
   useEffect(() => {
-    if (busy && url) videoRef.current?.pause();
+    if (busy) { videoRef.current?.pause(); programRef.current?.onPlaybackIntent(false); }
   }, [busy, url]);
 
   useEffect(() => {
     if (!ready || !clip || seek.sequence === 0 || !videoRef.current) return;
+    completed.current = false;
     videoRef.current.pause();
     const target = Math.min(mediaEndMs, Math.max(0, seek.timelineMs - clip.timelineStartMs)) / 1000;
     if (Math.abs(videoRef.current.currentTime - target) < 0.001) { updateClock(); return; }
-    setSeeking(true);
+    pendingSeek.current = true; setSeeking(true);
     videoRef.current.currentTime = target;
   }, [ready, seek.sequence]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (program && !program.resume) { video?.pause(); return; }
+    if (!program?.resume || !ready || seeking || pendingSeek.current || busy || !video || !url || activePreviewUrl.current !== url) return;
+    let active = true;
+    void video.play().catch(() => { if (active && activePreviewUrl.current === url) fail("MANUAL_VIDEO_UNSUPPORTED"); });
+    return () => { active = false; };
+  }, [program?.resume, ready, seeking, busy, url]);
 
   useEffect(() => {
     if (!playing || !ready || !clip) return;
@@ -115,6 +138,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   }, [playing, ready, clip?.id]);
 
   function fail(code: string) {
+    programRef.current?.onPlaybackIntent(false);
     activePreviewUrl.current = null;
     metadataVerified.current = false;
     imageVerified.current = null;
@@ -148,14 +172,32 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
 
   function updateClock() {
     const video = videoRef.current;
-    if (!video || !ready) return;
+    if (!video || !currentMedia()) return;
     const milliseconds = Math.min(endMs, Math.max(startMs, startMs + Math.round(video.currentTime * 1000)));
-    if (clip && video.currentTime * 1000 >= mediaEndMs) {
+    const boundary = program && clip ? Math.min(mediaEndMs, endMs - startMs) : mediaEndMs;
+    if (clip && video.currentTime * 1000 >= boundary) {
       video.pause();
-      if (video.currentTime * 1000 > mediaEndMs) video.currentTime = mediaEndMs / 1000;
+      if (video.currentTime * 1000 > boundary) video.currentTime = boundary / 1000;
+      if (program) {
+        setCurrentMs(endMs);
+        onPlayheadChange(clip.timelineEndMs);
+        finishClip();
+        return;
+      }
     }
     setCurrentMs(milliseconds);
     if (clip) onPlayheadChange(clip.timelineStartMs + milliseconds - startMs);
+  }
+
+  function currentMedia() {
+    const video = videoRef.current;
+    return Boolean(video && ready && !busy && url && activePreviewUrl.current === url && video.getAttribute("src") === url);
+  }
+
+  function finishClip() {
+    if (completed.current || !activePreviewUrl.current || !programRef.current?.resume || busy) return;
+    completed.current = true;
+    programRef.current.onClipEnd();
   }
 
   function mark(which: "in" | "out") {
@@ -167,19 +209,26 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
 
   async function togglePlayback() {
     const video = videoRef.current;
+    if (program?.resume && !busy) { program.onPlaybackIntent(false); video?.pause(); return; }
     if (!video || !ready || seeking || busy) return;
+    if (program) {
+      if (clip && currentMs >= endMs) { program.onSeek(0, true); return; }
+      program.onPlaybackIntent(true);
+      return;
+    }
     if (!video.paused) { video.pause(); return; }
     if (video.currentTime * 1000 >= mediaEndMs || video.currentTime < 0) video.currentTime = 0;
     try { await video.play(); } catch { fail("MANUAL_VIDEO_UNSUPPORTED"); }
   }
 
   const validRange = inMs !== null && outMs !== null && inMs < outMs && outMs <= (source?.durationMs ?? 0);
-  const errorKey = error === "MANUAL_VIDEO_PREVIEW_SETTLING" ? "preview.localSettling" : error === "MANUAL_VIDEO_TOO_LARGE" ? "preview.localTooLarge" : error === "MANUAL_VIDEO_STALE" || error === "MANUAL_VIDEO_SOURCE_CHANGED" ? "preview.localChanged" : "preview.localUnavailable";
+  const errorKey = error === "MANUAL_VIDEO_PREVIEW_SETTLING" ? "preview.localSettling" : error === "MANUAL_VIDEO_TOO_LARGE" ? "preview.localTooLarge" : error === "MANUAL_VIDEO_STALE" || error === "MANUAL_SEQUENCE_STALE" || error === "MANUAL_VIDEO_SOURCE_CHANGED" ? "preview.localChanged" : "preview.localUnavailable";
+  const programMs = clip ? clip.timelineStartMs + (currentMs - startMs) : 0;
   return <section className="manual-video-preview" aria-label={t("preview.localVideo")}>
-    <div className="manual-preview-heading"><strong>{sourceLabel ?? t("preview.localVideo")}</strong><span>{t(clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
+    <div className="manual-preview-heading"><strong>{sourceLabel ?? t("preview.localVideo")}</strong><span>{t(program ? "sequence.preview" : clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
     <div className="manual-video-stage">
-      <video ref={videoRef} src={url ?? undefined} preload="auto" playsInline onLoadedMetadata={event => { if (event.currentTarget === videoRef.current && url) metadataReady(); }} onLoadedData={frameReady} onCanPlay={frameReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
-        onSeeking={() => { setSeeking(true); }} onSeeked={() => { frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); updateClock(); }} />
+      <video ref={videoRef} src={url ?? undefined} hidden={Boolean(program && currentMs >= endMs)} preload="auto" playsInline onLoadedMetadata={event => { if (event.currentTarget === videoRef.current && url) metadataReady(); }} onLoadedData={frameReady} onCanPlay={frameReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
+        onSeeking={() => { pendingSeek.current = true; setSeeking(true); }} onSeeked={() => { pendingSeek.current = false; frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => { if (!currentMedia() || program && !program.resume) { videoRef.current?.pause(); return; } setPlaying(true); }} onPause={() => setPlaying(false)} onEnded={() => { if (!currentMedia()) return; setPlaying(false); if (program && clip) { setCurrentMs(endMs); onPlayheadChange(clip.timelineEndMs); finishClip(); } else updateClock(); }} />
       {initialFrame && initialFrame.url === url && <img key={url} ref={imageRef} className="manual-initial-frame" src={initialFrame.image} alt="" aria-hidden="true" hidden={playing || seeking || currentMs !== startMs}
         onLoad={event => {
           const image = event.currentTarget;
@@ -192,12 +241,13 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     </div>
     <div className="manual-preview-controls">
       {error && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setError(null); setRetry(value => value + 1); }}>{t("preview.retryLocal")}</button>}
-      <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => void togglePlayback()}>{t(playing ? "preview.pauseLocal" : "preview.playLocal")}</button>
-      <input type="range" aria-label={t(clip ? "preview.clipSeek" : "preview.sourceSeek")} min={startMs} max={Math.max(startMs + 1, endMs)} step="1" value={Math.min(endMs, Math.max(startMs, currentMs))} disabled={!ready || busy} onChange={(event) => {
+      <button type="button" className="secondary-button" disabled={busy || !program?.resume && (!ready || seeking)} onClick={() => void togglePlayback()}>{t((program ? program.resume : playing) ? "preview.pauseLocal" : "preview.playLocal")}</button>
+      <input type="range" aria-label={t(program ? "sequence.seek" : clip ? "preview.clipSeek" : "preview.sourceSeek")} min={program ? 0 : startMs} max={program ? program.durationMs : Math.max(startMs + 1, endMs)} step="1" value={program ? programMs : Math.min(endMs, Math.max(startMs, currentMs))} disabled={!ready || busy} onChange={(event) => {
+        if (program) { program.onSeek(Number(event.target.value)); return; }
         const video = videoRef.current; if (!video) return;
         setSeeking(true); video.currentTime = Math.min(mediaEndMs, Number(event.target.value) - startMs) / 1000;
       }} />
-      <time data-testid="preview-timecode">{t("preview.sourcePosition", { time: formatMilliseconds(currentMs) })} / {formatMilliseconds(endMs)}</time>
+      <time data-testid="preview-timecode">{t(program ? "sequence.position" : "preview.sourcePosition", { time: formatMilliseconds(program ? programMs : currentMs) })} / {formatMilliseconds(program ? program.durationMs : endMs)}</time>
     </div>
     {preview?.proxy && <p className="manual-preview-hint">{t("preview.proxyHint")}</p>}
     {clip && <div className="manual-preview-timing">

@@ -209,6 +209,15 @@ os IDs abaixo por variante; nenhum novo catálogo, G1 PASS ou microteste humano
 foi criado. Contratos/consumers/perfil pendentes ficam BLOCKED. Aceites limitados
 anteriores permanecem históricos; aprovação do plano não promove seus IDs completos.
 
+Preparação técnica do consumer de sequência: UNIT/FAKE 134/134 UI e 149/149 Host
+passaram, reutilizando I4-T1, X-T1/T7 e a variante de preview X-T6. Cobertura:
+transições, seek nas junções, repetição explícita, seleção Original, edição durante
+preparação, redo preservado e eventos tardios. O app usa previews Take admitidos
+por clip e pode esperar na junção; APP/OWNER, reprodução nativa/gapless, sync e
+G1/G5/G6 completos continuam NÃO EXECUTADO/BLOCKED conforme a variante.
+O perfil de bordas do export permanece pendente; a prova H.264 B-frames/7 ms é
+RUNTIME sintético, não aceite do export pelo app. Nenhum teste humano foi feito.
+
 Este roteiro agrega os IDs de A–E; não substitui nem duplica os casos canônicos. Preencher um registro por ID/variante/target, inclusive quando vários IDs forem percorridos no mesmo fluxo. Nenhum cenário foi executado nesta reconciliação.
 
 **Execução** começa como `NÃO EXECUTADO`; isso não é resultado. Depois do teste, registrar o resultado objetivo das Regras e, quando necessário, o julgamento humano separado. Marcar `BLOCKED` com a dependência concreta antes de tentar uma função ausente. Uma fundação implementada ou um PASS de CI/fake não equivale a PASS do fluxo no app. A build deve declarar as capabilities realmente disponíveis.

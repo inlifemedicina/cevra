@@ -1,4 +1,4 @@
-import { MANUAL_VIDEO_MAX_BYTES, MANUAL_VIDEO_FRAME_MAX_BYTES, manualVideoError, resolveManualVideo, type LocalVideoPreview, type LocalVideoPreviewRequest } from "@cevra/application";
+import { MANUAL_VIDEO_MAX_BYTES, MANUAL_VIDEO_FRAME_MAX_BYTES, manualVideoError, resolveManualVideo, resolveManualVideoSequence, type LocalVideoPreview, type LocalVideoPreviewRequest } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import type { ProjectHistory, SourceAsset } from "@cevra/project-ir";
 import { constants, type BigIntStats } from "node:fs";
@@ -25,14 +25,8 @@ export function previewPreparationBudgetMs(source: SourceAsset & { durationMs: n
 export function resolvePreviewClip(history: ProjectHistory, request: LocalVideoPreviewRequest) {
   const project = history.current;
   const source = resolveManualVideo(project, request);
-  const clip = project.timeline.clips.find((item) => item.id === request.clipId);
-  const track = project.timeline.tracks.find((item) => item.id === clip?.trackId);
-  if (!clip || clip.sourceId !== source.id || !track || track.kind !== "video" || track.hidden || track.muted
-    || project.timeline.clips.length !== 1 || project.captions.length || project.graphics.length
-    || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || Object.keys(clip.extensions ?? {}).length
-    || ![clip.sourceStartMs, clip.sourceEndMs, clip.timelineStartMs, clip.timelineEndMs].every(Number.isSafeInteger)
-    || clip.timelineStartMs !== 0 || clip.timelineEndMs !== clip.sourceEndMs - clip.sourceStartMs
-    || clip.sourceStartMs < 0 || clip.sourceStartMs >= clip.sourceEndMs || clip.sourceEndMs > source.durationMs || source.durationMs > 60_000) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+  const clip = resolveManualVideoSequence(project, request.expectedSnapshotId).find(item => item.id === request.clipId);
+  if (!clip || clip.sourceId !== source.id || source.durationMs > 60_000) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
   return { source, clip };
 }
 
@@ -225,7 +219,7 @@ export class DerivedVideoPreview {
       return this.packet(pendingCache!, request, current);
     } catch (cause) {
       primary = combined.aborted ? manualVideoError(timeout.signal.aborted && !signal.aborted ? "MANUAL_VIDEO_PREVIEW_TIMEOUT" : "OPERATION_CANCELLED")
-        : cause instanceof Error && "code" in cause && String(cause.code).startsWith("MANUAL_VIDEO_") ? cause : manualVideoError("MANUAL_VIDEO_UNAVAILABLE");
+        : cause instanceof Error && "code" in cause && (String(cause.code).startsWith("MANUAL_VIDEO_") || String(cause.code).startsWith("MANUAL_SEQUENCE_")) ? cause : manualVideoError("MANUAL_VIDEO_UNAVAILABLE");
       if ("code" in primary && primary.code === "MANUAL_VIDEO_SOURCE_CHANGED") for (const [cachedKey, entry] of this.cache) if (entry.sourceId === source.id) this.forget(cachedKey);
       throw primary;
     } finally {

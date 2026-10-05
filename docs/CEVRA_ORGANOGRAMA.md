@@ -26,13 +26,24 @@ cases, independent reviews and push/PR/exact-runtime CI. Canonical read-only
 preview preparation `6b9c737` passed Application 296/296 and review. The bounded
 preview follow-up passed Host 145/145, offline Rust 38/38, UI 126/126, i18n/build
 and source reviews, preserving unsaved Host on unknown preview retirement and
-allowing explicit Retry. Publication continues in that Draft; decoded sequence
-playback/export remain open. The owner approved initial MP4/H264/AAC 1080p/30-fps
+allowing explicit Retry; recovery head `230c3ff` passed push/PR/exact-runtime CI.
+The next bounded consumer connects canonical sequence occurrences to the existing
+clip route and production App, with all-source/journal revalidation, seek, repeat,
+Original mode and preserved edits/paused position. Host 149/149, Application
+296/296, UI 134/134, Rust 38/38, i18n/build and independent source reviews passed.
+It uses the existing Take envelope and may wait at joins; native/gapless/sync and
+whole-flow acceptance remain open. Publication continues in the same Draft;
+export remains open. The owner approved initial MP4/H264/AAC 1080p/30-fps
 SDR, 20-Mb/s target, preserved IN/OUT and 512-MiB memory/2-GiB owned temporary-file
 limits with clear errors and no silent quality drop. Synthetic export measurements,
 proof limits and the exact-cut versus strict-CFR boundary distinction remain in
 the same G1 plan; technical temporal admission remains open.
-Sequence/render integration remains open. No G1 PASS,
+H.264 B-frame fixtures and the 7-ms active-picture feasibility passed under
+approved execution outside the sandbox; identical sandbox commands retained the
+`-12908` failure. No encoder/profile change was adopted. The same plan recommends
+exact project cuts with nominal-30 variable boundary exposure, or explicit
+export-only quantization for strict CFR30; owner decision is still required.
+Final render/publication/resource-budget integration remains open. No G1 PASS,
 real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,
 Vids=Desktop; Lite/Full share core and Full visual output does not require Vids.

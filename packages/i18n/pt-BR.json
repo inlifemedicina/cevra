@@ -384,6 +384,11 @@
   "sequence.later": "Mover para depois",
   "sequence.remove": "Remover selecionado",
   "sequence.selectClip": "Selecione um clip na timeline para inserir, ajustar, dividir, reordenar ou remover.",
-  "sequence.previewPending": "Você está vendo a fonte original. Os controles de montagem estão disponíveis; a reprodução da sequência ainda está em preparação.",
+  "sequence.previewPending": "Você está vendo a fonte original. Use os controles de montagem para marcar e acrescentar trechos.",
+  "sequence.preview": "Sequência",
+  "sequence.previewMode": "Modo de prévia",
+  "sequence.repeat": "Repetir sequência",
+  "sequence.seek": "Posição na sequência",
+  "sequence.position": "Sequência {time}",
   "sequence.unavailable": "Esta edição da montagem está indisponível. Selecione um clip ou fonte compatível e tente novamente."
 }

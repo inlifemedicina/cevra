@@ -97,7 +97,8 @@ it("assembles four retained source ranges through UI with one Undo per action an
   await waitFor(() => expect(screen.getByRole("button", { name: "Refazer" }).matches(":disabled")).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Refazer" }));
   await waitFor(() => expect(backend.history.current).toEqual(before));
-  expect(screen.getByText(/reprodução da sequência ainda está em preparação/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Sequência" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Original" })).toBeTruthy();
 });
 
 it("inserts another source before selection, ripples trim, splits at the cursor and removes without extra journal entries", async () => {

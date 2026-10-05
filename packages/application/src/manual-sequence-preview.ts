@@ -57,6 +57,14 @@ export class ManualSequencePreviewApplicationService {
     resolveManualVideoSequence(this.options.history.current, plan.snapshotId);
   }
 
+  /** Recheck every original after asynchronous clip preparation, then the journal. */
+  async revalidate(plan: ManualSequencePreviewPlan, signal?: AbortSignal): Promise<void> {
+    this.assertCurrent(plan);
+    await verifyManualVideoSources(plan.sources, this.options.identity, signal);
+    signal?.throwIfAborted();
+    this.assertCurrent(plan);
+  }
+
   /** Half-open program intervals: a join belongs to the next clip; OUT has no frame. */
   position(plan: ManualSequencePreviewPlan, timelineMs: number): ManualSequencePreviewPosition | null {
     this.assertCurrent(plan);

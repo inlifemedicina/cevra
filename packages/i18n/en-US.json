@@ -384,6 +384,11 @@
   "sequence.later": "Move later",
   "sequence.remove": "Remove selected",
   "sequence.selectClip": "Select a timeline clip to insert, trim, split, reorder or remove.",
-  "sequence.previewPending": "You are viewing the original source. Montage controls are available; sequence playback is still being prepared.",
+  "sequence.previewPending": "You are viewing the original source. Use montage controls to mark and append ranges.",
+  "sequence.preview": "Sequence",
+  "sequence.previewMode": "Preview mode",
+  "sequence.repeat": "Repeat sequence",
+  "sequence.seek": "Sequence position",
+  "sequence.position": "Sequence {time}",
   "sequence.unavailable": "This montage edit is unavailable. Select a compatible clip or source and try again."
 }

@@ -7,6 +7,7 @@ import {
   SourceTechnicalDescriptorResolver,
   ManualVideoClipApplicationService,
   ManualVideoSequenceApplicationService,
+  ManualSequencePreviewApplicationService,
   resolveManualVideo,
   TranscriptionApplicationService
 } from "@cevra/application";
@@ -64,6 +65,7 @@ export interface DesktopSessionServices {
   temporaryEditorialReview?: true;
   manualVideoClip?: Pick<ManualVideoClipApplicationService, "create" | "trim">;
   manualVideoSequence?: Pick<ManualVideoSequenceApplicationService, "edit">;
+  manualSequencePreview?: Pick<ManualSequencePreviewApplicationService, "prepare" | "assertCurrent" | "revalidate">;
   derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare"> & Partial<Pick<DerivedVideoPreview, "close">>;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
@@ -257,10 +259,18 @@ export class DesktopSession {
       const task = this.runOperation(stable.operationId!, async (signal) => {
         await previous?.catch(() => undefined);
         if (signal.aborted) throw safeError("OPERATION_CANCELLED");
+        const journal = this.services.history.journalIdentity;
+        const sequence = stable.clipId !== undefined && this.services.history.current.timeline.clips.length > 1;
+        if (sequence && !this.services.manualSequencePreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+        const plan = sequence ? await this.services.manualSequencePreview!.prepare({ version: 1, expectedSnapshotId: stable.expectedSnapshotId }, signal) : undefined;
         const { source } = resolve();
         const preview = this.services.derivedVideoPreview && (stable.clipId !== undefined || supportsOriginalProxy(source))
           ? await this.services.derivedVideoPreview.prepare(stable, signal)
           : await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
+        if (signal.aborted) throw safeError("OPERATION_CANCELLED");
+        if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+        if (plan) await this.services.manualSequencePreview!.revalidate(plan, signal);
+        if (journal !== this.services.history.journalIdentity) throw safeError("MANUAL_VIDEO_STALE");
         if (signal.aborted) throw safeError("OPERATION_CANCELLED");
         if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
         resolve();
@@ -435,6 +445,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       history,
       manualVideoClip: new ManualVideoClipApplicationService({ history, identity: sourceIdentity }),
       manualVideoSequence: new ManualVideoSequenceApplicationService({ history, identity: sourceIdentity }),
+      manualSequencePreview: new ManualSequencePreviewApplicationService({ history, identity: sourceIdentity }),
       ...(media?.ingest ? { ingest: media.ingest } : {}),
       ...(media?.sourceTechnicalDescriptor ? { sourceTechnicalDescriptor: media.sourceTechnicalDescriptor } : {}),
       ...(transcription.service ? { transcription: transcription.service } : {}),

@@ -2689,7 +2689,16 @@ The next bounded preview preparation passed Host 145/145, offline Rust 38/38,
 UI 126/126, i18n/build and independent source reviews: verified limited Original
 fallback outside known Take bounds, workload-based deadlines and preservation of
 unsaved Host memory on unknown preview retirement, with explicit Retry. The same
-G1 plan retains both review findings and fixes. Sequence/render consumers remain open.
+G1 plan retains both review findings and fixes. The next bounded sequence consumer
+now connects canonical occurrences to the production App through existing clip
+RPC, with all-original/full-journal revalidation, seek, repeat, Original mode,
+snapshot cancellation and preserved paused position. Host 149/149, Application
+296/296, Desktop 134/134, offline Rust 38/38, i18n/build and both independent
+reviews passed at source tree `047206a0671aa2ee550669d8bc1437398f4830b8`.
+This uses the existing Take envelope and may wait at a join; gapless/native
+decoder, sync/perceptual and G1/G5/G6 acceptance remain open. Recovery head
+`230c3ff` passed push/PR/exact-runtime CI attempt 1; later publication needs its
+own receipts. Selected Original and unsaved changes remain authoritative.
 The G1 plan records measured
 original-master clock/copy/audio and colour/quality experiments, including exact
 60-s source-slice PCM/AAC coverage and absent-tag metadata equality, plus the exact
@@ -2703,6 +2712,14 @@ decision, separate from technical tuning. A 7-ms source range proves that strict
 boundary-cadence interpretation remains open before production admission.
 Tagged-colour preservation, general
 display-order admission and combined active-frame/export integration remain open.
+Owned B-frame diagnosis proved the earlier `-12908` error sandbox-dependent:
+identical H.264 commands passed under approved execution outside the sandbox;
+software MPEG-4 passed inside. H.264 reordered display-clock/7-ms active-picture
+feasibility passed without a product encoder/profile change. The G1 plan records
+failed receipts and a recommendation for explicit owner decision: preserve exact
+Project IR cuts; prefer nominal 30-fps output with variable boundary durations,
+or disclose export-only quantization if strict CFR30 is required. No policy was
+adopted and final render/publication/resource-budget integration remains open.
 Naming: Creator=Lite, Studio=Full, Vids=Desktop; I19's Full visual workspace/final
 output remains independent of Vids. No G1 PASS is implied; F-A02 and progress
 remain unchanged. Historical actions below retain their scope and evidence.

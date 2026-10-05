@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { createEmptyProject, ProjectHistory } from '@cevra/project-ir';
-import { ManualVideoClipApplicationService } from '@cevra/application';
+import { ManualVideoClipApplicationService, ManualVideoSequenceApplicationService, ManualSequencePreviewApplicationService } from '@cevra/application';
 import { NodeMediaArtifactStore } from '@cevra/media-ffmpeg';
 import { DesktopSession, DesktopHostProtocolServer } from '../dist/index.js';
 import { DerivedVideoPreview, previewPreparationBudgetMs } from '../dist/derived-video-preview.js';
@@ -25,7 +25,8 @@ async function setup(t, execute, settle, fixtureBytes = Buffer.from('bounded ori
   const calls = [];
   const engine = { async execute(op, context) { calls.push(op); if (op.type === 'extract-frame') return frameResult(op); return execute ? execute(op, context, { root, sourcePath, bytes, history }) : result(op); } };
   const service = new DerivedVideoPreview({ history, engine, temporaryRoot: root, ...(settle ? { settle } : {}) });
-  const session = new DesktopSession({ history, manualVideoClip: manual, derivedVideoPreview: service, mediaCapability: unavailable, transcriptionCapability: unavailable });
+  const session = new DesktopSession({ history, manualVideoClip: manual, derivedVideoPreview: service,
+    manualSequencePreview: new ManualSequencePreviewApplicationService({ history, identity: new NodeMediaArtifactStore() }), mediaCapability: unavailable, transcriptionCapability: unavailable });
   t.after(() => session.close());
   const request = { sourceId: 'source', clipId: created.clipId, operationId: 'preview-test', expectedSnapshotId: history.current.history.headSnapshotId };
   return { root, sourcePath, bytes, history, session, request, calls, service };
@@ -47,6 +48,59 @@ async function result(op, mutate) {
 }
 async function noTemporaryFiles(root) { assert.deepEqual((await readdir(root)).filter(name => name.startsWith('cevra-video-preview-')), []); }
 function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
+
+async function montage(f) {
+  const source = f.history.current.sources[0], secondPath = join(f.root, 'second.mp4');
+  await writeFile(secondPath, f.bytes);
+  f.history.commit({ type: 'source.add', source: { ...source, id: 'second', uri: secondPath, displayName: 'second.mp4' } });
+  const editor = new ManualVideoSequenceApplicationService({ history: f.history, identity: new NodeMediaArtifactStore(), idGenerator: () => 'second-occurrence' });
+  await editor.edit({ version: 1, expectedSnapshotId: f.history.current.history.headSnapshotId, type: 'append', sourceId: 'second', sourceStartMs: 0, sourceEndMs: 3000 });
+  const request = { ...f.request, expectedSnapshotId: f.history.current.history.headSnapshotId };
+  return { request, secondPath, clips: f.history.current.timeline.clips };
+}
+
+test('sequence RPC admits each canonical occurrence without changing history, originals or redo', async t => {
+  const f = await setup(t), m = await montage(f);
+  f.history.commit({type:'project.rename',name:'retained redo'}); f.history.undo();
+  const before = f.history.toArchive(), lines = [];
+  const server = new DesktopHostProtocolServer(f.session, {writeProtocolLine:line=>lines.push(JSON.parse(line)),writeLog(){},requestShutdown(){}});
+  for (const [i, clip] of m.clips.entries()) {
+    await server.handleLine(JSON.stringify({protocolVersion:1,id:'sequence-'+i,method:'video.previewLocal',params:{...m.request,sourceId:clip.sourceId,clipId:clip.id,operationId:'occurrence-'+i}}));
+    assert.equal(lines.at(-1).error, undefined);
+    assert.equal(lines.at(-1).result.clip.id, clip.id);
+    assert.equal(lines.at(-1).result.clip.sourceStartMs, clip.sourceStartMs);
+    assert.equal(lines.at(-1).result.durationMs, clip.timelineEndMs-clip.timelineStartMs);
+  }
+  assert.deepEqual(f.history.toArchive(), before); assert.equal(f.history.canRedo,true);
+  assert.deepEqual(await readFile(f.sourcePath),f.bytes); assert.deepEqual(await readFile(m.secondPath),f.bytes);
+  await noTemporaryFiles(f.root);
+});
+
+test('sequence rechecks a different original after preparing the active clip',async t=>{
+  let other;
+  const f=await setup(t,async op=>{const r=await result(op);await writeFile(other,Buffer.alloc(f.bytes.length,120));return r;});
+  const m=await montage(f);other=m.secondPath;const before=f.history.toArchive();
+  await assert.rejects(f.session.previewLocalVideo(m.request),{code:'MANUAL_VIDEO_SOURCE_CHANGED'});
+  assert.deepEqual(f.history.toArchive(),before);assert.deepEqual(await readFile(f.sourcePath),f.bytes);await noTemporaryFiles(f.root);
+});
+
+test('edit and Undo during sequence preparation reject its old result while preserving the new redo branch',async t=>{
+  const f=await setup(t,async(op,context,{history})=>{const r=await result(op);history.commit({type:'project.rename',name:'intervening sequence edit'});history.undo();return r;});
+  const m=await montage(f),snapshot=m.request.expectedSnapshotId;
+  await assert.rejects(f.session.previewLocalVideo(m.request),{code:'MANUAL_SEQUENCE_STALE'});
+  assert.equal(f.history.current.history.headSnapshotId,snapshot);assert.equal(f.history.canRedo,true);
+  f.history.redo();assert.equal(f.history.current.project.name,'intervening sequence edit');await noTemporaryFiles(f.root);
+});
+
+test('superseding sequence seek cancels only its old preparation and waits for retirement',async t=>{
+  const entered=deferred(),retire=deferred();let n=0;
+  const f=await setup(t,async(op,context)=>{if(++n===1){entered.resolve();await retire.promise;context.signal.throwIfAborted();}return result(op);});
+  const m=await montage(f),before=f.history.toArchive();
+  const first=f.session.previewLocalVideo(m.request),rejected=assert.rejects(first,{code:'OPERATION_CANCELLED'});await entered.promise;
+  const last=m.clips[1],next=f.session.previewLocalVideo({...m.request,sourceId:last.sourceId,clipId:last.id,operationId:'seek-next'});
+  assert.equal(n,1);retire.resolve();const packet=await next;await rejected;
+  assert.equal(packet.clip.id,last.id);assert.deepEqual(f.history.toArchive(),before);await noTemporaryFiles(f.root);
+});
 
 test('exact range cache revalidates source and rebinds a fresh snapshot after undo without rendering',async t=>{
   const f=await setup(t); const first=await f.session.previewLocalVideo(f.request);

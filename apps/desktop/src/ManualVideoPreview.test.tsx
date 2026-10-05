@@ -6,8 +6,188 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import type { DesktopBackend, DesktopBackendState } from "./backend/desktop-backend";
 import { App } from "./App";
 import { ManualVideoPreview, supportsManualClipPreview } from "./components/ManualVideoPreview";
+import { ManualSequenceVideoPreview } from "./components/ManualSequenceVideoPreview";
 import { Timeline } from "./components/Timeline";
 import { formatMilliseconds } from "./ui-model";
+it("mode round-trip retains a paused sequence position and the active Sequence button leaves playback unchanged", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container } = render(f.view());
+  const first = await metadata(container, 1);
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  fireEvent.play(first); first.currentTime = 0.432; fireEvent.timeUpdate(first);
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.preview") }));
+  expect(screen.getByRole("button", { name: t("preview.pauseLocal") })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: t("preview.pauseLocal") }));
+  fireEvent.click(screen.getByRole("button", { name: t("preview.originalMode") }));
+  await metadata(container, 6);
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.preview") }));
+  const restored = await metadata(container, 1);
+  expect(restored.currentTime).toBe(0.432);
+  fireEvent.seeked(restored);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Sequência 00:00.432 / 00:03.000");
+  expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+
+it("late ended events during a mutation or after failed media do not move the sequence clock", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container, rerender } = render(f.view());
+  const first = await metadata(container, 1);
+  rerender(f.view(true)); f.clock.mockClear();
+  fireEvent.ended(first);
+  expect(f.clock).not.toHaveBeenCalled();
+  expect(f.requests).toHaveBeenCalledTimes(1);
+  rerender(f.view(false)); fireEvent.error(first); f.clock.mockClear();
+  fireEvent.ended(first);
+  expect(f.clock).not.toHaveBeenCalled();
+  expect(f.requests).toHaveBeenCalledTimes(1);
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+function sequenceFixture() {
+  const admitted: SourceAsset = { ...source, technicalDescriptor: { version: 1, basis: "ingest", content: { sha256: "a".repeat(64), sizeBytes: 10 },
+    method: { profile: "cevra.source-technical.v1", engineId: "test", engineVersion: "1", engineApiVersion: 1 }, video: { codec: "h264" } },
+    extensions: { "cevra.ingest": { method: "local", hasVideo: true } } };
+  const backend = new ManualBackend(admitted);
+  backend.history.commit({ type: "source.add", source: { ...admitted, id: "other-video", uri: "/tmp/other-owned-fixture.mp4" } });
+  const clips = [
+    { id: "first", sourceId: source.id, sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 0, timelineEndMs: 1000 },
+    { id: "second", sourceId: "other-video", sourceStartMs: 2000, sourceEndMs: 3500, timelineStartMs: 1000, timelineEndMs: 2500 },
+    { id: "third", sourceId: source.id, sourceStartMs: 5000, sourceEndMs: 5500, timelineStartMs: 2500, timelineEndMs: 3000 }
+  ].map(clip => ({ ...clip, trackId: "v1", speed: 1, volume: 1, opacity: 1 }));
+  backend.history.commit({ type: "timeline.edit", version: 1, edits: [
+    { type: "track.add", track: { id: "v1", kind: "video", name: "V1", hidden: false, locked: false, muted: false } },
+    ...clips.map(clip => ({ type: "clip.add" as const, clip }))
+  ] });
+  const clock = vi.fn();
+  const requests = vi.spyOn(backend, "previewLocalVideo");
+  const view = (busy = false) => <ManualSequenceVideoPreview key={backend.history.current.history.headSnapshotId} backend={backend}
+    project={backend.history.current} clips={backend.history.current.timeline.clips} presentations={new Map()} originalSourceId={source.id}
+    busy={busy} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={clock} onCreate={vi.fn()} />;
+  return { backend, clips, clock, requests, view };
+}
+
+it("plays canonical sequence joins once, waits for each decoder and stops without a frame at program OUT", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container } = render(f.view());
+  const first = await metadata(container, 1);
+  expect(first.play).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  await waitFor(() => expect(first.play).toHaveBeenCalled());
+  fireEvent.play(first);
+  first.currentTime = 1.04; fireEvent.timeUpdate(first); fireEvent.ended(first);
+  await waitFor(() => expect(f.requests).toHaveBeenCalledTimes(2));
+  expect(f.requests.mock.calls[1][0].clipId).toBe("second");
+  expect(f.requests.mock.calls[1][0].sourceId).toBe("other-video");
+  expect(revoke).toHaveBeenCalledWith(expect.stringMatching(/^blob:/));
+  const second = await metadata(container, 1.5); fireEvent.play(second);
+  second.currentTime = 1.5; fireEvent.timeUpdate(second);
+  await waitFor(() => expect(f.requests).toHaveBeenCalledTimes(3));
+  const last = await metadata(container, 0.5); fireEvent.play(last);
+  last.currentTime = 0.5; fireEvent.timeUpdate(last); fireEvent.ended(last);
+  expect(f.clock).toHaveBeenLastCalledWith(3000);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Sequência 00:03.000 / 00:03.000");
+  expect(last.hidden).toBe(true);
+  expect(f.requests).toHaveBeenCalledTimes(3);
+  expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+
+it("sequence seek selects the following clip at joins and exposes no frame at exact OUT", async () => {
+  const f = sequenceFixture();
+  const { container } = render(f.view());
+  await metadata(container, 1);
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "1000" } });
+  const second = await metadata(container, 1.5);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("second");
+  expect(second.currentTime).toBe(0);
+  expect(second.play).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "2499" } });
+  expect(second.currentTime).toBe(1.499); fireEvent.seeked(second);
+  expect(f.clock).toHaveBeenLastCalledWith(2499);
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "2500" } });
+  const last = await metadata(container, 0.5);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("third");
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "3000" } });
+  fireEvent.seeked(last);
+  expect(last.hidden).toBe(true);
+  expect(f.clock).toHaveBeenLastCalledWith(3000);
+  expect(last.play).not.toHaveBeenCalled();
+});
+
+it("explicit sequence repeat returns from OUT to the first canonical occurrence without an edit", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container } = render(f.view()); await metadata(container, 1);
+  fireEvent.click(screen.getByRole("checkbox", { name: t("sequence.repeat") }));
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "2500" } });
+  const last = await metadata(container, 0.5);
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  fireEvent.play(last); last.currentTime = 0.5; fireEvent.timeUpdate(last);
+  const first = await metadata(container, 1);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("first");
+  expect(f.clock).toHaveBeenLastCalledWith(0);
+  expect(first.currentTime).toBe(0);
+  expect(screen.getByRole("button", { name: t("preview.pauseLocal") })).toBeTruthy();
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+
+it("a project edit cancels pending sequence preparation and ignores the old snapshot response", async () => {
+  const f = sequenceFixture();
+  const original = f.backend.previewLocalVideo.bind(f.backend);
+  let release!: (value: LocalVideoPreview) => void;
+  const oldPacket = await original({ sourceId: source.id, clipId: "first", expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
+  f.requests.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  const cancel = vi.spyOn(f.backend, "cancelOperation");
+  const { container, rerender } = render(f.view());
+  await waitFor(() => expect(f.requests).toHaveBeenCalled());
+  const oldOperation = f.requests.mock.calls.at(-1)![0].operationId;
+  f.backend.history.commit({ type: "project.rename", name: "unsaved sequence edit preserved" });
+  const afterEdit = f.backend.history.toArchive();
+  rerender(f.view());
+  await metadata(container, 1);
+  const activeUrl = container.querySelector("video")!.getAttribute("src");
+  await act(async () => release(oldPacket));
+  expect(cancel).toHaveBeenCalledWith(oldOperation);
+  expect(container.querySelector("video")!.getAttribute("src")).toBe(activeUrl);
+  expect(f.requests.mock.calls.at(-1)![0].expectedSnapshotId).toBe(f.backend.history.current.history.headSnapshotId);
+  expect(f.backend.history.toArchive()).toEqual(afterEdit);
+  expect(f.backend.creates).toEqual([]);
+});
+
+it("a mutation gate during sequence transition clears playback intent before the late decoder becomes ready", async () => {
+  const f = sequenceFixture();
+  let release!: (packet: LocalVideoPreview) => void;
+  const original = f.backend.previewLocalVideo.bind(f.backend);
+  const { container, rerender } = render(f.view());
+  const first = await metadata(container, 1);
+  f.requests.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  fireEvent.play(first); first.currentTime = 1; fireEvent.timeUpdate(first);
+  await waitFor(() => expect(release).toBeDefined());
+  expect((screen.getByRole("button", { name: t("preview.pauseLocal") }) as HTMLButtonElement).disabled).toBe(false);
+  rerender(f.view(true));
+  const packet = await original(f.requests.mock.calls.at(-1)![0]);
+  vi.mocked(HTMLMediaElement.prototype.play).mockClear();
+  await act(async () => release(packet)); await metadata(container, 1.5);
+  rerender(f.view(false));
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
+});
+
+it("the production App exposes sequence playback and Original marking on the same canonical project", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container } = render(<App backend={f.backend} />);
+  await screen.findByRole("button", { name: t("sequence.preview") });
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.preview") }));
+  await metadata(container, 1);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("first");
+  fireEvent.click(screen.getByRole("button", { name: t("preview.originalMode") }));
+  await metadata(container, 6);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBeUndefined();
+  expect(screen.getByRole("button", { name: t("preview.markIn") })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.preview") }));
+  await metadata(container, 1);
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
 
 const source: SourceAsset = { id: "original-video", kind: "video", uri: "/tmp/fixture.mp4", displayName: "fixture.mp4", durationMs: 6000 };
 const t = (key: Parameters<typeof translate>[1], parameters?: Parameters<typeof translate>[2]) => translate("pt-BR", key, parameters);
@@ -35,7 +215,7 @@ class ManualBackend implements DesktopBackend {
   readonly presentationOnly = false;
   readonly history = new ProjectHistory(createEmptyProject({ id: "manual-ui" }));
   readonly creates: CreateManualVideoClipRequest[] = [];
-  constructor() { this.history.commit({ type: "source.add", source }); }
+  constructor(inputSource = source) { this.history.commit({ type: "source.add", source: inputSource }); }
   async loadState(): Promise<DesktopBackendState> {
     const unavailable = { available: false, reason: "desktop-runtime-deferred" as const };
     return { project: this.history.current, sourceNumbering: this.history.sourceNumbering, canUndo: this.history.canUndo, canRedo: this.history.canRedo,
