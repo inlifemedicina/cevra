@@ -61,16 +61,18 @@ test("preview rejects replaced content, symlinks, nonregular files and oversized
 });
 
 test("manual clip checkpoint survives close/reopen with undo and redo; original bytes stay unchanged", async (t) => {
-  const { root, path, bytes, session, request } = await setup(t);
+  const { root, path, bytes, session, request, opened } = await setup(t);
+  const before = session.state().project.timeline; const entries = opened.history.entries.length;
   const result = await session.createManualVideoClip({ ...request, sourceStartMs: 1000, sourceEndMs: 4000 });
   const clip = result.state.project.timeline.clips[0]; assert.equal(clip.id, result.clipId);
+  assert.equal(opened.history.entries.length, entries + 1);
   assert.equal(result.state.status.persistence, "local-saved");
-  const undone = await session.undo(); assert.equal(undone.project.timeline.clips.length, 0); assert.equal(undone.canRedo, true);
+  const undone = await session.undo(); assert.deepEqual(undone.project.timeline, before); assert.equal(undone.canRedo, true);
   await session.close();
   const reopened = await DesktopProjectPersistence.open(join(root, "store"));
   t.after(() => reopened.persistence.close());
   assert.equal(reopened.history.canRedo, true); reopened.history.redo();
-  assert.deepEqual(reopened.history.current.timeline.clips, [clip]); assert.deepEqual(await readFile(path), bytes);
+  assert.deepEqual(reopened.history.current.timeline, result.state.project.timeline); assert.deepEqual(await readFile(path), bytes);
 });
 
 test("temporary review denies both new commands before file access or canonical mutation", async (t) => {

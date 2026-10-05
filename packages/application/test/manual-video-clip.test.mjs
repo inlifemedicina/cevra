@@ -24,13 +24,15 @@ function setup(sourceOverrides = {}, identityOverrides = {}, idGenerator) {
 test("manual excerpt uses typed history, exact source range, stable numbering and recoverable undo/redo", async () => {
   const { history, service, request } = setup();
   const source = history.current.sources[0]; const numbering = history.sourceNumbering;
+  const before = history.current; const entryCount = history.entries.length;
   const outcome = await service.create(request);
-  assert.deepEqual(history.entries.slice(-2).map((entry) => [entry.command.type, entry.actor.type]), [["track.add", "user"], ["clip.add", "user"]]);
+  assert.equal(history.entries.length, entryCount + 1);
+  assert.deepEqual([history.entries.at(-1).command.type, history.entries.at(-1).actor.type], ["timeline.edit", "user"]);
   const clip = outcome.project.timeline.clips[0];
   assert.deepEqual([clip.sourceId, clip.sourceStartMs, clip.sourceEndMs, clip.timelineStartMs, clip.timelineEndMs, clip.speed], ["video", 1000, 4000, 0, 3000, 1]);
   assert.equal(outcome.clipId, clip.id); assert.equal(outcome.project.timeline.durationMs, 3000);
   assert.deepEqual(outcome.project.sources[0], source); assert.deepEqual(history.sourceNumbering, numbering);
-  history.undo(); assert.equal(history.current.timeline.clips.length, 0); assert.equal(history.current.timeline.tracks.length, 1);
+  history.undo(); assert.deepEqual(history.current.timeline, before.timeline);
   const restored = ProjectHistory.fromArchive(history.toArchive());
   restored.redo(); assert.deepEqual(restored.current.timeline.clips, [clip]); assert.deepEqual(restored.sourceNumbering, numbering);
 });
@@ -88,10 +90,63 @@ test("ID preparation failure cannot leave a prepared track behind", async () => 
 test("existing unlocked video track is reused and a second clip is rejected", async () => {
   const { history, service, request } = setup();
   history.commit({ type: "track.add", track: { id: "existing-video", kind: "video", name: "Existing", locked: false, hidden: false, muted: false } });
+  const initialTimeline = history.current.timeline;
   await service.create({ ...request, expectedSnapshotId: history.current.history.headSnapshotId });
   assert.equal(history.current.timeline.tracks.length, 1); assert.equal(history.current.timeline.clips[0].trackId, "existing-video");
   const before = history.toArchive();
   await assert.rejects(service.create({ ...request, expectedSnapshotId: history.current.history.headSnapshotId }), { code: "MANUAL_VIDEO_TIMELINE_OCCUPIED" });
+  assert.deepEqual(history.toArchive(), before);
+  history.undo(); assert.deepEqual(history.current.timeline, initialTimeline);
+});
+
+test("failed atomic journal publication preserves the original empty timeline and redo", async () => {
+  const initial = setup();
+  initial.history.commit({ type: "project.rename", name: "Redo retained" }); initial.history.undo();
+  let ids = 0;
+  let fail = false;
+  const history = ProjectHistory.fromArchive(initial.history.toArchive(), { idGenerator: () => {
+    if (fail && ++ids === 2) throw new Error("snapshot allocation failed");
+    return `atomic-${ids}`;
+  } });
+  fail = true;
+  const service = new ManualVideoClipApplicationService({ history, identity: {
+    async captureSource() { return { sizeBytes: 10 }; },
+    async identifySource() { return { version: 1, content: { sha256: "a".repeat(64), sizeBytes: 10 }, stamp: {}, bytesRead: 10 }; },
+    async checkSource() { return "match"; }
+  } });
+  const before = history.toArchive();
+  await assert.rejects(service.create({ ...initial.request, expectedSnapshotId: history.current.history.headSnapshotId }), /snapshot allocation failed/);
+  assert.deepEqual(history.toArchive(), before); assert.equal(history.canRedo, true);
+  assert.equal(history.current.timeline.tracks.length, 0);
+});
+
+for (const action of ["create", "trim"]) {
+  test(`${action} rejects an intervening edit/Undo while hashing even when the visible snapshot returns`, async () => {
+    const context = action === "create" ? setup() : await trimSetup();
+    let release;
+    const blocked = new Promise((resolve) => { release = resolve; });
+    const service = new ManualVideoClipApplicationService({ history: context.history, identity: {
+      async captureSource() { await blocked; return { sizeBytes: 10 }; },
+      async identifySource() { return { version: 1, content: { sha256: "a".repeat(64), sizeBytes: 10 }, stamp: {}, bytesRead: 10 }; },
+      async checkSource() { return "match"; }
+    } });
+    const request = action === "create" ? context.request : context.trimRequest;
+    const task = service[action](request);
+    context.history.commit({ type: "project.rename", name: "Intervening branch" }); context.history.undo();
+    assert.equal(context.history.current.history.headSnapshotId, request.expectedSnapshotId);
+    const before = context.history.toArchive(); release();
+    await assert.rejects(task, { code: "MANUAL_VIDEO_STALE" });
+    assert.deepEqual(context.history.toArchive(), before); assert.equal(context.history.canRedo, true);
+  });
+}
+
+test("malformed create and trim requests fail with a closed error before identity reads", async () => {
+  const { history, service } = setup({}, { async captureSource() { assert.fail("must not read"); } });
+  const before = history.toArchive();
+  for (const value of [null, undefined, [], "request", 1]) {
+    await assert.rejects(service.create(value), { code: "MANUAL_VIDEO_INVALID_REQUEST" });
+    await assert.rejects(service.trim(value), { code: "MANUAL_VIDEO_INVALID_REQUEST" });
+  }
   assert.deepEqual(history.toArchive(), before);
 });
 

@@ -151,6 +151,27 @@ actual sequence/render consumers; independent approved M1 edits may proceed.
 Preserve R3/Take evidence, F-A02 allocation 1/1 and roadmap 55%. A technical Draft
 publication does not authorize merging #84/#85 or establish a functional G1 PASS.
 
+## M1 independent preparation — 2026-10-05
+
+Separate branch `feat/vids-g1-manual-atomic-consumer`, based on M0 publication
+head `60c639a09511df5fafa7dbd7ab8e63dc284f2241`. The existing first-excerpt
+consumer now commits track preparation plus clip as one `timeline.edit`, so one
+Undo restores the prior timeline exactly. Create and trim also bind async source
+verification to the retained journal, rejecting an intervening edit/Undo even
+when the visible snapshot ID returns. Focused automated evidence is 31/31
+application and 9/9 Host manual tests, including durable Undo/reopen/Redo and
+unchanged original bytes. This is preparation, not continuous montage delivery.
+
+The already available v0.3.3 macOS runtime was inspected directly: its pinned
+`join.py` video path uses a concat filter and video encoding, even with transition
+`none`; it does not provide a video packet-copy join. The candidate segment-copy
+strategy therefore needs a closed typed extension in the existing Media Runtime,
+with clock/copy/ownership evidence, rather than merely wiring the generic concat.
+H.264 VideoToolbox and AAC encoders are listed by that runtime. No sequence or
+quality prototype has yet run; this confirms primitives and a concrete gap,
+not final export feasibility or approval of quality, CFR/VFR, audio or budgets.
+No new engine/dependency or product envelope is selected by this preparation.
+
 ## Automated acceptance package
 
 Reuse I4-T1, D14-T2, D8-T2, I19-T1, I8-T3/T6/T11, I17-T8/T9 and
