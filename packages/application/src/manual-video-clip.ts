@@ -4,6 +4,7 @@ import { createSourceContentVerificationMemo, SourceTechnicalDescriptorResolver,
 /** Bounded first-video preview; streaming/composition remain separate work. */
 export const MANUAL_VIDEO_MAX_BYTES = 8 * 1024 * 1024;
 export const MANUAL_VIDEO_SOURCE_MAX_BYTES = 256 * 1024 * 1024;
+export const MANUAL_VIDEO_FRAME_MAX_BYTES = 2 * 1024 * 1024;
 
 export interface LocalVideoPreviewRequest {
   sourceId: string;
@@ -20,6 +21,8 @@ export interface LocalVideoPreview {
   mimeType: "video/mp4" | "video/quicktime" | "video/webm";
   base64: string;
   proxy?: { profile: "take-v1"; sourceDurationMs: number };
+  /** Ephemeral first admitted frame; never a source, poster asset or project edit. */
+  initialFrame?: { mimeType: "image/png"; base64: string; width: number; height: number; sourceTimeMs: number };
   clip?: { id: string; sourceStartMs: number; sourceEndMs: number; firstFrameMs: number; lastFrameMs: number; frameCount: number };
 }
 

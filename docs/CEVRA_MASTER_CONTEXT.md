@@ -2873,3 +2873,152 @@ preview and lateral Director/context controls is a presentation proposal for
 comparison in both orientations. Selected-media aspect does not set project or
 export aspect. No layout code, new output behavior or identity redesign is authorized
 by that proposal approval. The visual artifact uses neutral synthetic content.
+
+### 2026-10-05 — Approved editing sidebar implementation
+
+After reviewing the synthetic open/compact proposals, the owner approved the
+full-height right editing column: Director and editorial draft above contextual
+controls, an adjustable height divider, independent scrolling and adjustable
+width. Open is the default. The final compact mode collapses the entire column
+and exposes an explicit reopen button; the earlier narrow-column/tabs mockup is
+superseded. Width dragging or source aspect never changes modes automatically.
+Preview, excerpt and IN/OUT remain together centrally; text, selection and scroll
+positions must survive collapse/reopen. This is authorized presentation work,
+with no Project IR/history, engine, provider, permission or persistence change.
+
+Implementation is prepared on `feat/vids-right-sidebar`, based on Draft #84 head
+`a36d8ba` (the independently reviewed initial-frame correction, with PR/push CI
+5/5 and exact runtime 1/1 SUCCESS). The new Draft is stacked on #84 so its diff
+contains only the approved layout. It remains unmerged pending final review/CI
+and one consolidated owner layout/initial-frame check. Preserve the accepted Take orientation/voice/excerpt/save/reopen
+round; no full repeated acceptance, human-session manipulation, personal-media
+publication or real AI call. Director impact: compatible presentation extension;
+execution/state boundaries, progress 55% and exhausted F-A02 1/1 are unchanged.
+
+Local Desktop 98/98 and i18n 2/2 PASS, including five new sidebar cases for
+unsaved text, independent scroll, selection/playhead, explicit PT/EN reopening,
+resize limits and the divider after a reduced window. Independent review found
+one bounded divider issue: dragging now starts from its visible clamped height,
+with Escape restoring the initial proportion. Native WKWebView synthetic checks
+confirm the whole column collapses, timeline width changes from 1075 to 1435 px
+at a 1435×868 client, and text/scroll/selection/history survive. The Original
+video box is 707×359 px with the column open, versus the previous 781×192 px;
+portrait content is fitted, never used to select a mode or export aspect.
+Both synthetic Original and excerpt paint their initial frame paused at zero,
+with zero Play events. These checks do not certify subjective legibility or
+the point-specific real Take check. The replacement native package is prepared
+closed; the accepted human session and its project are preserved. Canonical
+owner steps: [grouped sidebar/first-frame check](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#editing-column-and-paused-frame-owner-check--2026-10-05).
+
+### 2026-10-05 — Owner V1 failure and revised compact approval
+
+At Draft #85 `f4ea20f`, the owner confirmed the Original initial frame PASS,
+but the existing V1 excerpt still has no initial frame before Play: APP/OWNER
+FAIL. Synthetic technical PASS does not supersede that failure. The authorized
+follow-up diagnoses/corrects this exact behavior while preserving the saved
+project and accepted orientation/voice/content/save/reopen round.
+
+The owner explicitly replaced whole-column collapse with a revised compact
+mode: a 286 px column (the measured original width) confined to the upper editing
+area, with Director/Controls tabs; the timeline spans the entire lower width.
+Open keeps the approved full-height adjustable column. Preview/excerpt/IN/OUT
+stay centrally; tab/mode transitions preserve text, selection and scroll.
+Implementation and exact review/CI are active on Draft #85. No merge, AI call,
+provider/engine/project schema/persistence extension or Take device operation
+is authorized. Director impact is a compatible presentation/lifecycle extension.
+
+The bounded correction admits one decoded excerpt frame as an in-memory PNG
+(maximum 720 px on its longer side), waits for image decoding before enabling
+controls, and hides it during Play/seek. It is released with preview identity or
+failure; no image/media enters history, storage or external services. Original
+retains its accepted video path. Isolated raw WKWebView Original/excerpt media
+decoded and painted at zero without Play, so the exact failure in the human
+window remains unreproduced; this follow-up must not claim a proven native
+compositor cause or an APP/OWNER V1 PASS.
+
+Desktop 102/102 and i18n 2/2 PASS, including delayed compact-clamp/layout scroll
+restoration, tab keyboard/selection/text preservation, bounded image admission
+and image error/Play/seek lifecycle. Independent review and exact CI remain
+pending. Initial native layout measurements confirm compact width 286 px and a
+1435 px timeline at a 1435×868 client. The follow-up native probe then expired
+three times in its background window; final scroll and actual-UI V1 image checks
+remain BLOCKED/PENDING, not PASS. The saved human project, existing review app
+and Take testing are preserved. The owner asked to continue approved technical
+work overnight and accumulate one reviewed package/minimal shared Vids/Take
+round for the morning, with no intermediate human tests or app installation/open.
+
+### 2026-10-05 — WKWebView environment and premature image correction
+
+Further isolated diagnosis distinguishes two concrete findings. The Mac display
+is asleep/inactive; a nonpersistent WKWebView continues native messages/timers
+but executes zero rendering callbacks while occluded. No display wake, human
+session operation, screenshot or recording was performed. Native painting and
+render-dependent scroll verification remain BLOCKED by that environment.
+
+At reviewed Draft #85 `ce53f81`, the actual Original → existing 5–10 s V1
+transition also exposed a premature canvas capture: the initially admitted PNG
+was black (mean 0), whereas the same paused clip at time zero was later readable
+(mean 0.489). The early image correction therefore cannot be treated as native
+PASS, even though Chromium passed. The bounded follow-up waits through a
+rendering turn before sampling, rechecks media identity/data/seek/time, cancels
+both callbacks on selection, seek, failure or disposal, and still requires image
+decoding before controls. It never auto-plays, advances time or rejects legitimate
+black content by brightness. Original's accepted path remains unchanged.
+
+Desktop 105/105 PASS includes a regression red against `ce53f81`'s immediate
+capture and cancellation of both queued stages after selecting Original. The
+full offline compact audit also preserves context-only workspace/tab memory,
+unsaved fields, intentional user scroll after clamping, expanded width and
+minimum-window geometry. Final exact review/CI/package outcomes are PENDING at
+this checkpoint; results will be recorded in Draft #85 and its local technical
+receipt. Awake native image/painting and
+owner acceptance remain pending; this does not claim the exact human-window
+cause fully reproduced. Director impact remains compatible; no engine/provider,
+history, schema or persistence extension, progress 55%, F-A02 exhausted 1/1.
+
+
+### 2026-10-05 — Approved bounded preview fluency and first-frame admission
+
+The R2 owner round accepted compact/tabs/fields/scroll at 12:34 UTC; its V1
+initial-frame FAIL is preserved as historical evidence. Earlier
+orientation/voice/content/save/reopen and Original initial-frame acceptance
+are preserved. The owner-directed normal R3 transition then enabled only the
+corrected V1 first-frame recheck, with no repeated layout round.
+
+The owner approved measured exact-range session reuse plus a PNG extracted
+from the admitted derivative, then bounded reuse of verified independent source
+inspection. Host LRU is four entries / 32 MiB; PNG ≤2 MiB/720 px; worker LRU is
+four entries / 1 MiB counted resident facts. Source/runtime/range identity,
+fresh source hashes, sealed copies, complete output PTS/audio/orientation/hash
+admission, cancellation/temp cleanup and shutdown remain mandatory. Runtime
+0.3.4 keeps the pinned provenance/licenses and adds no provider, dependency,
+command, WebView permission or IR/History/Package migration. The UI remains
+paused at zero and accepts legitimate black frames without a brightness gate.
+
+Complete local CI, Python 101/101, Rust 28/28 and ten exact-runtime functional
+controls PASS; independent review found no code blocker. Current host first V1
+fell from 6.041 s to 1.528 s; another new range from 6.542 s to 2.089 s. Retained
+V1 host samples are 25.1–27.8 ms, explicitly not full UI latency. Native complete-IPC control PASS: retained V1 PNG present in 56–150 ms and
+Play ready in 197–325 ms; cold Original 9.878 s and first V1 2.226 s to readiness.
+A separate sampled budget/eviction/close control PASS. Exact commit CI and the
+review package are verified at `7d4e66776fbfc112429d333e5d8883221c2851fb`;
+Drafts #84/#85 remain unmerged. The owner explicitly authorized normal R2
+retirement and R3 opening, preserving the saved Original/V1 project. The R3
+owner reported that both first frames appeared, the first V1 took approximately
+two seconds, and subsequent Original↔V1 switches appeared immediate. This is
+limited APP/OWNER PASS for first frame and observed switching, not a latency
+guarantee or product READY. Preserve earlier accepted layout and real Take
+behavior without repeating those rounds.
+
+The owner's separate question about absent IN/OUT buttons remains a
+discoverability observation. Read-only current-window inspection found both
+enabled V1 trim handles inside the visible central timeline, IN 5.037 s and
+OUT 9.928 s. Creation buttons are omitted once the timeline contains an item;
+that condition predates R3. No trim, selection, scroll, Play, capture or focus
+action was performed, and no new layout or editing behavior was introduced.
+[Current location and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#r3-inout-location-check--2026-10-05).
+[Canonical decision](adr/0032-bounded-preview-session-reuse.md) and
+[measurements/limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-preview-fluency-and-admitted-png--2026-10-05).
+Director impact compatible, official progress stays 55%, F-A02 remains exhausted
+1/1. No real AI, human store inspection/copy, Take/iPhone/Xcode operation or
+merge is part of this approved follow-up.

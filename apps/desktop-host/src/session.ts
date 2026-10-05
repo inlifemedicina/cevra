@@ -37,6 +37,7 @@ import {
 } from "@cevra/transcription-faster-whisper";
 import { FileTranscriptCache } from "@cevra/transcript-cache";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { DesktopPersistenceError, DesktopProjectPersistence } from "./persistence.js";
 import {
@@ -60,7 +61,7 @@ export interface DesktopSessionServices {
   persistence?: DesktopProjectPersistence;
   temporaryEditorialReview?: true;
   manualVideoClip?: Pick<ManualVideoClipApplicationService, "create" | "trim">;
-  derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare">;
+  derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare"> & Partial<Pick<DerivedVideoPreview, "close">>;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
 }
@@ -74,6 +75,7 @@ export class DesktopSession {
   private activeMutationTask: Promise<unknown> | null = null;
   private previewTask: Promise<LocalVideoPreview> | null = null;
   private previewOperationId: string | null = null;
+  private closing = false;
 
   constructor(private readonly services: DesktopSessionServices) {
     this.editorial = new EditorialDraftService(services.history);
@@ -176,6 +178,7 @@ export class DesktopSession {
   }
 
   async previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> {
+    if (this.closing) throw safeError("OPERATION_CANCELLED");
     if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     const stable = structuredClone(request);
@@ -192,12 +195,12 @@ export class DesktopSession {
       if (this.previewOperationId) this.cancel(this.previewOperationId);
       const task = this.runOperation(stable.operationId!, async (signal) => {
         await previous?.catch(() => undefined);
-        signal.throwIfAborted();
+        if (signal.aborted) throw safeError("OPERATION_CANCELLED");
         const { source } = resolvePreviewRange(this.services.history, stable);
         const preview = this.services.derivedVideoPreview
           ? await this.services.derivedVideoPreview.prepare(stable, signal)
           : await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
-        signal.throwIfAborted();
+        if (signal.aborted) throw safeError("OPERATION_CANCELLED");
         if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
         resolvePreviewRange(this.services.history, stable);
         return preview;
@@ -260,6 +263,8 @@ export class DesktopSession {
   }
 
   async close(): Promise<void> {
+    this.closing = true;
+    this.services.derivedVideoPreview?.close?.();
     for (const controller of this.operations.values()) controller.abort();
     await Promise.allSettled([
       ...this.activeTasks.values(),
@@ -268,11 +273,13 @@ export class DesktopSession {
     try {
       await this.services.close?.();
     } finally {
+      this.services.derivedVideoPreview?.close?.();
       await this.services.persistence?.close();
     }
   }
 
   private async runOperation<T>(operationId: string, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    if (this.closing) throw safeError("OPERATION_CANCELLED");
     if (this.operations.has(operationId)) throw safeError("OPERATION_DUPLICATE");
     const controller = new AbortController();
     this.operations.set(operationId, controller);
@@ -296,6 +303,7 @@ export class DesktopSession {
   }
 
   private async runMutation<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.closing) throw safeError("OPERATION_CANCELLED");
     if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     const task = operation();
@@ -359,7 +367,8 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       transcriptionCapability: transcription.capability,
       persistence: opened.persistence,
       ...(media?.resolvedAudioPlan ? { resolvedAudioPlan: media.resolvedAudioPlan } : {}),
-      ...(media?.engine && media.settle ? { derivedVideoPreview: new DerivedVideoPreview({ history, engine: media.engine, settle: media.settle }) } : {}),
+      ...(media?.engine && media.settle ? { derivedVideoPreview: new DerivedVideoPreview({ history, engine: media.engine, settle: media.settle,
+        runtimeIdentity: () => createHash("sha256").update(readFileSync(resolve(configuredMediaRuntime.paths!.root, "manifest.json"))).digest("hex") }) } : {}),
       close: async () => {
         await media?.close?.();
       }

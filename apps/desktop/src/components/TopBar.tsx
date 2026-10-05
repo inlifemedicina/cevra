@@ -6,7 +6,7 @@ interface TopBarProps {
   projectName: string;
   workspace: Workspace;
   locale: CevraLocale;
-  inspectorOpen: boolean;
+  sidebarCompact: boolean;
   mediaOpen: boolean;
   exportAvailable: boolean;
   status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable" | "temporary-review";
@@ -15,13 +15,13 @@ interface TopBarProps {
   t: Translate;
   onWorkspaceChange(workspace: Workspace): void;
   onLocaleChange(locale: CevraLocale): void;
-  onInspectorToggle(): void;
+  onSidebarToggle(): void;
   onMediaToggle(): void;
   onUndo(): void;
   onRedo(): void;
 }
 
-export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpen, exportAvailable, status, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onInspectorToggle, onMediaToggle, onUndo, onRedo }: TopBarProps) {
+export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOpen, exportAvailable, status, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onSidebarToggle, onMediaToggle, onUndo, onRedo }: TopBarProps) {
   function handleWorkspaceKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const currentIndex = workspaces.indexOf(workspace);
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -59,7 +59,7 @@ export function TopBar({ projectName, workspace, locale, inspectorOpen, mediaOpe
 
       <div className="top-actions">
         <button type="button" className={mediaOpen ? "icon-button toggled" : "icon-button"} onClick={onMediaToggle} aria-label={t("top.mediaPanel")} title={t("top.mediaPanel")}><Icon name="panel" /></button>
-        <button type="button" className={inspectorOpen ? "icon-button toggled" : "icon-button"} onClick={onInspectorToggle} aria-label={t("top.inspector")} title={t("top.inspector")}><Icon name="inspect" /></button>
+        <button type="button" data-sidebar-toggle className={sidebarCompact ? "icon-button toggled sidebar-toggle" : "icon-button sidebar-toggle"} onClick={onSidebarToggle} aria-label={t(sidebarCompact ? "sidebar.activateOpen" : "sidebar.activateCompact")} title={t(sidebarCompact ? "sidebar.activateOpen" : "sidebar.activateCompact")} aria-pressed={sidebarCompact} aria-controls="editing-sidebar"><Icon name="inspect" /></button>
         <button type="button" className="icon-button" disabled={!canUndo} onClick={onUndo} aria-label={t("action.undo")} title={canUndo ? t("action.undo") : t("history.undoUnavailable")}><Icon name="undo" /></button>
         <button type="button" className="icon-button" disabled={!canRedo} onClick={onRedo} aria-label={t("action.redo")} title={canRedo ? t("action.redo") : t("history.redoUnavailable")}><Icon name="redo" /></button>
         <span className={`save-status ${status === "demo-not-persisted" ? "demo-status" : status === "host-unavailable" || status === "persistence-error" ? "failed-status" : "local-status"}`}><i aria-hidden="true" />{t(statusKey(status))}</span>

@@ -351,5 +351,15 @@
   "timeline.trimIn": "Adjust clip IN",
   "timeline.trimOut": "Adjust clip OUT",
   "timeline.trimRange": "Clip excerpt",
-  "timeline.trimHint": "Drag IN/OUT · arrows: 0.1 s · Shift: 0.01 s · Esc: cancel"
+  "timeline.trimHint": "Drag IN/OUT · arrows: 0.1 s · Shift: 0.01 s · Esc: cancel",
+  "sidebar.title": "Editing panel",
+  "sidebar.expanded": "Expanded mode",
+  "sidebar.compact": "Compact mode",
+  "sidebar.resizeWidth": "Resize editing column",
+  "sidebar.resizeSplit": "Divide space between Director and controls",
+  "sidebar.activateOpen": "Activate open mode",
+  "sidebar.activateCompact": "Activate compact mode",
+  "sidebar.tabs": "Editing column content",
+  "sidebar.directorTab": "Director",
+  "sidebar.controlsTab": "Controls"
 }

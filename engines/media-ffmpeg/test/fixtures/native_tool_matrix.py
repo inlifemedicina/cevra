@@ -154,7 +154,23 @@ def main() -> int:
                 print(json.dumps({"command": common.command, "graph": common.graph}))
                 return 0
         elif request["operation"] == "extract-frame":
-            tools._run_extract_frame(common, request["arguments"])
+            with tempfile.TemporaryDirectory(prefix="cevra-frame-fixture-") as directory:
+                previous = Path.cwd()
+                try:
+                    os.chdir(directory)
+                    common.write_output = True
+                    result = tools._run_extract_frame(common, request["arguments"])
+                    publication = result["structuredContent"].get("publication")
+                    output = Path(request["arguments"]["output"])
+                    metadata = output.stat()
+                    print(json.dumps({"command": common.command, "graph": common.graph,
+                                      "publication": publication,
+                                      "publicationMatches": publication is None if os.name != "posix" else
+                                      publication == {"version": 1, "scheme": "posix-dev-inode",
+                                                      "device": str(metadata.st_dev), "inode": str(metadata.st_ino)}}))
+                finally:
+                    os.chdir(previous)
+                return 0
         elif request["operation"] == "audio-sequence":
             with tempfile.TemporaryDirectory(prefix="cevra-audio-sequence-fixture-") as directory:
                 root = Path(directory)

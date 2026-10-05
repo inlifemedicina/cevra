@@ -376,3 +376,133 @@ terminal evidence will be recorded in the PR and local technical receipts.
 Preserve the already accepted native round. Director impact:
 compatible presentation lifecycle correction; typed execution and state boundaries
 are unchanged. No real AI calls or existing human-session manipulation.
+
+
+## Approved preview fluency and admitted PNG — 2026-10-05
+
+The owner approved a two-stage bounded correction after measured feasibility and
+independent architecture review. Stage 1 retains exact-range admitted derivatives
+in a session LRU (four entries / 32 MiB) and returns the first admitted frame as
+an ephemeral PNG (≤2 MiB, longest side ≤720 px) extracted from the verified
+bounded derivative through the existing typed primitive. The UI requires PNG
+image decoding and current video metadata/frame readiness before Play. This
+supersedes the two-callback canvas capture: the real fractional-IN range
+5.037–9.928 s still captured black pixels while the typed extraction returned
+the actual first admitted frame. No automatic Play, clock advance or product
+brightness rejection is used. Source-time and movie-zero remain distinct.
+
+Stage 2 retains only verified, range-independent source inspection in the
+worker: four entries / 1 MiB counted resident objects, freshly hashed source/tool
+identity, immutable sealed copies, corruption eviction and shutdown clearing.
+Per-derivative encoding and complete output admission remain mandatory. Source
+rehash on every host hit and initial/final worker checks remain in force. Host
+entries become visible only after successful admission/settlement/temp cleanup;
+close rejects new work and cannot repopulate memory. A miss regenerates the exact
+range, never a full Original proxy plus OUT pause. Runtime is 0.3.4 with the same
+pinned dependencies, integrity inventory, licenses and provenance.
+[Decision and safeguards](adr/0032-bounded-preview-session-reuse.md).
+
+Current production-host timing on the authorized recording, using an isolated
+history and sealed release runtime:
+
+| Request | Previous host | Current host |
+| --- | ---: | ---: |
+| Cold Original | 8.754 s | 7.353 s |
+| First V1 after inspecting that source | 6.041 s | 1.528 s |
+| Another new range on that source | 6.542 s | 2.089 s |
+| Retained Original | 8.008 s | 26.9 ms |
+| Retained V1, five samples | 6.066 s | 25.1–27.8 ms |
+
+These are host measurements, not complete UI latency or a general performance
+promise. Current serialization/Node decode models were measured separately.
+Undo/redo reuse the exact admitted range with fresh snapshot IDs. One rapid
+selection/cancellation control completed the latest cached Original in about
+178 ms; worker retirement was about 140 ms in that case, not a universal bound.
+Three entries retained 3,526,490 bytes and close cleared them to zero; owned
+preview directories were absent and the original remained unchanged.
+
+Validation: complete local npm CI PASS with supported private Python 3.12
+(Desktop 110/110); media Python 101/101; Rust 28/28. Focused host 31/31, preview
+45/45 and inspection 10/10 passed. Ten sealed-runtime functional cases pass actual
+first-frame identity at CFR/VFR and fractional IN, legitimate black openings,
+PNG publication device/inode, orientation/color and existing decoded audio/PTS
+admission. PNG color MAE is 1.95 against the independent control. Independent
+read-only review found no remaining code blocker. Full native IPC measurement,
+final exact-tree review/CI and package identity are recorded separately when
+terminal; failed/private harness attempts are not promoted to PASS.
+
+The owner accepted compact/tabs/fields/scroll in the R2 round at 12:34 UTC.
+Preserve that acceptance and the earlier real orientation/voice/content/save/
+reopen round. V1 first frame was APP/OWNER FAIL at R2. The owner-directed R3
+transition and subsequent report supersede only that bounded first-frame
+failure: at reviewed commit `7d4e66776fbfc112429d333e5d8883221c2851fb`, Original
+and V1 appeared before Play, first V1 took approximately two seconds, and
+subsequent Original↔V1 switches appeared immediate. APP/OWNER PASS is limited
+to this first-frame/observed-fluency recheck; the times are owner observations,
+not a general measured latency guarantee. No repeated compact/layout round,
+private human store read/copy, device operation, real AI or media publication.
+Director impact compatible; existing proposal/permission/execution/state
+boundaries and official global roadmap progress 55% are unchanged. Full
+composition/export/release and broader provider gates remain open.
+
+### R3 IN/OUT location check — 2026-10-05
+
+The owner separately reported that the IN/OUT buttons were not apparent.
+Creation buttons “Marcar IN/OUT” appear below the preview only while the timeline
+is empty. Once the simple V1 exists, select it and adjust the two blue handles
+on its timeline edges: IN on the left, OUT on the right. These controls remain
+in the central preview/timeline area. This condition predates R3 and is present
+in the Draft #84 base `a36d8ba4d85ab103d96cfa6309a5c53c7eb6d5c4`.
+
+Read-only accessibility inspection of the actual R3 window found Edit/open mode,
+the existing V1 selected, and both enabled handles fully inside the window and
+its scroll viewport. Each handle is about 16×21 px; the visible range is
+IN 5.037 s · OUT 9.928 s. No overflow or mode-dependent omission of those handles
+was established. The narrow unlabeled grips explain their location, but whether
+they are clear enough remains an owner UX question. No selection, scrolling,
+trim, Play, screenshot or app activation was performed. The foreground PID was
+the same before and after the read; continuous foreground preservation is not
+claimed. No new control/layout or multi-clip behavior was introduced.
+
+
+### Complete native IPC and budget controls
+
+The private control uses the actual production preview component/backend and
+unchanged Rust command/supervisor, bundled Host and sealed runtime. Only the
+private shell copy prohibits application activation; it is not product code.
+The bundle's runtime tree is restored with its internal symlinks after Tauri
+resource copying, preserving the complete integrity seal. No integrity gate is
+relaxed. Corrected control: 18 admitted requests with correct decoded PNG
+geometry/source bounds, paused movie time zero and enabled Play; three superseded
+requests reject with OPERATION_CANCELLED. No Play was requested.
+
+| Native request | Correct PNG present | Play ready |
+| --- | ---: | ---: |
+| Cold Original | 9.088 s | 9.878 s |
+| First V1 on that source | 2.065 s | 2.226 s |
+| Retained V1, five samples | 56–150 ms | 197–325 ms |
+| Retained Original, five samples | 100–251 ms | 221–408 ms |
+| Another new interval | 2.136 s | 2.245 s |
+| Retained new interval | 59 ms | 226 ms |
+| Undo / redo exact interval | 77 / 148 ms | 226 / 282 ms |
+
+Latest cached Original became ready 436 ms after the rapid switch sequence began;
+its final selection alone took 238 ms. These are background technical samples on
+one authorized recording, with actual Rust/Tauri/WK IPC and decoder/React work;
+not foreground UX acceptance or a general latency guarantee. The control stayed
+inactive with zero requested focus, screenshots or recordings. Foreground PID
+differed between observation points, so continuous foreground preservation is
+not claimed. Earlier private attempts failed at instrumentation/runtime-copy
+admission and remain failed receipts; their activation flags are not overwritten
+as passing controls. No human app or its store was operated/read/copied.
+
+A separate production-host budget observer sampled only its own process tree
+and owned temporary directory every 250 ms while preparing Original, five new
+ranges, an evicted Original and a retained hit. Cache stayed at ≤4 entries and
+32 MiB; final four entries retained 3,555,849 bytes. Evicted Original performed
+two typed operations, the retained hit zero. Sampled peak Host/runtime/decoder
+RSS was 197,664 KiB (observer overhead included, not total Desktop/WK memory or
+an absolute peak). Peak combined sampled CPU was 265% and owned temporary bytes
+47,815,263. Close cleared the cache and owned temporary entries to zero; original
+identity remained unchanged. Unit admission/oversize tests enforce the maximum
+packet and resident cache bounds independently of these single-file observations.

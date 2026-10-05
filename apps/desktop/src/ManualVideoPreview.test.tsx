@@ -1,7 +1,7 @@
 import { createEmptyProject, ProjectHistory, type SourceAsset } from "@cevra/project-ir";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreview, LocalVideoPreviewRequest } from "@cevra/application";
 import { translate } from "@cevra/i18n";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import type { DesktopBackend, DesktopBackendState } from "./backend/desktop-backend";
 import { App } from "./App";
@@ -13,11 +13,16 @@ const source: SourceAsset = { id: "original-video", kind: "video", uri: "/tmp/fi
 const t = (key: Parameters<typeof translate>[1], parameters?: Parameters<typeof translate>[2]) => translate("pt-BR", key, parameters);
 const revoke = vi.fn();
 let urlSequence = 0;
+const admittedPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,decoded-frame");
+  vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(1);
+  vi.spyOn(HTMLImageElement.prototype, "naturalHeight", "get").mockReturnValue(1);
   Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => `blob:test-${++urlSequence}`) });
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revoke });
   revoke.mockClear();
@@ -41,7 +46,7 @@ class ManualBackend implements DesktopBackend {
     const clip = request.clipId ? this.history.current.timeline.clips.find(item => item.id === request.clipId) : undefined;
     const start = clip?.sourceStartMs ?? (request.clipId ? 1000 : 0), end = clip?.sourceEndMs ?? (request.clipId ? 4000 : 6000);
     return { sourceId: request.sourceId, snapshotId: request.expectedSnapshotId, durationMs: request.clipId ? end - start : 6000, mimeType: "video/mp4", base64: btoa("transport-test-only"),
-      ...(request.clipId ? { clip: { id: request.clipId, sourceStartMs: start, sourceEndMs: end, firstFrameMs: start, lastFrameMs: Math.max(start, end - 1000 / 30), frameCount: Math.ceil((end - start) * 30 / 1000) } } : {}) };
+      ...(request.clipId ? { initialFrame: {mimeType:'image/png',base64:admittedPng,width:1,height:1,sourceTimeMs:start}, clip: { id: request.clipId, sourceStartMs: start, sourceEndMs: end, firstFrameMs: start, lastFrameMs: Math.max(start, end - 1000 / 30), frameCount: Math.ceil((end - start) * 30 / 1000) } } : {}) };
   }
   async createManualVideoClip(request: CreateManualVideoClipRequest) {
     this.creates.push(request);
@@ -70,11 +75,16 @@ async function metadata(container: HTMLElement, duration?: number, initialFrame 
   const excerpt = screen.queryByTestId("preview-clip-timecode")?.textContent?.match(/\/ (\d+):(\d+)\.(\d+)/);
   const effectiveDuration = duration ?? (excerpt ? Number(excerpt[1]) * 60 + Number(excerpt[2]) + Number(excerpt[3]) / 1000 : 6);
   Object.defineProperty(video, "duration", { configurable: true, value: effectiveDuration });
+  Object.defineProperty(video, "videoWidth", { configurable: true, value: 1920 });
+  Object.defineProperty(video, "videoHeight", { configurable: true, value: 1080 });
   Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_METADATA });
   fireEvent.loadedMetadata(video);
   if (initialFrame) {
     Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
     fireEvent.loadedData(video);
+    if (excerpt) await waitFor(() => expect(container.querySelector(".manual-initial-frame")).not.toBeNull());
+    const image = container.querySelector<HTMLImageElement>(".manual-initial-frame");
+    if (image) fireEvent.load(image);
   }
   return video;
 }
@@ -95,6 +105,13 @@ for (const excerpt of [false, true]) {
     expect(video.currentTime).toBe(0);
     Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
     fireEvent.loadedData(video);
+    if (excerpt) {
+      expect(play.disabled).toBe(true);
+      await waitFor(() => expect(container.querySelector(".manual-initial-frame")).not.toBeNull());
+      const image = container.querySelector<HTMLImageElement>(".manual-initial-frame")!;
+      expect(image.getAttribute("src")).toBe(`data:image/png;base64,${admittedPng}`);
+      fireEvent.load(image);
+    }
     expect(play.disabled).toBe(false);
     expect(video.play).not.toHaveBeenCalled();
     expect(video.currentTime).toBe(0);
@@ -113,6 +130,100 @@ it("metadata validation can admit an already buffered initial frame", async () =
   fireEvent.loadedMetadata(video);
   expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(false);
   expect(video.play).not.toHaveBeenCalled();
+});
+
+it("uses a bounded ephemeral decoded excerpt image until playback or a seek leaves its first frame", async () => {
+  const backend = new ManualBackend();
+  const before = backend.history.toArchive();
+  const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
+  const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId="frame-image" clip={clip} timelineOccupied busy={false}
+    seek={{ sequence: 1, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  const video = await metadata(container, 3);
+  const image = container.querySelector<HTMLImageElement>(".manual-initial-frame")!;
+  expect(image.hidden).toBe(false);
+  expect(HTMLCanvasElement.prototype.getContext).not.toHaveBeenCalled();
+  expect(video.play).not.toHaveBeenCalled();
+  fireEvent.play(video);
+  expect(image.hidden).toBe(true);
+  video.currentTime = 1; fireEvent.timeUpdate(video); fireEvent.pause(video);
+  expect(image.hidden).toBe(true);
+  video.currentTime = 0; fireEvent.seeking(video);
+  expect(image.hidden).toBe(true);
+  fireEvent.seeked(video);
+  expect(image.hidden).toBe(false);
+  expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  expect(backend.history.toArchive()).toEqual(before);
+});
+
+it("admits the supplied frame even when video canvas is black at zero, after image and video readiness", async () => {
+  const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
+  const { container } = render(<ManualVideoPreview backend={new ManualBackend()} source={source} snapshotId="render-turn" clip={clip} timelineOccupied busy={false}
+    seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  const video = await metadata(container, 3, false), play = screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement;
+  Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
+  fireEvent.loadedData(video); fireEvent.canPlay(video);
+  expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  expect(HTMLCanvasElement.prototype.getContext).not.toHaveBeenCalled();
+  expect(play.disabled).toBe(true);
+  fireEvent.load(container.querySelector(".manual-initial-frame")!);
+  expect(play.disabled).toBe(false); expect(video.play).not.toHaveBeenCalled(); expect(video.currentTime).toBe(0);
+});
+
+it("a stale image load cannot unlock the replacement Original before its metadata", async () => {
+  const backend = new ManualBackend(), clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
+  const props = { backend, source, timelineOccupied: true, busy: false, seek: { sequence: 0, timelineMs: 0 }, t, onPlayheadChange: vi.fn(), onCreate: vi.fn() };
+  const { container, rerender } = render(<ManualVideoPreview {...props} snapshotId="old-clip" clip={clip} />);
+  const video = await metadata(container, 3, false);
+  Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA }); fireEvent.loadedData(video);
+  const stale = container.querySelector('.manual-initial-frame')!;
+  rerender(<ManualVideoPreview {...props} snapshotId="new-original" />);
+  fireEvent.load(stale);
+  expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  expect(container.querySelector(".manual-initial-frame")).toBeNull();
+  await metadata(container, 6);
+  expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(container.querySelector(".manual-initial-frame")).toBeNull();
+});
+
+it("retains early image decoding until that same video's metadata and current data arrive",async()=>{
+ const clip={id:'clip',trackId:'track-v1',sourceId:source.id,timelineStartMs:0,timelineEndMs:3000,sourceStartMs:1000,sourceEndMs:4000,speed:1,volume:1,opacity:1};
+ const {container}=render(<ManualVideoPreview backend={new ManualBackend()} source={source} snapshotId="early-image" clip={clip} timelineOccupied busy={false} seek={{sequence:0,timelineMs:0}} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()}/>);
+ await waitFor(()=>expect(container.querySelector('.manual-initial-frame')).not.toBeNull());
+ fireEvent.load(container.querySelector('.manual-initial-frame')!);
+ expect((screen.getByRole('button',{name:'Reproduzir'}) as HTMLButtonElement).disabled).toBe(true);
+ const v=await metadata(container,3,false);Object.defineProperty(v,'readyState',{configurable:true,value:HTMLMediaElement.HAVE_CURRENT_DATA});fireEvent.loadedData(v);
+ expect((screen.getByRole('button',{name:'Reproduzir'}) as HTMLButtonElement).disabled).toBe(false);
+ expect(v.currentTime).toBe(0);expect(v.play).not.toHaveBeenCalled();
+});
+
+for(const attack of ['missing','bounds','source-time','signature','decoded-dimensions'])it(`rejects an invalid first-frame packet: ${attack}`,async()=>{
+ const backend=new ManualBackend(),original=backend.previewLocalVideo.bind(backend);
+ backend.previewLocalVideo=async r=>{const packet=await original(r);if(attack==='missing')delete packet.initialFrame;else if(attack==='bounds')packet.initialFrame!.base64='a'.repeat(2_796_205);else if(attack==='source-time')packet.initialFrame!.sourceTimeMs=999;else if(attack==='signature')packet.initialFrame!.base64=btoa('invalid PNG body');return packet;};
+ if(attack==='decoded-dimensions')vi.spyOn(HTMLImageElement.prototype,'naturalWidth','get').mockReturnValue(2);
+ const clip={id:'clip',trackId:'track-v1',sourceId:source.id,timelineStartMs:0,timelineEndMs:3000,sourceStartMs:1000,sourceEndMs:4000,speed:1,volume:1,opacity:1};
+ const {container}=render(<ManualVideoPreview backend={backend} source={source} snapshotId="bad-packet" clip={clip} timelineOccupied busy={false} seek={{sequence:0,timelineMs:0}} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()}/>);
+ if(attack==='decoded-dimensions'){await waitFor(()=>expect(container.querySelector('.manual-initial-frame')).not.toBeNull());fireEvent.load(container.querySelector('.manual-initial-frame')!);}
+ await screen.findByText(t('preview.localUnavailable'));expect((screen.getByRole('button',{name:'Reproduzir'}) as HTMLButtonElement).disabled).toBe(true);
+ expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+});
+
+it("keeps the excerpt unavailable if its initial image cannot decode and releases the media", async () => {
+  const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
+  const { container } = render(<ManualVideoPreview backend={new ManualBackend()} source={source} snapshotId="bad-frame-image" clip={clip} timelineOccupied busy={false}
+    seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  const video = await metadata(container, 3, false);
+  Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
+  fireEvent.loadedData(video);
+  await waitFor(() => expect(container.querySelector(".manual-initial-frame")).not.toBeNull());
+  const play = screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement;
+  expect(play.disabled).toBe(true);
+  fireEvent.error(container.querySelector(".manual-initial-frame")!);
+  expect(play.disabled).toBe(true);
+  expect(screen.getByText(t("preview.localUnavailable"))).toBeTruthy();
+  expect(video.hasAttribute("src")).toBe(false);
+  expect(container.querySelector(".manual-initial-frame")).toBeNull();
+  expect(revoke).toHaveBeenCalled();
 });
 
 it("a frame notification cannot unlock a replacement preview before its own metadata is verified", async () => {
@@ -198,7 +309,7 @@ it("shows source milliseconds separately from excerpt elapsed/duration for the r
   const backend = new ManualBackend(); const onPlayheadChange = vi.fn();
   const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 1990, sourceStartMs: 2000, sourceEndMs: 3990, speed: 1, volume: 1, opacity: 1 };
   const props = { backend, source, snapshotId: "snapshot", timelineOccupied: true, busy: false, clip, onPlayheadChange, onCreate: vi.fn(), seek: { sequence: 0, timelineMs: 0 } };
-  backend.previewLocalVideo = vi.fn(async (request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> => ({ sourceId: request.sourceId, snapshotId: request.expectedSnapshotId, durationMs: 2000, mimeType: "video/mp4", base64: btoa("transport-test-only"), clip: { id: "clip", sourceStartMs: 2000, sourceEndMs: 3990, firstFrameMs: 2000, lastFrameMs: 3966.666667, frameCount: 60 } }));
+  backend.previewLocalVideo = vi.fn(async (request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> => ({ sourceId: request.sourceId, snapshotId: request.expectedSnapshotId, durationMs: 2000, mimeType: "video/mp4", base64: btoa("transport-test-only"), initialFrame:{mimeType:'image/png',base64:admittedPng,width:1,height:1,sourceTimeMs:2000}, clip: { id: "clip", sourceStartMs: 2000, sourceEndMs: 3990, firstFrameMs: 2000, lastFrameMs: 3966.666667, frameCount: 60 } }));
   const { container, rerender } = render(<ManualVideoPreview {...props} snapshotId="quantized" t={t} />);
   const video = await metadata(container, 2); fireEvent.seeked(video);
   expect(video.currentTime).toBe(0);
@@ -479,7 +590,7 @@ it("preserves a newer Original selection while reconciling a rejected trim's can
 it("trim invalidates pending derived preparation, cancels its operation and ignores the late old range", async () => {
   const backend = new ManualBackend(); let finish!: (value: LocalVideoPreview) => void;
   const clip = { id: "clip", trackId: "v1", sourceId: source.id, sourceStartMs: 2000, sourceEndMs: 3990, timelineStartMs: 0, timelineEndMs: 1990, speed: 1, volume: 1, opacity: 1 };
-  const answer = (request: LocalVideoPreviewRequest, start: number): LocalVideoPreview => ({ sourceId: source.id, snapshotId: request.expectedSnapshotId, durationMs: 3990 - start, mimeType: "video/mp4", base64: btoa("derived"), clip: { id: "clip", sourceStartMs: start, sourceEndMs: 3990, firstFrameMs: start, lastFrameMs: 3966, frameCount: 40 } });
+  const answer = (request: LocalVideoPreviewRequest, start: number): LocalVideoPreview => ({ sourceId: source.id, snapshotId: request.expectedSnapshotId, durationMs: 3990 - start, mimeType: "video/mp4", base64: btoa("derived"), initialFrame:{mimeType:'image/png',base64:admittedPng,width:1,height:1,sourceTimeMs:start}, clip: { id: "clip", sourceStartMs: start, sourceEndMs: 3990, firstFrameMs: start, lastFrameMs: 3966, frameCount: 40 } });
   const requests: LocalVideoPreviewRequest[] = [];
   backend.previewLocalVideo = async request => { requests.push(request); return request.expectedSnapshotId === "old" ? new Promise(resolve => { finish = resolve; }) : answer(request, 2500); };
   backend.cancelOperation = vi.fn(async operationId => ({ operationId, cancelled: true }));

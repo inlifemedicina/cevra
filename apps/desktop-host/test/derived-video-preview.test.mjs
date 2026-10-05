@@ -23,12 +23,18 @@ async function setup(t, execute, settle, fixtureBytes = Buffer.from('bounded ori
   const manual = new ManualVideoClipApplicationService({ history, identity: new NodeMediaArtifactStore(), idGenerator: () => 'test' });
   const created = await manual.create({ sourceId: 'source', expectedSnapshotId: history.current.history.headSnapshotId, sourceStartMs: 1000, sourceEndMs: 4000 });
   const calls = [];
-  const engine = { async execute(op, context) { calls.push(op); return execute ? execute(op, context, { root, sourcePath, bytes, history }) : result(op); } };
+  const engine = { async execute(op, context) { calls.push(op); if (op.type === 'extract-frame') return frameResult(op); return execute ? execute(op, context, { root, sourcePath, bytes, history }) : result(op); } };
   const service = new DerivedVideoPreview({ history, engine, temporaryRoot: root, ...(settle ? { settle } : {}) });
   const session = new DesktopSession({ history, manualVideoClip: manual, derivedVideoPreview: service, mediaCapability: unavailable, transcriptionCapability: unavailable });
   t.after(() => session.close());
   const request = { sourceId: 'source', clipId: created.clipId, operationId: 'preview-test', expectedSnapshotId: history.current.history.headSnapshotId };
-  return { root, sourcePath, bytes, history, session, request, calls };
+  return { root, sourcePath, bytes, history, session, request, calls, service };
+}
+async function frameResult(op) {
+  const png = Buffer.alloc(24); Buffer.from([137,80,78,71,13,10,26,10]).copy(png);
+  png.writeUInt32BE(13,8); png.write('IHDR',12); png.writeUInt32BE(128,16); png.writeUInt32BE(96,20);
+  await writeFile(op.outputUri,png,{flag:'wx'}); const s=await lstat(op.outputUri,{bigint:true});
+  return {type:'file',outputUri:op.outputUri,probe:{uri:op.outputUri,width:128,height:96},publication:{version:1,scheme:'posix-dev-inode',device:String(s.dev),inode:String(s.ino)}};
 }
 async function result(op, mutate) {
   await writeFile(op.outputUri, Buffer.from('derived transport fixture'), { flag: 'wx' });
@@ -41,6 +47,87 @@ async function result(op, mutate) {
 }
 async function noTemporaryFiles(root) { assert.deepEqual((await readdir(root)).filter(name => name.startsWith('cevra-video-preview-')), []); }
 function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
+
+test('exact range cache revalidates source and rebinds a fresh snapshot after undo without rendering',async t=>{
+  const f=await setup(t); const first=await f.session.previewLocalVideo(f.request);
+  f.history.commit({type:'clip.trim',clipId:f.request.clipId,timelineStartMs:0,timelineEndMs:1990,sourceStartMs:2000,sourceEndMs:3990});
+  const next={...f.request,operationId:'new-range',expectedSnapshotId:f.history.current.history.headSnapshotId};
+  const changed=await f.session.previewLocalVideo(next);assert.equal(changed.clip.sourceStartMs,2000);
+  f.history.undo();const old=await f.session.previewLocalVideo({...f.request,operationId:'undo-hit',expectedSnapshotId:f.history.current.history.headSnapshotId});
+  assert.equal(old.base64,first.base64);assert.deepEqual(old.initialFrame,first.initialFrame);
+  f.history.redo();const redoRequest={...next,operationId:'redo-hit',expectedSnapshotId:f.history.current.history.headSnapshotId};
+  const before=f.history.toArchive();const redone=await f.session.previewLocalVideo(redoRequest);
+  assert.equal(redone.snapshotId,redoRequest.expectedSnapshotId);assert.deepEqual(f.history.toArchive(),before);
+  assert.equal(f.calls.filter(op=>op.type==='trim').length,2);assert.equal(f.calls.filter(op=>op.type==='extract-frame').length,2);
+  await noTemporaryFiles(f.root);
+});
+
+test('cached range never serves a changed source and is evicted on failed identity',async t=>{
+ const f=await setup(t);await f.session.previewLocalVideo(f.request);assert.equal(f.service.cacheState().entries,1);
+ await writeFile(f.sourcePath,Buffer.alloc(f.bytes.length,90));
+ await assert.rejects(f.session.previewLocalVideo({...f.request,operationId:'changed-hit'}),{code:'MANUAL_VIDEO_SOURCE_CHANGED'});
+ assert.equal(f.service.cacheState().entries,0);assert.equal(f.calls.filter(op=>op.type==='trim').length,1);
+});
+
+test('runtime identity change invalidates exact derivative reuse',async t=>{
+ const f=await setup(t);let identity='verified-runtime-a';f.service.options.runtimeIdentity=()=>identity;
+ await f.session.previewLocalVideo(f.request);identity='verified-runtime-b';
+ await f.session.previewLocalVideo({...f.request,operationId:'runtime-replaced'});assert.equal(f.calls.filter(op=>op.type==='trim').length,2);
+});
+
+test('a corrupted retained derivative is discarded and regenerated before delivery',async t=>{
+ const f=await setup(t);const first=await f.session.previewLocalVideo(f.request);
+ f.service.cache.values().next().value.video[0]^=1;
+ const second=await f.session.previewLocalVideo({...f.request,operationId:'corruption-fallback'});
+ assert.equal(second.base64,first.base64);assert.equal(f.calls.filter(op=>op.type==='trim').length,2);
+});
+
+test('a PNG descriptor close failure preserves the identity error and its cache eviction',async t=>{
+ const f=await setup(t);await f.session.previewLocalVideo(f.request);
+ f.history.commit({type:'clip.trim',clipId:f.request.clipId,timelineStartMs:0,timelineEndMs:1990,sourceStartMs:2000,sourceEndMs:3990});
+ const execute=f.service.options.engine.execute.bind(f.service.options.engine);
+ f.service.options.engine.execute=async(op,ctx)=>{const r=await execute(op,ctx);if(op.type==='extract-frame')r.publication.inode='0';return r};
+ const {default:fs}=await import('node:fs');const {syncBuiltinESMExports}=await import('node:module');const originalOpen=fs.promises.open;
+ fs.promises.open=async(...args)=>{const handle=await originalOpen(...args);if(String(args[0]).endsWith('first-frame.png')){const close=handle.close.bind(handle);handle.close=async()=>{await close();throw Error('close failed after identity failure')}}return handle};syncBuiltinESMExports();
+ try{
+  await assert.rejects(f.session.previewLocalVideo({...f.request,operationId:'close-primary',expectedSnapshotId:f.history.current.history.headSnapshotId}),{code:'MANUAL_VIDEO_SOURCE_CHANGED'});
+  assert.equal(f.service.cacheState().entries,0);await noTemporaryFiles(f.root);
+ }finally{fs.promises.open=originalOpen;syncBuiltinESMExports()}
+});
+
+test('LRU is bounded by entries and bytes and shutdown erases it and rejects new work',async t=>{
+ const f=await setup(t);f.service.options.cacheLimits={maxEntries:2,maxBytes:3000};
+ for(let i=0;i<3;i++){
+  if(i)f.history.commit({type:'clip.trim',clipId:f.request.clipId,timelineStartMs:0,timelineEndMs:3000-i*100,sourceStartMs:1000+i*100,sourceEndMs:4000});
+  await f.session.previewLocalVideo({...f.request,operationId:'range-'+i,expectedSnapshotId:f.history.current.history.headSnapshotId});
+ }
+ assert.equal(f.service.cacheState().entries,2);assert.ok(f.service.cacheState().retainedBytes<=3000);
+ f.history.undo();f.history.undo();await f.session.previewLocalVideo({...f.request,operationId:'evicted'});
+ assert.equal(f.calls.filter(op=>op.type==='trim').length,4);
+ await f.session.close();assert.deepEqual(f.service.cacheState(),{entries:0,retainedBytes:0});
+ await assert.rejects(f.session.previewLocalVideo({...f.request,operationId:'closed'}),{code:'OPERATION_CANCELLED'});
+ await assert.rejects(f.service.prepare(f.request,new AbortController().signal),{code:'OPERATION_CANCELLED'});
+});
+
+test('cancellation while extracting first frame cannot publish a partial cache entry',async t=>{
+ const f=await setup(t);const execute=f.service.options.engine.execute.bind(f.service.options.engine),entered=deferred();
+ f.service.options.engine.execute=async(op,ctx)=>{if(op.type==='extract-frame'){entered.resolve();await new Promise(r=>ctx.signal.addEventListener('abort',r,{once:true}));ctx.signal.throwIfAborted();}return execute(op,ctx)};
+ const task=f.session.previewLocalVideo(f.request),rejected=assert.rejects(task,{code:'OPERATION_CANCELLED'});await entered.promise;
+ await f.session.close();await rejected;assert.equal(f.service.cacheState().entries,0);await noTemporaryFiles(f.root);
+});
+
+for(const attack of ['signature','dimensions','inode','oversize','decode-failure'])test(`invalid first-frame ${attack} cannot be cached`,async t=>{
+ const f=await setup(t);const execute=f.service.options.engine.execute.bind(f.service.options.engine);
+ f.service.options.engine.execute=async(op,ctx)=>{
+  const r=await execute(op,ctx);if(op.type!=='extract-frame')return r;
+  if(attack==='decode-failure')throw Error('extract failed');
+  if(attack==='inode')r.publication.inode='0';
+  if(attack==='oversize')await truncate(op.outputUri,2*1024*1024+1);
+  if(attack==='signature'||attack==='dimensions'){const b=await readFile(op.outputUri);if(attack==='signature')b[0]=0;else b.writeUInt32BE(721,16);await writeFile(op.outputUri,b)}
+  return r;
+ };
+ await assert.rejects(f.session.previewLocalVideo(f.request));assert.equal(f.service.cacheState().entries,0);await noTemporaryFiles(f.root);
+});
 
 test('derived preview consumes a private verified copy and leaves original, IR, history and paths untouched', async t => {
   const fixture = await setup(t, async (op, context, f) => {

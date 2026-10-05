@@ -7,6 +7,7 @@ import type { DesktopBackend, DesktopBackendState, DesktopOperationError } from 
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
 import { EditorialDraftPanel } from "./components/EditorialDraftPanel";
 import { DirectorPanel } from "./components/DirectorPanel";
+import { EditingSidebar } from "./components/EditingSidebar";
 import { Inspector } from "./components/Inspector";
 import { MediaPanel } from "./components/MediaPanel";
 import { Timeline } from "./components/Timeline";
@@ -49,7 +50,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [preset, setPreset] = useState("medical-consultation-clean");
   const [activeTool, setActiveTool] = useState("media");
   const [mediaOpen, setMediaOpen] = useState(true);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [sidebarCompact, setSidebarCompact] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(360);
   const t = useMemo(() => (key: TranslationKey, parameters: Readonly<Record<string, string | number>> = {}) => translate(locale, key, parameters), [locale]);
 
   const sourcePresentations = useMemo(() => project && backendState ? presentSources(project.sources, backendState.sourceNumbering, t) : new Map(), [project, backendState, t]);
@@ -303,14 +305,14 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
 
   if (!project || !backendState) return <main className="loading-screen"><span className="brand-mark">C</span><p>{runtimeError ? t(runtimeErrorKey(runtimeError)) : t("app.loadingProject")}</p></main>;
 
-  const layoutStyle = { "--timeline-height": `${timelineHeight}px` } as CSSProperties;
+  const layoutStyle = { "--timeline-height": `${timelineHeight}px`, "--sidebar-width": `${sidebarCompact ? 286 : sidebarWidth}px` } as CSSProperties;
   const mutationBusy = importBusy || transcriptionOperationId !== null || editorialBusy || manualMutationBusy;
   const realPreview = !backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" && workspace === "edit";
   const selectedPreviewClip = project.timeline.clips.find((clip) => clip.id === selectedProjectItemId);
   const previewClip = selectedPreviewClip && supportsManualClipPreview(project, selectedPreviewClip) ? selectedPreviewClip : undefined;
   return (
-    <main className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${inspectorOpen ? " inspector-open" : " inspector-closed"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision} data-selected-project-item-id={selectedProjectItemId ?? undefined} data-active-source-id={activeSourceId ?? undefined}>
-      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} inspectorOpen={inspectorOpen} exportAvailable={backendState.capabilities["project.export"].available} status={backendState.status} canUndo={backendState.canUndo && !mutationBusy} canRedo={backendState.canRedo && !mutationBusy} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onInspectorToggle={() => setInspectorOpen((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} />
+    <main className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${sidebarCompact ? " sidebar-compact" : " sidebar-open"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision} data-selected-project-item-id={selectedProjectItemId ?? undefined} data-active-source-id={activeSourceId ?? undefined}>
+      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} sidebarCompact={sidebarCompact} exportAvailable={backendState.capabilities["project.export"].available} status={backendState.status} canUndo={backendState.canUndo && !mutationBusy} canRedo={backendState.canRedo && !mutationBusy} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onSidebarToggle={() => setSidebarCompact((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={setActiveTool} />
         {mediaOpen && <MediaPanel sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !transcriptionOperationId && !editorialBusy && !manualMutationBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
@@ -320,10 +322,11 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
           </div>
           {runtimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(runtimeError))}</div>}
           {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
-          <div className="director-slot" hidden={workspace !== "edit"}><DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || mutationBusy} error={editorialError} t={t} onRefresh={() => void refreshEditorial()} onRevise={reviseEditorial} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} /></div>
         </div>
-        {inspectorOpen && <Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />}
       </div>
+      <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} t={t} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
+        directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || mutationBusy} error={editorialError} t={t} onRefresh={() => void refreshEditorial()} onRevise={reviseEditorial} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
+        contextualPanel={<Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />} />
       <Timeline presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} trimAvailable={realPreview} trimBusy={mutationBusy} onTrim={trimManualClip} />
     </main>
   );

@@ -6,6 +6,10 @@ import hashlib
 import math
 import os
 import stat
+import sys
+import copy
+import threading
+from collections import OrderedDict
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -14,6 +18,55 @@ import cevra_job_control as jobs
 
 MAX_BYTES = 8 * 1024 * 1024
 MAX_FRAMES = 3600
+INSPECTION_MAX_ENTRIES = 4
+INSPECTION_MAX_BYTES = 1024 * 1024
+_inspections: OrderedDict[tuple, tuple[Any, int, str]] = OrderedDict()
+_inspection_bytes = 0
+_inspection_lock = threading.Lock()
+
+
+def _inspection_size(value: Any) -> int:
+    # Conservative resident-object accounting, including Fraction integers.
+    size = sys.getsizeof(value)
+    if isinstance(value, Fraction):
+        return size + sys.getsizeof(value.numerator) + sys.getsizeof(value.denominator)
+    if isinstance(value, dict):
+        return size + sum(_inspection_size(k) + _inspection_size(v) for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        return size + sum(_inspection_size(v) for v in value)
+    return size
+
+
+def _inspection_seal(value: Any) -> str:
+    def fraction(item: Any) -> Any:
+        if isinstance(item, Fraction):
+            return {"numerator": item.numerator, "denominator": item.denominator}
+        raise TypeError("unsupported inspection value")
+    encoded = json.dumps(value, default=fraction, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _clear_inspections() -> None:
+    global _inspection_bytes
+    with _inspection_lock:
+        _inspections.clear()
+        _inspection_bytes = 0
+
+
+def _remember_inspection(key: tuple, inspection: tuple) -> None:
+    global _inspection_bytes
+    size = _inspection_size(key) + _inspection_size(inspection) + 512
+    if size > INSPECTION_MAX_BYTES:
+        return
+    with _inspection_lock:
+        old = _inspections.pop(key, None)
+        if old:
+            _inspection_bytes -= old[1]
+        while _inspections and (len(_inspections) >= INSPECTION_MAX_ENTRIES or _inspection_bytes + size > INSPECTION_MAX_BYTES):
+            _, (_, removed_size, _) = _inspections.popitem(last=False)
+            _inspection_bytes -= removed_size
+        _inspections[key] = (copy.deepcopy(inspection), size, _inspection_seal((key, inspection)))
+        _inspection_bytes += size
 
 
 def frame_times(common: Any, path: str) -> tuple[list[Fraction], Fraction]:
@@ -185,7 +238,7 @@ def _hash_stable(path: Path, initial: os.stat_result, limit: int) -> str:
 
 
 def _scan_video(common: Any, path: str) -> tuple[list[Fraction], list[Fraction], Fraction, dict[str, Any]]:
-    result = jobs.run([common.require_tool("ffprobe"), "-v", "error", "-select_streams", "v:0",
+    result = jobs.run([common.require_tool("ffprobe"), "-v", "error", "-threads", "2", "-select_streams", "v:0",
         "-read_intervals", "%+#7201", "-show_frames", "-show_streams", "-show_entries",
         "stream=time_base,nb_frames,duration_ts,width,height,sample_aspect_ratio:stream_side_data=rotation,displaymatrix:frame=best_effort_timestamp,duration",
         "-of", "json", path], stdout=-1, stderr=-1, text=True, timeout=10, check=True)
@@ -298,6 +351,54 @@ def _rotation(stream: dict[str, Any], fallback: int) -> int:
     return rotation % 360
 
 
+def _inspect_source(common: Any, source: Path, original: os.stat_result, digest: str) -> tuple:
+    # Only complete range-independent facts are cached. The caller freshly hashes
+    # each private input before this lookup; the runtime/tool identity is process-local.
+    key = ("take-inspection-v1", digest, original.st_size, common.require_tool("ffprobe"), common.require_tool("ffmpeg"))
+    global _inspection_bytes
+    with _inspection_lock:
+        cached = _inspections.get(key)
+        if cached:
+            try:
+                valid = cached[2] == _inspection_seal((key, cached[0]))
+            except (TypeError, ValueError):
+                valid = False
+            if valid:
+                _inspections.move_to_end(key)
+                facts = copy.deepcopy(cached[0])
+                return facts[0], list(facts[1]), list(facts[2]), facts[3], facts[4], facts[5]
+            _inspection_bytes -= cached[1]
+            del _inspections[key]
+    probed = common.probe(str(source))
+    meta = {k: copy.deepcopy(probed[k]) for k in ("duration", "video", "audio") if k in probed}
+    video, audio = meta.get("video") or {}, meta.get("audio")
+    duration = Fraction(str(meta.get("duration") or 0))
+    if not 0 < duration <= 60 or not video or video.get("hdr"):
+        raise ValueError("Take preview requires bounded SDR video")
+    width, height = video.get("width", 0), video.get("height", 0)
+    if not 2 <= min(width, height) <= 1080 or max(width, height) > 1920:
+        raise ValueError("preview resolution exceeds Full HD budget")
+    times, durations, tick, stream = _scan_video(common, str(source))
+    _rotation(stream, video.get("rotation", 0))
+    if abs(times[-1] + durations[-1] - duration) > Fraction(1, 10):
+        raise ValueError("preview video coverage is incomplete")
+    coverage = None
+    if audio:
+        sr, channels = audio.get("sample_rate"), audio.get("channels")
+        if sr not in (44100, 48000) or channels not in (1, 2):
+            raise ValueError("preview audio format is unsupported")
+        first, count = _scan_audio(common, str(source), sr)
+        source_samples = math.ceil(duration * sr)
+        if max(0, source_samples - first - count) > sr // 10 or first + count > source_samples + 1024:
+            raise ValueError("preview audio coverage exceeds edge budget")
+        coverage = (first, count)
+    if _hash_stable(source, original, 256 * 1024 * 1024) != digest:
+        raise ValueError("preview input changed during inspection")
+    jobs.check_cancelled()
+    _remember_inspection(key, (meta, tuple(times), tuple(durations), tick, stream, coverage))
+    return meta, times, durations, tick, stream, coverage
+
+
 def run_take(common: Any, args: dict[str, Any]) -> dict[str, Any]:
     """Closed SDR phone profile: immutable source, one clock, bounded proxy."""
     source, output = Path(args["input"]), Path(args["output"])
@@ -310,7 +411,7 @@ def run_take(common: Any, args: dict[str, Any]) -> dict[str, Any]:
     start, end = Fraction(str(args["start"])), Fraction(str(args["end"]))
     if not 0 <= start < end <= 60:
         raise ValueError("preview range exceeds budget")
-    meta = common.probe(str(source))
+    meta, times, durations, tick, stream, coverage = _inspect_source(common, source, original, input_digest)
     video, audio = meta.get("video") or {}, meta.get("audio")
     duration = Fraction(str(meta.get("duration") or 0))
     if not 0 < duration <= 60 or end > duration + Fraction(1, 1000) or not video or video.get("hdr"):
@@ -318,7 +419,6 @@ def run_take(common: Any, args: dict[str, Any]) -> dict[str, Any]:
     width, height = video.get("width", 0), video.get("height", 0)
     if not 2 <= min(width, height) <= 1080 or max(width, height) > 1920:
         raise ValueError("preview resolution exceeds Full HD budget")
-    times, durations, tick, stream = _scan_video(common, str(source))
     rotation = _rotation(stream, video.get("rotation", 0))
     if abs(times[-1] + durations[-1] - duration) > Fraction(1, 10):
         raise ValueError("preview video coverage is incomplete")
@@ -339,7 +439,7 @@ def run_take(common: Any, args: dict[str, Any]) -> dict[str, Any]:
         sr, channels = audio.get("sample_rate"), audio.get("channels")
         if sr not in (44100, 48000) or channels not in (1, 2):
             raise ValueError("preview audio format is unsupported")
-        first, count = _scan_audio(common, str(source), sr)
+        first, count = coverage
         source_samples = math.ceil(duration * sr)
         tail = max(0, source_samples - first - count)
         if tail > sr // 10 or first + count > source_samples + 1024:

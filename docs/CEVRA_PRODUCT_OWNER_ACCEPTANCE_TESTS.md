@@ -334,3 +334,91 @@ Focused UNIT cases cover Original/excerpt, buffered data and stale selection
 events. Native WKWebView synthetic evidence distinguishes metadata-only blank
 output from visible initial-frame output at zero time with no play events.
 This evidence does not replace the pending point-specific owner check.
+
+#### Editing column and paused-frame owner check — 2026-10-05
+
+Reuse the Normal manual-editing variant (I4-T1, D14-T2, X-T1/T7/T10) and the
+point-specific Original/simple V1 preview check above. The owner approved the
+full-height right column with Director/editorial draft above context, adjustable
+height/width and independent scroll. After testing Draft #85 `f4ea20f`, the owner
+explicitly replaced whole-column collapse with a 286 px upper-only compact
+column, Director/Controls tabs and a full-width timeline below. Open retains
+its full-height adjustable layout. The follow-up package combines this layout
+with a bounded V1 paused-frame correction; prepare it closed while Take testing
+continues. It is not a release or merged build.
+
+1. After normally quitting the previous review app, open the designated new
+   package when the owner authorizes that session transition, select the existing
+   V1 excerpt before Play. Confirm its initial frame appears paused, with the
+   central IN/OUT and excerpt intact. Original's initial-frame PASS at `f4ea20f`
+   is preserved; do not repeat it without a new regression.
+2. Read the Director/editorial draft and contextual controls; resize the width
+   and divider and scroll the two areas independently. Enter a temporary title,
+   note or instruction, switch to compact, use Director/Controls tabs and return
+   to open. Confirm the compact column occupies only the upper editing area,
+   the timeline spans the full lower width, and text, independent scroll,
+   selection and playhead survive. Assess legibility in both modes and PT/EN;
+   window/source aspect changes must not switch modes automatically.
+
+Status: UNIT PASS (Desktop 105/105, including seven sidebar regressions and
+bounded excerpt-image lifecycle cases; i18n 2/2). Earlier whole-collapse native
+geometry/state/initial-frame PASS applies only to `f4ea20f` technical fixtures.
+At that head APP/OWNER Original initial frame is PASS and V1 initial frame is
+FAIL; the revised compact layout is newly approved and PENDING. Native technical
+verification of the correction remains in progress and cannot promote owner
+acceptance. The isolated derived fixture has not reproduced the human V1
+failure; the follow-up displays its decoded paused frame as an ephemeral image
+until Play/seek, without storing or transmitting it. The follow-up at `ce53f81`
+then exposed premature black canvas pixels in WKWebView before a rendering turn;
+current code defers capture and cancels stale tasks, with a red-before regression.
+The display is asleep/inactive and suspends native rendering callbacks. Thus
+awake native painting/scroll and the point-specific owner check remain PENDING;
+the environment was not awakened or replaced to manufacture a native PASS.
+Preserve the earlier real Take orientation/voice/excerpt/save/reopen PASS at
+`b57c649`; no repeated full round or promotion of broader catalog IDs. Final
+exact review, CI and package identity are reported in the dependent Draft and
+local technical receipt. No private project-store inspection/copy or media
+publication is part of this check.
+
+
+#### Preview fluency and first-frame-only recheck — 2026-10-05
+
+Reuse I4-T1, D14-T2, X-T1/T7/T10 and the bounded simple-clip X-T6/T9,
+I13-T3 and K3-T2 variant. The owner accepted the R2 compact/tabs/fields/scroll
+round at 12:34 UTC; the earlier numbered layout step is now PASS for that bounded
+variant and must not be repeated. Preserve Original first-frame PASS and the
+real Take orientation/voice/content/save/reopen PASS. The V1 first-frame
+APP/OWNER FAIL at R2 remains historical evidence; technical controls alone
+cannot supersede it.
+
+After a safe owner-directed normal transition to the designated reviewed
+package, select the existing V1 excerpt before Play. Confirm its intended first
+frame appears while paused, with the existing IN/OUT and excerpt intact. This
+was the only new human recheck. On the owner-directed R3 transition at reviewed
+commit `7d4e66776fbfc112429d333e5d8883221c2851fb` (tree
+`e303129639b24a5187ae81baaf12a949528c8af2`), the owner reported: “NO ORIGINAL
+APARECEU. NO V1 APARECEU NA PRIMEIRA APOS 2SEG E APOS IR E VOLTAR FICOU
+IMEDIATO.” This establishes APP/OWNER PASS for the corrected paused V1 first
+frame and the observed Original↔V1 switching in this bounded fixture. The
+approximately two-second first selection and subsequent immediate switches
+are human observations, not a measured latency guarantee. No full repeated
+round or promotion of composition/export/release/catalog-wide acceptance follows.
+
+The same report asks where the IN/OUT buttons went. This is a separate
+discoverability question, not an IN/OUT acceptance. Read-only inspection found
+the existing selected V1's two enabled timeline handles inside the visible
+window in open mode, with canonical IN 5.037 s and OUT 9.928 s. “Marcar IN/OUT”
+creation buttons render only while the timeline is empty; that condition also
+exists in the pre-R3 base. No control was moved to the sidebar, and this check
+performed no trim, selection, scroll, Play or focus action. Keep the previously
+accepted trim behavior without promoting this unanswered UX observation to PASS.
+
+AUTO/UNIT: exact-range cache identity/eviction/undo/redo/cancellation/close,
+admitted PNG publication and stale UI decoding, plus verified independent
+inspection reuse pass. Complete local CI (Desktop 110), Python 101, Rust 28 and
+ten sealed-runtime functional cases PASS. Native complete-IPC technical control PASS (current PNG, paused zero, Play-ready,
+undo/redo and superseded cancellation), with separate budget/eviction/close PASS.
+Exact final CI and package identity belong in the technical receipt and Draft #85;
+failed harness attempts remain failed evidence. No automatic Play or product
+brightness gate, no original change, private human-store read/copy, media
+publication or actual AI. [Current bounds and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-preview-fluency-and-admitted-png--2026-10-05).

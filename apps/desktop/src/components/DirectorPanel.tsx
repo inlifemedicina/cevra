@@ -31,7 +31,7 @@ export function DirectorPanel({ draft, preset, directorAvailable, t, onDraftChan
           <small>{t("preset.libraryFixture")}</small>
         </div>
       </div>
-      <div className="change-set">
+      <div className="change-set" data-sidebar-scroll="editorial">
         {editorialPanel}
         <div className="change-actions"><button type="button" className="apply-button" disabled title={t("changes.applyUnavailable")}>{t("action.apply")}</button></div>
       </div>
