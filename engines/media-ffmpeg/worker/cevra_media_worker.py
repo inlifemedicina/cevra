@@ -24,7 +24,7 @@ if str(WORKER_DIRECTORY) not in sys.path:
 
 from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
-WORKER_VERSION = "0.3.3"
+WORKER_VERSION = "0.3.4"
 PROTOCOL_VERSION = 1
 UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
@@ -1109,6 +1109,9 @@ def main() -> int:
         thread = _JOB_THREAD
         if thread is not None:
             thread.join(timeout=5.0)
+        inspected = sys.modules.get("cevra_bounded_preview")
+        if inspected is not None:
+            inspected._clear_inspections()
     return 0
 
 

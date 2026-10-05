@@ -141,6 +141,7 @@ test("Python frame extraction writes exactly the requested output using the PNG 
   assert.equal(result.error, undefined);
   assert.deepEqual(result.command.slice(-7), ["-map", "0:v:0", "-frames:v", "1", "-c:v", "png", "frame.png"]);
   assert.equal(result.command.includes("frame_1.250s.png"), false);
+  assert.equal(result.publicationMatches, true, "publication must identify the produced file");
 });
 
 test("Python audio-sequence compiler uses one bounded float32 pass with source URIs outside the graph", () => {

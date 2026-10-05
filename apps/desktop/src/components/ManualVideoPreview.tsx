@@ -24,9 +24,9 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const metadataVerified = useRef(false);
-  const capturedFrame = useRef(false);
-  const frameTask = useRef<{ first: number; second: number } | null>(null);
-  const [initialFrame, setInitialFrame] = useState<{ url: string; image: string } | null>(null);
+  const imageVerified = useRef<string | null>(null);
+  const activePreviewUrl = useRef<string | null>(null);
+  const [initialFrame, setInitialFrame] = useState<{ url: string; image: string; width: number; height: number } | null>(null);
   const [preview, setPreview] = useState<LocalVideoPreview | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,11 +45,11 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     let settled = false;
     let objectUrl: string | null = null;
     const operationId = `video-preview-${crypto.randomUUID()}`;
-    cancelFrameTask();
+    activePreviewUrl.current = null;
     metadataVerified.current = false;
-    capturedFrame.current = false;
+    imageVerified.current = null;
     setInitialFrame(null);
-    setPreview(null); setUrl(null); setReady(false); setError(null); setPlaying(false); setSeeking(false); setInMs(null); setOutMs(null); setCurrentMs(0);
+    setPreview(null); setUrl(null); setReady(false); setError(null); setPlaying(false); setSeeking(false); setInMs(null); setOutMs(null); setCurrentMs(startMs);
     if (source?.kind === "video") {
       void backend.previewLocalVideo({ sourceId: source.id, expectedSnapshotId: snapshotId, operationId, ...(clip ? { clipId: clip.id } : {}) }).then((result) => {
         settled = true;
@@ -61,14 +61,29 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
           || !["video/mp4", "video/quicktime", "video/webm"].includes(result.mimeType) || result.base64.length > 11_184_812) throw { code: "MANUAL_VIDEO_STALE" };
         const bytes = Uint8Array.from(atob(result.base64), (character) => character.charCodeAt(0));
         if (!bytes.length || bytes.length > 8 * 1024 * 1024) throw { code: "MANUAL_VIDEO_TOO_LARGE" };
+        if (clip && !result.initialFrame) throw { code: "MANUAL_VIDEO_UNSUPPORTED" };
+        const frame = result.initialFrame;
+        if (frame) {
+          if (frame.mimeType !== "image/png" || frame.base64.length > 2_796_204 || !Number.isSafeInteger(frame.width) || !Number.isSafeInteger(frame.height)
+            || Math.min(frame.width, frame.height) < 1 || Math.max(frame.width, frame.height) > 720 || !Number.isFinite(frame.sourceTimeMs)
+            || (clip ? frame.sourceTimeMs !== result.clip!.firstFrameMs : frame.sourceTimeMs < 0 || frame.sourceTimeMs >= source.durationMs!)) throw { code: "MANUAL_VIDEO_UNSUPPORTED" };
+          const png = Uint8Array.from(atob(frame.base64), character => character.charCodeAt(0));
+          const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+          if (png.length < 24 || png.length > 2 * 1024 * 1024 || signature.some((value, i) => png[i] !== value)) throw { code: "MANUAL_VIDEO_UNSUPPORTED" };
+          const header = new DataView(png.buffer, png.byteOffset, png.byteLength);
+          if (header.getUint32(8) !== 13 || header.getUint32(12) !== 0x49484452 || header.getUint32(16) !== frame.width || header.getUint32(20) !== frame.height) throw { code: "MANUAL_VIDEO_UNSUPPORTED" };
+        }
         objectUrl = URL.createObjectURL(new Blob([bytes], { type: result.mimeType }));
-        setPreview(result); setUrl(objectUrl);
+        activePreviewUrl.current = objectUrl;
+        setInitialFrame(frame ? { url: objectUrl, image: `data:image/png;base64,${frame.base64}`, width: frame.width, height: frame.height } : null);
+        // Metadata remains in React; transport bytes belong only to the Blob/image.
+        setPreview({ ...result, base64: "", ...(frame ? { initialFrame: { ...frame, base64: "" } } : {}) }); setUrl(objectUrl);
       }).catch((cause: unknown) => { settled = true; if (active) setError(errorCode(cause)); });
     }
     const video = videoRef.current;
     return () => {
       active = false;
-      cancelFrameTask();
+      if (activePreviewUrl.current === objectUrl) activePreviewUrl.current = null;
       if (operationId && !settled) void backend.cancelOperation(operationId).catch(() => undefined);
       // Release decoder before revoking; never retain an old source/snapshot URL.
       if (video && objectUrl) { video.pause(); video.removeAttribute("src"); video.load(); }
@@ -98,9 +113,9 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   }, [playing, ready, clip?.id]);
 
   function fail(code: string) {
-    cancelFrameTask();
+    activePreviewUrl.current = null;
     metadataVerified.current = false;
-    capturedFrame.current = false;
+    imageVerified.current = null;
     setInitialFrame(null);
     const video = videoRef.current;
     video?.pause();
@@ -111,7 +126,8 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
 
   function metadataReady() {
     const video = videoRef.current;
-    if (!video || !preview || !Number.isFinite(video.duration) || video.duration <= 0 || Math.abs(video.duration * 1000 - preview.durationMs) > 100) {
+    if (!video || !preview || !url || activePreviewUrl.current !== url || video.getAttribute("src") !== url) return;
+    if (!Number.isFinite(video.duration) || video.duration <= 0 || Math.abs(video.duration * 1000 - preview.durationMs) > 100) {
       fail("MANUAL_VIDEO_UNSUPPORTED"); return;
     }
     metadataVerified.current = true;
@@ -120,46 +136,12 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     frameReady();
   }
 
-  function cancelFrameTask() {
-    const pending = frameTask.current;
-    frameTask.current = null;
-    if (pending) { cancelAnimationFrame(pending.first); cancelAnimationFrame(pending.second); }
-  }
-
   function frameReady() {
     const video = videoRef.current;
     // Metadata alone does not guarantee a decoded frame in WKWebView.
-    if (!metadataVerified.current || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking) return;
-    if (!clip) { setReady(true); return; }
-    if (capturedFrame.current || frameTask.current || !url || video.currentTime !== 0) return;
-    // WKWebView can report loadeddata before its frame is readable by canvas.
-    // Let one rendering turn finish, then admit the same paused frame identity.
-    if (video.videoWidth <= 0 || video.videoHeight <= 0) return;
-    const pending = { first: 0, second: 0 };
-    frameTask.current = pending;
-    pending.first = requestAnimationFrame(() => {
-      if (frameTask.current !== pending) return;
-      pending.second = requestAnimationFrame(() => {
-        if (frameTask.current !== pending) return;
-        frameTask.current = null;
-        if (!metadataVerified.current || videoRef.current !== video || video.getAttribute("src") !== url || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking || video.currentTime !== 0) return;
-        captureFrame(video, url);
-      });
-    });
-  }
-
-  function captureFrame(video: HTMLVideoElement, frameUrl: string) {
-    try {
-      const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("frame image unavailable");
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      capturedFrame.current = true;
-      setInitialFrame({ url: frameUrl, image: canvas.toDataURL("image/png") });
-    } catch { fail("MANUAL_VIDEO_UNSUPPORTED"); }
+    if (!metadataVerified.current || !video || !url || activePreviewUrl.current !== url || video.getAttribute("src") !== url
+      || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking) return;
+    if (initialFrame ? imageVerified.current === url : !clip) setReady(true);
   }
 
   function updateClock() {
@@ -195,9 +177,14 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     <div className="manual-preview-heading"><strong>{sourceLabel ?? t("preview.localVideo")}</strong><span>{t(clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
     <div className="manual-video-stage">
       <video ref={videoRef} src={url ?? undefined} preload="auto" playsInline onLoadedMetadata={event => { if (event.currentTarget === videoRef.current && url) metadataReady(); }} onLoadedData={frameReady} onCanPlay={frameReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
-        onSeeking={() => { cancelFrameTask(); setSeeking(true); }} onSeeked={() => { frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); updateClock(); }} />
-      {clip && initialFrame && initialFrame.url === url && <img key={url} ref={imageRef} className="manual-initial-frame" src={initialFrame.image} alt="" aria-hidden="true" hidden={playing || seeking || currentMs !== startMs}
-        onLoad={event => { if (event.currentTarget === imageRef.current && metadataVerified.current && videoRef.current?.getAttribute("src") === initialFrame.url) setReady(true); }}
+        onSeeking={() => { setSeeking(true); }} onSeeked={() => { frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); updateClock(); }} />
+      {initialFrame && initialFrame.url === url && <img key={url} ref={imageRef} className="manual-initial-frame" src={initialFrame.image} alt="" aria-hidden="true" hidden={playing || seeking || currentMs !== startMs}
+        onLoad={event => {
+          const image = event.currentTarget;
+          if (image !== imageRef.current || activePreviewUrl.current !== initialFrame.url || videoRef.current?.getAttribute("src") !== initialFrame.url) return;
+          if (image.naturalWidth !== initialFrame.width || image.naturalHeight !== initialFrame.height) { fail("MANUAL_VIDEO_UNSUPPORTED"); return; }
+          imageVerified.current = initialFrame.url; frameReady();
+        }}
         onError={event => { if (event.currentTarget === imageRef.current) fail("MANUAL_VIDEO_UNSUPPORTED"); }} />}
       {!ready && <p role="status">{error ? t(errorKey) : source?.kind === "video" ? t("preview.localLoading") : t("preview.localEmpty")}</p>}
     </div>

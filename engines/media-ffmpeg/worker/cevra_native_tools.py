@@ -329,7 +329,8 @@ def _run_extract_frame(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
         "-map", "0:v:0", "-frames:v", "1", "-c:v", "png", output,
     ]
     common.run(cmd)
-    return _file_result(common, output)
+    publication = _publication_evidence(Path(output))
+    return _file_result(common, output, {"publication": publication} if publication else None)
 
 
 def _run_overlay(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:

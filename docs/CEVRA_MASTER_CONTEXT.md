@@ -2975,3 +2975,35 @@ receipt. Awake native image/painting and
 owner acceptance remain pending; this does not claim the exact human-window
 cause fully reproduced. Director impact remains compatible; no engine/provider,
 history, schema or persistence extension, progress 55%, F-A02 exhausted 1/1.
+
+
+### 2026-10-05 — Approved bounded preview fluency and first-frame admission
+
+The R2 owner round accepted compact/tabs/fields/scroll at 12:34 UTC; its V1
+initial frame remains FAIL. Earlier orientation/voice/content/save/reopen and
+Original initial-frame acceptance are preserved. Recheck only the corrected
+V1 first frame, with no repeated layout round or existing-session operation.
+
+The owner approved measured exact-range session reuse plus a PNG extracted
+from the admitted derivative, then bounded reuse of verified independent source
+inspection. Host LRU is four entries / 32 MiB; PNG ≤2 MiB/720 px; worker LRU is
+four entries / 1 MiB counted resident facts. Source/runtime/range identity,
+fresh source hashes, sealed copies, complete output PTS/audio/orientation/hash
+admission, cancellation/temp cleanup and shutdown remain mandatory. Runtime
+0.3.4 keeps the pinned provenance/licenses and adds no provider, dependency,
+command, WebView permission or IR/History/Package migration. The UI remains
+paused at zero and accepts legitimate black frames without a brightness gate.
+
+Complete local CI, Python 101/101, Rust 28/28 and ten exact-runtime functional
+controls PASS; independent review found no code blocker. Current host first V1
+fell from 6.041 s to 1.528 s; another new range from 6.542 s to 2.089 s. Retained
+V1 host samples are 25.1–27.8 ms, explicitly not full UI latency. Native complete-IPC control PASS: retained V1 PNG present in 56–150 ms and
+Play ready in 197–325 ms; cold Original 9.878 s and first V1 2.226 s to readiness.
+A separate sampled budget/eviction/close control PASS. Exact commit CI and the
+closed review package remain terminal receipts, with no promotion of human
+acceptance or product READY.
+[Canonical decision](adr/0032-bounded-preview-session-reuse.md) and
+[measurements/limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-preview-fluency-and-admitted-png--2026-10-05).
+Director impact compatible, official progress stays 55%, F-A02 remains exhausted
+1/1. No real AI, human store inspection/copy, Take/iPhone/Xcode operation or
+merge is part of this approved follow-up.

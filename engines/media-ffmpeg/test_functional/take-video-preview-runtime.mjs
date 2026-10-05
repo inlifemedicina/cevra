@@ -66,7 +66,12 @@ try {
     const sourceIds = ids(source), sourceTimes = times(source);
     for (const [start, end] of [[0, 3000], [1010, 1990]]) {
       const { output } = await preview(source, start, end);
-      assert.deepEqual(ids(output), sourceIds.filter((_, i) => sourceTimes[i] >= start && sourceTimes[i] < end));
+      const admittedIds = sourceIds.filter((_, i) => sourceTimes[i] >= start && sourceTimes[i] < end);
+      assert.deepEqual(ids(output), admittedIds);
+      const png = join(root, `first-${sequence}.png`);
+      const extracted = await engine.execute({type:'extract-frame',inputUri:output,outputUri:png,atMs:0},{jobId:`first-${sequence}`,locale:'en-US'});
+      assert.equal(extracted.type,'file');assert.deepEqual(ids(png),[admittedIds[0]],'PNG must contain exactly the first admitted frame, including fractional IN and black openings');
+      if(process.platform!=='win32'){const s=statSync(png,{bigint:true});assert.equal(extracted.publication.inode,String(s.ino));assert.equal(extracted.publication.device,String(s.dev));}
     }
   }
   const wav = join(root, 'edge-audio.wav'), edgeSource = join(root, 'edge-audio.mov'); audioFixture(wav);
@@ -107,6 +112,13 @@ try {
   const mae = expected.reduce((sum, value, i) => sum + Math.abs(value - actual[i]), 0) / expected.length;
   const wrong = picture(base), wrongMae = wrong.reduce((sum, value, i) => sum + Math.abs(value - actual[i]), 0) / wrong.length;
   assert.ok(mae < 20 && wrongMae > mae + 10, `orientation MAE ${mae}, unrotated negative control ${wrongMae}`);
+  const portraitPng = join(root,'portrait-first.png');
+  const portraitFrame = await engine.execute({type:'extract-frame',inputUri:output,outputUri:portraitPng,atMs:0},{jobId:'portrait-first',locale:'en-US'});
+  assert.equal(portraitFrame.probe.width,404);assert.equal(portraitFrame.probe.height,720);
+  function rgbPicture(path){return run(['-i',path,'-frames:v','1','-vf','scale=32:32','-pix_fmt','rgb24','-f','rawvideo','pipe:1'])}
+  const expectedRgb=rgbPicture(output),pngRgb=rgbPicture(portraitPng);
+  const pngColorMae=expectedRgb.reduce((sum,value,i)=>sum+Math.abs(value-pngRgb[i]),0)/expectedRgb.length;
+  assert.ok(pngColorMae<4,`first PNG color/orientation MAE ${pngColorMae}`);
   const quicktime = join(root, 'quicktime-edit-list.mov');
   run(['-y', '-display_rotation', '-90', '-i', base, '-c', 'copy', '-video_track_timescale', '600', quicktime]);
   // Reproduce Apple's origin-normalized matrix and a track edit list hiding
@@ -134,5 +146,5 @@ try {
   const longest = join(root, 'maximum-duration.mov');
   run(['-y', '-f', 'lavfi', '-i', 'testsrc2=s=128x96:r=30:d=60', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=60', '-c:v', 'mpeg4', '-q:v', '5', '-c:a', 'pcm_s16le', longest]);
   await preview(longest, 0, 60000);
-  process.stdout.write(JSON.stringify({ status: 'PASS', mode: 'exact-release-runtime', measurements, orientationMeanAbsoluteError: mae, unrotatedNegativeControlMeanAbsoluteError: wrongMae, vfrContentVerified: true, audioOffsetAndEdgeSilenceVerified: true, interiorAudioGapRejected: true }, null, 2) + '\n');
+  process.stdout.write(JSON.stringify({ status: 'PASS', mode: 'exact-release-runtime', measurements, orientationMeanAbsoluteError: mae, unrotatedNegativeControlMeanAbsoluteError: wrongMae, firstPngColorMeanAbsoluteError:pngColorMae, firstAdmittedPngCfrVfrFractionalAndBlackVerified:true, vfrContentVerified: true, audioOffsetAndEdgeSilenceVerified: true, interiorAudioGapRejected: true }, null, 2) + '\n');
 } finally { await transport.settle(); await client.close(); rmSync(root, { recursive: true, force: true }); }

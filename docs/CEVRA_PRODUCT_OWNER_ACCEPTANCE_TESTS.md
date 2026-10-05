@@ -379,3 +379,29 @@ Preserve the earlier real Take orientation/voice/excerpt/save/reopen PASS at
 exact review, CI and package identity are reported in the dependent Draft and
 local technical receipt. No private project-store inspection/copy or media
 publication is part of this check.
+
+
+#### Preview fluency and first-frame-only recheck — 2026-10-05
+
+Reuse I4-T1, D14-T2, X-T1/T7/T10 and the bounded simple-clip X-T6/T9,
+I13-T3 and K3-T2 variant. The owner accepted the R2 compact/tabs/fields/scroll
+round at 12:34 UTC; the earlier numbered layout step is now PASS for that bounded
+variant and must not be repeated. Preserve Original first-frame PASS and the
+real Take orientation/voice/content/save/reopen PASS. V1 first frame remains
+APP/OWNER FAIL at R2; technical controls cannot supersede it.
+
+After a safe owner-directed normal transition to the designated reviewed
+package, select the existing V1 excerpt before Play. Confirm its intended first
+frame appears while paused, with the existing IN/OUT and excerpt intact. This
+is the only new human recheck; its status is PENDING. No full repeated round or
+promotion of composition/export/release/catalog-wide acceptance follows.
+
+AUTO/UNIT: exact-range cache identity/eviction/undo/redo/cancellation/close,
+admitted PNG publication and stale UI decoding, plus verified independent
+inspection reuse pass. Complete local CI (Desktop 110), Python 101, Rust 28 and
+ten sealed-runtime functional cases PASS. Native complete-IPC technical control PASS (current PNG, paused zero, Play-ready,
+undo/redo and superseded cancellation), with separate budget/eviction/close PASS.
+Exact final CI and package identity belong in the technical receipt and Draft #85;
+failed harness attempts remain failed evidence. No automatic Play or product
+brightness gate, no original change, private human-store read/copy, media
+publication or actual AI. [Current bounds and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-preview-fluency-and-admitted-png--2026-10-05).
