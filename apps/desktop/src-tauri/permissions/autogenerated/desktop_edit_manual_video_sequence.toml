@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-edit-manual-video-sequence"
+description = "Enables the desktop_edit_manual_video_sequence command without any pre-configured scope."
+commands.allow = ["desktop_edit_manual_video_sequence"]
+
+[[permission]]
+identifier = "deny-desktop-edit-manual-video-sequence"
+description = "Denies the desktop_edit_manual_video_sequence command without any pre-configured scope."
+commands.deny = ["desktop_edit_manual_video_sequence"]

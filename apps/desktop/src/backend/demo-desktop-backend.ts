@@ -20,6 +20,7 @@ export class DemoDesktopBackend implements DesktopBackend {
   async previewLocalVideo(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
   async trimManualVideoClip(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
   async createManualVideoClip(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
+  async editManualVideoSequence(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
 
   async loadState(): Promise<DesktopBackendState> {
     return demoState(structuredClone(createDemoProject()));

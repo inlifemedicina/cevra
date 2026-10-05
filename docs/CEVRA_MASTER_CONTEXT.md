@@ -2667,15 +2667,25 @@ material choices and gates. It grants no advanced catalog, dependency/provider
 or app/human-media/device action. The owner explicitly approved the two exact
 heads; #84 then #85 merged at `6e2cce16a8506bb5a3816aeb04281a7698abc471` and
 `60345a7db3fcfc1b78e6cc878cdbb217b1dac7a4`. That new approval resolved the earlier
-automatic-review rejection. Post-#85 exact runtime passed; general CI needs its
-requested rerun after hosted-runner acquisition failures. Insert before selection,
+automatic-review rejection. Post-#85 exact runtime passed; general CI attempt 3
+passed four jobs but remained FAILURE because the hosted Transcription runner
+was not acquired. The plan preserves the infrastructure receipt and prior attempts.
+Insert before selection,
 duplicate after selection and explicit Retry after failed save are also approved.
 Preserve all
 scoped R3/Take evidence. The plan records the isolated technical M0 implementation,
 published as [Draft #86](https://github.com/inlifemedicina/cevra/pull/86) now targeting
 main, bounded tests/exact-tree reviews, the corrected private-Node CI close
 handshake and remaining sequence/render prerequisites. #86 is not authorized
-for merge; fresh exact-head CI remains required after the smoke correction.
+for merge; corrected head `58531d6` passed push CI 5/5 and PR CI attempt 2 5/5.
+The separate local M1 branch has a tested typed continuous-edit API (seven
+intents, one action per Undo) through Application/Host/native/backend; its UI
+controls and render consumers remain unconnected. The G1 plan records measured
+original-master clock/copy/audio and colour/quality experiments, including exact
+60-s source-slice PCM/AAC coverage and absent-tag metadata equality, plus the exact
+range/profile/budget proposal; these are pending material choices, not a new
+functional PASS or approved export envelope. Tagged-colour preservation, general
+display-order admission and combined active-frame/export integration remain open.
 Naming: Creator=Lite, Studio=Full, Vids=Desktop; I19's Full visual workspace/final
 output remains independent of Vids. No G1 PASS is implied; F-A02 and progress
 remain unchanged. Historical actions below retain their scope and evidence.

@@ -10,15 +10,19 @@ audio/captions/refinement → presets/Director → distribution. G5 fluency and 
 recovery accompany each available flow; automation precedes grouped owner review.
 [Milestones and pending material choices](CEVRA_MANUAL_SEQUENCE_G1.md).
 After explicit approval of their exact heads, #84→#85 merged at `6e2cce16` and
-`60345a7d`. Post-#85 exact runtime passed; general CI requires its requested
-rerun after hosted-runner acquisition failures. Insert before selection, duplicate
+`60345a7d`. Post-#85 exact runtime passed; general CI attempt 3 remains FAILURE:
+four jobs passed and the hosted Transcription runner was not acquired.
+Insert before selection, duplicate
 after selection and explicit Retry after failed save are approved.
 M0 is published as [technical Draft #86](https://github.com/inlifemedicina/cevra/pull/86)
 now targeting main, with bounded automated/exact-tree-review evidence and a
-private-Node CI smoke close-handshake correction recorded in the plan. Fresh
-exact-head CI is required; continuous editing proceeds while render-profile
+private-Node CI smoke close-handshake correction recorded in the plan. Corrected
+head `58531d6` passed push and PR CI 5/5; continuous editing proceeds while render-profile
 choices and sequence/render consumers remain open. Historical R3/Take PASS
-remains limited. No G1 PASS, real AI, dependency, human
+remains limited. Separate local M1 typed editing API and synthetic export
+clock/copy/audio/colour experiments are recorded in the G1 plan; UI/render
+integration and the measured profile/budget proposal remain open. No G1 PASS,
+real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,
 Vids=Desktop; Lite/Full share core and Full visual output does not require Vids.
 

@@ -1,6 +1,6 @@
 use crate::protocol::DesktopCommandError;
 use crate::supervisor::DesktopHostSupervisor;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -161,6 +161,61 @@ pub struct EditorialBlockEdit {
     block_id: String,
     title: Option<String>,
     user_note: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualVideoSequenceArgs {
+    version: u8,
+    expected_snapshot_id: String,
+    action: ManualVideoSequenceAction,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase", rename_all_fields = "camelCase", deny_unknown_fields)]
+pub enum ManualVideoSequenceAction {
+    Append { source_id: String, source_start_ms: u64, source_end_ms: u64 },
+    Insert { before_clip_id: String, source_id: String, source_start_ms: u64, source_end_ms: u64 },
+    Duplicate { clip_id: String },
+    Remove { clip_id: String },
+    Trim { clip_id: String, source_start_ms: u64, source_end_ms: u64 },
+    Split { clip_id: String, timeline_at_ms: u64 },
+    Reorder { clip_ids: Vec<String> },
+}
+
+fn manual_sequence_params(args: ManualVideoSequenceArgs) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    if args.version != 1 {
+        return Err(DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Manual sequence version is invalid."));
+    }
+    let mut params = serde_json::to_value(args.action)
+        .map_err(|_| DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Manual sequence action is invalid."))?;
+    for (key, value) in params.as_object().expect("typed action serializes as an object") {
+        if key.ends_with("Id") { validate_id(value.as_str().expect("typed ID"), key)?; }
+        if key == "clipIds" {
+            for id in value.as_array().expect("typed IDs") { validate_id(id.as_str().expect("typed ID"), "clipId")?; }
+        }
+        if key.ends_with("Ms") && value.as_u64().expect("typed time") > 9_007_199_254_740_991 {
+            return Err(DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Manual sequence time is invalid."));
+        }
+    }
+    params["version"] = json!(args.version);
+    params["expectedSnapshotId"] = json!(args.expected_snapshot_id);
+    Ok(params)
+}
+
+#[tauri::command]
+pub async fn desktop_edit_manual_video_sequence(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualVideoSequenceArgs,
+) -> Result<Value, DesktopCommandError> {
+    let params = manual_sequence_params(args)?;
+    supervisor.ensure_started(&app).await?;
+    match supervisor.request_immediate_mutation("video.editManualSequence", params).await {
+        Ok(result) => Ok(result),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
 }
 
 #[derive(Deserialize)]
@@ -439,6 +494,39 @@ mod video_boundary_tests {
             })).is_err());
         }
     }
+    #[test]
+    fn manual_sequence_boundary_accepts_only_closed_intents_and_safe_bindings() {
+        for action in [
+            json!({"type":"append","sourceId":"source","sourceStartMs":0,"sourceEndMs":700}),
+            json!({"type":"insert","beforeClipId":"clip","sourceId":"source","sourceStartMs":0,"sourceEndMs":700}),
+            json!({"type":"duplicate","clipId":"clip"}),
+            json!({"type":"remove","clipId":"clip"}),
+            json!({"type":"trim","clipId":"clip","sourceStartMs":0,"sourceEndMs":700}),
+            json!({"type":"split","clipId":"clip","timelineAtMs":350}),
+            json!({"type":"reorder","clipIds":["clip","other"]}),
+        ] {
+            let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":action});
+            let params = manual_sequence_params(serde_json::from_value(request.clone()).unwrap()).unwrap();
+            assert_eq!(params["type"], action["type"]);
+            assert_eq!(params["expectedSnapshotId"], "snapshot");
+            for extra in ["path", "commands", "edits", "outputUri"] {
+                let mut bad = request.clone(); bad["action"][extra] = json!("injected");
+                assert!(serde_json::from_value::<ManualVideoSequenceArgs>(bad).is_err());
+            }
+            let mut bad = request.clone(); bad["version"] = json!(2);
+            assert!(manual_sequence_params(serde_json::from_value(bad).unwrap()).is_err());
+            let mut bad = request; bad["expectedSnapshotId"] = json!("x".repeat(129));
+            assert!(manual_sequence_params(serde_json::from_value(bad).unwrap()).is_err());
+        }
+        for invalid in [json!(-1), json!(0.5), json!(9_007_199_254_740_992_u64)] {
+            let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":{"type":"split","clipId":"clip","timelineAtMs":invalid}});
+            match serde_json::from_value::<ManualVideoSequenceArgs>(request) {
+                Err(_) => {},
+                Ok(args) => assert!(manual_sequence_params(args).is_err()),
+            }
+        }
+    }
+
     #[test]
     fn manual_trim_args_accept_only_clip_binding_and_integer_source_range() {
         let valid = json!({ "clipId": "clip", "expectedSnapshotId": "snapshot", "sourceStartMs": 1000, "sourceEndMs": 4000 });

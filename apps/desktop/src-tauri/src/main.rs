@@ -7,6 +7,7 @@ mod protocol;
 mod supervisor;
 
 use commands::{
+    desktop_edit_manual_video_sequence,
     desktop_get_close_state,
     desktop_retry_checkpoint,
     desktop_cancel_operation, desktop_get_state, desktop_pick_and_ingest_media, desktop_redo,
@@ -28,6 +29,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(supervisor)
         .invoke_handler(tauri::generate_handler![
+            desktop_edit_manual_video_sequence,
             desktop_get_close_state,
             desktop_retry_checkpoint,
             desktop_get_state,

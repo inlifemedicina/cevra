@@ -6,6 +6,7 @@ import {
   SourceTechnicalDescriptorApplicationService,
   SourceTechnicalDescriptorResolver,
   ManualVideoClipApplicationService,
+  ManualVideoSequenceApplicationService,
   resolveManualVideo,
   TranscriptionApplicationService
 } from "@cevra/application";
@@ -19,6 +20,7 @@ import type {
 } from "@cevra/application";
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
+import type { ManualVideoSequenceEdit } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
   FfmpegMediaEngine,
@@ -61,6 +63,7 @@ export interface DesktopSessionServices {
   persistence?: DesktopProjectPersistence;
   temporaryEditorialReview?: true;
   manualVideoClip?: Pick<ManualVideoClipApplicationService, "create" | "trim">;
+  manualVideoSequence?: Pick<ManualVideoSequenceApplicationService, "edit">;
   derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare"> & Partial<Pick<DerivedVideoPreview, "close">>;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
@@ -285,6 +288,16 @@ export class DesktopSession {
     });
   }
 
+  async editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopHostState; changedClipIds: string[] }> {
+    return this.runMutation(async () => {
+      if (!this.services.manualVideoSequence) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+      const before = this.services.history.journalIdentity;
+      const result = await this.services.manualVideoSequence.edit(structuredClone(request));
+      if (before !== this.services.history.journalIdentity) await this.persistMutation();
+      return { state: this.state(), changedClipIds: result.changedClipIds };
+    });
+  }
+
   async trimManualVideoClip(request: TrimManualVideoClipRequest): Promise<{ state: DesktopHostState; clipId: string }> {
     return this.runMutation(async () => {
       if (!this.services.manualVideoClip) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
@@ -419,6 +432,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
     return new DesktopSession({
       history,
       manualVideoClip: new ManualVideoClipApplicationService({ history, identity: sourceIdentity }),
+      manualVideoSequence: new ManualVideoSequenceApplicationService({ history, identity: sourceIdentity }),
       ...(media?.ingest ? { ingest: media.ingest } : {}),
       ...(media?.sourceTechnicalDescriptor ? { sourceTechnicalDescriptor: media.sourceTechnicalDescriptor } : {}),
       ...(transcription.service ? { transcription: transcription.service } : {}),

@@ -30,6 +30,7 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); });
 
 class ManualBackend implements DesktopBackend {
+  async editManualVideoSequence(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
   readonly adapterName = "ManualTestBackend";
   readonly presentationOnly = false;
   readonly history = new ProjectHistory(createEmptyProject({ id: "manual-ui" }));

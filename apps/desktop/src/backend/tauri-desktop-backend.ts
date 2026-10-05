@@ -1,6 +1,7 @@
 import { assertValidSourceNumbering, SourceNumberRegistry, type ProjectIR, type SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
+import type { ManualVideoSequenceEdit } from "@cevra/application";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import type {
   DesktopBackend,
@@ -56,6 +57,14 @@ export class TauriDesktopBackend implements DesktopBackend {
 
   async reviseEditorialDraft(request: ReviseEditorialDraftRequest): Promise<EditorialDraftState> {
     return this.call("desktop_revise_editorial_draft", { args: request });
+  }
+
+  async editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopBackendState; changedClipIds: string[] }> {
+    const { version, expectedSnapshotId, ...action } = request;
+    const result = await this.call<{ state: HostState; changedClipIds: string[] }>("desktop_edit_manual_video_sequence", {
+      args: { version, expectedSnapshotId, action }
+    });
+    return { state: fromHostState(result.state), changedClipIds: result.changedClipIds };
   }
 
   async pickAndImportMedia(locale: "pt-BR" | "en-US"): Promise<ImportMediaResult> {

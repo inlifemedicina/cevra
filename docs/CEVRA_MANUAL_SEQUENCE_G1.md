@@ -22,8 +22,10 @@ normally at `60345a7db3fcfc1b78e6cc878cdbb217b1dac7a4`. Each exact feature head 
 feature tree. The earlier automatic approval rejection is retained in history;
 the new explicit authorization resolved it. Post-#84 runs were cancelled when
 #85 advanced main. Post-#85 Audio Sequence Exact Runtime `37371249881` passed;
-general CI `37371249855` ended with four unacquired/cancelled jobs and one passing
-alignment job; a failed-job rerun was requested. This is not a complete CI PASS.
+general CI `37371249855` attempt 1 ended with four unacquired/cancelled jobs and
+one passing alignment job. After bounded retries, attempt 3 passed four jobs but
+still failed when its hosted Transcription runner was not acquired. The detailed
+receipt below retains the failure; this is not a complete post-merge CI PASS.
 Running R3 product `7d4e66776fbfc112429d333e5d8883221c2851fb` and its limited owner
 acceptance remain historical evidence, not G1 PASS. M0 Draft #86 now targets main;
 its feature history preserves the reviewed baseline. No #86 merge is authorized.
@@ -165,13 +167,15 @@ acknowledgement and zero exit, bounds total waiting/output and reaps only its
 owned empty-store child before removing that store. Production close admission
 is unchanged. Targeted smoke regression tests cover the actual bundled Host,
 an unresponsive child that ignores TERM and a mismatched close acknowledgement
-with a foreign directory preserved. Fresh exact-head remote checks remain
-required; cancelled/failed attempts are not reclassified as passing.
+with a foreign directory preserved. Corrected head `58531d6` then passed fresh
+push and PR CI 5/5, detailed below; cancelled/failed attempts remain preserved.
 
 ## M1 independent preparation — 2026-10-05
 
 Separate branch `feat/vids-g1-manual-atomic-consumer`, based on M0 publication
-head `60c639a09511df5fafa7dbd7ab8e63dc284f2241`. The existing first-excerpt
+head `60c639a09511df5fafa7dbd7ab8e63dc284f2241`, now includes corrected M0
+head `58531d671d7e45931e079e153613962d23f932d7` through local merge `047cbe4`.
+The existing first-excerpt
 consumer now commits track preparation plus clip as one `timeline.edit`, so one
 Undo restores the prior timeline exactly. Create and trim also bind async source
 verification to the retained journal, rejecting an intervening edit/Undo even
@@ -179,15 +183,117 @@ when the visible snapshot ID returns. Focused automated evidence is 31/31
 application and 9/9 Host manual tests, including durable Undo/reopen/Redo and
 unchanged original bytes. This is preparation, not continuous montage delivery.
 
-The already available v0.3.3 macOS runtime was inspected directly: its pinned
-`join.py` video path uses a concat filter and video encoding, even with transition
-`none`; it does not provide a video packet-copy join. The candidate segment-copy
-strategy therefore needs a closed typed extension in the existing Media Runtime,
-with clock/copy/ownership evidence, rather than merely wiring the generic concat.
-H.264 VideoToolbox and AAC encoders are listed by that runtime. No sequence or
-quality prototype has yet run; this confirms primitives and a concrete gap,
-not final export feasibility or approval of quality, CFR/VFR, audio or budgets.
-No new engine/dependency or product envelope is selected by this preparation.
+The local M1 preparation now implements closed version-1 append, insert before
+selection, duplicate after selection, remove, ripple trim, split and complete
+contiguous reorder. Each action compiles to one existing atomic timeline edit.
+No-op/invalid/stale work preserves redo; allocated occurrence IDs cannot replace
+an existing clip. The shared original-content guard retains the ingest evidence
+and full journal binding. Metadata-only remove/reorder require no media read.
+One typed Host/Rust/backend route uses the existing mutation/close/checkpoint
+gates; it exposes no path, raw command, IR or filtergraph field. Generated ACL
+and manifest admit only that specific route. The UI sequence controls and
+program preview/export are still unconnected, so this is API preparation.
+Application 287/287, Host 143/143, UI 118/118 and offline Rust 36/36 passed;
+Host/UI production builds passed. New Host tests drive production RPC through
+all intents, checkpoint, Undo/reopen/Redo and immutable original byte fixtures.
+The first Host suite run caught the expected ACL list needing the new typed
+permission; the corrected complete suite passed. This local branch remains
+unpublished pending the complete workflow; no button-sized PR is created.
+
+M0 head `58531d671d7e45931e079e153613962d23f932d7` passed push CI
+`37373291877`, 5/5, and PR CI `37373297199` attempt 2, 5/5. PR attempt 1's
+unacquired Media runner failure remains preserved. Post-#85 exact-runtime run
+`37371249881` passed. General CI `37371249855` attempt 3 passed four jobs;
+Transcription was not acquired by a hosted runner and had no execution steps.
+GitHub reports internal-server correlation `73bcdb54-c553-45d8-98e5-f86f26522866`
+in the [attempt receipt](https://github.com/inlifemedicina/cevra/actions/runs/37371249855/attempts/3).
+That run remains FAILURE after bounded retries, not a full post-merge PASS.
+These are separate receipts;
+remote success on M0 is not CI or functional acceptance for this local M1 tree.
+
+## Original-master export prototype and proposed choices
+
+Private owned synthetic experiments ran with the existing macOS arm64 runtime
+artifact 0.3.3. Its profile helper has the same SHA as the current 0.3.4 source,
+but this is raw-engine feasibility, not 0.3.4/Application/IPC integration. The
+generic `join.py` video path encodes; a closed packet-copy sequence extension is
+still needed inside the existing engine. No new engine/dependency is proposed.
+
+The first clock prototype preserved barcode order and video packet payload,
+but stronger oracles rejected fractional CFR/VFR at clip heads/tails. Adjusting
+only the joined tail was insufficient. A second unapproved policy experiment
+selects the actual active frame (`PTS <= IN < PTS + duration`), places that first
+sample at local zero, preserves subsequent PTS relative to IN, and normalizes
+positive sample durations consecutively through exact OUT in every segment.
+The four CFR30/fractional/VFR 360p/1080p cases passed barcode, each-sample
+coverage, 7-ms cuts (one frame in CFR cases, two in VFR), exact boundaries and concatenated
+payload/PTS/DTS/duration identity against normalized segments. Originals stayed
+unchanged. A supplementary independent oracle decoded the original display
+frames and used their explicit integer PTS/durations to verify uninterrupted
+source coverage through every requested OUT. Missing middle-frame and short-tail
+metadata faults were rejected. These sources have no B-frames; the packet-based
+experiment is not a general display-order/source-admission proof. Proposed policy
+preserves requested IN/OUT; frame-quantizing the
+requested ranges is a different alternative requiring explicit approval.
+
+Audio uses source IN and the same cumulative placement, original decoded PCM,
+explicit edge silence and one final AAC192k encode. Stereo48k fixtures produced
+129600 decoded samples without tail padding, 1024-sample priming skip and exact
+2700-ms stream/packet coverage. A final MP4 with an injected 500-ms shift failed
+the same diagnostic gate. SNR 33.39 dB/max error 0.111 on synthetic tones and
+hard-cut jumps are measurements, not an audio/perceptual quality contract; no
+automatic fade/downmix is selected.
+
+A streamed high-motion full-colour 1080p30 program (60 s, four occurrences,
+three unique segments, two original sources) confirmed 1800 video samples,
+exact 60-s video/2,880,000 audio sample end and payload/PTS/DTS/duration copy.
+The forced BT.709 signalling variant showed a large decoded comparison
+difference in these fixtures: about 26-dB PSNR; its physical cause is not proved.
+Omitting the forced override measured
+42.21-dB PSNR/0.99290 SSIM on one 15-s segment at 4.98 Mb/s. The proposed higher
+quality candidate, without that override at 20 Mb/s, measured segment means
+54.07–54.60-dB PSNR/0.99946–0.99953 SSIM across the complete program. Its output
+was 117,009,921 bytes; render stages took 8.666 s and retained owned intermediates
+plus master used 342,570,676 bytes, excluding originals/private input copies.
+Largest owned child RSS was 136,806,400 bytes and the Python oracle peak was
+37,027,840 bytes. These are separate process peaks, not a simultaneous native
+process-tree/G5 SLA. The measured lighter profile reduces file size/quality;
+neither candidate is lossless or a natural-content subjective PASS.
+
+The complete 60-s higher-quality master also passed independent source-slice
+audio oracles: the canonical PCM matched exactly (RMSE 0); final raw AAC decoded
+to 2,880,000 samples/channel without padding, with verified priming/packet bounds.
+AAC versus original decoded slices measured SNR 45.09 dB and maximum absolute
+error 0.20626, including cut-boundary errors; this is no perceptual contract.
+Explicit original/final video metadata equality passed for format, bit depth,
+colour tags, SAR, dimensions and field order. Colour tags were absent in these
+fixtures, so preservation of explicitly tagged source colour is still unproved.
+The active-frame video experiment and this full-colour/audio experiment are
+complementary fixtures, not one integrated fractional/VFR high-quality export.
+
+Concrete proposal pending owner decision: active-frame exact-range policy;
+MP4/H264 VideoToolbox SDR/yuv420p without a forced BT.709 override, with declared
+source-colour admission/preservation proved before production,
+one original-derived lossy generation per unique segment, copy join/mux and
+AAC192k once. Prefer the higher-quality candidate, with bitrate scaling and
+canvas/cadence/audio/orientation compatibility explicitly fixed before shipping.
+The existing Take source bounds are not silently narrowed or expanded by this
+prototype. HDR/4K, rotated/mixed canvases, no-audio/mixed layouts, longer aggregate
+programs and other rates require declared compatibility and execution proof.
+Candidate operational gates are one render job, streaming I/O, 512 MiB renderer
+subtree memory and 2 GiB total owned-job disk with explicit preflight/failure,
+rather than truncating ranges or destroying unsaved Host state. These budgets
+are proposed, not proved across the envelope or adopted production limits.
+Retained owned-file totals are not sampled peak disk; originals and any private
+input copies must also be accounted for before enforcing a total-job budget.
+
+Minimum remaining integration: typed Contracts/Runtime plan and packet evidence,
+source/display/colour admission and full clock oracle, owned-file publication/
+cancel/recovery, Application export journal binding, native/Host/backend/UI
+consumers, then grouped automated G1/G5/G6 and independent exact-tree review.
+The 0.3.4 integration, Original preview eligibility fallback outside Take and
+workload-derived preview deadline also remain FIX NOW prerequisites. No real
+AI/provider/account request or human media/app/device action occurred.
 
 ## Automated acceptance package
 

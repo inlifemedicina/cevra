@@ -60,6 +60,7 @@ class MultiSourceDemoDesktopBackend extends DemoDesktopBackend {
 }
 
 class FunctionalDesktopBackend implements DesktopBackend {
+  async editManualVideoSequence(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
   readonly adapterName = "FunctionalDesktopBackend";
   readonly presentationOnly = false;
   readonly history = new ProjectHistory(createEmptyProject({ id: "desktop-real", name: "CEVRA Vids", now: "2026-09-14T00:00:00.000Z" }), {
@@ -399,6 +400,24 @@ describe("CEVRA Vids desktop shell", () => {
     expect(calls.map((call) => call.command)).toEqual(["desktop_get_state", "desktop_pick_and_ingest_media", "desktop_undo", "desktop_redo", "desktop_cancel_operation"]);
     expect(JSON.stringify(calls)).not.toContain("path");
     expect(JSON.stringify(calls)).not.toContain("uri");
+  });
+
+  it("sequence backend keeps the typed action boundary and canonical save state", async () => {
+    const state = new FunctionalDesktopBackend().state();
+    const calls: { command: string; args?: Record<string, unknown> }[] = [];
+    const backend = new TauriDesktopBackend(async (command, args) => {
+      calls.push({ command, args });
+      return { changedClipIds: ["clip-new"], state: { ...state, status: { hostAvailable: true, persistence: "local-saved" },
+        capabilities: { mediaImport: { available: false, reason: "runtime-not-configured" }, transcription: { available: false, reason: "runtime-not-configured" } } } } as never;
+    });
+    const result = await backend.editManualVideoSequence({ version: 1, expectedSnapshotId: "snapshot", type: "duplicate", clipId: "clip" });
+    expect(calls).toEqual([{ command: "desktop_edit_manual_video_sequence", args: {
+      args: { version: 1, expectedSnapshotId: "snapshot", action: { type: "duplicate", clipId: "clip" } }
+    } }]);
+    expect(result.state.status).toBe("local-saved");
+    expect(result.state.sourceNumbering).toEqual(state.sourceNumbering);
+    expect(result.state.capabilities["project.export"].available).toBe(false);
+    expect(result.changedClipIds).toEqual(["clip-new"]);
   });
 
   it("renders a terminal localized state when initial host loading fails", async () => {

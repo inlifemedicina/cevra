@@ -4,6 +4,7 @@
   "description": "Main CEVRA Vids window with narrow application commands, including offline draft query/revision. Native host plugins remain Rust-only.",
   "windows": ["main"],
   "permissions": [
+    "allow-desktop-edit-manual-video-sequence",
     "allow-desktop-get-close-state",
     "allow-desktop-retry-checkpoint",
     "allow-desktop-get-state",

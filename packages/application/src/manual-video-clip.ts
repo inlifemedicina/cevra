@@ -129,23 +129,27 @@ export class ManualVideoClipApplicationService {
   }
 
   private async verifySource(source: SourceAsset): Promise<void> {
-    const identity = this.options.identity;
-    const resolver = new SourceTechnicalDescriptorResolver({
-      captureSource: async (uri, signal) => {
-        const stamp = await identity.captureSource(uri, signal);
-        // Reject replacement/growth before the generic resolver hashes the file.
-        if (stamp.sizeBytes !== source.technicalDescriptor!.content.sizeBytes || stamp.sizeBytes > MANUAL_VIDEO_SOURCE_MAX_BYTES) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
-        return stamp;
-      },
-      identifySource: (uri, stamp, signal) => identity.identifySource(uri, stamp, signal),
-      checkSource: (uri, stamp, signal) => identity.checkSource(uri, stamp, signal)
-    });
-    const memo = createSourceContentVerificationMemo(1);
-    const verified = await resolver.verify(source, memo);
-    if (verified.status !== "verified" || await resolver.revalidate(memo) !== "verified") throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
+    await verifyManualVideoSource(source, this.options.identity);
   }
 
   private nextId(): string {
     return this.options.idGenerator?.() ?? globalThis.crypto.randomUUID();
   }
+}
+
+/** Shared original-content guard for typed manual edits; never a WebView path request. */
+export async function verifyManualVideoSource(source: SourceAsset, identity: SourceContentIdentityPort): Promise<void> {
+  const resolver = new SourceTechnicalDescriptorResolver({
+    captureSource: async (uri, signal) => {
+      const stamp = await identity.captureSource(uri, signal);
+      // Reject replacement/growth before the generic resolver hashes the file.
+      if (stamp.sizeBytes !== source.technicalDescriptor!.content.sizeBytes || stamp.sizeBytes > MANUAL_VIDEO_SOURCE_MAX_BYTES) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
+      return stamp;
+    },
+    identifySource: (uri, stamp, signal) => identity.identifySource(uri, stamp, signal),
+    checkSource: (uri, stamp, signal) => identity.checkSource(uri, stamp, signal)
+  });
+  const memo = createSourceContentVerificationMemo(1);
+  const verified = await resolver.verify(source, memo);
+  if (verified.status !== "verified" || await resolver.revalidate(memo) !== "verified") throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
 }
