@@ -2813,3 +2813,63 @@ Only IN visual drag and new excerpt playback require the consolidated owner
 recheck; preserve the accepted cancellation/keyboard/undo results. Director
 impact is a compatible typed Media/trim/history consumer, no additional provider
 or execution authority. Progress stays 55%, F-A02 exhausted 1/1, no real AI call.
+
+
+## Approved Take local preview expansion — 2026-10-04
+
+After merged PR #82 (`906eea695836fe2ae2b81ab0b50610b600748995`) and its accepted
+IN/playback round, the owner approved real Take video preview preparation. The
+existing typed Media adapter now prepares a cancellable ephemeral proxy for
+Original and a canonical single clip: source ≤256 MiB/60 s/SDR Full HD in either
+orientation; output ≤8 MiB/720-side H.264/AAC. Measured CFR/VFR PTS and quarter-turn
+rotation are verified, with input/output hashes and decoded audio evidence.
+Original marks use logical source duration. Legacy v1 remains tested; no proxy
+becomes a Project IR source or durable execution.
+
+Synthetic exact-runtime tests and production-host import/preview/close/reopen
+pass, including a 40,370,307-byte portrait MOV. Real Take preflight and human
+acceptance remain BLOCKED until the authorized transferred Mac file is designated.
+The isolated review package and Draft PR are tracked in the final receipt; no
+human sessions or device are touched, no real AI call. One new owner round covers
+real-file orientation/voice sync and save/reopen; preserve prior accepted checks.
+Director impact compatible, progress 55%, F-A02 1/1 unchanged. Full composition,
+export, release and provider gates remain open. [Canonical profile, measurements,
+limits and acceptance status](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-take-local-preview-expansion--2026-10-04).
+
+
+### Real Take recording technical validation — 2026-10-04
+
+The owner designated the transferred 45,593,687-byte Take MOV; its identity was
+verified locally. Preflight/import/Original proxy/5–10 s clip/close/reopen PASS
+with unchanged original/project/numbering/undo. Three real QuickTime metadata
+cases required a bounded correction: 1/600 time base, exact bounds-normalizing
+cardinal matrix translation, and two explicitly discarded packets beyond track
+end. Visible packet PTS must exactly account for decoded frames; arbitrary
+transforms and unaccounted frame loss remain rejected. New negative Python tests
+and a synthetic exact-runtime edit-list regression PASS. Decoded pixels and PCM
+confirm orientation and zero measured audio lag; this is technical evidence, not
+subjective native acceptance. No media leaves the Mac or enters the repository.
+Real-file preflight is no longer blocked; the consolidated human round stays
+PENDING. Draft #84/head CI/native receipt track the correction. Director impact
+compatible; 55%/F-A02 1/1 unchanged, no AI/device/session operation or next-block
+implementation. [Canonical real evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).
+
+### 2026-10-05 — Real Take native acceptance and initial paused-frame correction
+
+APP/OWNER accepted the requested real Take preview round at PR #84 head
+`b57c649`: Original/excerpt orientation and voice sync, excerpt content and
+save/close/reopen. A distinct initial-frame-before-Play defect remains FAIL at
+that head. The authorized bounded Desktop correction eagerly requests frame data
+and waits for validated metadata/current-frame readiness while remaining paused
+at zero. It is IN DEVELOPMENT / NOT MERGED; only Original/V1 selection before
+Play requires a point-specific owner recheck. Prior accepted steps remain valid.
+No Media worker, typed commands, Project IR/history, provider or permission changes.
+Director impact is compatible; progress 55% and exhausted F-A02 1/1 unchanged.
+
+The owner separately approved preparation of a visual layout proposal, not its
+implementation. Measured native window: 1435×900; video area: 781×192. A 9:16
+source therefore occupies about 108×192. A stable layout with a taller central
+preview and lateral Director/context controls is a presentation proposal for
+comparison in both orientations. Selected-media aspect does not set project or
+export aspect. No layout code, new output behavior or identity redesign is authorized
+by that proposal approval. The visual artifact uses neutral synthetic content.

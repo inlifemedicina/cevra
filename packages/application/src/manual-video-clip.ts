@@ -3,11 +3,12 @@ import { createSourceContentVerificationMemo, SourceTechnicalDescriptorResolver,
 
 /** Bounded first-video preview; streaming/composition remain separate work. */
 export const MANUAL_VIDEO_MAX_BYTES = 8 * 1024 * 1024;
+export const MANUAL_VIDEO_SOURCE_MAX_BYTES = 256 * 1024 * 1024;
 
 export interface LocalVideoPreviewRequest {
   sourceId: string;
   expectedSnapshotId: string;
-  /** Together, request an ephemeral derivative of this canonical clip. */
+  /** A clip requires an operation; Original may also prepare a cancellable proxy. */
   clipId?: string;
   operationId?: string;
 }
@@ -18,6 +19,7 @@ export interface LocalVideoPreview {
   durationMs: number;
   mimeType: "video/mp4" | "video/quicktime" | "video/webm";
   base64: string;
+  proxy?: { profile: "take-v1"; sourceDurationMs: number };
   clip?: { id: string; sourceStartMs: number; sourceEndMs: number; firstFrameMs: number; lastFrameMs: number; frameCount: number };
 }
 
@@ -49,7 +51,7 @@ export function resolveManualVideo(project: Readonly<ProjectIR>, request: LocalV
     || !ingest || typeof ingest !== "object" || Array.isArray(ingest) || !("method" in ingest) || ingest.method !== "local" || !("hasVideo" in ingest) || ingest.hasVideo !== true) {
     throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
   }
-  if (source.technicalDescriptor.content.sizeBytes <= 0 || source.technicalDescriptor.content.sizeBytes > MANUAL_VIDEO_MAX_BYTES) {
+  if (source.technicalDescriptor.content.sizeBytes <= 0 || source.technicalDescriptor.content.sizeBytes > MANUAL_VIDEO_SOURCE_MAX_BYTES) {
     throw manualVideoError("MANUAL_VIDEO_TOO_LARGE");
   }
   return source as SourceAsset & { durationMs: number };
@@ -123,7 +125,7 @@ export class ManualVideoClipApplicationService {
       captureSource: async (uri, signal) => {
         const stamp = await identity.captureSource(uri, signal);
         // Reject replacement/growth before the generic resolver hashes the file.
-        if (stamp.sizeBytes !== source.technicalDescriptor!.content.sizeBytes || stamp.sizeBytes > MANUAL_VIDEO_MAX_BYTES) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
+        if (stamp.sizeBytes !== source.technicalDescriptor!.content.sizeBytes || stamp.sizeBytes > MANUAL_VIDEO_SOURCE_MAX_BYTES) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
         return stamp;
       },
       identifySource: (uri, stamp, signal) => identity.identifySource(uri, stamp, signal),

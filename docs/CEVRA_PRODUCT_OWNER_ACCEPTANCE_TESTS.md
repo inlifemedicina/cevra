@@ -278,3 +278,59 @@ native perceptual acceptance remains PENDING. Recheck only visual IN drag and
 new excerpt playback together, preserving accepted cancellation, keyboard and
 undo/redo. This does not promote full I4-T1, X-T1/T7, X-T6, composition/export,
 release or provider gates. [Current implemented profile and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
+
+
+### Take preview expansion — 2026-10-04
+
+Reuse X-T6/T9, I13-T3 and K3-T2; this is another bounded variant of the same
+preview/sync rows. AUTO PASS: measured CFR/VFR frame-content/PTS, Full HD portrait,
+quarter-turn orientation negative control, source >8 MiB/payload ≤8 MiB, aligned
+PCM offset/edge silence/interior-gap rejection, ≤60 s, original identity and
+production-host close/reopen. Legacy v1 evidence remains PASS.
+
+APP/OWNER real Take footage: BLOCKED until the authorized transferred Mac file
+is designated. Reserve one consolidated round for only the new points:
+
+1. Import the designated recording; confirm correct upright picture and voice
+   sync in Original's explicitly labelled lightweight local preview.
+2. Create/review an excerpt; confirm orientation, voice sync and intended content.
+3. Save, close and reopen the isolated review session; confirm the same project,
+   source numbering, clip and regenerated playback.
+
+Do not repeat accepted keyboard/cancel/undo or IN drag checks. Synthetic fixtures
+are technical control evidence, never human acceptance. HDR/composition/export
+and broader release gates stay BLOCKED. [Profile and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-take-local-preview-expansion--2026-10-04).
+
+
+#### Real Take technical follow-up — 2026-10-04
+
+Same X-T6/T9, I13-T3 and K3-T2 bounded variant: designated recording local
+preflight/import/Original proxy/5–10 s clip/host close/reopen AUTO PASS. Original
+hash, canonical project, numbering and undo unchanged. Decoded pixels confirm
+orientation against an unrotated control; PCM correlation shows zero measured
+sample lag. QuickTime time-base/matrix/edit-list regression and negatives PASS.
+No recording/derived media is committed or transferred externally.
+
+The earlier file-designation BLOCKED state is resolved. APP/OWNER native
+orientation/voice sync, excerpt perception and save/close/reopen remain PENDING,
+using only the same three new consolidated steps above. Technical automation is
+not human acceptance; preserve already accepted keyboard/cancel/undo/IN results.
+[Real evidence and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).
+
+#### Real Take owner round and first-frame follow-up — 2026-10-05
+
+At PR #84 head `b57c64926b64c470adaaecd76acb0f290eeac70d`, the owner reported
+all requested steps working: native Original/excerpt orientation and voice
+synchronization, excerpt content, and save/close/reopen. These scoped APP/OWNER
+steps are PASS; the complete catalog IDs remain governed by their broader gates.
+Selecting the original or the V1 excerpt initially left the preview blank until
+Play. This distinct first-frame defect is FAIL at that head. Prior acceptance
+remains valid. Recheck only selection of Original and the simple V1 excerpt
+before Play after the correction; do not request another full round.
+
+Technical correction: load frame data eagerly while remaining paused, and
+unlock preview controls only after validated metadata and current-frame data.
+Focused UNIT cases cover Original/excerpt, buffered data and stale selection
+events. Native WKWebView synthetic evidence distinguishes metadata-only blank
+output from visible initial-frame output at zero time with no play events.
+This evidence does not replace the pending point-specific owner check.

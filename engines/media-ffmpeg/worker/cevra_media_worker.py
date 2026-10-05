@@ -24,7 +24,7 @@ if str(WORKER_DIRECTORY) not in sys.path:
 
 from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
-WORKER_VERSION = "0.3.2"
+WORKER_VERSION = "0.3.3"
 PROTOCOL_VERSION = 1
 UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
@@ -134,6 +134,7 @@ _UPSTREAM_TOOL_SCHEMAS: Dict[str, Dict[str, Any]] = {
     "cut": _object_schema({
         "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "start": _NON_NEGATIVE_SCHEMA,
         "end": _POSITIVE_SCHEMA, "accurate": {"type": "boolean"}, "bounded_preview": {"type": "boolean", "enum": [True]},
+        "preview_profile": {"type": "string", "enum": ["take-v1"]},
     }, ["input", "output", "start", "end", "accurate"]),
     "fit": _object_schema({
         "input": _PATH_SCHEMA, "output": _PATH_SCHEMA, "width": _WIDTH_SCHEMA,

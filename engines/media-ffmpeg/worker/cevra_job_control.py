@@ -37,6 +37,13 @@ def is_cancelled(job_id: str) -> bool:
         return bool(_ACTIVE and _ACTIVE.job_id == job_id and _ACTIVE.cancelled.is_set())
 
 
+def check_cancelled() -> None:
+    with _LOCK:
+        cancelled = bool(_ACTIVE and _ACTIVE.cancelled.is_set())
+    if cancelled:
+        raise RuntimeError("media job cancelled")
+
+
 def register_artifacts(paths: Iterable[str]) -> None:
     with _LOCK:
         if _ACTIVE is None:

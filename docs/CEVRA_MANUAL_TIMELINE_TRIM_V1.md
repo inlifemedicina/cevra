@@ -251,3 +251,128 @@ Reuse I4-T1, X-T1/T7 and the bounded part of X-T6; no whole catalog, composition
 export, release, Windows or provider gate is promoted. Director impact is a
 compatible consumer of typed Media and canonical trim/history; progress stays
 55%, F-A02 exhausted 1/1 and real model calls zero.
+
+
+## Approved Take local preview expansion — 2026-10-04
+
+After PR #82 merged at `906eea695836fe2ae2b81ab0b50610b600748995`, the owner approved
+expanding the local preview for a real Take recording. The previous IN/playback
+owner acceptance and post-merge CI remain valid; the acceptance record is also
+proposed in Draft #83. This expansion does not declare the real recording tested.
+
+The closed `take-v1` typed trim profile prepares an ephemeral H.264/AAC MP4 for
+Original and the canonical single clip. Source admission is ≤256 MiB, ≤60 s,
+SDR, square pixels, Full HD in either orientation, quarter-turn display rotation
+and measured monotonic VFR/CFR PTS (≤60 fps, gaps/frame durations ≤100 ms).
+The IPC/result remains ≤8 MiB; longest side ≤720 pixels, bitrate 700 kbit/s video
+and 96 kbit/s audio. The UI identifies this lightweight preview and keeps marks
+in the logical source clock rather than the physical proxy duration. Sources
+remain immutable and final-quality work continues to use originals under ADR 0013.
+
+Source verification/copy uses one no-follow regular FD and 64 KiB chunks; only a
+private descriptor/hash-verified copy reaches the existing Media adapter. Evidence
+v2 binds input/output hashes, each source/output PTS, measured quantization,
+geometry and decoded audio samples. Video subtracts logical IN from the source
+clock; audio preserves its measured sample origin. Only measured leading/trailing
+silence ≤100 ms is permitted, with no interior gaps or overlaps. AAC padding is
+<1024 samples. Output size, publication inode and hash are admitted before bytes
+cross IPC. Cancellation waits for retirement before owned cleanup. The proxy is
+regenerated on reopen, never persisted as a Project IR source or durable execution.
+Worker/runtime 0.3.3 retains the eight-file integrity inventory, pinned approved
+FFmpeg/vendor/Python, licenses and strict provenance. Legacy evidence/profile v1
+remains available and its six decoded frame/audio cases still pass.
+
+Exact-runtime synthetic evidence passes actual frame barcodes and PTS for CFR/VFR
+and non-aligned IN, Full HD portrait, quarter-turn rotation versus an unrotated
+negative control, sources >8 MiB, PCM audio offset/boundary sentinels and edge
+silence, interior audio-gap rejection, and 60 s/1800-frame output within 8 MiB.
+Production-host ingest→Original proxy→5–10 s clip→close/reopen passes for a 40,370,307
+byte 1080×1920 synthetic MOV, with source hash, canonical project, numbering and
+undo state unchanged. This is technical control evidence, not Take footage or
+human acceptance. Regression checks: final affected Node 530/530; host/contracts 137/137;
+Desktop 89/89; Rust 28/28; Python Media 91/91. At this implementation checkpoint,
+exact final-tree review, Draft PR publication and terminal CI are PENDING;
+their later outcomes belong in the exact-head PR receipt.
+
+Real Take preflight is BLOCKED until its authorized, already-transferred Mac
+file is designated. No iPhone, Take/Xcode session or app container is accessed.
+HDR, >Full HD, >60 s, arbitrary rotation, missing/incomplete frame evidence,
+non-square pixels and unsupported audio cadence remain unsupported visibly;
+there is no silent tone mapping or original-file fallback for a clip.
+Only the new human points are needed together with Take: real-file import,
+orientation/voice sync in Original and excerpt, then save/close/reopen and
+regenerated playback. Preserve previous keyboard/cancel/undo and IN acceptance.
+Director impact: compatible typed Media/manual-history consumer, unchanged
+permissions/proposal/execution authority. Progress stays 55%, F-A02 exhausted
+1/1, real AI calls zero. Multi-clip composition, full acceptance/export/release
+and provider gates remain open.
+
+
+## Real Take technical validation — 2026-10-04
+
+The owner subsequently designated the transferred Take MOV. Its hash and
+45,593,687-byte size were verified before and after local work. Preflight confirms
+29.928333 s, H.264/yuv420p SDR BT.709, 1920×1080 with −90° display rotation,
+nominal 30 fps and contiguous AAC mono/48 kHz. No recording, image or audio is
+committed or sent to GitHub, AI or external services; receipts and media stay local.
+
+The real MOV revealed three bounded QuickTime cases absent from the original
+synthetic controls: a 1/600 video time base, cardinal display rotation translated
+by the exact frame bounds, and two encoded tail packets marked discard by the
+track edit list. Initial import passed but preview admission rejected this file.
+The correction admits time bases no coarser than 1/600 while retaining ≤2 ms
+PTS evidence tolerance; rotation must still be a matching cardinal unit matrix,
+with only zero or exact bounds-normalizing translation. Scale, reflection, shear,
+perspective and arbitrary translation remain rejected. A metadata/decoded-count
+difference requires a bounded packet scan, at most two explicitly discarded
+packets after track end within 100 ms, and exact equality of all visible packet
+PTS and decoded frame PTS. Missing/interior/unflagged frames remain rejected.
+
+Real recording production-host import→Original proxy→5–10 s/150-frame clip→
+close/reopen PASS. Original's 898 visible frames produce a 2,221,576-byte proxy
+with physical duration 29,933 ms versus canonical source duration 29,928 ms;
+marks retain canonical time and the original remains unchanged. Project, source
+numbering, undo availability and clip bounds survive reopen; proxy preparation
+adds no mutation. Local decoded-pixel comparison at the clip start has MAE 1.711
+versus 64.347 for the unrotated negative control. PCM correlations are 0.9916 for
+Original and 0.9900 for the excerpt, with best measured lag zero samples in both.
+These deterministic measurements do not certify subjective native playback.
+
+Python Media 96/96 PASS includes negative coverage for lost/interior frames,
+missing packet evidence, excessive discarded tail, arbitrary affine transforms
+and wrong rotation angle. The exact-runtime synthetic oracle additionally
+reproduces the 1/600 matrix/edit-list case with two hidden tail packets; previous
+VFR, audio and size controls remain PASS. Final tree review, updated Draft #84
+head CI and new isolated native package receipt are PENDING at this checkpoint.
+
+Real-file access/preflight is no longer blocked. APP/OWNER orientation/voice sync,
+excerpt perception and native save/close/reopen remain PENDING for one consolidated
+new round; preserve prior accepted checks. No device/sensor or existing human
+session is operated, no AI/provider call, no next `clip.remove` implementation.
+Director impact compatible; progress 55%, F-A02 exhausted 1/1 unchanged.
+
+## Initial paused frame correction — 2026-10-05
+
+The owner accepted the real Take round at PR #84 head `b57c649`: Original and
+excerpt orientation/voice synchronization, excerpt content and native
+save/close/reopen. A separate defect remained: selection did not show the initial
+frame until playback. Only that selection behavior needs a new human check.
+
+An isolated WKWebView test with neutral synthetic H.264 reproduced the cause:
+`preload=metadata` stopped at readyState 1 with no decoded frame and dark painted
+output; `preload=auto` reached readyState 4 and painted the initial frame while
+paused at currentTime 0, with zero play events. The Desktop component now requests
+frame data and requires validated metadata plus HAVE_CURRENT_DATA before enabling
+controls. Loaded data and completed initial seek can satisfy readiness; already
+buffered metadata is admitted. Metadata failure and selection replacement reset
+the guard. No autoplay, epsilon seek, poster extraction, worker operation,
+Project IR/history mutation, dependency or new permission is introduced.
+See the [HTML media readiness model](https://html.spec.whatwg.org/multipage/media.html#ready-states).
+
+The bounded correction is IN DEVELOPMENT / NOT MERGED. Focused UNIT and native
+synthetic evidence stay distinct from the pending owner selection check. Final
+exact-tree review, CI and new package identity are PENDING at this checkpoint;
+terminal evidence will be recorded in the PR and local technical receipts.
+Preserve the already accepted native round. Director impact:
+compatible presentation lifecycle correction; typed execution and state boundaries
+are unchanged. No real AI calls or existing human-session manipulation.

@@ -86,7 +86,7 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
       case "probe":
         return { type: "probe", probe: parseProbe(await call("probe", { inputs: [operation.inputUri] }), operation.inputUri) };
       case "trim":
-        return fileResult(await call("cut", { input: operation.inputUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), accurate: true, ...(operation.boundedPreview ? { bounded_preview: true } : {}) }), operation.outputUri);
+        return fileResult(await call("cut", { input: operation.inputUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), accurate: true, ...(operation.boundedPreview ? { bounded_preview: true } : {}), ...(operation.previewProfile ? { preview_profile: operation.previewProfile } : {}) }), operation.outputUri);
       case "concat":
         return fileResult(await call("join", { inputs: operation.inputUris, output: operation.outputUri }), operation.outputUri);
       case "fit":
@@ -357,7 +357,8 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
 
 function parseBoundedPreviewEvidence(value: unknown) {
   if (value === undefined) return undefined;
-  if (!isRecord(value) || value.version !== 1 || Object.keys(value).some((key) => !["version", "sourceStartMs", "sourceEndMs", "firstFrameMs", "lastFrameMs", "frameCount", "frameRate", "outputSha256", "audio"].includes(key))
+  const extra = isRecord(value) && value.version === 2 ? ["inputSha256", "sourceTimesMs", "outputTimesMs", "timeBaseToleranceMs", "durationToleranceMs", "width", "height", "sourceRotation", "audioPadding"] : [];
+  if (!isRecord(value) || ![1, 2].includes(value.version as number) || Object.keys(value).some((key) => !["version", "sourceStartMs", "sourceEndMs", "firstFrameMs", "lastFrameMs", "frameCount", "frameRate", "outputSha256", "audio", ...extra].includes(key))
     || typeof value.outputSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.outputSha256)
     || ![value.sourceStartMs, value.sourceEndMs, value.firstFrameMs, value.lastFrameMs, value.frameRate].every(finite)
     || !Number.isSafeInteger(value.sourceStartMs) || !Number.isSafeInteger(value.sourceEndMs)
@@ -370,6 +371,28 @@ function parseBoundedPreviewEvidence(value: unknown) {
       || ![44100, 48000].includes(audio.sampleRate as number) || ![1, 2].includes(audio.channels as number)
       || !Number.isSafeInteger(audio.inputSamples) || (audio.inputSamples as number) <= 0 || (audio.inputSamples as number) > 2_880_000
       || !Number.isSafeInteger(audio.decodedSamples) || (audio.decodedSamples as number) < (audio.inputSamples as number) || (audio.decodedSamples as number) >= (audio.inputSamples as number) + 1024) throw new Error("Media worker bounded preview audio evidence is invalid.");
+  }
+  if (value.version === 2) {
+    if (typeof value.inputSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.inputSha256)
+      || !finite(value.timeBaseToleranceMs) || value.timeBaseToleranceMs <= 0 || value.timeBaseToleranceMs > 2
+      || !finite(value.durationToleranceMs) || value.durationToleranceMs <= 0 || value.durationToleranceMs > 102.001
+      || ![value.width, value.height].every(n => Number.isSafeInteger(n) && (n as number) >= 2 && (n as number) <= 720 && (n as number) % 2 === 0)
+      || ![0, 90, 180, 270].includes(value.sourceRotation as number)
+      || !Array.isArray(value.sourceTimesMs) || !Array.isArray(value.outputTimesMs)
+      || value.sourceTimesMs.length !== value.frameCount || value.outputTimesMs.length !== value.frameCount
+      || value.sourceTimesMs[0] !== value.firstFrameMs || value.sourceTimesMs.at(-1) !== value.lastFrameMs) throw new Error("Media worker Take preview evidence is invalid.");
+    for (let i = 0; i < value.sourceTimesMs.length; i++) {
+      const source = value.sourceTimesMs[i], output = value.outputTimesMs[i];
+      if (!finite(source) || !finite(output) || source < (value.sourceStartMs as number) || source >= (value.sourceEndMs as number) || output < 0
+        || (i > 0 && (source <= value.sourceTimesMs[i - 1] || output <= value.outputTimesMs[i - 1]))
+        || Math.abs(output - (source - (value.sourceStartMs as number))) > value.timeBaseToleranceMs) throw new Error("Media worker Take preview timestamps are invalid.");
+    }
+    if (value.audio !== undefined) {
+      const padding = value.audioPadding, audio = value.audio as { sampleRate: number; inputSamples: number };
+      if (!isRecord(padding) || Object.keys(padding).some(key => !["leadingSamples", "trailingSamples"].includes(key))
+        || ![padding.leadingSamples, padding.trailingSamples].every(n => Number.isSafeInteger(n) && (n as number) >= 0 && (n as number) <= audio.sampleRate / 10)
+        || (padding.leadingSamples as number) + (padding.trailingSamples as number) >= audio.inputSamples) throw new Error("Media worker Take preview padding is invalid.");
+    } else if (value.audioPadding !== undefined) throw new Error("Media worker Take preview padding has no audio.");
   }
   return value as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["boundedPreview"]>;
 }

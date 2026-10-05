@@ -1054,6 +1054,8 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Optional[Dict[str, Any]]:
+    if "preview_profile" in args and (name != "cut" or args.get("bounded_preview") is not True):
+        raise ValueError("preview profile requires bounded cut")
     if name not in CUSTOM_TOOLS and not (name == "cut" and args.get("bounded_preview") is True):
         return None
     stdout = io.StringIO()
@@ -1065,7 +1067,7 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
             common.STATE.reset()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             if name == "cut" and args.get("bounded_preview") is True:
-                return bounded_preview.run(common, args)
+                return bounded_preview.run_take(common, args) if args.get("preview_profile") == "take-v1" else bounded_preview.run(common, args)
             if name == "cevra-extract-frame":
                 return _run_extract_frame(common, args)
             if name == "cevra-scale":

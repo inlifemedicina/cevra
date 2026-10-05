@@ -57,13 +57,16 @@ pub async fn desktop_preview_local_video(
     validate_id(&args.source_id, "sourceId")?;
     validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
     let mut params = json!({ "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id });
-    if let (Some(clip), Some(operation)) = (&args.clip_id, &args.operation_id) {
-        validate_id(clip, "clipId")?;
+    if let Some(operation) = &args.operation_id {
         validate_id(operation, "operationId")?;
-        params["clipId"] = json!(clip);
         params["operationId"] = json!(operation);
-    } else if args.clip_id.is_some() || args.operation_id.is_some() {
-        return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_REQUEST", "Clip and operation identifiers must be supplied together."));
+    }
+    if let Some(clip) = &args.clip_id {
+        validate_id(clip, "clipId")?;
+        if args.operation_id.is_none() {
+            return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_REQUEST", "A clip requires an operation identifier."));
+        }
+        params["clipId"] = json!(clip);
     }
     supervisor.ensure_started(&app).await?;
     if let Some(operation) = args.operation_id {

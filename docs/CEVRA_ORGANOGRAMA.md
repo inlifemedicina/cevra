@@ -415,3 +415,44 @@ under a separate identifier. Preserve accepted cancellation/keyboard/undo result
 group only IN visual drag and new playback into the owner recheck. [Details](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-bounded-derived-preview--2026-10-04).
 Director impact: compatible typed Media/manual-edit consumer; no new provider,
 proposal or execution authority. Draft #82 not merged, progress 55%, F-A02 1/1.
+
+
+## Approved Take local preview expansion — 2026-10-04
+
+The owner approved extending local preview for Take recordings after PR #82
+merged at `906eea695836fe2ae2b81ab0b50610b600748995`. Media owns the closed ephemeral
+proxy/profile and measured timestamps; application/host own source identity,
+canonical clip bounds, cancellation/admission and reopen; UI keeps source-clock
+marks and labels lightweight quality. Project IR/history, permissions and final
+original-source policy remain unchanged. Runtime 0.3.3 preserves the pinned
+approved engine and legacy v1 profile.
+
+Synthetic runtime and production-host reopen controls pass. Real Take preflight
+and one consolidated new owner round remain BLOCKED by the missing designated
+Mac file. The isolated package and Draft PR are tracked in the final receipt;
+no session/device access or AI call. Director impact is compatible with unchanged
+execution authority; progress 55%, F-A02 exhausted 1/1. Broader composition/export,
+acceptance, provider and release gates remain open. [Canonical evidence and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-take-local-preview-expansion--2026-10-04).
+
+
+### Real Take recording technical validation — 2026-10-04
+
+The designated transferred recording now passes local hash/preflight, production
+host import/Original proxy/clip/reopen, with immutable original and unchanged
+canonical project/numbering/undo. Media's bounded QuickTime correction preserves
+the typed adapter and privilege boundary; packet/PTS and affine-transform
+negatives remain closed. No media enters GitHub/external services. Real preflight
+is complete; subjective native orientation/voice sync/reopen acceptance stays
+PENDING in one new round. Draft #84 final-head/runtime/native receipts record
+the correction. Director impact compatible, progress 55%, F-A02 1/1 unchanged;
+no AI/device/session operation or `clip.remove` implementation. [Real evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).
+
+### 2026-10-05 — Take preview acceptance follow-up
+
+Owner accepted the scoped real Take native round at PR #84 `b57c649`: Original
+and excerpt orientation/voice sync, content and save/reopen. A separate blank
+initial frame before Play remains under a bounded Desktop correction. Only
+selection of Original and the V1 excerpt requires a point-specific recheck.
+Director/state boundaries, progress 55% and F-A02 exhausted 1/1 are unchanged.
+A neutral visual proposal for a taller preview with lateral Director/context
+controls is approved for preparation only; product layout is not implemented.

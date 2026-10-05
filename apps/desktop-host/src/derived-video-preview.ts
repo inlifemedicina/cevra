@@ -3,10 +3,10 @@ import type { MediaEngineAdapter } from "@cevra/contracts";
 import type { ProjectHistory } from "@cevra/project-ir";
 import { constants } from "node:fs";
 import { createHash } from "node:crypto";
-import { chmod, lstat, mkdtemp, open, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, open, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { readVerifiedVideoBytes } from "./local-video-preview.js";
+import { verifyAndCopyVideoSource } from "./local-video-preview.js";
 
 export function resolvePreviewClip(history: ProjectHistory, request: LocalVideoPreviewRequest) {
   const project = history.current;
@@ -22,12 +22,22 @@ export function resolvePreviewClip(history: ProjectHistory, request: LocalVideoP
   return { source, clip };
 }
 
+export function resolvePreviewRange(history: ProjectHistory, request: LocalVideoPreviewRequest) {
+  if (request.clipId !== undefined) {
+    const { source, clip } = resolvePreviewClip(history, request);
+    return { source, clip, startMs: clip.sourceStartMs, endMs: clip.sourceEndMs };
+  }
+  const source = resolveManualVideo(history.current, request);
+  if (source.durationMs > 60_000) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+  return { source, clip: undefined, startMs: 0, endMs: source.durationMs };
+}
+
 /** Read-only preparation: no Project IR, execution ledger or checkpoint writes. */
 export class DerivedVideoPreview {
   constructor(private readonly options: { history: ProjectHistory; engine: MediaEngineAdapter; settle?: () => Promise<void>; temporaryRoot?: string }) {}
 
   async prepare(request: LocalVideoPreviewRequest, signal: AbortSignal): Promise<LocalVideoPreview> {
-    const { source, clip } = resolvePreviewClip(this.options.history, request);
+    const { source, clip, startMs, endMs } = resolvePreviewRange(this.options.history, request);
     const timeout = new AbortController();
     const combined = AbortSignal.any([signal, timeout.signal]);
     const timer = setTimeout(() => timeout.abort(), 30_000);
@@ -35,29 +45,34 @@ export class DerivedVideoPreview {
     let owned: Awaited<ReturnType<typeof lstat>> | undefined;
     let primary: Error | undefined;
     try {
-      const original = await readVerifiedVideoBytes(source, combined);
-      resolvePreviewClip(this.options.history, request);
       root = await mkdtemp(join(await realpath(this.options.temporaryRoot ?? tmpdir()), "cevra-video-preview-"));
       owned = await lstat(root);
       await chmod(root, 0o700);
       const input = join(root, `input${extname(source.uri).toLowerCase()}`);
       const output = join(root, "preview.mp4");
-      await writeFile(input, original.bytes, { flag: "wx", mode: 0o600, signal: combined });
+      await verifyAndCopyVideoSource(source, combined, input);
+      resolvePreviewRange(this.options.history, request);
       combined.throwIfAborted();
       const result = await this.options.engine.execute({ type: "trim", inputUri: input, outputUri: output,
-        startMs: clip.sourceStartMs, endMs: clip.sourceEndMs, boundedPreview: true }, { jobId: `preview:${request.operationId}`, locale: "en-US", signal: combined });
+        startMs, endMs, boundedPreview: true, previewProfile: "take-v1" }, { jobId: `preview:${request.operationId}`, locale: "en-US", signal: combined });
       combined.throwIfAborted();
       const evidence = result.type === "file" ? result.boundedPreview : undefined;
       const duration = result.type === "file" ? result.durationMs : undefined;
       if (result.type !== "file" || result.outputUri !== output || result.probe.uri !== output || !result.probe.hasVideo
-        || !evidence || evidence.sourceStartMs !== clip.sourceStartMs || evidence.sourceEndMs !== clip.sourceEndMs
-        || evidence.firstFrameMs < clip.sourceStartMs || evidence.lastFrameMs >= clip.sourceEndMs || evidence.frameCount < 1
+        || !evidence || evidence.version !== 2 || evidence.inputSha256 !== source.technicalDescriptor!.content.sha256
+        || evidence.sourceStartMs !== startMs || evidence.sourceEndMs !== endMs
+        || evidence.firstFrameMs < startMs || evidence.lastFrameMs >= endMs || evidence.frameCount < 1
+        || evidence.sourceTimesMs.length !== evidence.frameCount || evidence.outputTimesMs.length !== evidence.frameCount
+        || evidence.sourceTimesMs.some((time, index) => !Number.isFinite(time) || time < startMs || time >= endMs
+          || !Number.isFinite(evidence.outputTimesMs[index]) || Math.abs(evidence.outputTimesMs[index]! - (time - startMs)) > evidence.timeBaseToleranceMs)
+        || !Number.isFinite(evidence.durationToleranceMs) || evidence.durationToleranceMs > 102.001
+        || result.probe.width !== evidence.width || result.probe.height !== evidence.height || result.probe.rotationDegrees !== 0
         || result.probe.hasAudio !== Boolean(source.technicalDescriptor?.audio)
         || (result.probe.hasAudio && (result.probe.audioCodec !== "aac" || !evidence.audio || evidence.audio.sampleRate !== source.sampleRate || evidence.audio.channels !== source.channels
-          || evidence.audio.inputSamples !== Math.ceil(clip.sourceEndMs * evidence.audio.sampleRate / 1000) - Math.ceil(clip.sourceStartMs * evidence.audio.sampleRate / 1000)
+          || evidence.audio.inputSamples !== Math.ceil(endMs * evidence.audio.sampleRate / 1000) - Math.ceil(startMs * evidence.audio.sampleRate / 1000)
           || evidence.audio.decodedSamples < evidence.audio.inputSamples || evidence.audio.decodedSamples >= evidence.audio.inputSamples + 1024))
         || result.effectiveProfile.container !== "mp4" || result.effectiveProfile.videoCodec !== "h264"
-        || !Number.isSafeInteger(duration) || duration! <= 0 || Math.abs(duration! - clip.timelineEndMs) > Math.ceil(Math.max(1000 / evidence.frameRate, 1024_000 / (source.sampleRate ?? 44100))) + 2) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+        || !Number.isSafeInteger(duration) || duration! <= 0 || Math.abs(duration! - (endMs - startMs)) > evidence.durationToleranceMs + 1) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
       const handle = await open(output, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
       let bytes: Buffer;
       try {
@@ -77,11 +92,12 @@ export class DerivedVideoPreview {
         if (initial.dev !== final.dev || initial.ino !== final.ino || initial.size !== final.size || initial.mtimeNs !== final.mtimeNs || initial.ctimeNs !== final.ctimeNs
           || path.dev !== final.dev || path.ino !== final.ino || !path.isFile() || createHash("sha256").update(bytes).digest("hex") !== evidence.outputSha256) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
       } finally { await handle.close(); }
-      await readVerifiedVideoBytes(source, combined);
-      resolvePreviewClip(this.options.history, request);
+      await verifyAndCopyVideoSource(source, combined);
+      resolvePreviewRange(this.options.history, request);
       combined.throwIfAborted();
       return { sourceId: source.id, snapshotId: request.expectedSnapshotId, durationMs: duration!, mimeType: "video/mp4", base64: bytes.toString("base64"),
-        clip: { id: clip.id, sourceStartMs: clip.sourceStartMs, sourceEndMs: clip.sourceEndMs, firstFrameMs: evidence.firstFrameMs, lastFrameMs: evidence.lastFrameMs, frameCount: evidence.frameCount } };
+        proxy: { profile: "take-v1", sourceDurationMs: source.durationMs },
+        ...(clip ? { clip: { id: clip.id, sourceStartMs: startMs, sourceEndMs: endMs, firstFrameMs: evidence.firstFrameMs, lastFrameMs: evidence.lastFrameMs, frameCount: evidence.frameCount } } : {}) };
     } catch (cause) {
       primary = combined.aborted ? manualVideoError(timeout.signal.aborted && !signal.aborted ? "MANUAL_VIDEO_PREVIEW_TIMEOUT" : "OPERATION_CANCELLED")
         : cause instanceof Error && "code" in cause && String(cause.code).startsWith("MANUAL_VIDEO_") ? cause : manualVideoError("MANUAL_VIDEO_UNAVAILABLE");

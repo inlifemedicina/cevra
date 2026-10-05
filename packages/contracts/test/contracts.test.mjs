@@ -2,6 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { MAX_AUDIO_SEQUENCE_ITEMS, MAX_MEDIA_DURATION_MS, MAX_MEDIA_FPS, MAX_MEDIA_HEIGHT, MAX_MEDIA_INPUTS, MAX_MEDIA_URI_LENGTH, MAX_MEDIA_WIDTH, MEDIA_DELIVERY_MATRIX, resolveAudioDelivery, resolveAudioMutationDelivery, resolveStandardAvDelivery, resolveTranscodeDelivery, validateCopyCompatibility, validateMediaOperation } from "../dist/index.js";
 
+test("Take preview profile is closed and requires the ephemeral bounded operation", () => {
+  const operation = { type: "trim", inputUri: "/media/source.mov", outputUri: "/media/preview.mp4", startMs: 0, endMs: 30000, boundedPreview: true, previewProfile: "take-v1" };
+  assert.doesNotThrow(() => validateMediaOperation(operation));
+  for (const override of [{ boundedPreview: undefined }, { previewProfile: "arbitrary" }, { endMs: 60001 }, { argv: [] }, { outputUri: "/media/preview.mov" }]) {
+    assert.throws(() => validateMediaOperation({ ...operation, ...override }));
+  }
+});
+
 function audioSequence(overrides = {}) {
   return {
     type: "render-audio-sequence",

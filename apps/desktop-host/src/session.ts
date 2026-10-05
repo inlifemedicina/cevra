@@ -46,7 +46,7 @@ import {
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
 import { readDesignatedFa02Pair } from "./fa02-review-admission.js";
 import { readLocalVideoPreview } from "./local-video-preview.js";
-import { DerivedVideoPreview, resolvePreviewClip } from "./derived-video-preview.js";
+import { DerivedVideoPreview, resolvePreviewRange } from "./derived-video-preview.js";
 
 type Locale = "pt-BR" | "en-US";
 
@@ -180,12 +180,12 @@ export class DesktopSession {
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     const stable = structuredClone(request);
     if (Object.keys(stable).some((key) => !["sourceId", "expectedSnapshotId", "clipId", "operationId"].includes(key))
-      || (stable.clipId === undefined) !== (stable.operationId === undefined)
-      || (stable.clipId !== undefined && (!stable.clipId || !stable.operationId))) throw safeError("MANUAL_VIDEO_INVALID_REQUEST");
-    if (stable.clipId !== undefined) {
+      || (stable.clipId !== undefined && (!stable.clipId || !stable.operationId))
+      || (stable.operationId !== undefined && (typeof stable.operationId !== "string" || !stable.operationId))) throw safeError("MANUAL_VIDEO_INVALID_REQUEST");
+    if (stable.operationId !== undefined) {
       if (this.operations.has(stable.operationId!)) throw safeError("OPERATION_DUPLICATE");
-      resolvePreviewClip(this.services.history, stable);
-      if (!this.services.derivedVideoPreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+      resolvePreviewRange(this.services.history, stable);
+      if (stable.clipId !== undefined && !this.services.derivedVideoPreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
       // Only the latest preview prepares bytes. Cancellation is scoped to this
       // read-only operation; ingest/transcription keep their own controllers.
       const previous = this.previewTask;
@@ -193,11 +193,13 @@ export class DesktopSession {
       const task = this.runOperation(stable.operationId!, async (signal) => {
         await previous?.catch(() => undefined);
         signal.throwIfAborted();
-        resolvePreviewClip(this.services.history, stable);
-        const preview = await this.services.derivedVideoPreview!.prepare(stable, signal);
+        const { source } = resolvePreviewRange(this.services.history, stable);
+        const preview = this.services.derivedVideoPreview
+          ? await this.services.derivedVideoPreview.prepare(stable, signal)
+          : await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
         signal.throwIfAborted();
         if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
-        resolvePreviewClip(this.services.history, stable);
+        resolvePreviewRange(this.services.history, stable);
         return preview;
       });
       this.previewTask = task;
