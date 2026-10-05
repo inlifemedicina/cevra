@@ -446,3 +446,13 @@ is complete; subjective native orientation/voice sync/reopen acceptance stays
 PENDING in one new round. Draft #84 final-head/runtime/native receipts record
 the correction. Director impact compatible, progress 55%, F-A02 1/1 unchanged;
 no AI/device/session operation or `clip.remove` implementation. [Real evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).
+
+### 2026-10-05 — Take preview acceptance follow-up
+
+Owner accepted the scoped real Take native round at PR #84 `b57c649`: Original
+and excerpt orientation/voice sync, content and save/reopen. A separate blank
+initial frame before Play remains under a bounded Desktop correction. Only
+selection of Original and the V1 excerpt requires a point-specific recheck.
+Director/state boundaries, progress 55% and F-A02 exhausted 1/1 are unchanged.
+A neutral visual proposal for a taller preview with lateral Director/context
+controls is approved for preparation only; product layout is not implemented.

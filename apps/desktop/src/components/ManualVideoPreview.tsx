@@ -22,6 +22,7 @@ interface Props {
 /** Original bytes or a bounded, ephemeral derivative of the canonical clip. */
 export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, clip, unsupportedClip, timelineOccupied, busy, seek, t, onPlayheadChange, onCreate }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const metadataVerified = useRef(false);
   const [preview, setPreview] = useState<LocalVideoPreview | null>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     let settled = false;
     let objectUrl: string | null = null;
     const operationId = `video-preview-${crypto.randomUUID()}`;
+    metadataVerified.current = false;
     setPreview(null); setUrl(null); setReady(false); setError(null); setPlaying(false); setSeeking(false); setInMs(null); setOutMs(null); setCurrentMs(0);
     if (source?.kind === "video") {
       void backend.previewLocalVideo({ sourceId: source.id, expectedSnapshotId: snapshotId, operationId, ...(clip ? { clipId: clip.id } : {}) }).then((result) => {
@@ -88,6 +90,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   }, [playing, ready, clip?.id]);
 
   function fail(code: string) {
+    metadataVerified.current = false;
     const video = videoRef.current;
     video?.pause();
     if (video) { video.removeAttribute("src"); video.load(); }
@@ -100,9 +103,17 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     if (!video || !preview || !Number.isFinite(video.duration) || video.duration <= 0 || Math.abs(video.duration * 1000 - preview.durationMs) > 100) {
       fail("MANUAL_VIDEO_UNSUPPORTED"); return;
     }
-    setReady(true);
+    metadataVerified.current = true;
     setCurrentMs(startMs);
     video.currentTime = 0;
+    frameReady();
+  }
+
+  function frameReady() {
+    const video = videoRef.current;
+    // Metadata alone does not guarantee a decoded frame in WKWebView.
+    if (!metadataVerified.current || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking) return;
+    setReady(true);
   }
 
   function updateClock() {
@@ -137,8 +148,8 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   return <section className="manual-video-preview" aria-label={t("preview.localVideo")}>
     <div className="manual-preview-heading"><strong>{sourceLabel ?? t("preview.localVideo")}</strong><span>{t(clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
     <div className="manual-video-stage">
-      <video ref={videoRef} src={url ?? undefined} preload="metadata" playsInline onLoadedMetadata={metadataReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
-        onSeeking={() => setSeeking(true)} onSeeked={() => { setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); updateClock(); }} />
+      <video ref={videoRef} src={url ?? undefined} preload="auto" playsInline onLoadedMetadata={metadataReady} onLoadedData={frameReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
+        onSeeking={() => setSeeking(true)} onSeeked={() => { frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); updateClock(); }} />
       {!ready && <p role="status">{error ? t(errorKey) : source?.kind === "video" ? t("preview.localLoading") : t("preview.localEmpty")}</p>}
     </div>
     <div className="manual-preview-controls">

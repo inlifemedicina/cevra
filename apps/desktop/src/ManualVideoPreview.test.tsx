@@ -64,15 +64,73 @@ class ManualBackend implements DesktopBackend {
   async cancelOperation(operationId: string) { return { operationId, cancelled: false }; }
 }
 
-async function metadata(container: HTMLElement, duration?: number) {
+async function metadata(container: HTMLElement, duration?: number, initialFrame = true) {
   await waitFor(() => expect(container.querySelector("video")?.getAttribute("src")).toMatch(/^blob:/));
   const video = container.querySelector("video")!;
   const excerpt = screen.queryByTestId("preview-clip-timecode")?.textContent?.match(/\/ (\d+):(\d+)\.(\d+)/);
   const effectiveDuration = duration ?? (excerpt ? Number(excerpt[1]) * 60 + Number(excerpt[2]) + Number(excerpt[3]) / 1000 : 6);
   Object.defineProperty(video, "duration", { configurable: true, value: effectiveDuration });
+  Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_METADATA });
   fireEvent.loadedMetadata(video);
+  if (initialFrame) {
+    Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
+    fireEvent.loadedData(video);
+  }
   return video;
 }
+
+for (const excerpt of [false, true]) {
+  it(`waits for the decoded initial frame of ${excerpt ? "the selected clip" : "Original"} without play or clock advancement`, async () => {
+    const backend = new ManualBackend();
+    const clip = { id: "clip", trackId: "track-v1", sourceId: source.id, timelineStartMs: 0, timelineEndMs: 3000, sourceStartMs: 1000, sourceEndMs: 4000, speed: 1, volume: 1, opacity: 1 };
+    const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId="initial-frame" clip={excerpt ? clip : undefined}
+      timelineOccupied={excerpt} busy={false} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+    const video = await metadata(container, excerpt ? 3 : 6, false);
+    const play = screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement;
+    expect(play.disabled).toBe(true);
+    expect(screen.getByText(t("preview.localLoading"))).toBeTruthy();
+    expect(video.getAttribute("preload")).toBe("auto");
+    expect(video.autoplay).toBe(false);
+    expect(video.play).not.toHaveBeenCalled();
+    expect(video.currentTime).toBe(0);
+    Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
+    fireEvent.loadedData(video);
+    expect(play.disabled).toBe(false);
+    expect(video.play).not.toHaveBeenCalled();
+    expect(video.currentTime).toBe(0);
+    expect(screen.getByTestId("preview-timecode").textContent).toBe(excerpt ? "Fonte 00:01.000 / 00:04.000" : "Fonte 00:00.000 / 00:06.000");
+    if (excerpt) expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00.000 / 00:03.000");
+  });
+}
+
+it("metadata validation can admit an already buffered initial frame", async () => {
+  const { container } = render(<ManualVideoPreview backend={new ManualBackend()} source={source} snapshotId="buffered" timelineOccupied={false} busy={false}
+    seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  await waitFor(() => expect(container.querySelector("video")?.getAttribute("src")).toMatch(/^blob:/));
+  const video = container.querySelector("video")!;
+  Object.defineProperty(video, "duration", { configurable: true, value: 6 });
+  Object.defineProperty(video, "readyState", { configurable: true, value: HTMLMediaElement.HAVE_CURRENT_DATA });
+  fireEvent.loadedMetadata(video);
+  expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(video.play).not.toHaveBeenCalled();
+});
+
+it("a frame notification cannot unlock a replacement preview before its own metadata is verified", async () => {
+  const backend = new ManualBackend();
+  let deliver!: (value: LocalVideoPreview) => void;
+  const original = backend.previewLocalVideo.bind(backend);
+  backend.previewLocalVideo = async request => request.expectedSnapshotId === "replacement" ? new Promise(resolve => { deliver = resolve; }) : original(request);
+  const props = { backend, source, timelineOccupied: false, busy: false, seek: { sequence: 0, timelineMs: 0 }, t, onPlayheadChange: vi.fn(), onCreate: vi.fn() };
+  const { container, rerender } = render(<ManualVideoPreview {...props} snapshotId="first" />);
+  const video = await metadata(container);
+  rerender(<ManualVideoPreview {...props} snapshotId="replacement" />);
+  fireEvent.loadedData(video);
+  expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(true);
+  deliver(await original({ sourceId: source.id, expectedSnapshotId: "replacement" }));
+  await metadata(container);
+  expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(video.play).not.toHaveBeenCalled();
+});
 
 it("marks from the actual media clock, creates a visible clip and verifies undo/redo in the same UI", async () => {
   const backend = new ManualBackend(); const { container } = render(<App backend={backend} />);

@@ -316,3 +316,21 @@ orientation/voice sync, excerpt perception and save/close/reopen remain PENDING,
 using only the same three new consolidated steps above. Technical automation is
 not human acceptance; preserve already accepted keyboard/cancel/undo/IN results.
 [Real evidence and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).
+
+#### Real Take owner round and first-frame follow-up — 2026-10-05
+
+At PR #84 head `b57c64926b64c470adaaecd76acb0f290eeac70d`, the owner reported
+all requested steps working: native Original/excerpt orientation and voice
+synchronization, excerpt content, and save/close/reopen. These scoped APP/OWNER
+steps are PASS; the complete catalog IDs remain governed by their broader gates.
+Selecting the original or the V1 excerpt initially left the preview blank until
+Play. This distinct first-frame defect is FAIL at that head. Prior acceptance
+remains valid. Recheck only selection of Original and the simple V1 excerpt
+before Play after the correction; do not request another full round.
+
+Technical correction: load frame data eagerly while remaining paused, and
+unlock preview controls only after validated metadata and current-frame data.
+Focused UNIT cases cover Original/excerpt, buffered data and stale selection
+events. Native WKWebView synthetic evidence distinguishes metadata-only blank
+output from visible initial-frame output at zero time with no play events.
+This evidence does not replace the pending point-specific owner check.

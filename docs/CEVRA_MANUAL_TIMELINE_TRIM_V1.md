@@ -350,3 +350,29 @@ excerpt perception and native save/close/reopen remain PENDING for one consolida
 new round; preserve prior accepted checks. No device/sensor or existing human
 session is operated, no AI/provider call, no next `clip.remove` implementation.
 Director impact compatible; progress 55%, F-A02 exhausted 1/1 unchanged.
+
+## Initial paused frame correction — 2026-10-05
+
+The owner accepted the real Take round at PR #84 head `b57c649`: Original and
+excerpt orientation/voice synchronization, excerpt content and native
+save/close/reopen. A separate defect remained: selection did not show the initial
+frame until playback. Only that selection behavior needs a new human check.
+
+An isolated WKWebView test with neutral synthetic H.264 reproduced the cause:
+`preload=metadata` stopped at readyState 1 with no decoded frame and dark painted
+output; `preload=auto` reached readyState 4 and painted the initial frame while
+paused at currentTime 0, with zero play events. The Desktop component now requests
+frame data and requires validated metadata plus HAVE_CURRENT_DATA before enabling
+controls. Loaded data and completed initial seek can satisfy readiness; already
+buffered metadata is admitted. Metadata failure and selection replacement reset
+the guard. No autoplay, epsilon seek, poster extraction, worker operation,
+Project IR/history mutation, dependency or new permission is introduced.
+See the [HTML media readiness model](https://html.spec.whatwg.org/multipage/media.html#ready-states).
+
+The bounded correction is IN DEVELOPMENT / NOT MERGED. Focused UNIT and native
+synthetic evidence stay distinct from the pending owner selection check. Final
+exact-tree review, CI and new package identity are PENDING at this checkpoint;
+terminal evidence will be recorded in the PR and local technical receipts.
+Preserve the already accepted native round. Director impact:
+compatible presentation lifecycle correction; typed execution and state boundaries
+are unchanged. No real AI calls or existing human-session manipulation.

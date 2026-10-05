@@ -2853,3 +2853,23 @@ Real-file preflight is no longer blocked; the consolidated human round stays
 PENDING. Draft #84/head CI/native receipt track the correction. Director impact
 compatible; 55%/F-A02 1/1 unchanged, no AI/device/session operation or next-block
 implementation. [Canonical real evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#real-take-technical-validation--2026-10-04).
+
+### 2026-10-05 — Real Take native acceptance and initial paused-frame correction
+
+APP/OWNER accepted the requested real Take preview round at PR #84 head
+`b57c649`: Original/excerpt orientation and voice sync, excerpt content and
+save/close/reopen. A distinct initial-frame-before-Play defect remains FAIL at
+that head. The authorized bounded Desktop correction eagerly requests frame data
+and waits for validated metadata/current-frame readiness while remaining paused
+at zero. It is IN DEVELOPMENT / NOT MERGED; only Original/V1 selection before
+Play requires a point-specific owner recheck. Prior accepted steps remain valid.
+No Media worker, typed commands, Project IR/history, provider or permission changes.
+Director impact is compatible; progress 55% and exhausted F-A02 1/1 unchanged.
+
+The owner separately approved preparation of a visual layout proposal, not its
+implementation. Measured native window: 1435×900; video area: 781×192. A 9:16
+source therefore occupies about 108×192. A stable layout with a taller central
+preview and lateral Director/context controls is a presentation proposal for
+comparison in both orientations. Selected-media aspect does not set project or
+export aspect. No layout code, new output behavior or identity redesign is authorized
+by that proposal approval. The visual artifact uses neutral synthetic content.
