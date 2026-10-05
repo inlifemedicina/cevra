@@ -12,6 +12,7 @@ interface Props {
   clip?: TimelineClip;
   unsupportedClip?: boolean;
   timelineOccupied: boolean;
+  sequenceEditing?: boolean;
   busy: boolean;
   seek: { sequence: number; timelineMs: number };
   t: Translate;
@@ -20,7 +21,7 @@ interface Props {
 }
 
 /** Original bytes or a bounded, ephemeral derivative of the canonical clip. */
-export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, clip, unsupportedClip, timelineOccupied, busy, seek, t, onPlayheadChange, onCreate }: Props) {
+export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, clip, unsupportedClip, timelineOccupied, sequenceEditing, busy, seek, t, onPlayheadChange, onCreate }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const metadataVerified = useRef(false);
@@ -158,7 +159,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
 
   function mark(which: "in" | "out") {
     const video = videoRef.current;
-    if (!video || !ready || seeking || video.seeking || busy || timelineOccupied) return;
+    if (!video || !ready || seeking || video.seeking || busy || timelineOccupied && !sequenceEditing) return;
     const value = Math.min(source!.durationMs!, Math.max(0, Math.round(video.currentTime * 1000)));
     if (which === "in") setInMs(value); else setOutMs(value);
   }
@@ -201,14 +202,15 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
       <time data-testid="preview-clip-timecode">{t("preview.clipElapsed", { time: formatMilliseconds(currentMs - startMs), duration: formatMilliseconds(endMs - startMs) })}</time>
       <output>{t("preview.clipBounds", { start: formatMilliseconds(startMs), end: formatMilliseconds(endMs) })}</output>
     </div>}
-    {timelineOccupied ? <p className="manual-preview-hint" role="status">{t(unsupportedClip ? "preview.unsupportedClip" : clip ? "preview.boundedClip" : "preview.singleClip")}</p> : <>
+    {sequenceEditing && timelineOccupied && !clip && <p className="manual-preview-hint" role="status">{t("sequence.previewPending")}</p>}
+    {clip || timelineOccupied && !sequenceEditing ? <p className="manual-preview-hint" role="status">{t(unsupportedClip ? "preview.unsupportedClip" : clip ? "preview.boundedClip" : "preview.singleClip")}</p> : <>
       <div className="manual-preview-marks">
         <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("in")}>{t("preview.markIn")}</button><output>IN {inMs === null ? "—" : formatMilliseconds(inMs)}</output>
         <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("out")}>{t("preview.markOut")}</button><output>OUT {outMs === null ? "—" : formatMilliseconds(outMs)}</output>
         <button type="button" className="manual-create-clip-button" disabled={!ready || seeking || busy || !validRange} onClick={() => {
           videoRef.current?.pause();
           if (source && validRange) void onCreate({ sourceId: source.id, expectedSnapshotId: snapshotId, sourceStartMs: inMs!, sourceEndMs: outMs! }).catch((cause: unknown) => fail(errorCode(cause)));
-        }}>{t(busy ? "preview.creatingClip" : "preview.createClip")}</button>
+        }}>{t(busy ? "preview.creatingClip" : sequenceEditing && timelineOccupied ? "sequence.append" : "preview.createClip")}</button>
       </div>
       <p className="manual-preview-hint">{inMs !== null && outMs !== null && !validRange ? t("preview.rangeInvalid") : t("preview.localHint")}</p>
     </>}

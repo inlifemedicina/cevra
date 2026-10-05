@@ -1,6 +1,7 @@
 import type { CaptionCue, GraphicItem, ProjectIR, TimelineClip, TimelineTrack } from "@cevra/project-ir";
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { TrimManualVideoClipRequest } from "@cevra/application";
+import type { ManualVideoSequenceEdit, TrimManualVideoClipRequest } from "@cevra/application";
+import { ManualSequenceControls } from "./ManualSequenceControls";
 import { supportsManualClipPreview } from "./ManualVideoPreview";
 import { formatMilliseconds, formatTime, type Translate } from "../ui-model";
 import { Icon } from "./Icon";
@@ -38,6 +39,8 @@ interface TimelineProps {
   trimAvailable?: boolean;
   trimBusy?: boolean;
   onTrim?(request: TrimManualVideoClipRequest): Promise<void>;
+  sequenceClips?: readonly TimelineClip[];
+  onSequenceEdit?(request: ManualVideoSequenceEdit): Promise<void>;
   onSelect(id: string): void;
   onPlayheadChange(milliseconds: number): void;
   onZoomChange(value: number): void;
@@ -49,12 +52,12 @@ type TimelineVisual =
   | { id: string; kind: "caption"; startMs: number; endMs: number; label: string; caption: CaptionCue }
   | { id: string; kind: "graphic"; startMs: number; endMs: number; label: string; graphic: GraphicItem };
 
-export function Timeline({ project, presentations, selectedId, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, trimAvailable, trimBusy, onTrim }: TimelineProps) {
+export function Timeline({ project, presentations, selectedId, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit }: TimelineProps) {
   const canonicalDuration = project.timeline.durationMs;
-  const trimClip = trimAvailable && onTrim ? project.timeline.clips.find((clip) => supportsManualClipPreview(project, clip)
+  const trimClip = trimAvailable && onTrim ? sequenceClips?.find(clip => clip.id === selectedId) ?? project.timeline.clips.find((clip) => supportsManualClipPreview(project, clip)
     && !project.timeline.tracks.find((track) => track.id === clip.trackId)?.locked) : undefined;
   const sourceDuration = trimClip ? project.sources.find((source) => source.id === trimClip.sourceId)!.durationMs! : 0;
-  const geometryDuration = trimClip ? Math.max(1000, sourceDuration) : Math.max(60_000, canonicalDuration);
+  const geometryDuration = trimClip ? Math.max(1000, canonicalDuration, Math.min(Number.MAX_SAFE_INTEGER, trimClip.timelineStartMs + sourceDuration)) : sequenceClips ? Math.max(1000, canonicalDuration) : Math.max(60_000, canonicalDuration);
   const tracks = project.timeline.tracks.length > 0 ? project.timeline.tracks : EMPTY_TRACK_SCAFFOLD;
   const playheadPercent = canonicalDuration === 0 ? 0 : (playheadMs / geometryDuration) * 100;
   const tickIntervals = trimClip ? Math.min(13, Math.max(1, Math.floor(geometryDuration / 1000))) : 13;
@@ -72,7 +75,8 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
     event.preventDefault();
     if (event.key === "Home") return onPlayheadChange(0);
     if (event.key === "End") return onPlayheadChange(canonicalDuration);
-    onPlayheadChange(Math.min(canonicalDuration, Math.max(0, playheadMs + (event.key === "ArrowRight" ? 1000 : -1000))));
+    const step = sequenceClips ? event.shiftKey ? 10 : 100 : 1000;
+    onPlayheadChange(Math.min(canonicalDuration, Math.max(0, playheadMs + (event.key === "ArrowRight" ? step : -step))));
   }
 
   return (
@@ -83,6 +87,7 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
         {trimClip && selectedId === trimClip.id && <span className="timeline-trim-hint">{t("timeline.trimHint")}</span>}
         <div className="timeline-zoom"><label htmlFor="timeline-zoom">{t("timeline.zoom")}</label><span>−</span><input id="timeline-zoom" type="range" min="70" max="180" value={zoom} onChange={(event) => onZoomChange(Number(event.target.value))} /><span>＋</span><button type="button" onClick={() => onZoomChange(100)}><Icon name="fit" size={14} />{t("timeline.fit")}</button></div>
       </div>
+      {sequenceClips && onSequenceEdit && <ManualSequenceControls project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedId} playheadMs={playheadMs} busy={Boolean(trimBusy)} t={t} onEdit={onSequenceEdit} />}
       <div className="timeline-table">
         <div className="timeline-corner"><span className="timecode">{trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs)}</span></div>
         <div

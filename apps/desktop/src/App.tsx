@@ -1,4 +1,5 @@
-import type { EditorialDraftState, ReviseEditorialDraftRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
+import type { ManualVideoSequenceEdit, EditorialDraftState, ReviseEditorialDraftRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
+import { manualSequenceClips as manualSequence } from "./components/ManualSequenceControls";
 import type { CevraLocale, TranslationKey } from "@cevra/i18n";
 import { translate } from "@cevra/i18n";
 import type { ProjectIR } from "@cevra/project-ir";
@@ -272,6 +273,10 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function createManualClip(request: CreateManualVideoClipRequest) {
+    if (project?.timeline.clips.length && manualSequence(project)) {
+      await editManualSequence({ type: "append", version: 1, ...request });
+      return;
+    }
     if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     manualMutationInFlight.current = true;
     setManualMutationBusy(true);
@@ -292,6 +297,10 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function trimManualClip(request: TrimManualVideoClipRequest) {
+    if (project && manualSequence(project)) {
+      try { await editManualSequence({ type: "trim", version: 1, ...request }); } catch { /* Error already reconciled. */ }
+      return;
+    }
     if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     manualMutationInFlight.current = true;
     setManualMutationBusy(true);
@@ -308,6 +317,37 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       }
     } catch (cause) {
       handleRuntimeError(cause, startedSelection !== selectionEpoch.current);
+    } finally {
+      manualMutationInFlight.current = false;
+      setManualMutationBusy(false);
+    }
+  }
+
+  async function editManualSequence(request: ManualVideoSequenceEdit) {
+    if (!project || importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
+    manualMutationInFlight.current = true;
+    setManualMutationBusy(true);
+    setRuntimeError(null); setRuntimeNotice(null);
+    const startedSelection = selectionEpoch.current;
+    const previousIds = new Set(project.timeline.clips.map(clip => clip.id));
+    const oldSelectedIndex = [...project.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs).findIndex(clip => clip.id === selectedProjectItemId);
+    try {
+      const result = await backend.editManualVideoSequence(request);
+      applyBackendState(result.state, undefined, true);
+      if (startedSelection === selectionEpoch.current) {
+        const ordered = [...result.state.project.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs);
+        const added = ordered.find(clip => !previousIds.has(clip.id));
+        const next = (request.type === "append" || request.type === "insert" || request.type === "duplicate") && added ? added
+          : request.type === "remove" && request.clipId === selectedProjectItemId ? ordered[Math.min(oldSelectedIndex, ordered.length - 1)]
+          : ordered.find(clip => clip.id === selectedProjectItemId);
+        if (next) {
+          setSelectedProjectItemId(next.id); setActiveSourceId(next.sourceId); setPlayheadMs(next.timelineStartMs);
+          setPreviewSeek({ sequence: 0, timelineMs: next.timelineStartMs });
+        }
+      }
+    } catch (cause) {
+      handleRuntimeError(cause, startedSelection !== selectionEpoch.current);
+      throw cause;
     } finally {
       manualMutationInFlight.current = false;
       setManualMutationBusy(false);
@@ -380,6 +420,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const layoutStyle = { "--timeline-height": `${timelineHeight}px`, "--sidebar-width": `${sidebarCompact ? 286 : sidebarWidth}px` } as CSSProperties;
   const mutationBusy = importBusy || transcriptionOperationId !== null || editorialBusy || manualMutationBusy || checkpointPending || closePending;
   const realPreview = !backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" && workspace === "edit";
+  const sequenceClips = realPreview ? manualSequence(project) : undefined;
   const selectedPreviewClip = project.timeline.clips.find((clip) => clip.id === selectedProjectItemId);
   const previewClip = selectedPreviewClip && supportsManualClipPreview(project, selectedPreviewClip) ? selectedPreviewClip : undefined;
   return (
@@ -390,7 +431,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
         {mediaOpen && <MediaPanel sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !mutationBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
-            {realPreview ? <ManualVideoPreview key={`${project.history.headSnapshotId}:${activeSourceId}:${previewClip?.id ?? "source"}`} backend={backend} source={project.sources.find((source) => source.id === activeSourceId)} sourceLabel={activeSourceId ? sourcePresentations.get(activeSourceId)?.label : undefined} snapshotId={project.history.headSnapshotId!} clip={previewClip} unsupportedClip={Boolean(selectedPreviewClip && !previewClip)} timelineOccupied={project.timeline.clips.length > 0 || project.captions.length > 0 || project.graphics.length > 0} busy={mutationBusy} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} /> : <WorkspaceStage presentations={sourcePresentations} workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy || editorialBusy || manualMutationBusy || checkpointPending || closePending} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />}
+            {realPreview ? <ManualVideoPreview key={`${project.history.headSnapshotId}:${activeSourceId}:${previewClip?.id ?? "source"}`} backend={backend} source={project.sources.find((source) => source.id === activeSourceId)} sourceLabel={activeSourceId ? sourcePresentations.get(activeSourceId)?.label : undefined} snapshotId={project.history.headSnapshotId!} clip={previewClip} unsupportedClip={Boolean(selectedPreviewClip && !previewClip)} timelineOccupied={project.timeline.clips.length > 0 || project.captions.length > 0 || project.graphics.length > 0} sequenceEditing={sequenceClips !== undefined} busy={mutationBusy} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} /> : <WorkspaceStage presentations={sourcePresentations} workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy || editorialBusy || manualMutationBusy || checkpointPending || closePending} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />}
           </div>
           {visibleRuntimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(visibleRuntimeError))}</div>}
           {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
@@ -399,7 +440,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} t={t} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
         directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || mutationBusy} error={editorialError} t={t} onRefresh={() => void refreshEditorial()} onRevise={reviseEditorial} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
         contextualPanel={<Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />} />
-      <Timeline presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} trimAvailable={realPreview} trimBusy={mutationBusy} onTrim={trimManualClip} />
+      <Timeline presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} trimAvailable={realPreview} trimBusy={mutationBusy} onTrim={trimManualClip} sequenceClips={sequenceClips} onSequenceEdit={editManualSequence} />
     </main>
   );
 }
@@ -446,6 +487,9 @@ function isTerminalHostCode(code: string): boolean {
 }
 
 function runtimeErrorKey(code: string): TranslationKey {
+  if (code === "MANUAL_SEQUENCE_STALE") return "preview.localChanged";
+  if (code === "MANUAL_SEQUENCE_INVALID_RANGE") return "preview.rangeInvalid";
+  if (code.startsWith("MANUAL_SEQUENCE_")) return "sequence.unavailable";
   if (code === "MANUAL_VIDEO_INVALID_RANGE") return "preview.rangeInvalid";
   if (code === "MANUAL_VIDEO_TOO_LARGE") return "preview.localTooLarge";
   if (code === "MANUAL_VIDEO_STALE" || code === "MANUAL_VIDEO_SOURCE_CHANGED") return "preview.localChanged";

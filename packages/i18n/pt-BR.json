@@ -367,5 +367,21 @@
   "sidebar.activateCompact": "Ativar modo compacto",
   "sidebar.tabs": "Conteúdo da coluna de edição",
   "sidebar.directorTab": "Diretor",
-  "sidebar.controlsTab": "Controles"
+  "sidebar.controlsTab": "Controles",
+  "sequence.controls": "Controles da montagem",
+  "sequence.sourceRange": "Trecho da fonte",
+  "sequence.source": "Fonte",
+  "sequence.inSeconds": "IN (segundos)",
+  "sequence.outSeconds": "OUT (segundos)",
+  "sequence.append": "Adicionar trecho ao final",
+  "sequence.insert": "Inserir antes do selecionado",
+  "sequence.trim": "Ajustar trecho selecionado",
+  "sequence.duplicate": "Duplicar selecionado",
+  "sequence.split": "Dividir no cursor",
+  "sequence.earlier": "Mover para antes",
+  "sequence.later": "Mover para depois",
+  "sequence.remove": "Remover selecionado",
+  "sequence.selectClip": "Selecione um clip na timeline para inserir, ajustar, dividir, reordenar ou remover.",
+  "sequence.previewPending": "Você está vendo a fonte original. Os controles de montagem estão disponíveis; a reprodução da sequência ainda está em preparação.",
+  "sequence.unavailable": "Esta edição da montagem está indisponível. Selecione um clip ou fonte compatível e tente novamente."
 }

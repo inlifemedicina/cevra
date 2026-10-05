@@ -24,8 +24,9 @@ the new explicit authorization resolved it. Post-#84 runs were cancelled when
 #85 advanced main. Post-#85 Audio Sequence Exact Runtime `37371249881` passed;
 general CI `37371249855` attempt 1 ended with four unacquired/cancelled jobs and
 one passing alignment job. After bounded retries, attempt 3 passed four jobs but
-still failed when its hosted Transcription runner was not acquired. The detailed
-receipt below retains the failure; this is not a complete post-merge CI PASS.
+still failed when its hosted Transcription runner was not acquired. After fresh
+M1 Transcription runners executed successfully, one targeted retry was requested.
+Attempt 4 completed SUCCESS, 5/5; prior failures remain preserved below.
 Running R3 product `7d4e66776fbfc112429d333e5d8883221c2851fb` and its limited owner
 acceptance remain historical evidence, not G1 PASS. M0 Draft #86 now targets main;
 its feature history preserves the reviewed baseline. No #86 merge is authorized.
@@ -191,14 +192,36 @@ an existing clip. The shared original-content guard retains the ingest evidence
 and full journal binding. Metadata-only remove/reorder require no media read.
 One typed Host/Rust/backend route uses the existing mutation/close/checkpoint
 gates; it exposes no path, raw command, IR or filtergraph field. Generated ACL
-and manifest admit only that specific route. The UI sequence controls and
-program preview/export are still unconnected, so this is API preparation.
+and manifest admit only that specific route. Program preview/export consumers
+remain unconnected; the subsequent UI preparation is recorded below.
 Application 287/287, Host 143/143, UI 118/118 and offline Rust 36/36 passed;
 Host/UI production builds passed. New Host tests drive production RPC through
 all intents, checkpoint, Undo/reopen/Redo and immutable original byte fixtures.
 The first Host suite run caught the expected ACL list needing the new typed
-permission; the corrected complete suite passed. This local branch remains
-unpublished pending the complete workflow; no button-sized PR is created.
+permission; the corrected complete suite passed. API head `711a6ff963937de1c59c3d6e70366ee646d95732`,
+tree `5670030031bba2371bb65e19222b3baf9b2ef7bd`, is published as
+[Draft #87](https://github.com/inlifemedicina/cevra/pull/87), stacked on #86's
+foundation branch/head `58531d6`; later UI work continues in this same Draft.
+PR CI `37377661842` and exact runtime `37377661645` passed. Push CI
+`37377581988` failed one existing editorial UI fixture while four jobs passed.
+The fixture attempted title edits before inputs became editable; its bounded
+correction waits for editable state, with no production editorial change.
+
+The working UI now connects all seven intents, reusable source-clock IN/OUT and
+numeric source ranges, insert before selection, adjacent moves and ripple trim
+handles on the selected montage clip. It uses the existing mutation/close/save
+gates, preserves newer selections on late confirmation and reconciles committed
+save errors without replay. PT/EN have the same controls. Montage playback is
+explicitly pending; multi-clip selection shows the original source, not a composed
+preview. Seven focused UI tests passed using the production Application service
+with controlled offline identity/transport fixtures; the complete Desktop suite
+passed 125/125, i18n 2/2 and the production build passed. Both independent
+read-only reviews approved UI tree `71c7ceb96883ef163e08752b54314af6dd15389b`.
+Twelve owned headless layout cases passed at 900/1120/1440 px, PT/EN and
+open/compact sidebar, checking hit targets, clip-row visibility and overflow.
+An initial browser failure from a value import of Application's Node utilities
+was fixed with type-only imports and browser-only affordance checks; authoritative
+validation remains in Host/Application. UI publication proceeds in the same Draft.
 
 M0 head `58531d671d7e45931e079e153613962d23f932d7` passed push CI
 `37373291877`, 5/5, and PR CI `37373297199` attempt 2, 5/5. PR attempt 1's
@@ -207,7 +230,10 @@ unacquired Media runner failure remains preserved. Post-#85 exact-runtime run
 Transcription was not acquired by a hosted runner and had no execution steps.
 GitHub reports internal-server correlation `73bcdb54-c553-45d8-98e5-f86f26522866`
 in the [attempt receipt](https://github.com/inlifemedicina/cevra/actions/runs/37371249855/attempts/3).
-That run remains FAILURE after bounded retries, not a full post-merge PASS.
+Attempt 4 later completed SUCCESS, 5/5, after a single targeted retry supported
+by fresh successful M1 runner execution. Main's actual Transcription job executed
+its nine steps and passed; this is a terminal post-merge receipt, distinct from
+the equivalent unchanged contracts passed on M0. Attempts 1–3 remain failures.
 These are separate receipts;
 remote success on M0 is not CI or functional acceptance for this local M1 tree.
 
@@ -271,7 +297,23 @@ fixtures, so preservation of explicitly tagged source colour is still unproved.
 The active-frame video experiment and this full-colour/audio experiment are
 complementary fixtures, not one integrated fractional/VFR high-quality export.
 
-Concrete proposal pending owner decision: active-frame exact-range policy;
+The owner approved the initial simple-export profile on 2026-10-05:
+MP4/H264/AAC, 1920×1080, 30 fps, SDR and a 20-Mb/s target, preserving requested
+IN/OUT; 512 MiB renderer memory and 2 GiB owned temporary job files, with a clear
+error rather than silent quality reduction. This authorizes bounded implementation
+and automatic validation, not other formats/resolutions, HDR or a source-cut change.
+Technical admission and temporal feasibility remain required before adoption.
+
+The boundary-cadence distinction is concrete: an owned 1080p H264 fixture for
+IN 901/OUT 908 has one packet at zero with exactly 7,000 μs duration. Its reported
+rate is 1000/7, not constant 30 Hz. Exact arbitrary millisecond cuts require
+shortened first/last picture exposure; strict 30-Hz frame exposures cannot also
+represent a 7-ms program. Do not infer approval to snap cuts or silently describe
+variable boundary timing as strict CFR30. The affected cadence interpretation
+must be reconciled with the owner-approved profile before production admission;
+independent UI and canonical preview-plan preparation continue.
+
+The active-frame implementation proposal remains under that temporal check:
 MP4/H264 VideoToolbox SDR/yuv420p without a forced BT.709 override, with declared
 source-colour admission/preservation proved before production,
 one original-derived lossy generation per unique segment, copy join/mux and
@@ -280,12 +322,44 @@ canvas/cadence/audio/orientation compatibility explicitly fixed before shipping.
 The existing Take source bounds are not silently narrowed or expanded by this
 prototype. HDR/4K, rotated/mixed canvases, no-audio/mixed layouts, longer aggregate
 programs and other rates require declared compatibility and execution proof.
-Candidate operational gates are one render job, streaming I/O, 512 MiB renderer
+Approved initial operational gates are one render job, streaming I/O, 512 MiB renderer
 subtree memory and 2 GiB total owned-job disk with explicit preflight/failure,
 rather than truncating ranges or destroying unsaved Host state. These budgets
-are proposed, not proved across the envelope or adopted production limits.
-Retained owned-file totals are not sampled peak disk; originals and any private
-input copies must also be accounted for before enforcing a total-job budget.
+are approved targets, not proved across the envelope or adopted production limits.
+Retained owned-file totals are not sampled peak disk; preflight must account for
+source sizes and any private input copies before enforcing a total-job budget.
+
+The three policies and their proof limits remain in this same plan:
+
+- **Off-grid cuts:** show the original frame already active at requested IN,
+  beginning at local zero, preserve later frame times and end exactly at OUT.
+  For a 30-fps frame spanning 900–933.333 ms, IN 901/OUT 908 displays that active
+  picture for exactly 7 ms; audio uses the requested source range. The alternative
+  is snapping requested boundaries to a frame grid, which changes timing and can
+  expand or empty a sub-frame excerpt. Production uses decoded display-frame
+  coverage, including B-frame order; it must reject unproved gaps/tails visibly.
+- **Default quality/size:** the approved initial candidate is MP4/H264 VideoToolbox,
+  SDR 8-bit yuv420p, 20 Mb/s at 1920×1080/30 fps, plus one AAC192k encode.
+  The alternative 4.98-Mb/s candidate makes smaller files at the measured lower
+  fidelity. This test selects no HDR/4K or Windows export promise. Other admitted
+  canvases/cadences/rotation/colour/audio layouts need measured compatibility;
+  bitrate scaling is engineering work under the chosen quality priority.
+- **Bounded failure policy:** one streaming render job, provisionally 512 MiB
+  resident memory for its owned renderer subtree and 2 GiB of owned job files,
+  including private input copies, intermediates and the new output. Existing
+  original files outside the job remain immutable. These numbers give headroom
+  over the measured ~137-MB single-child peak and ~491-MB retained files plus
+  originals, but whole-subtree/peak-disk evidence is still required. There is no
+  new fixed aggregate-duration limit: duration is the sum of canonical ranges;
+  longer programs consume more resources. Preflight rejects an over-budget plan
+  visibly; a measured overrun cancels only the owned render, preserves project/
+  unsaved Host/originals/prior final output and reports the limit, without silently
+  truncating ranges or lowering quality. The thresholds are provisional tuning,
+  not certified limits for the full envelope.
+
+Packet timescales, flags, sampling, copy checks and exact threshold tuning are
+technical validation, not separate owner protocols. Approval of these policies
+does not certify the unmeasured envelope or close G1/G5/G6.
 
 Minimum remaining integration: typed Contracts/Runtime plan and packet evidence,
 source/display/colour admission and full clock oracle, owned-file publication/

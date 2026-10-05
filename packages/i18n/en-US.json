@@ -367,5 +367,21 @@
   "sidebar.activateCompact": "Activate compact mode",
   "sidebar.tabs": "Editing column content",
   "sidebar.directorTab": "Director",
-  "sidebar.controlsTab": "Controls"
+  "sidebar.controlsTab": "Controls",
+  "sequence.controls": "Montage controls",
+  "sequence.sourceRange": "Source range",
+  "sequence.source": "Source",
+  "sequence.inSeconds": "IN (seconds)",
+  "sequence.outSeconds": "OUT (seconds)",
+  "sequence.append": "Append range",
+  "sequence.insert": "Insert before selected",
+  "sequence.trim": "Trim selected",
+  "sequence.duplicate": "Duplicate selected",
+  "sequence.split": "Split at playhead",
+  "sequence.earlier": "Move earlier",
+  "sequence.later": "Move later",
+  "sequence.remove": "Remove selected",
+  "sequence.selectClip": "Select a timeline clip to insert, trim, split, reorder or remove.",
+  "sequence.previewPending": "You are viewing the original source. Montage controls are available; sequence playback is still being prepared.",
+  "sequence.unavailable": "This montage edit is unavailable. Select a compatible clip or source and try again."
 }

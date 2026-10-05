@@ -340,6 +340,17 @@ h1, h2, h3, p { margin: 0; }
 .manual-preview-controls time { font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .manual-preview-timing { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; color: #b7c3d4; font-size: 11px; font-variant-numeric: tabular-nums; }
 .manual-preview-marks { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.manual-sequence-controls { flex: 0 0 auto; min-width: 0; max-height: 130px; overflow: auto; padding: 4px 12px 8px; border-bottom: 1px solid var(--cevra-border); font-size: 11px; }
+.timeline { display: flex; flex-direction: column; }
+.timeline-toolbar { flex-shrink: 0; }
+.timeline-table { flex: 1; min-height: 0; height: auto; }
+.manual-sequence-controls fieldset { display: flex; align-items: end; flex-wrap: wrap; gap: 6px 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.manual-sequence-controls legend { padding: 0; margin-bottom: 4px; color: var(--cevra-fg-muted); }
+.manual-sequence-controls label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.manual-sequence-controls input, .manual-sequence-controls select { height: 26px; width: 94px; max-width: 100%; border: 1px solid var(--cevra-border); border-radius: 4px; background: var(--cevra-surface-2); color: var(--cevra-fg); padding: 2px 6px; }
+.manual-sequence-controls select { width: 132px; }
+.manual-sequence-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.manual-sequence-actions span, .manual-sequence-controls fieldset > span { color: var(--cevra-fg-muted); }
 .manual-preview-marks output { font-size: 11px; font-variant-numeric: tabular-nums; color: #b7c3d4; }
 .manual-create-clip-button { height: 29px; padding: 0 9px; border: 1px solid var(--cevra-accent); border-radius: var(--cevra-radius-sm); background: var(--cevra-accent); color: var(--cevra-accent-contrast); font-size: 11px; font-weight: 700; cursor: pointer; }
 .manual-create-clip-button:hover:not(:disabled) { background: var(--cevra-accent-strong); border-color: var(--cevra-accent-strong); }
