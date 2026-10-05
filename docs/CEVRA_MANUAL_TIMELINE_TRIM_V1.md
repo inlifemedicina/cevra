@@ -433,12 +433,36 @@ terminal; failed/private harness attempts are not promoted to PASS.
 
 The owner accepted compact/tabs/fields/scroll in the R2 round at 12:34 UTC.
 Preserve that acceptance and the earlier real orientation/voice/content/save/
-reopen round. V1 first frame remains APP/OWNER FAIL at R2; after this correction,
-only that first-frame recheck is PENDING. No repeated compact/layout round,
-private human store read/copy, app/device operation, real AI or media publication.
+reopen round. V1 first frame was APP/OWNER FAIL at R2. The owner-directed R3
+transition and subsequent report supersede only that bounded first-frame
+failure: at reviewed commit `7d4e66776fbfc112429d333e5d8883221c2851fb`, Original
+and V1 appeared before Play, first V1 took approximately two seconds, and
+subsequent Original↔V1 switches appeared immediate. APP/OWNER PASS is limited
+to this first-frame/observed-fluency recheck; the times are owner observations,
+not a general measured latency guarantee. No repeated compact/layout round,
+private human store read/copy, device operation, real AI or media publication.
 Director impact compatible; existing proposal/permission/execution/state
 boundaries and official global roadmap progress 55% are unchanged. Full
 composition/export/release and broader provider gates remain open.
+
+### R3 IN/OUT location check — 2026-10-05
+
+The owner separately reported that the IN/OUT buttons were not apparent.
+Creation buttons “Marcar IN/OUT” appear below the preview only while the timeline
+is empty. Once the simple V1 exists, select it and adjust the two blue handles
+on its timeline edges: IN on the left, OUT on the right. These controls remain
+in the central preview/timeline area. This condition predates R3 and is present
+in the Draft #84 base `a36d8ba4d85ab103d96cfa6309a5c53c7eb6d5c4`.
+
+Read-only accessibility inspection of the actual R3 window found Edit/open mode,
+the existing V1 selected, and both enabled handles fully inside the window and
+its scroll viewport. Each handle is about 16×21 px; the visible range is
+IN 5.037 s · OUT 9.928 s. No overflow or mode-dependent omission of those handles
+was established. The narrow unlabeled grips explain their location, but whether
+they are clear enough remains an owner UX question. No selection, scrolling,
+trim, Play, screenshot or app activation was performed. The foreground PID was
+the same before and after the read; continuous foreground preservation is not
+claimed. No new control/layout or multi-clip behavior was introduced.
 
 
 ### Complete native IPC and budget controls

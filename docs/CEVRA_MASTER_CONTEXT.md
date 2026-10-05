@@ -2980,9 +2980,10 @@ history, schema or persistence extension, progress 55%, F-A02 exhausted 1/1.
 ### 2026-10-05 — Approved bounded preview fluency and first-frame admission
 
 The R2 owner round accepted compact/tabs/fields/scroll at 12:34 UTC; its V1
-initial frame remains FAIL. Earlier orientation/voice/content/save/reopen and
-Original initial-frame acceptance are preserved. Recheck only the corrected
-V1 first frame, with no repeated layout round or existing-session operation.
+initial-frame FAIL is preserved as historical evidence. Earlier
+orientation/voice/content/save/reopen and Original initial-frame acceptance
+are preserved. The owner-directed normal R3 transition then enabled only the
+corrected V1 first-frame recheck, with no repeated layout round.
 
 The owner approved measured exact-range session reuse plus a PNG extracted
 from the admitted derivative, then bounded reuse of verified independent source
@@ -3000,8 +3001,22 @@ fell from 6.041 s to 1.528 s; another new range from 6.542 s to 2.089 s. Retaine
 V1 host samples are 25.1–27.8 ms, explicitly not full UI latency. Native complete-IPC control PASS: retained V1 PNG present in 56–150 ms and
 Play ready in 197–325 ms; cold Original 9.878 s and first V1 2.226 s to readiness.
 A separate sampled budget/eviction/close control PASS. Exact commit CI and the
-closed review package remain terminal receipts, with no promotion of human
-acceptance or product READY.
+review package are verified at `7d4e66776fbfc112429d333e5d8883221c2851fb`;
+Drafts #84/#85 remain unmerged. The owner explicitly authorized normal R2
+retirement and R3 opening, preserving the saved Original/V1 project. The R3
+owner reported that both first frames appeared, the first V1 took approximately
+two seconds, and subsequent Original↔V1 switches appeared immediate. This is
+limited APP/OWNER PASS for first frame and observed switching, not a latency
+guarantee or product READY. Preserve earlier accepted layout and real Take
+behavior without repeating those rounds.
+
+The owner's separate question about absent IN/OUT buttons remains a
+discoverability observation. Read-only current-window inspection found both
+enabled V1 trim handles inside the visible central timeline, IN 5.037 s and
+OUT 9.928 s. Creation buttons are omitted once the timeline contains an item;
+that condition predates R3. No trim, selection, scroll, Play, capture or focus
+action was performed, and no new layout or editing behavior was introduced.
+[Current location and limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#r3-inout-location-check--2026-10-05).
 [Canonical decision](adr/0032-bounded-preview-session-reuse.md) and
 [measurements/limits](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-preview-fluency-and-admitted-png--2026-10-05).
 Director impact compatible, official progress stays 55%, F-A02 remains exhausted

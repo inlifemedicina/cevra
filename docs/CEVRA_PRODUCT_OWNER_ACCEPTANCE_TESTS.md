@@ -387,14 +387,31 @@ Reuse I4-T1, D14-T2, X-T1/T7/T10 and the bounded simple-clip X-T6/T9,
 I13-T3 and K3-T2 variant. The owner accepted the R2 compact/tabs/fields/scroll
 round at 12:34 UTC; the earlier numbered layout step is now PASS for that bounded
 variant and must not be repeated. Preserve Original first-frame PASS and the
-real Take orientation/voice/content/save/reopen PASS. V1 first frame remains
-APP/OWNER FAIL at R2; technical controls cannot supersede it.
+real Take orientation/voice/content/save/reopen PASS. The V1 first-frame
+APP/OWNER FAIL at R2 remains historical evidence; technical controls alone
+cannot supersede it.
 
 After a safe owner-directed normal transition to the designated reviewed
 package, select the existing V1 excerpt before Play. Confirm its intended first
 frame appears while paused, with the existing IN/OUT and excerpt intact. This
-is the only new human recheck; its status is PENDING. No full repeated round or
-promotion of composition/export/release/catalog-wide acceptance follows.
+was the only new human recheck. On the owner-directed R3 transition at reviewed
+commit `7d4e66776fbfc112429d333e5d8883221c2851fb` (tree
+`e303129639b24a5187ae81baaf12a949528c8af2`), the owner reported: “NO ORIGINAL
+APARECEU. NO V1 APARECEU NA PRIMEIRA APOS 2SEG E APOS IR E VOLTAR FICOU
+IMEDIATO.” This establishes APP/OWNER PASS for the corrected paused V1 first
+frame and the observed Original↔V1 switching in this bounded fixture. The
+approximately two-second first selection and subsequent immediate switches
+are human observations, not a measured latency guarantee. No full repeated
+round or promotion of composition/export/release/catalog-wide acceptance follows.
+
+The same report asks where the IN/OUT buttons went. This is a separate
+discoverability question, not an IN/OUT acceptance. Read-only inspection found
+the existing selected V1's two enabled timeline handles inside the visible
+window in open mode, with canonical IN 5.037 s and OUT 9.928 s. “Marcar IN/OUT”
+creation buttons render only while the timeline is empty; that condition also
+exists in the pre-R3 base. No control was moved to the sidebar, and this check
+performed no trim, selection, scroll, Play or focus action. Keep the previously
+accepted trim behavior without promoting this unanswered UX observation to PASS.
 
 AUTO/UNIT: exact-range cache identity/eviction/undo/redo/cancellation/close,
 admitted PNG publication and stale UI decoding, plus verified independent
