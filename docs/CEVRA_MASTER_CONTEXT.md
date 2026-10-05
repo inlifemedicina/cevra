@@ -2658,6 +2658,21 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
+**Current priority — 2026-10-05:** after the complete code/EDVID/market audit,
+the Product Owner approved complete workflow blocks. Foundation and manual G1
+(continuous multi-clip edit, sequence preview and simple original-master export)
+are IN DEVELOPMENT, with automated G1/G5/G6 before grouped subjective review.
+The [G1 plan](CEVRA_MANUAL_SEQUENCE_G1.md) records baselines, milestones, pending
+material choices and gates. It grants no advanced catalog, dependency/provider
+or app/human-media/device action. Prepare reviewed #84 then #85; both remain
+Draft/unmerged, and explicit merge authorization is pending after automatic
+approval review rejected #84. Do not retry/bypass that rejection. Preserve all
+scoped R3/Take evidence. The plan records the isolated technical M0 implementation,
+bounded tests/source reviews and remaining sequence/render prerequisites.
+Naming: Creator=Lite, Studio=Full, Vids=Desktop; I19's Full visual workspace/final
+output remains independent of Vids. No G1 PASS is implied; F-A02 and progress
+remain unchanged. Historical actions below retain their scope and evidence.
+
 1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved admission of the designated F-A02 result/history into a temporary native session is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-revise-editorial-draft"
+description = "Enables the desktop_revise_editorial_draft command without any pre-configured scope."
+commands.allow = ["desktop_revise_editorial_draft"]
+
+[[permission]]
+identifier = "deny-desktop-revise-editorial-draft"
+description = "Denies the desktop_revise_editorial_draft command without any pre-configured scope."
+commands.deny = ["desktop_revise_editorial_draft"]

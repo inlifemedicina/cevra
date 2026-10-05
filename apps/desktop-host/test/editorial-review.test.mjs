@@ -10,7 +10,7 @@ function setup(admit = true) {
   const input = structuredClone(fixture);
   const history = ProjectHistory.fromArchive(input.history);
   let checkpoints = 0;
-  const session = new DesktopSession({ history, mediaCapability: { available: false, reason: "runtime-not-configured" }, transcriptionCapability: { available: false, reason: "runtime-not-configured" }, persistence: { state: "local-unsaved", async checkpoint() { checkpoints++; } } });
+  const session = new DesktopSession({ history, mediaCapability: { available: false, reason: "runtime-not-configured" }, transcriptionCapability: { available: false, reason: "runtime-not-configured" }, persistence: { state: "local-saved", stateFor() { return "local-saved"; }, async checkpoint() { checkpoints++; } } });
   if (admit) session.acceptEditorialAnalysis(input.request);
   const lines = [];
   const server = new DesktopHostProtocolServer(session, { writeProtocolLine(line) { lines.push(JSON.parse(line)); }, writeLog() {}, requestShutdown() {} });

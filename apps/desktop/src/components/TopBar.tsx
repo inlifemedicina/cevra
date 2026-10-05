@@ -9,7 +9,9 @@ interface TopBarProps {
   sidebarCompact: boolean;
   mediaOpen: boolean;
   exportAvailable: boolean;
-  status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable" | "temporary-review";
+  status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "checkpoint-pending" | "host-unavailable" | "temporary-review";
+  retryAvailable: boolean;
+  retryBusy: boolean;
   canUndo: boolean;
   canRedo: boolean;
   t: Translate;
@@ -19,16 +21,20 @@ interface TopBarProps {
   onMediaToggle(): void;
   onUndo(): void;
   onRedo(): void;
+  onRetryCheckpoint(): void;
 }
 
-export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOpen, exportAvailable, status, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onSidebarToggle, onMediaToggle, onUndo, onRedo }: TopBarProps) {
+export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOpen, exportAvailable, status, retryAvailable, retryBusy, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onSidebarToggle, onMediaToggle, onUndo, onRedo, onRetryCheckpoint }: TopBarProps) {
   function handleWorkspaceKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const currentIndex = workspaces.indexOf(workspace);
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     const delta = event.key === "ArrowRight" ? 1 : -1;
     const next = workspaces[(currentIndex + delta + workspaces.length) % workspaces.length];
-    if (next) onWorkspaceChange(next);
+    if (next) {
+      onWorkspaceChange(next);
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="tab"]')[workspaces.indexOf(next)]?.focus();
+    }
   }
 
   return (
@@ -62,18 +68,19 @@ export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOp
         <button type="button" data-sidebar-toggle className={sidebarCompact ? "icon-button toggled sidebar-toggle" : "icon-button sidebar-toggle"} onClick={onSidebarToggle} aria-label={t(sidebarCompact ? "sidebar.activateOpen" : "sidebar.activateCompact")} title={t(sidebarCompact ? "sidebar.activateOpen" : "sidebar.activateCompact")} aria-pressed={sidebarCompact} aria-controls="editing-sidebar"><Icon name="inspect" /></button>
         <button type="button" className="icon-button" disabled={!canUndo} onClick={onUndo} aria-label={t("action.undo")} title={canUndo ? t("action.undo") : t("history.undoUnavailable")}><Icon name="undo" /></button>
         <button type="button" className="icon-button" disabled={!canRedo} onClick={onRedo} aria-label={t("action.redo")} title={canRedo ? t("action.redo") : t("history.redoUnavailable")}><Icon name="redo" /></button>
-        <span className={`save-status ${status === "demo-not-persisted" ? "demo-status" : status === "host-unavailable" || status === "persistence-error" ? "failed-status" : "local-status"}`}><i aria-hidden="true" />{t(statusKey(status))}</span>
+        <span role="status" className={`save-status ${status === "demo-not-persisted" ? "demo-status" : status === "host-unavailable" || status === "persistence-error" ? "failed-status" : "local-status"}`}><i aria-hidden="true" />{t(statusKey(status))}</span>
+        {retryAvailable && <button type="button" className="save-retry-button" disabled={retryBusy} onClick={onRetryCheckpoint}>{t("top.retrySave")}</button>}
         <button className="locale-button" type="button" onClick={() => onLocaleChange(locale === "pt-BR" ? "en-US" : "pt-BR")} aria-label={t("top.switchLanguage")} title={t("top.switchLanguage")}>
           {locale === "pt-BR" ? "EN" : "PT"}
         </button>
         <button type="button" className="export-button" disabled={!exportAvailable} title={exportAvailable ? undefined : t("status.unavailableDetail")}>{t("action.export")}</button>
-        <button type="button" className="icon-button" disabled aria-label={t("top.settings")} title={t("status.unavailableDetail")}><Icon name="settings" /></button>
+        <button type="button" className="icon-button settings-action" disabled aria-label={t("top.settings")} title={t("status.unavailableDetail")}><Icon name="settings" /></button>
       </div>
     </header>
   );
 }
 
-function statusKey(status: TopBarProps["status"]): "top.demoNotPersisted" | "top.localUnsaved" | "top.saved" | "top.recovered" | "top.persistenceError" | "runtime.hostUnavailable" | "top.temporaryReview" {
+function statusKey(status: TopBarProps["status"]): "top.demoNotPersisted" | "top.localUnsaved" | "top.saved" | "top.recovered" | "top.persistenceError" | "top.saving" | "runtime.hostUnavailable" | "top.temporaryReview" {
   switch (status) {
     case "demo-not-persisted": return "top.demoNotPersisted";
     case "local-unsaved": return "top.localUnsaved";
@@ -81,6 +88,7 @@ function statusKey(status: TopBarProps["status"]): "top.demoNotPersisted" | "top
     case "local-saved": return "top.saved";
     case "local-recovered": return "top.recovered";
     case "persistence-error": return "top.persistenceError";
+    case "checkpoint-pending": return "top.saving";
     case "host-unavailable": return "runtime.hostUnavailable";
   }
 }

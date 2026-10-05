@@ -1,8 +1,21 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-10-03
+**Updated:** 2026-10-05
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 **Current global weighted roadmap progress:** 55%.
+
+**Active approved sequence:** foundation → G1 continuous manual montage,
+program preview and simple original-master export → identity/composition →
+audio/captions/refinement → presets/Director → distribution. G5 fluency and G6
+recovery accompany each available flow; automation precedes grouped owner review.
+[Milestones and pending material choices](CEVRA_MANUAL_SEQUENCE_G1.md).
+Reviewed #84→#85 preparation continues; both are Draft/unmerged and explicit
+merge authorization remains pending after automatic review rejected #84.
+M0 has bounded automated/source-review evidence, recorded in the plan;
+continuous sequence/render consumers remain blocked. Historical R3/Take PASS
+remains limited. No G1 PASS, real AI, dependency, human
+media/app/device action or release claim is implied. Creator=Lite, Studio=Full,
+Vids=Desktop; Lite/Full share core and Full visual output does not require Vids.
 
 ```text
 CEVRA VIDS

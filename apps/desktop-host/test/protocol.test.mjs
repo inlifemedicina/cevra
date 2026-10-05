@@ -24,7 +24,8 @@ function createServer() {
   const session = new DesktopSession({
     history: new ProjectHistory(createEmptyProject({ id: "protocol-project", now: "2026-09-14T00:00:00.000Z" })),
     mediaCapability: unavailable,
-    transcriptionCapability: unavailable
+    transcriptionCapability: unavailable,
+    temporaryEditorialReview: true
   });
   const server = new DesktopHostProtocolServer(session, {
     writeProtocolLine(line) { lines.push(JSON.parse(line)); },
@@ -107,9 +108,26 @@ test("responses retain their request IDs when requests complete out of order", a
 
 test("host.shutdown acknowledges before requesting process shutdown", async () => {
   const { server, lines, didShutdown } = createServer();
-  await server.handleLine(JSON.stringify({ protocolVersion: 1, id: "shutdown", method: "host.shutdown", params: {} }));
-  assert.deepEqual(lines[0].result, { shuttingDown: true });
+  await server.handleLine(JSON.stringify({ protocolVersion: 1, id: "prepare", method: "host.prepareClose", params: { attemptId: "close-test" } }));
+  await server.handleLine(JSON.stringify({ protocolVersion: 1, id: "shutdown", method: "host.shutdown", params: { attemptId: "close-test" } }));
+  assert.deepEqual(lines[0].result, { ready: true, attemptId: "close-test" });
+  assert.deepEqual(lines[1].result, { shuttingDown: true });
   assert.equal(didShutdown(), true);
+});
+
+test("checkpoint and lifecycle requests reject unknown fields and invalid bindings before execution", async () => {
+  const { server, lines, didShutdown } = createServer();
+  for (const [method, params] of [
+    ["project.checkpoint", {}],
+    ["project.checkpoint", { expectedToken: "checkpoint-v1:" + "G".repeat(64) }],
+    ["project.checkpoint", { expectedToken: "checkpoint-v1:" + "a".repeat(64), command: "project.rename" }],
+    ["host.prepareClose", { attemptId: "close-test", discard: true }],
+    ["host.cancelClose", { attemptId: "" }],
+    ["host.shutdown", {}]
+  ]) await server.handleLine(JSON.stringify({ protocolVersion: 1, id: "invalid-" + lines.length, method, params }));
+  assert.equal(lines.length, 6);
+  assert.ok(lines.every(line => line.error.code === "HOST_INVALID_PARAMS"));
+  assert.equal(didShutdown(), false);
 });
 
 test("operation cancellation reaches a live AbortController", async () => {
@@ -164,13 +182,15 @@ test("session shutdown waits for cancelled long operations to reap", async () =>
 test("the bundled host keeps stdout protocol-only and logs on stderr", async () => {
   const execution = await runHost([
     { protocolVersion: 1, id: "hello", method: "host.hello", params: {} },
-    { protocolVersion: 1, id: "bye", method: "host.shutdown", params: {} }
+    { protocolVersion: 1, id: "prepare", method: "host.prepareClose", params: { attemptId: "close-bundle" } },
+    { protocolVersion: 1, id: "bye", method: "host.shutdown", params: { attemptId: "close-bundle" } }
   ]);
   assert.equal(execution.code, 0);
   const responses = execution.stdout.trim().split("\n").map((line) => JSON.parse(line));
-  assert.equal(responses.length, 2);
+  assert.equal(responses.length, 3);
+  assert.deepEqual(responses.find(response => response.id === "bye").result, { shuttingDown: true });
   assert.match(execution.stderr, /ready/u);
-  assert.doesNotMatch(execution.stdout, /ready/u);
+  assert.doesNotMatch(execution.stdout, /\[cevra-desktop-host\]/u);
 });
 
 test("an externally terminated host exits and cannot leave a network listener", async () => {

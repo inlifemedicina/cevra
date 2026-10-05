@@ -1,5 +1,7 @@
 #[allow(dead_code)]
 pub const APPLICATION_COMMANDS: &[&str] = &[
+    "desktop_get_close_state",
+    "desktop_retry_checkpoint",
     "desktop_get_state",
     "desktop_pick_and_ingest_media",
     "desktop_transcribe_source",

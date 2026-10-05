@@ -66,6 +66,7 @@ class ManualBackend implements DesktopBackend {
   async transcribeSource() { return this.loadState(); }
   async undo() { this.history.undo(); return this.loadState(); }
   async redo() { this.history.redo(); return this.loadState(); }
+  async retryCheckpoint(): Promise<never> { throw { code: "PROJECT_PERSISTENCE_UNAVAILABLE" }; }
   async cancelOperation(operationId: string) { return { operationId, cancelled: false }; }
 }
 

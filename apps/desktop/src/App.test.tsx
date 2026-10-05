@@ -91,6 +91,7 @@ class FunctionalDesktopBackend implements DesktopBackend {
   }
   async undo(): Promise<DesktopBackendState> { this.history.undo(); return this.state(); }
   async redo(): Promise<DesktopBackendState> { this.history.redo(); return this.state(); }
+  async retryCheckpoint(): Promise<never> { throw { code: "PROJECT_PERSISTENCE_UNAVAILABLE" }; }
   async cancelOperation(operationId: string) { return { operationId, cancelled: false }; }
 
   state(project = this.history.current): DesktopBackendState {
@@ -141,7 +142,12 @@ describe("CEVRA Vids desktop shell", () => {
     const edit = screen.getByRole("tab", { name: "Editar" });
     edit.focus();
     fireEvent.keyDown(edit.parentElement!, { key: "ArrowRight" });
-    expect(screen.getByRole("tab", { name: "Transcrição" }).getAttribute("aria-selected")).toBe("true");
+    const transcription = screen.getByRole("tab", { name: "Transcrição" });
+    expect(transcription.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(transcription);
+    fireEvent.keyDown(transcription, { key: "ArrowLeft" });
+    expect(edit.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(edit);
   });
 
   it("preserves the same playhead when changing workspaces", async () => {

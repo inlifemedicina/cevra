@@ -2,9 +2,10 @@ use crate::protocol::{
     DesktopCommandError, HostRequest, HostResponse, JsonLineFramer, PendingRequests,
     MAX_MESSAGE_BYTES, PROTOCOL_VERSION,
 };
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
@@ -89,6 +90,8 @@ struct LaunchedHost {
 }
 
 struct SupervisorCore {
+    close_admission: AtomicBool,
+    exit_committed: AtomicBool,
     process: Mutex<Option<Arc<dyn ProcessControl>>>,
     pending: Mutex<PendingRequests>,
     lifecycle: watch::Sender<Lifecycle>,
@@ -101,6 +104,8 @@ impl SupervisorCore {
     fn new(timeouts: SupervisorTimeouts) -> Self {
         let (lifecycle, _) = watch::channel(Lifecycle::Stopped);
         Self {
+            close_admission: AtomicBool::new(false),
+            exit_committed: AtomicBool::new(false),
             process: Mutex::new(None),
             pending: Mutex::new(PendingRequests::default()),
             lifecycle,
@@ -289,8 +294,17 @@ impl SupervisorCore {
         ),
         DesktopCommandError,
     > {
+        if self.exit_committed.load(Ordering::Acquire) && !internal {
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_PENDING", "Application exit has been committed."));
+        }
+        if self.close_admission.load(Ordering::Acquire) && !internal
+            && !matches!(method, "project.snapshot" | "host.status" | "editorial.snapshot" | "operation.cancel") {
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_PENDING", "The native close request has not settled."));
+        }
         let state = self.state();
-        let permitted = state == Lifecycle::Ready
+        let close_read = self.close_admission.load(Ordering::Acquire)
+            && matches!(method, "project.snapshot" | "host.status" | "editorial.snapshot" | "operation.cancel");
+        let permitted = state == Lifecycle::Ready || (state == Lifecycle::Stopping && close_read)
             || (internal && matches!(state, Lifecycle::Starting | Lifecycle::Stopping));
         if !permitted {
             return Err(DesktopCommandError::new(
@@ -425,6 +439,18 @@ impl SupervisorCore {
 pub struct DesktopHostSupervisor {
     core: Arc<SupervisorCore>,
     start_guard: AsyncMutex<()>,
+    close_guard: AsyncMutex<()>,
+    close_state: Mutex<NativeCloseState>,
+    close_attempt: Mutex<Option<String>>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeCloseState {
+    pub sequence: u64,
+    pub pending: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
 }
 
 impl DesktopHostSupervisor {
@@ -435,6 +461,9 @@ impl DesktopHostSupervisor {
         Self {
             core: Arc::new(SupervisorCore::new(timeouts)),
             start_guard: AsyncMutex::new(()),
+            close_guard: AsyncMutex::new(()),
+            close_state: Mutex::new(NativeCloseState { sequence: 0, pending: false, error_code: None }),
+            close_attempt: Mutex::new(None),
         }
     }
 
@@ -455,8 +484,14 @@ impl DesktopHostSupervisor {
     where
         F: FnOnce(bool) -> Result<LaunchedHost, DesktopCommandError>,
     {
-        if self.core.state() == Lifecycle::Ready {
+        if self.core.exit_committed.load(Ordering::Acquire) {
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_PENDING", "Application exit has been committed; a new host will not be started."));
+        }
+        if matches!(self.core.state(), Lifecycle::Ready | Lifecycle::Stopping) {
             return Ok(());
+        }
+        if self.core.close_admission.load(Ordering::Acquire) {
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_PENDING", "Close reconciliation is still active; a recovery host will not be started."));
         }
         if self.core.state() == Lifecycle::Failed {
             return Err(DesktopCommandError::new(
@@ -465,8 +500,14 @@ impl DesktopHostSupervisor {
             ));
         }
         let _guard = self.start_guard.lock().await;
-        if self.core.state() == Lifecycle::Ready {
+        if self.core.exit_committed.load(Ordering::Acquire) {
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_PENDING", "Application exit has been committed; a new host will not be started."));
+        }
+        if matches!(self.core.state(), Lifecycle::Ready | Lifecycle::Stopping) {
             return Ok(());
+        }
+        if self.core.close_admission.load(Ordering::Acquire) {
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_PENDING", "Close reconciliation is still active; a recovery host will not be started."));
         }
         if self.core.state() == Lifecycle::Failed {
             return Err(DesktopCommandError::new(
@@ -560,20 +601,92 @@ impl DesktopHostSupervisor {
             .await
     }
 
-    pub async fn shutdown(&self) {
-        if self.core.state() == Lifecycle::Stopped {
-            return;
-        }
-        if self.core.state() != Lifecycle::Ready {
+    pub fn native_close_state(&self) -> Result<NativeCloseState, DesktopCommandError> {
+        Ok(self.close_state.lock().map_err(lock_error)?.clone())
+    }
+
+    fn set_close_state(&self, pending: bool, error_code: Option<&str>) -> Result<(), DesktopCommandError> {
+        self.core.close_admission.store(pending, Ordering::Release);
+        let mut state = self.close_state.lock().map_err(lock_error)?;
+        state.sequence = state.sequence.saturating_add(1);
+        state.pending = pending;
+        state.error_code = error_code.map(str::to_owned);
+        if !pending { *self.close_attempt.lock().map_err(lock_error)? = None; }
+        Ok(())
+    }
+
+    async fn cancel_close_attempt(&self, attempt: &str) -> Result<bool, DesktopCommandError> {
+        let result = self.core.request_internal("host.cancelClose", json!({ "attemptId": attempt }), self.core.timeouts.control).await?;
+        if result.get("released").and_then(Value::as_bool) == Some(true) {
+            if self.core.state() == Lifecycle::Stopping { self.core.set_state(Lifecycle::Ready); }
+            self.set_close_state(false, None)?;
+            Ok(false)
+        } else if result.get("committed").and_then(Value::as_bool) == Some(true) {
+            Ok(true)
+        } else { Err(DesktopCommandError::new("PROJECT_CLOSE_UNKNOWN", "Native close admission remains unknown.")) }
+    }
+
+    pub async fn shutdown(&self) -> Result<(), DesktopCommandError> {
+        let _guard = self.close_guard.try_lock().map_err(|_| DesktopCommandError::new("PROJECT_CLOSE_PENDING", "A close request is already active."))?;
+        if self.core.exit_committed.load(Ordering::Acquire) { return Ok(()); }
+        // Serialize a stopped/startup decision with startup admission. Never cancel
+        // an in-progress launch merely because native Close/Exit was requested.
+        let _startup = self.start_guard.try_lock().map_err(|_| {
+            let _ = self.set_close_state(false, Some("PROJECT_CLOSE_BUSY"));
+            DesktopCommandError::new("PROJECT_CLOSE_BUSY", "Desktop startup is still active.")
+        })?;
+        if matches!(self.core.state(), Lifecycle::Stopped | Lifecycle::Recoverable | Lifecycle::Failed) {
+            // These states hold no live unsaved Host; do not start a recovery as a close side effect.
             self.core.force_stop();
-            return;
+            self.complete_close()?;
+            return Ok(());
         }
-        let mut lifecycle = self.core.lifecycle.subscribe();
+        if self.core.state() == Lifecycle::Starting {
+            self.set_close_state(false, Some("PROJECT_CLOSE_BUSY"))?;
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_BUSY", "Desktop startup is still active."));
+        }
+        let previous_attempt = self.close_attempt.lock().map_err(lock_error)?.clone();
+        if let Some(attempt) = previous_attempt {
+            match self.cancel_close_attempt(&attempt).await {
+                Ok(true) => return self.finish_confirmed_shutdown().await,
+                Ok(false) => {},
+                Err(error) => {
+                    if self.core.state() == Lifecycle::Stopped { self.complete_close()?; return Ok(()); }
+                    self.set_close_state(true, Some("PROJECT_CLOSE_UNKNOWN"))?;
+                    return Err(error);
+                }
+            }
+        }
+        let attempt = format!("close-{}", self.core.next_id.fetch_add(1, Ordering::Relaxed));
+        *self.close_attempt.lock().map_err(lock_error)? = Some(attempt.clone());
+        self.set_close_state(true, None)?;
+        let admission = self.core.request_internal("host.prepareClose", json!({ "attemptId": attempt }), self.core.timeouts.control).await;
+        let ready = matches!(&admission, Ok(result) if result.get("ready").and_then(Value::as_bool) == Some(true) && result.get("attemptId").and_then(Value::as_str) == Some(attempt.as_str()));
+        if !ready {
+            let error = admission.err().unwrap_or_else(|| DesktopCommandError::new("PROJECT_CLOSE_UNKNOWN", "Native close admission is invalid."));
+            if matches!(error.code.as_str(), "PROJECT_CLOSE_UNSAVED" | "PROJECT_CLOSE_BUSY") {
+                self.set_close_state(false, Some(&error.code))?;
+            } else if matches!(self.cancel_close_attempt(&attempt).await, Ok(false)) {
+                self.set_close_state(false, Some(&error.code))?;
+            } else { self.set_close_state(true, Some("PROJECT_CLOSE_UNKNOWN"))?; }
+            return Err(error);
+        }
         self.core.set_state(Lifecycle::Stopping);
-        let _ = self
-            .core
-            .request_internal("host.shutdown", json!({}), self.core.timeouts.shutdown)
-            .await;
+        let shutdown = self.core.request_internal("host.shutdown", json!({ "attemptId": attempt }), self.core.timeouts.shutdown).await;
+        if matches!(&shutdown, Ok(result) if result.get("shuttingDown").and_then(Value::as_bool) == Some(true)) {
+            return self.finish_confirmed_shutdown().await;
+        }
+        if self.core.state() == Lifecycle::Stopped { self.complete_close()?; return Ok(()); }
+        let error = shutdown.err().unwrap_or_else(|| DesktopCommandError::new("PROJECT_CLOSE_UNKNOWN", "Native shutdown acknowledgment is invalid."));
+        match self.cancel_close_attempt(&attempt).await {
+            Ok(true) => self.finish_confirmed_shutdown().await,
+            Ok(false) => { self.set_close_state(false, Some(&error.code))?; Err(error) },
+            Err(_) => { self.set_close_state(true, Some("PROJECT_CLOSE_UNKNOWN"))?; Err(error) }
+        }
+    }
+
+    async fn finish_confirmed_shutdown(&self) -> Result<(), DesktopCommandError> {
+        let mut lifecycle = self.core.lifecycle.subscribe();
         let wait_for_stop = async {
             while *lifecycle.borrow() != Lifecycle::Stopped {
                 lifecycle.changed().await.map_err(|_| ())?;
@@ -584,8 +697,19 @@ impl DesktopHostSupervisor {
             .await
             .is_err()
         {
+            // Only a positively acknowledged committed shutdown reaches here.
+            // Canonical mutation admission was frozen while its entire history was confirmed durable.
             self.core.force_stop();
         }
+        self.complete_close()?;
+        Ok(())
+    }
+
+    fn complete_close(&self) -> Result<(), DesktopCommandError> {
+        // Retain this latch through app_handle.exit: polling or queued IPC must
+        // never reopen a Host after the confirmed shutdown returned success.
+        self.core.exit_committed.store(true, Ordering::Release);
+        self.set_close_state(false, None)
     }
 }
 
@@ -805,6 +929,12 @@ mod tests {
         Manual,
     }
 
+    #[derive(Clone, Copy)]
+    enum ClosePrepareMode { Valid, Unsaved, Manual }
+
+    #[derive(Clone, Copy)]
+    enum CloseCancelMode { Released, Committed, Manual }
+
     struct FakeControl {
         events: mpsc::Sender<HostEvent>,
         writes: Mutex<Vec<Value>>,
@@ -813,6 +943,9 @@ mod tests {
         shutdown_responds: bool,
         cancel_original: bool,
         snapshot_revision: u64,
+        close_prepare: Mutex<ClosePrepareMode>,
+        close_cancel: Mutex<CloseCancelMode>,
+        shutdown_terminates: AtomicBool,
     }
 
     impl FakeControl {
@@ -869,9 +1002,19 @@ mod tests {
                         if let Some(original) = original { self.send_error(original["id"].as_str().unwrap(), "OPERATION_CANCELLED"); }
                     }
                 }
+                "host.prepareClose" => match *self.close_prepare.lock().unwrap() {
+                    ClosePrepareMode::Valid => self.send_result(id, json!({ "ready": true, "attemptId": request["params"]["attemptId"] })),
+                    ClosePrepareMode::Unsaved => self.send_error(id, "PROJECT_CLOSE_UNSAVED"),
+                    ClosePrepareMode::Manual => {}
+                },
+                "host.cancelClose" => match *self.close_cancel.lock().unwrap() {
+                    CloseCancelMode::Released => self.send_result(id, json!({ "released": true, "committed": false })),
+                    CloseCancelMode::Committed => self.send_result(id, json!({ "released": false, "committed": true })),
+                    CloseCancelMode::Manual => {}
+                },
                 "host.shutdown" if self.shutdown_responds => {
                     self.send_result(id, json!({ "shuttingDown": true }));
-                    self.events.try_send(HostEvent::Terminated).unwrap();
+                    if self.shutdown_terminates.load(Ordering::Relaxed) { self.events.try_send(HostEvent::Terminated).unwrap(); }
                 }
                 _ => {}
             }
@@ -916,6 +1059,9 @@ mod tests {
             shutdown_responds,
             cancel_original,
             snapshot_revision,
+            close_prepare: Mutex::new(ClosePrepareMode::Valid),
+            close_cancel: Mutex::new(CloseCancelMode::Released),
+            shutdown_terminates: AtomicBool::new(true),
         });
         (
             LaunchedHost {
@@ -1054,6 +1200,23 @@ mod tests {
         control.send_result(first_request["id"].as_str().unwrap(), json!("first"));
         assert_eq!(first.await.unwrap().unwrap(), json!("first"));
         assert_eq!(second.await.unwrap().unwrap(), json!("second"));
+    }
+
+    #[tokio::test]
+    async fn checkpoint_timeout_preserves_host_and_late_result_can_be_reconciled() {
+        let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
+        let (launched, control) = fake_launch_with_revision(HelloMode::Valid, true, false, 7);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let error = supervisor.request_control("project.checkpoint", json!({ "expectedToken": "fixture" })).await.unwrap_err();
+        assert_eq!(error.code, "HOST_TIMEOUT");
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        let original = control.request("project.checkpoint");
+        control.send_result(original["id"].as_str().unwrap(), json!({ "saved": true }));
+        let state = supervisor.request_control("project.snapshot", json!({})).await.unwrap();
+        assert_eq!(state["project"]["history"]["revision"], 7);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
     }
 
     #[tokio::test]
@@ -1347,21 +1510,127 @@ mod tests {
             .ensure_started_with(|| Ok(launched))
             .await
             .unwrap();
-        supervisor.shutdown().await;
+        supervisor.shutdown().await.unwrap();
         assert_eq!(supervisor.core.state(), Lifecycle::Stopped);
         assert_eq!(control.kills.load(Ordering::Relaxed), 0);
     }
 
     #[tokio::test]
-    async fn nonresponsive_shutdown_is_force_killed_after_bound() {
+    async fn uncommitted_shutdown_timeout_releases_gate_without_killing_host() {
         let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
         let (launched, control) = fake_launch(HelloMode::Valid, false, false);
         supervisor
             .ensure_started_with(|| Ok(launched))
             .await
             .unwrap();
-        supervisor.shutdown().await;
+        assert_eq!(supervisor.shutdown().await.unwrap_err().code, "HOST_TIMEOUT");
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert!(!supervisor.native_close_state().unwrap().pending);
+    }
+
+    #[tokio::test]
+    async fn unsaved_close_preserves_host_and_does_not_send_shutdown() {
+        let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        *control.close_prepare.lock().unwrap() = ClosePrepareMode::Unsaved;
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        assert_eq!(supervisor.shutdown().await.unwrap_err().code, "PROJECT_CLOSE_UNSAVED");
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert!(!control.writes.lock().unwrap().iter().any(|request| request["method"] == "host.shutdown"));
+        let state = supervisor.native_close_state().unwrap();
+        assert!(!state.pending);
+        assert_eq!(state.error_code.as_deref(), Some("PROJECT_CLOSE_UNSAVED"));
+    }
+
+    #[tokio::test]
+    async fn prepare_timeout_reconciles_its_attempt_and_ignores_late_ack_without_killing() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        *control.close_prepare.lock().unwrap() = ClosePrepareMode::Manual;
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let closing = { let supervisor = Arc::clone(&supervisor); tokio::spawn(async move { supervisor.shutdown().await }) };
+        let prepare = wait_for_write(&control, "host.prepareClose").await;
+        assert!(supervisor.native_close_state().unwrap().pending);
+        assert_eq!(supervisor.request_control("project.checkpoint", json!({})).await.unwrap_err().code, "PROJECT_CLOSE_PENDING");
+        assert_eq!(closing.await.unwrap().unwrap_err().code, "HOST_TIMEOUT");
+        assert_eq!(control.request("host.cancelClose")["params"]["attemptId"], prepare["params"]["attemptId"]);
+        control.send_result(prepare["id"].as_str().unwrap(), json!({ "ready": true, "attemptId": prepare["params"]["attemptId"] }));
+        supervisor.request_control("project.snapshot", json!({})).await.unwrap();
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert!(!supervisor.native_close_state().unwrap().pending);
+    }
+
+    #[tokio::test]
+    async fn unknown_close_blocks_mutations_and_restart_but_keeps_canonical_reads_available() {
+        let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
+        let (launched, control) = fake_launch(HelloMode::Valid, false, false);
+        *control.close_cancel.lock().unwrap() = CloseCancelMode::Manual;
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        assert_eq!(supervisor.shutdown().await.unwrap_err().code, "HOST_TIMEOUT");
+        assert_eq!(supervisor.core.state(), Lifecycle::Stopping);
+        assert!(supervisor.native_close_state().unwrap().pending);
+        assert_eq!(supervisor.native_close_state().unwrap().error_code.as_deref(), Some("PROJECT_CLOSE_UNKNOWN"));
+        assert_eq!(supervisor.request_control("project.undo", json!({})).await.unwrap_err().code, "PROJECT_CLOSE_PENDING");
+        supervisor.request_control("project.snapshot", json!({})).await.unwrap();
+        let launches = AtomicUsize::new(0);
+        supervisor.ensure_started_with(|| { launches.fetch_add(1, Ordering::Relaxed); Ok(fake_launch(HelloMode::Valid, true, false).0) }).await.unwrap();
+        assert_eq!(launches.load(Ordering::Relaxed), 0);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        // A subsequent confirmed cancellation releases this attempt before another is prepared.
+        *control.close_cancel.lock().unwrap() = CloseCancelMode::Released;
+        *control.close_prepare.lock().unwrap() = ClosePrepareMode::Unsaved;
+        assert_eq!(supervisor.shutdown().await.unwrap_err().code, "PROJECT_CLOSE_UNSAVED");
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert!(!supervisor.native_close_state().unwrap().pending);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn positively_committed_shutdown_can_reap_a_nonterminating_process() {
+        for acknowledged in [true, false] {
+            let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
+            let (launched, control) = fake_launch(HelloMode::Valid, acknowledged, false);
+            control.shutdown_terminates.store(false, Ordering::Relaxed);
+            *control.close_cancel.lock().unwrap() = CloseCancelMode::Committed;
+            supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+            supervisor.shutdown().await.unwrap();
+            assert_eq!(supervisor.core.state(), Lifecycle::Stopped);
+            assert_eq!(control.kills.load(Ordering::Relaxed), 1);
+            assert!(!supervisor.native_close_state().unwrap().pending);
+        }
+    }
+
+    #[tokio::test]
+    async fn confirmed_exit_latches_stopped_state_against_polling_or_queued_startup() {
+        for initially_stopped in [true, false] {
+            let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
+            if !initially_stopped { supervisor.ensure_started_with(|| Ok(fake_launch(HelloMode::Valid, true, false).0)).await.unwrap(); }
+            supervisor.shutdown().await.unwrap();
+            let launches = AtomicUsize::new(0);
+            assert_eq!(supervisor.ensure_started_with(|| { launches.fetch_add(1, Ordering::Relaxed); Ok(fake_launch(HelloMode::Valid, true, false).0) }).await.unwrap_err().code, "PROJECT_CLOSE_PENDING");
+            assert_eq!(launches.load(Ordering::Relaxed), 0);
+            assert_eq!(supervisor.request_control("project.snapshot", json!({})).await.unwrap_err().code, "PROJECT_CLOSE_PENDING");
+            assert_eq!(supervisor.core.state(), Lifecycle::Stopped);
+            supervisor.shutdown().await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn close_during_startup_keeps_launch_alive_and_can_be_retried_after_hello() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Manual, true, false);
+        let starting = { let supervisor = Arc::clone(&supervisor); tokio::spawn(async move { supervisor.ensure_started_with(|| Ok(launched)).await }) };
+        let hello = wait_for_write(&control, "host.hello").await;
+        assert_eq!(supervisor.shutdown().await.unwrap_err().code, "PROJECT_CLOSE_BUSY");
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert_eq!(supervisor.core.state(), Lifecycle::Starting);
+        control.send_result(hello["id"].as_str().unwrap(), json!({ "identity": "cevra.desktop-host", "version": "0.1.0", "protocolVersion": 1 }));
+        starting.await.unwrap().unwrap();
+        supervisor.shutdown().await.unwrap();
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
         assert_eq!(supervisor.core.state(), Lifecycle::Stopped);
-        assert_eq!(control.kills.load(Ordering::Relaxed), 1);
     }
 }

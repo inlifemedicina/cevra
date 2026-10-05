@@ -85,6 +85,26 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+test("atomic timeline action round-trips through the package codec with redo and transcript reuse", () => {
+  const history = historyWithTranscript();
+  const before = history.current;
+  const action = { type: "timeline.edit", version: 1, edits: [
+    { type: "track.add", track: { id: "video", kind: "video", name: "Video", locked: false, hidden: false, muted: false } },
+    { type: "clip.add", clip: { id: "clip", trackId: "video", sourceId: "source-1", timelineStartMs: 0, timelineEndMs: 500, sourceStartMs: 0, sourceEndMs: 500, speed: 1, volume: 1, opacity: 1 } }
+  ] };
+  const after = history.commit(action);
+  history.undo();
+  const encoded = JSON.parse(JSON.stringify(serializeProjectPackage(history, fixedTime)));
+  const restored = deserializeProjectPackage(encoded);
+  assert.deepEqual(restored.current, before);
+  assert.deepEqual(restored.entries.at(-1).command, action);
+  assert.equal(restored.canRedo, true);
+  assert.deepEqual(restored.redo(), after);
+  assert.deepEqual(restored.undo(), before);
+  assert.deepEqual(restored.sourceNumbering, history.sourceNumbering);
+  assert.equal(restored.toArchive().transcriptBlobs.length, 1);
+});
+
 test("project package round-trips history and redo state", () => {
   let seq = 0;
   const history = new ProjectHistory(createEmptyProject({ id: "p1", name: "A", now: fixedTime }), {

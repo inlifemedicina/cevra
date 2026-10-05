@@ -13,7 +13,10 @@ export type HostMethod =
   | "host.hello"
   | "host.status"
   | "host.shutdown"
+  | "host.prepareClose"
+  | "host.cancelClose"
   | "project.snapshot"
+  | "project.checkpoint"
   | "editorial.snapshot"
   | "editorial.revise"
   | "media.ingestLocal"
@@ -47,8 +50,10 @@ export interface DesktopHostState {
   canRedo: boolean;
   status: {
     hostAvailable: true;
-    persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "temporary-review";
+    persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "checkpoint-pending" | "temporary-review";
   };
+  checkpoint?: { token: string; pending: boolean };
+  closePending?: boolean;
   capabilities: {
     mediaImport: CapabilityState;
     transcription: CapabilityState;
@@ -76,7 +81,10 @@ const METHODS = new Set<HostMethod>([
   "host.hello",
   "host.status",
   "host.shutdown",
+  "host.prepareClose",
+  "host.cancelClose",
   "project.snapshot",
+  "project.checkpoint",
   "editorial.snapshot",
   "editorial.revise",
   "media.ingestLocal",
@@ -128,6 +136,19 @@ export function parseRequest(line: string): HostRequest {
 
 export function validateNoParams(params: Record<string, unknown>, id: string): void {
   exactKeys(params, [], id);
+}
+
+export function validateCheckpointParams(params: Record<string, unknown>, id: string): string {
+  exactKeys(params, ["expectedToken"], id);
+  if (typeof params.expectedToken !== "string" || !/^checkpoint-v1:[0-9a-f]{64}$/u.test(params.expectedToken)) {
+    throw new ProtocolValidationError("HOST_INVALID_PARAMS", "Checkpoint token is invalid.", id);
+  }
+  return params.expectedToken;
+}
+
+export function validateCloseParams(params: Record<string, unknown>, id: string): string {
+  exactKeys(params, ["attemptId"], id);
+  return operationId(params.attemptId, id);
 }
 
 export function validateEditorialRevisionParams(params: Record<string, unknown>, id: string): ReviseEditorialDraftRequest {

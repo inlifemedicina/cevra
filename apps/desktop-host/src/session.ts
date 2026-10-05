@@ -39,7 +39,7 @@ import { FileTranscriptCache } from "@cevra/transcript-cache";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
-import { DesktopPersistenceError, DesktopProjectPersistence } from "./persistence.js";
+import { DesktopPersistenceError, DesktopProjectPersistence, historyCheckpointToken } from "./persistence.js";
 import {
   DesktopMediaExecutionArchiveFullError,
   isDesktopMediaExecutionArchiveOperationalError
@@ -75,7 +75,9 @@ export class DesktopSession {
   private activeMutationTask: Promise<unknown> | null = null;
   private previewTask: Promise<LocalVideoPreview> | null = null;
   private previewOperationId: string | null = null;
+  private legacyPreviewSequence = 0;
   private closing = false;
+  private closeAttempt: { id: string; checkpointToken?: string; committed: boolean } | null = null;
 
   constructor(private readonly services: DesktopSessionServices) {
     this.editorial = new EditorialDraftService(services.history);
@@ -83,6 +85,7 @@ export class DesktopSession {
 
   /** Trusted in-process Application handoff only; never a WebView/RPC admission. */
   acceptEditorialAnalysis(request: CreateEditorialDraftRequest): void {
+    if (this.closing) throw safeError("PROJECT_CLOSE_PENDING", { state: this.state() });
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     // One accepted analysis per session: revision 0 cannot be reused by a
     // replacement context while a WebView still holds an earlier projection.
@@ -104,6 +107,7 @@ export class DesktopSession {
   }
 
   reviseEditorialDraft(request: ReviseEditorialDraftRequest): EditorialDraftState {
+    if (this.closing) throw safeError("PROJECT_CLOSE_PENDING", { state: this.state() });
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     if (!this.editorialDraft) throw safeError("EDITORIAL_DRAFT_UNAVAILABLE");
     this.editorialDraft = this.editorial.revise(this.editorialDraft, request);
@@ -116,12 +120,64 @@ export class DesktopSession {
       sourceNumbering: this.services.history.sourceNumbering,
       canUndo: !this.services.temporaryEditorialReview && this.services.history.canUndo,
       canRedo: !this.services.temporaryEditorialReview && this.services.history.canRedo,
-      status: { hostAvailable: true, persistence: this.services.temporaryEditorialReview ? "temporary-review" : this.services.persistence?.state ?? "local-unsaved" },
+      status: { hostAvailable: true, persistence: this.services.temporaryEditorialReview ? "temporary-review" : this.services.persistence?.stateFor(this.services.history) ?? "local-unsaved" },
+      ...(this.services.persistence && !this.services.temporaryEditorialReview ? { checkpoint: {
+        token: historyCheckpointToken(this.services.history),
+        pending: this.services.persistence.state === "checkpoint-pending"
+      } } : {}),
+      closePending: this.closeAttempt !== null,
       capabilities: {
         mediaImport: { ...this.services.mediaCapability },
         transcription: { ...this.services.transcriptionCapability }
       }
     };
+  }
+
+  async retryCheckpoint(expectedToken: string): Promise<DesktopHostState> {
+    return this.runMutation(async () => {
+      if (!this.services.persistence) throw safeError("PROJECT_PERSISTENCE_UNAVAILABLE");
+      if (expectedToken !== historyCheckpointToken(this.services.history)) throw safeError("PROJECT_CHECKPOINT_STALE", { state: this.state() });
+      try {
+        await this.services.persistence.retryCheckpoint(this.services.history);
+      } catch {
+        throw safeError("PROJECT_PERSISTENCE_FAILED", { state: this.state() });
+      }
+      return this.state();
+    });
+  }
+
+  /** Native lifecycle gate only. No autosave, cancellation or mutation is implied. */
+  prepareClose(attemptId: string): { ready: true; attemptId: string } {
+    if (this.closeAttempt?.id === attemptId) return { ready: true, attemptId };
+    if (this.closing || this.activeMutationTask || this.activeTasks.size || this.previewTask) throw safeError("PROJECT_CLOSE_BUSY", { state: this.state() });
+    const persistence = this.services.persistence;
+    if (!this.services.temporaryEditorialReview && (!persistence || !["local-saved", "local-recovered"].includes(persistence.stateFor(this.services.history)))) {
+      throw safeError("PROJECT_CLOSE_UNSAVED", { state: this.state() });
+    }
+    // No await between checking canonical durability and freezing mutation admission.
+    this.closeAttempt = { id: attemptId, committed: false, ...(persistence ? { checkpointToken: historyCheckpointToken(this.services.history) } : {}) };
+    this.closing = true;
+    return { ready: true, attemptId };
+  }
+
+  cancelClose(attemptId: string): { released: boolean; committed: boolean } {
+    if (!this.closeAttempt) return { released: true, committed: false };
+    if (this.closeAttempt.id !== attemptId || this.closeAttempt.committed) return { released: false, committed: this.closeAttempt.committed };
+    this.closeAttempt = null;
+    this.closing = false;
+    return { released: true, committed: false };
+  }
+
+  admitShutdown(attemptId: string): void {
+    if (this.closeAttempt?.id !== attemptId || !this.closing || this.activeMutationTask || this.activeTasks.size || this.previewTask) throw safeError("PROJECT_CLOSE_BUSY", { state: this.state() });
+    if (this.closeAttempt.checkpointToken !== undefined && (
+      this.closeAttempt.checkpointToken !== historyCheckpointToken(this.services.history)
+      || !["local-saved", "local-recovered"].includes(this.services.persistence!.stateFor(this.services.history))
+    )) {
+      this.cancelClose(attemptId);
+      throw safeError("PROJECT_CLOSE_UNSAVED", { state: this.state() });
+    }
+    this.closeAttempt.committed = true;
   }
 
   async ingestLocal(params: { uri: string; displayName: string; operationId: string; locale: Locale }): Promise<{ state: DesktopHostState; importedSourceId: string }> {
@@ -211,11 +267,13 @@ export class DesktopSession {
         if (this.previewTask === task) { this.previewTask = null; this.previewOperationId = null; }
       }
     }
-    const source = resolveManualVideo(this.services.history.current, stable);
-    const preview = await readLocalVideoPreview(source, stable.expectedSnapshotId);
-    if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
-    resolveManualVideo(this.services.history.current, stable);
-    return preview;
+    return this.runOperation(`legacy-preview-${++this.legacyPreviewSequence}`, async (signal) => {
+      const source = resolveManualVideo(this.services.history.current, stable);
+      const preview = await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
+      if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+      resolveManualVideo(this.services.history.current, stable);
+      return preview;
+    });
   }
 
   async createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopHostState; clipId: string }> {
@@ -303,6 +361,7 @@ export class DesktopSession {
   }
 
   private async runMutation<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.closeAttempt) throw safeError("PROJECT_CLOSE_PENDING", { state: this.state() });
     if (this.closing) throw safeError("OPERATION_CANCELLED");
     if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
