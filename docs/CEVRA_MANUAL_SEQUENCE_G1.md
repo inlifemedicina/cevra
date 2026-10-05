@@ -223,6 +223,24 @@ An initial browser failure from a value import of Application's Node utilities
 was fixed with type-only imports and browser-only affordance checks; authoritative
 validation remains in Host/Application. UI publication proceeds in the same Draft.
 
+UI head `508436ed199d99522a0eebd93246541d12e11770`, tree
+`a4753313dfcbe4ebe3bffbf6c3f5030b0b961ad7`, is now published in Draft #87;
+its exact-head remote checks are being monitored separately from local proof.
+The next read-only Application preparation resolves the canonical ordered clips
+and only their unique original sources, verifies every original and rechecks all
+operational stamps after the last hash. It binds the immutable ephemeral plan to
+the retained journal, rejecting edit/Undo ABA and forged/foreign plans. Program
+joins select the following occurrence; exact program OUT returns no source frame
+position. Cancellation reaches identity work. Application 296/296 and Host
+143/143 regressions passed; the first new fixture omitted required displayName
+and was corrected before the complete passing run. This is canonical preparation,
+not decoded playback, rendered-byte/source admission or frame-policy adoption.
+It writes no IR, history, persistent source, export or cache record.
+Independent review caught an intermediate numeric overflow near MAX_SAFE_INTEGER;
+the clock now computes source IN plus the bounded local offset, with one- and
+four-millisecond near-MAX head/tail oracles passing. Desktop 125/125 and the
+production build also passed against this preparation.
+
 M0 head `58531d671d7e45931e079e153613962d23f932d7` passed push CI
 `37373291877`, 5/5, and PR CI `37373297199` attempt 2, 5/5. PR attempt 1's
 unacquired Media runner failure remains preserved. Post-#85 exact-runtime run

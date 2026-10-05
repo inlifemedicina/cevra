@@ -1,5 +1,5 @@
 import { type ProjectHistory, type ProjectIR, type SourceAsset, type TimelineEditOperation } from "@cevra/project-ir";
-import { createSourceContentVerificationMemo, SourceTechnicalDescriptorResolver, type SourceContentIdentityPort } from "./source-technical-descriptor.js";
+import { createSourceContentVerificationMemo, SourceTechnicalDescriptorResolver, type SourceContentIdentityPort, type SourceFileOperationalStampV1 } from "./source-technical-descriptor.js";
 
 /** Bounded first-video preview; streaming/composition remain separate work. */
 export const MANUAL_VIDEO_MAX_BYTES = 8 * 1024 * 1024;
@@ -138,10 +138,18 @@ export class ManualVideoClipApplicationService {
 }
 
 /** Shared original-content guard for typed manual edits; never a WebView path request. */
-export async function verifyManualVideoSource(source: SourceAsset, identity: SourceContentIdentityPort): Promise<void> {
+export async function verifyManualVideoSource(source: SourceAsset, identity: SourceContentIdentityPort, signal?: AbortSignal): Promise<void> {
+  await verifyManualVideoSources([source], identity, signal);
+}
+
+/** Verify every unique original, then revalidate all stamps after the last hash. */
+export async function verifyManualVideoSources(sources: readonly SourceAsset[], identity: SourceContentIdentityPort, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
+  const byUri = new Map(sources.map(source => [source.uri, source]));
   const resolver = new SourceTechnicalDescriptorResolver({
     captureSource: async (uri, signal) => {
       const stamp = await identity.captureSource(uri, signal);
+      const source = byUri.get(uri)!;
       // Reject replacement/growth before the generic resolver hashes the file.
       if (stamp.sizeBytes !== source.technicalDescriptor!.content.sizeBytes || stamp.sizeBytes > MANUAL_VIDEO_SOURCE_MAX_BYTES) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
       return stamp;
@@ -150,6 +158,19 @@ export async function verifyManualVideoSource(source: SourceAsset, identity: Sou
     checkSource: (uri, stamp, signal) => identity.checkSource(uri, stamp, signal)
   });
   const memo = createSourceContentVerificationMemo(1);
-  const verified = await resolver.verify(source, memo);
-  if (verified.status !== "verified" || await resolver.revalidate(memo) !== "verified") throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
+  const stamps: SourceFileOperationalStampV1[] = [];
+  for (const source of sources) {
+    signal?.throwIfAborted();
+    memo.entries.clear();
+    const verified = await resolver.verify(source, memo, signal);
+    signal?.throwIfAborted();
+    if (verified.status !== "verified") throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
+    stamps.push(verified.verification.stamp);
+  }
+  for (const stamp of stamps) {
+    signal?.throwIfAborted();
+    const status = await identity.checkSource(stamp.uri, stamp, signal);
+    signal?.throwIfAborted();
+    if (status !== "match") throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
+  }
 }
