@@ -49,7 +49,7 @@ import {
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
 import { readDesignatedFa02Pair } from "./fa02-review-admission.js";
 import { readLocalVideoPreview } from "./local-video-preview.js";
-import { DerivedVideoPreview, resolvePreviewRange } from "./derived-video-preview.js";
+import { DerivedVideoPreview, resolvePreviewRange, supportsOriginalProxy } from "./derived-video-preview.js";
 
 type Locale = "pt-BR" | "en-US";
 
@@ -246,7 +246,9 @@ export class DesktopSession {
       || (stable.operationId !== undefined && (typeof stable.operationId !== "string" || !stable.operationId))) throw safeError("MANUAL_VIDEO_INVALID_REQUEST");
     if (stable.operationId !== undefined) {
       if (this.operations.has(stable.operationId!)) throw safeError("OPERATION_DUPLICATE");
-      resolvePreviewRange(this.services.history, stable);
+      const resolve = () => stable.clipId !== undefined ? resolvePreviewRange(this.services.history, stable)
+        : { source: resolveManualVideo(this.services.history.current, stable) };
+      resolve();
       if (stable.clipId !== undefined && !this.services.derivedVideoPreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
       // Only the latest preview prepares bytes. Cancellation is scoped to this
       // read-only operation; ingest/transcription keep their own controllers.
@@ -255,13 +257,13 @@ export class DesktopSession {
       const task = this.runOperation(stable.operationId!, async (signal) => {
         await previous?.catch(() => undefined);
         if (signal.aborted) throw safeError("OPERATION_CANCELLED");
-        const { source } = resolvePreviewRange(this.services.history, stable);
-        const preview = this.services.derivedVideoPreview
+        const { source } = resolve();
+        const preview = this.services.derivedVideoPreview && (stable.clipId !== undefined || supportsOriginalProxy(source))
           ? await this.services.derivedVideoPreview.prepare(stable, signal)
           : await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
         if (signal.aborted) throw safeError("OPERATION_CANCELLED");
         if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
-        resolvePreviewRange(this.services.history, stable);
+        resolve();
         return preview;
       });
       this.previewTask = task;

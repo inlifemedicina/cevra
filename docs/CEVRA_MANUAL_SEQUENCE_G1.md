@@ -241,6 +241,39 @@ the clock now computes source IN plus the bounded local offset, with one- and
 four-millisecond near-MAX head/tail oracles passing. Desktop 125/125 and the
 production build also passed against this preparation.
 
+The independently reviewed canonical preparation is now published at `6b9c737`,
+tree `85f6c60c5b84c19a6a4bfb9b32358560d1f47e8c`, in the same Draft. UI head
+`508436e` passed push CI `37381516705`, PR CI `37381522054` and exact runtime
+`37381522040`, all attempt 1. Later heads require their own receipts.
+At `6b9c737`, PR CI `37382806573` and exact runtime `37382806557` passed;
+push CI `37382801295` passed four jobs but its Media release-signature step
+failed: the zlib signing-key source contained no armored public key. This remains
+a failure, even though the same head's PR job passed. No release pin, signature
+verification or model/provider behavior was weakened; the next head receives
+fresh exact-head checks rather than inheriting those PASS receipts.
+
+The next bounded preview prerequisites preserve the existing Take derivative
+route while Original outside known Take metadata bounds can use the existing
+verified ≤8-MiB byte transport. Known duration/resolution/HDR/audio exclusions
+never silently fall through to an unadmitted proxy; browser decoding still decides
+playability, and transport tests do not prove those formats playable. Named-file
+identity is checked again after the original read.
+The Host deadline accounts for full-source inspection, selected-range encoding
+and four conservative I/O passes, bounded to six minutes; native preparation has
+a seven-minute ceiling. These are cancellation allowances, not latency promises.
+A concrete recovery fault was fixed: unknown preview retirement formerly failed
+and killed the Host. The new path keeps canonical memory alive, retains a bounded
+receiver per unsettled request to discard its late result and blocks new previews
+until actual settlement. Canonical reads/save remain available; Host active-task
+and saved-state guards still govern close. PT/EN expose a truthful settling error
+and explicit read-only Retry; no automatic retries or audiovisual edits occur.
+Host 145/145, offline Rust 38/38, UI 126/126, focused preview UI 46/46, i18n 2/2
+and production build passed. Independent review found a race between admission
+and marking unknown retirement; both now use one short mutex without awaits,
+with a forced-interleaving regression. Native and Host/UI reviews approved source
+tree `ff7017e10063683e0f08de275a68aa54690293cb`. These prerequisites
+are separate from sequence decoding, export timing and product acceptance.
+
 M0 head `58531d671d7e45931e079e153613962d23f932d7` passed push CI
 `37373291877`, 5/5, and PR CI `37373297199` attempt 2, 5/5. PR attempt 1's
 unacquired Media runner failure remains preserved. Post-#85 exact-runtime run

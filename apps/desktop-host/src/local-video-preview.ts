@@ -79,7 +79,9 @@ export async function readVerifiedVideoBytes(source: SourceAsset, signal?: Abort
       offset += read.bytesRead;
     }
     const final = await handle.stat({ bigint: true });
+    const named = await lstat(path, { bigint: true });
     if (initial.dev !== final.dev || initial.ino !== final.ino || initial.size !== final.size || initial.mtimeNs !== final.mtimeNs || initial.ctimeNs !== final.ctimeNs
+      || !named.isFile() || named.dev !== final.dev || named.ino !== final.ino || named.size !== final.size || named.mtimeNs !== final.mtimeNs || named.ctimeNs !== final.ctimeNs
       || createHash("sha256").update(bytes).digest("hex") !== source.technicalDescriptor!.content.sha256) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
     signal?.throwIfAborted();
     return { bytes, mimeType };

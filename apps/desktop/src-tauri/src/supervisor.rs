@@ -17,6 +17,7 @@ use tokio::sync::{mpsc, oneshot, watch, Mutex as AsyncMutex};
 struct SupervisorTimeouts {
     hello: Duration,
     control: Duration,
+    preparation: Duration,
     mutation: Duration,
     reconciliation: Duration,
     shutdown: Duration,
@@ -27,6 +28,7 @@ impl Default for SupervisorTimeouts {
         Self {
             hello: Duration::from_secs(30),
             control: Duration::from_secs(30),
+            preparation: Duration::from_secs(7 * 60),
             mutation: Duration::from_secs(6 * 60 * 60),
             reconciliation: Duration::from_secs(30),
             shutdown: Duration::from_secs(5),
@@ -92,6 +94,8 @@ struct LaunchedHost {
 struct SupervisorCore {
     close_admission: AtomicBool,
     exit_committed: AtomicBool,
+    unsettled_previews: Arc<AtomicU64>,
+    preview_gate: Mutex<()>,
     process: Mutex<Option<Arc<dyn ProcessControl>>>,
     pending: Mutex<PendingRequests>,
     lifecycle: watch::Sender<Lifecycle>,
@@ -106,6 +110,8 @@ impl SupervisorCore {
         Self {
             close_admission: AtomicBool::new(false),
             exit_committed: AtomicBool::new(false),
+            unsettled_previews: Arc::new(AtomicU64::new(0)),
+            preview_gate: Mutex::new(()),
             process: Mutex::new(None),
             pending: Mutex::new(PendingRequests::default()),
             lifecycle,
@@ -156,9 +162,23 @@ impl SupervisorCore {
         self.request_timed(method, params, timeout, true).await
     }
 
+    fn begin_preparation(&self, method: &str, params: Value) -> Result<(String, oneshot::Receiver<Result<Value, DesktopCommandError>>), DesktopCommandError> {
+        let _gate = self.preview_gate.lock().map_err(lock_error)?;
+        if self.unsettled_previews.load(Ordering::Acquire) != 0 {
+            return Err(DesktopCommandError::new("MANUAL_VIDEO_PREVIEW_SETTLING", "The previous preview is still settling; the project remains open."));
+        }
+        self.begin_request(method, params, false)
+    }
+
+    fn mark_unsettled_preview(&self) -> Result<(), DesktopCommandError> {
+        let _gate = self.preview_gate.lock().map_err(lock_error)?;
+        self.unsettled_previews.fetch_add(1, Ordering::AcqRel);
+        Ok(())
+    }
+
     async fn request_preparation(&self, method: &str, params: Value, operation_id: &str) -> Result<Value, DesktopCommandError> {
-        let (id, mut receiver) = self.begin_request(method, params, false)?;
-        match tokio::time::timeout(self.timeouts.control, &mut receiver).await {
+        let (_id, mut receiver) = self.begin_preparation(method, params)?;
+        match tokio::time::timeout(self.timeouts.preparation, &mut receiver).await {
             Ok(Ok(outcome)) => return outcome,
             Ok(Err(_)) => return Err(DesktopCommandError::new("HOST_UNAVAILABLE", "Desktop host response channel closed.")),
             Err(_) => {}
@@ -169,10 +189,16 @@ impl SupervisorCore {
         match tokio::time::timeout(self.timeouts.reconciliation, &mut receiver).await {
             Ok(_) => Err(DesktopCommandError::new("MANUAL_VIDEO_PREVIEW_TIMEOUT", "The preview timed out and its preparation settled.")),
             Err(_) => {
-                self.pending.lock().map_err(lock_error)?.remove(&id);
-                let error = DesktopCommandError::new("HOST_UNAVAILABLE", "The preview did not settle after cancellation; the session was stopped.");
-                self.fail(error.clone());
-                Err(error)
+                // A read-only preview cannot destroy the only unsaved history.
+                // Keep one receiver per unsettled operation to discard its late
+                // result; block further previews until actual retirement.
+                self.mark_unsettled_preview()?;
+                let unsettled = self.unsettled_previews.clone();
+                tokio::spawn(async move {
+                    let _ = receiver.await;
+                    unsettled.fetch_sub(1, Ordering::AcqRel);
+                });
+                Err(DesktopCommandError::new("MANUAL_VIDEO_PREVIEW_SETTLING", "The preview has not settled after cancellation; the project remains open."))
             }
         }
     }
@@ -1030,6 +1056,7 @@ mod tests {
         SupervisorTimeouts {
             hello: Duration::from_millis(100),
             control: Duration::from_millis(100),
+            preparation: Duration::from_millis(100),
             mutation: Duration::from_millis(10),
             reconciliation: Duration::from_millis(100),
             shutdown: Duration::from_millis(20),
@@ -1276,6 +1303,54 @@ mod tests {
         assert_eq!(supervisor.core.state(), Lifecycle::Ready);
         assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
         assert!(!control.writes.lock().unwrap().iter().any(|request| request["method"] == "project.snapshot"));
+    }
+
+    #[tokio::test]
+    async fn unsettled_preview_preserves_host_blocks_new_preview_and_releases_after_late_retirement() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move { supervisor.request_preparation("video.previewLocal", json!({ "operationId": "old-preview" }), "old-preview").await })
+        };
+        let original = wait_for_write(&control, "video.previewLocal").await;
+        assert_eq!(operation.await.unwrap().unwrap_err().code, "MANUAL_VIDEO_PREVIEW_SETTLING");
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 1);
+        assert_eq!(supervisor.request_control("project.snapshot", json!({})).await.unwrap()["project"]["history"]["revision"], 0);
+        assert_eq!(supervisor.request_preparation("video.previewLocal", json!({}), "new-preview").await.unwrap_err().code, "MANUAL_VIDEO_PREVIEW_SETTLING");
+        assert_eq!(control.writes.lock().unwrap().iter().filter(|r| r["method"] == "video.previewLocal").count(), 1);
+        control.send_result(original["id"].as_str().unwrap(), json!({ "late": true }));
+        tokio::time::timeout(Duration::from_millis(100), async {
+            while supervisor.core.unsettled_previews.load(Ordering::Acquire) != 0 { tokio::task::yield_now().await; }
+        }).await.unwrap();
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn retry_waiting_at_admission_cannot_cross_an_unknown_retirement_transition() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let gate = supervisor.core.preview_gate.lock().unwrap();
+        let (started, ready) = std::sync::mpsc::channel();
+        let core = supervisor.core.clone();
+        let retry = std::thread::spawn(move || {
+            started.send(()).unwrap();
+            core.begin_preparation("video.previewLocal", json!({ "operationId": "racing-retry" })).err().unwrap().code
+        });
+        ready.recv().unwrap();
+        // Force unknown retirement while the retry is waiting at the gate.
+        // Production mark_unsettled_preview uses this same critical section.
+        supervisor.core.unsettled_previews.fetch_add(1, Ordering::AcqRel);
+        drop(gate);
+        assert_eq!(retry.join().unwrap(), "MANUAL_VIDEO_PREVIEW_SETTLING");
+        assert!(!control.writes.lock().unwrap().iter().any(|r| r["method"] == "video.previewLocal"));
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
     }
 
     #[tokio::test]

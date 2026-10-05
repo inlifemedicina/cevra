@@ -8,7 +8,7 @@ import { createEmptyProject, ProjectHistory } from '@cevra/project-ir';
 import { ManualVideoClipApplicationService } from '@cevra/application';
 import { NodeMediaArtifactStore } from '@cevra/media-ffmpeg';
 import { DesktopSession, DesktopHostProtocolServer } from '../dist/index.js';
-import { DerivedVideoPreview } from '../dist/derived-video-preview.js';
+import { DerivedVideoPreview, previewPreparationBudgetMs } from '../dist/derived-video-preview.js';
 const unavailable = { available: false, reason: 'runtime-not-configured' };
 
 async function setup(t, execute, settle, fixtureBytes = Buffer.from('bounded original transport fixture')) {
@@ -195,6 +195,31 @@ test('Original prepares a cancellable proxy with logical duration and no clip, j
   assert.equal(preview.clip, undefined); assert.deepEqual(preview.proxy, { profile: 'take-v1', sourceDurationMs: 6000 });
   assert.equal(f.calls[0].startMs, 0); assert.equal(f.calls[0].endMs, 6000);
   assert.deepEqual(f.history.toArchive(), before); await noTemporaryFiles(f.root);
+});
+
+test('Original outside known Take bounds uses only bounded verified bytes without invoking a proxy', async t => {
+  const f = await setup(t);
+  for (const [name, change] of [['long', { durationMs: 70_000 }], ['large', { width: 3840, height: 2160 }], ['pq', { colorTransfer: 'smpte2084' }], ['audio', { sampleRate: 96000, channels: 6 }]]) {
+    const original = f.history.current.sources[0];
+    const source = { ...original, id: 'original-' + name, ...change,
+      technicalDescriptor: { ...original.technicalDescriptor, video: { ...original.technicalDescriptor.video, ...(change.colorTransfer ? { colorTransfer: change.colorTransfer } : {}) } } };
+    delete source.colorTransfer;
+    f.history.commit({ type: 'source.add', source });
+    const before = f.history.toArchive();
+    const preview = await f.session.previewLocalVideo({ sourceId: source.id, expectedSnapshotId: f.history.current.history.headSnapshotId, operationId: 'outside-' + name });
+    assert.equal(preview.proxy, undefined); assert.equal(preview.clip, undefined);
+    assert.equal(preview.durationMs, source.durationMs);
+    assert.deepEqual(Buffer.from(preview.base64, 'base64'), f.bytes);
+    assert.deepEqual(f.history.toArchive(), before); assert.deepEqual(f.calls, []);
+  }
+  await noTemporaryFiles(f.root);
+});
+
+test('preparation allowance accounts for full-source inspection, range encoding and bounded I/O', async t => {
+  const f = await setup(t); const source = f.history.current.sources[0];
+  const short = previewPreparationBudgetMs(source, 1000, 4000);
+  const full = previewPreparationBudgetMs({ ...source, durationMs: 60_000, technicalDescriptor: { ...source.technicalDescriptor, content: { ...source.technicalDescriptor.content, sizeBytes: 256 * 1024 * 1024 } } }, 0, 60_000);
+  assert.ok(short > 30_000 && short < full); assert.ok(full < 7 * 60_000);
 });
 
 test('verified source above the IPC ceiling is copied privately and admitted only as a small proxy', async t => {

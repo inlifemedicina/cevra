@@ -1,12 +1,26 @@
 import { MANUAL_VIDEO_MAX_BYTES, MANUAL_VIDEO_FRAME_MAX_BYTES, manualVideoError, resolveManualVideo, type LocalVideoPreview, type LocalVideoPreviewRequest } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
-import type { ProjectHistory } from "@cevra/project-ir";
+import type { ProjectHistory, SourceAsset } from "@cevra/project-ir";
 import { constants, type BigIntStats } from "node:fs";
 import { createHash } from "node:crypto";
 import { chmod, lstat, mkdtemp, open, realpath, rm, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { verifyAndCopyVideoSource } from "./local-video-preview.js";
+
+/** Early metadata rejection only; the runtime still performs complete admission. */
+export function supportsOriginalProxy(source: SourceAsset & { durationMs: number }): boolean {
+  const transfer = source.technicalDescriptor?.video?.colorTransfer?.toLowerCase();
+  return source.durationMs <= 60_000 && transfer !== "smpte2084" && transfer !== "arib-std-b67"
+    && (source.width === undefined || source.height === undefined || Math.min(source.width, source.height) >= 2 && Math.min(source.width, source.height) <= 1080 && Math.max(source.width, source.height) <= 1920)
+    && (!source.technicalDescriptor?.audio || (source.sampleRate === undefined || [44100, 48000].includes(source.sampleRate)) && (source.channels === undefined || [1, 2].includes(source.channels)));
+}
+
+/** Conservative preparation allowance, not a latency SLA or delivery policy. */
+export function previewPreparationBudgetMs(source: SourceAsset & { durationMs: number }, startMs: number, endMs: number): number {
+  const ioMs = source.technicalDescriptor!.content.sizeBytes * 4 / (8 * 1024 * 1024) * 1000;
+  return Math.min(360_000, Math.ceil(30_000 + source.durationMs * 2 + (endMs - startMs) + ioMs));
+}
 
 export function resolvePreviewClip(history: ProjectHistory, request: LocalVideoPreviewRequest) {
   const project = history.current;
@@ -101,7 +115,7 @@ export class DerivedVideoPreview {
     const { source, startMs, endMs } = range;
     const timeout = new AbortController();
     const combined = AbortSignal.any([signal, timeout.signal]);
-    const timer = setTimeout(() => timeout.abort(), 30_000);
+    const timer = setTimeout(() => timeout.abort(), previewPreparationBudgetMs(source, startMs, endMs));
     let root: string | undefined;
     let owned: Awaited<ReturnType<typeof lstat>> | undefined;
     let primary: Error | undefined;

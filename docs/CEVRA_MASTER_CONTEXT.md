@@ -2680,10 +2680,16 @@ handshake and remaining sequence/render prerequisites. #86 is not authorized
 for merge; corrected head `58531d6` passed push CI 5/5 and PR CI attempt 2 5/5.
 The M1 API (seven intents, one action per Undo) is published as
 [stacked Draft #87](https://github.com/inlifemedicina/cevra/pull/87), based on #86.
-The working UI connects the approved controls: Desktop 125/125, i18n 2/2,
-production build, twelve owned PT/EN responsive layout cases and both independent
-exact-tree UI reviews passed. Publication continues in the same Draft;
-sequence/render consumers remain open.
+The UI is published in that Draft at `508436e`: Desktop 125/125, i18n 2/2,
+production build, twelve owned PT/EN responsive layout cases, both independent
+exact-tree reviews and push/PR/exact-runtime CI passed. Read-only canonical preview
+preparation is published at `6b9c737`, with Application 296/296 and independent
+review; it binds exact ranges and unique originals without decoded playback.
+The next bounded preview preparation passed Host 145/145, offline Rust 38/38,
+UI 126/126, i18n/build and independent source reviews: verified limited Original
+fallback outside known Take bounds, workload-based deadlines and preservation of
+unsaved Host memory on unknown preview retirement, with explicit Retry. The same
+G1 plan retains both review findings and fixes. Sequence/render consumers remain open.
 The G1 plan records measured
 original-master clock/copy/audio and colour/quality experiments, including exact
 60-s source-slice PCM/AAC coverage and absent-tag metadata equality, plus the exact

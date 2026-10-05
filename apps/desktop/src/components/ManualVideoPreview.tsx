@@ -37,6 +37,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   const [currentMs, setCurrentMs] = useState(0);
   const [inMs, setInMs] = useState<number | null>(null);
   const [outMs, setOutMs] = useState<number | null>(null);
+  const [retry, setRetry] = useState(0);
   const startMs = clip?.sourceStartMs ?? 0;
   const endMs = clip?.sourceEndMs ?? source?.durationMs ?? 0;
   const mediaEndMs = preview?.durationMs ?? 0;
@@ -90,7 +91,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
       if (video && objectUrl) { video.pause(); video.removeAttribute("src"); video.load(); }
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [backend, source?.id, snapshotId, clip?.id, clip?.sourceStartMs, clip?.sourceEndMs]);
+  }, [backend, source?.id, snapshotId, clip?.id, clip?.sourceStartMs, clip?.sourceEndMs, retry]);
 
   useEffect(() => {
     if (busy && url) videoRef.current?.pause();
@@ -173,7 +174,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   }
 
   const validRange = inMs !== null && outMs !== null && inMs < outMs && outMs <= (source?.durationMs ?? 0);
-  const errorKey = error === "MANUAL_VIDEO_TOO_LARGE" ? "preview.localTooLarge" : error === "MANUAL_VIDEO_STALE" || error === "MANUAL_VIDEO_SOURCE_CHANGED" ? "preview.localChanged" : "preview.localUnavailable";
+  const errorKey = error === "MANUAL_VIDEO_PREVIEW_SETTLING" ? "preview.localSettling" : error === "MANUAL_VIDEO_TOO_LARGE" ? "preview.localTooLarge" : error === "MANUAL_VIDEO_STALE" || error === "MANUAL_VIDEO_SOURCE_CHANGED" ? "preview.localChanged" : "preview.localUnavailable";
   return <section className="manual-video-preview" aria-label={t("preview.localVideo")}>
     <div className="manual-preview-heading"><strong>{sourceLabel ?? t("preview.localVideo")}</strong><span>{t(clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
     <div className="manual-video-stage">
@@ -190,6 +191,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
       {!ready && <p role="status">{error ? t(errorKey) : source?.kind === "video" ? t("preview.localLoading") : t("preview.localEmpty")}</p>}
     </div>
     <div className="manual-preview-controls">
+      {error && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setError(null); setRetry(value => value + 1); }}>{t("preview.retryLocal")}</button>}
       <button type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => void togglePlayback()}>{t(playing ? "preview.pauseLocal" : "preview.playLocal")}</button>
       <input type="range" aria-label={t(clip ? "preview.clipSeek" : "preview.sourceSeek")} min={startMs} max={Math.max(startMs + 1, endMs)} step="1" value={Math.min(endMs, Math.max(startMs, currentMs))} disabled={!ready || busy} onChange={(event) => {
         const video = videoRef.current; if (!video) return;

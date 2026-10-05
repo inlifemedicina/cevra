@@ -21,9 +21,13 @@ private-Node CI smoke close-handshake correction recorded in the plan. Corrected
 head `58531d6` passed push and PR CI 5/5; continuous editing proceeds while render-profile
 choices and sequence/render consumers remain open. Historical R3/Take PASS
 remains limited. M1 API is [Draft #87](https://github.com/inlifemedicina/cevra/pull/87),
-stacked on #86; UI passed 125/125 tests, i18n 2/2, production build, twelve owned
-PT/EN layout cases and both independent exact-tree reviews. UI publication
-continues in that Draft. The owner approved initial MP4/H264/AAC 1080p/30-fps
+stacked on #86; UI head `508436e` passed tests/build, twelve owned PT/EN layout
+cases, independent reviews and push/PR/exact-runtime CI. Canonical read-only
+preview preparation `6b9c737` passed Application 296/296 and review. The bounded
+preview follow-up passed Host 145/145, offline Rust 38/38, UI 126/126, i18n/build
+and source reviews, preserving unsaved Host on unknown preview retirement and
+allowing explicit Retry. Publication continues in that Draft; decoded sequence
+playback/export remain open. The owner approved initial MP4/H264/AAC 1080p/30-fps
 SDR, 20-Mb/s target, preserved IN/OUT and 512-MiB memory/2-GiB owned temporary-file
 limits with clear errors and no silent quality drop. Synthetic export measurements,
 proof limits and the exact-cut versus strict-CFR boundary distinction remain in

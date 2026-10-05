@@ -91,6 +91,33 @@ async function metadata(container: HTMLElement, duration?: number, initialFrame 
   return video;
 }
 
+it("preserves the project on an unsettled preview and retries once only when requested", async () => {
+  const backend = new ManualBackend();
+  const before = backend.history.toArchive();
+  const original = backend.previewLocalVideo.bind(backend);
+  let attempts = 0;
+  const requests: LocalVideoPreviewRequest[] = [];
+  backend.previewLocalVideo = async request => {
+    requests.push(request);
+    if (++attempts === 1) throw { code: "MANUAL_VIDEO_PREVIEW_SETTLING" };
+    return original(request);
+  };
+  const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId={backend.history.current.history.headSnapshotId!}
+    timelineOccupied={false} busy={false} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  const retry = await screen.findByRole("button", { name: t("preview.retryLocal") });
+  expect(screen.getByText(t("preview.localSettling"))).toBeTruthy();
+  expect(attempts).toBe(1);
+  expect(backend.history.toArchive()).toEqual(before);
+  fireEvent.click(retry);
+  await metadata(container);
+  expect(attempts).toBe(2);
+  expect(requests[1].operationId).not.toBe(requests[0].operationId);
+  expect(requests[1].expectedSnapshotId).toBe(requests[0].expectedSnapshotId);
+  expect(screen.queryByRole("button", { name: t("preview.retryLocal") })).toBeNull();
+  expect(backend.history.toArchive()).toEqual(before);
+  expect(backend.creates).toEqual([]);
+});
+
 for (const excerpt of [false, true]) {
   it(`waits for the decoded initial frame of ${excerpt ? "the selected clip" : "Original"} without play or clock advancement`, async () => {
     const backend = new ManualBackend();
