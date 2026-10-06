@@ -97,6 +97,17 @@ their historical binding. Native packaging/Host validation and final-head review
 receipts accompany the same Draft. The 100-ms watchdog waits after each scan;
 instantaneous RAM/disk ceilings and real-project/perceptual/Owner acceptance stay
 open. Two synthetic flash/beep fixtures are prepared; no human app was opened.
+The first packaged Host exposed unavailable manual capabilities: FFmpeg9's two
+filter flags failed the three-column parser, before any ingest/render/export.
+The bounded two/three-column fix passed Python128 and sealed R4 actual health/
+manual-capability plus full functional acceptance. The catalog now checks those
+capabilities before rendering. Native compilation/resource hashes passed, but
+strict signature verification fails in the unchanged pinned Node even before
+bundling; that GUI_PACKAGE_BLOCKED_SIGNATURE receipt is retained. A separately
+declared ad-hoc signed Node copy passed strict verification/version while the
+original pin, official manifests and sealed Media/Python remain unchanged.
+Whole-bundle/Host verification is separate. Exact-head package/Host/review/CI
+receipts accompany the Draft; no GUI/Owner or hard-cap PASS follows.
 No G1 PASS,
 real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,

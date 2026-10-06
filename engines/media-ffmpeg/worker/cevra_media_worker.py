@@ -249,7 +249,8 @@ def _filters() -> List[str]:
     proc = _run([ffmpeg, "-hide_banner", "-filters"])
     result: List[str] = []
     for line in (proc.stdout or "").splitlines():
-        match = re.match(r"^\s*[TSC\.]{3}\s+(\S+)\s", line)
+        # FFmpeg 9 lists two flags; earlier supported releases list three.
+        match = re.match(r"^\s*[TSC\.]{2,3}\s+(\S+)\s", line)
         if match and match.group(1) != "=":
             result.append(match.group(1))
     return sorted(set(result))

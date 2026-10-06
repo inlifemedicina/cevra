@@ -269,6 +269,17 @@ gate explicitamente aberto; o pacote não declara READY para G1 completo ou proj
 real arbitrário. Os receipts técnicos de build/Host/runtime e comandos de abertura
 posterior acompanham a mesma variante, sem duplicar este catálogo.
 
+O primeiro smoke do Host empacotado parou antes de ingest/render/export por
+capability indisponível: o parser de filtros rejeitava as duas colunas reais do
+FFmpeg9. A correção aceita duas/três colunas; Python128 e catálogo selado R4 com
+health/capabilities reais PASS. O binário Node pinado mantém seus bytes oficiais,
+mas falha na verificação estrita da assinatura também antes do bundle; o primeiro
+pacote fica BLOCKED por assinatura. Uma cópia separada assinada localmente ad hoc
+passou no probe estrito/version, com hash pós assinatura declarado e original,
+pins/manifests e Media/Python preservados. Isso não prova o novo bundle/Host.
+Compilação/headless não promovem os itens humanos acima; preservar receipts
+falhos e aguardar pacote/verificação próprios.
+
 Estado deste roteiro: **NÃO EXECUTADO / preparação nativa agrupada**. Não promove G1,
 G5/G6, native/owner, progresso ou F-A02. A política temporal está aprovada;
 os gates técnicos e o julgamento humano continuam pendentes.

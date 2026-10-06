@@ -2818,7 +2818,7 @@ bytes, and check again after creating that link. Excess blocks publication.
 This is quiescent admission, not a quota intercepting earlier writes. Python
 126/126 and the exact sealed R3 manual functional catalog passed; manifest SHA
 `ac2663fe25458970b153557b7255fe35f48a8152f533ca84f811112ec4e73cf0` binds the
-current worker modules. R3 again proved actual decoded picture/audio counts,
+then-current R3 worker modules. R3 again proved actual decoded picture/audio counts,
 source identity, Original timing and checkpoint/archive reopen without replay.
 Its 60-s flat-barcode final sampled 133562368 B RSS and 39407529 B logical files.
 The earlier R2 Full HD PSNR/resource measurements remain their own historical
@@ -2830,6 +2830,25 @@ the 100-ms delay follows each scan and is not a maximum observation interval.
 Instantaneous 512-MiB/2-GiB, arbitrary-source/perceptual and Owner gates stay open.
 Director impact is a compatible internal extension: existing typed operations,
 IR/History and preset boundaries remain authoritative, with no new AI authority.
+
+The first packaged Host at `cac53b31` exposed a real admission gap: hello/snapshot
+passed, but manual export stayed unavailable because FFmpeg 9.0.1's two filter
+flags were rejected by a three-column inventory parser. No ingest/render/export
+occurred in that failed attempt. The minimal parser correction supports both
+formats with negative regressions; Python128 passed. Exact sealed R4 passed real
+health/manual-capability admission plus the existing complete functional catalog;
+manifest SHA `08b4091a295b3835be5368153157756b7eebc4270cd301fad17a50d622a7898d`,
+nine modules bound to source. R4's 60-s final sampled RSS136445952 B and owned
+logical39407529 B; this is not an instantaneous ceiling. The catalog now checks
+capabilities before rendering. The initial package is also explicitly blocked by
+strict signature failure of the unchanged officially pinned Node executable,
+reproduced before bundling. A separate copied Node signed locally ad hoc passed
+strict verification/version; input SHA18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572
+remains intact and the declared derivative is SHA4f191ec5bfd680bc806226c193ba7f48594836a09ba1bbb9d800f9e325eac0af.
+Official pins/manifests and sealed Media/Python are unchanged; no signing key or
+credential is used. Node-only signing does not prove whole-bundle/Host acceptance;
+do not declare GUI READY based on headless tests. Fresh exact-head package/Host/review/CI
+receipts accompany the Draft; actual GUI/Owner and strict resource gates stay open.
 
 1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved admission of the designated F-A02 result/history into a temporary native session is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.

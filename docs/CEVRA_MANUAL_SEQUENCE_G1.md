@@ -885,6 +885,43 @@ renderer RSS enforcement ([header](https://raw.githubusercontent.com/apple-oss-d
 Treating it as equivalent would require a different policy/proof and is not part
 of this bounded fix. Director impact remains a compatible internal extension.
 
+### Packaged capability admission correction
+
+The first packaged-Host smoke at `cac53b31` stopped after hello/snapshot:
+manual export was unavailable and no ingest/render/export occurred. Its retained
+health receipt showed the pinned FFmpeg 9.0.1 emits two filter flags, whereas the
+worker inventory parser required three. Earlier service/guard functional PASS
+therefore did not prove the Host's actual capability admission. The bounded fix
+accepts both supported two/three-column forms and continues rejecting legends and
+malformed columns. Python 128/128 passed. The checked-in functional catalog now
+requires real ready health and both manual preview/export capabilities before
+any render, so an unavailable native Host cannot be hidden by lower-level PASS.
+
+Exact sealed R4 functional acceptance passed that new admission and the complete
+existing picture/audio/Original/archive/60-s catalog. Nine source modules match;
+manifest SHA-256 `08b4091a295b3835be5368153157756b7eebc4270cd301fad17a50d622a7898d`,
+entrypoint SHA-256 `e62db9b657634ab3242a8c865642db4fd1ae7b0deaa5c4bc8641fdd1f88420d3`.
+The long final sampled RSS 136445952 B and logical/allocated 39407529/39481344 B.
+R2 quality and R3 execution retain their historical bindings; neither is relabeled
+as packaged UI acceptance. A fresh exact-head package/Host receipt accompanies
+the same Draft; no new dependency, engine, filtergraph authority or preset.
+
+The original pinned Node executable also fails strict macOS signature verification
+before packaging. The first bundle retains its exact official pinned bytes and
+is `GUI_PACKAGE_BLOCKED_SIGNATURE`, despite native compilation and sealed-runtime
+hashes passing. That attempt did not re-sign nested binaries or rewrite official
+hashes to hide the failure. A separate local ad-hoc signing probe now passed
+strict verification and Node v22.23.2: the original input stays SHA-256
+`18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572`, while the signed
+copy is `4f191ec5bfd680bc806226c193ba7f48594836a09ba1bbb9d800f9e325eac0af`.
+This declared packaging transformation uses no credential and leaves official
+pins/manifests and sealed Media/Python bytes intact. Fresh whole-bundle signature
+and packaged-Host results are separate receipts; a Node-only probe is not their
+PASS. Tauri platform resource resolution passed in the canonical
+`/private/tmp` path; AppHandle/WebView/picker and human perception remain untested.
+No GUI opening or full READY follows from a headless Host result. Existing resource
+ceilings, broader source and Owner/native gates remain open.
+
 ## Product and Director boundaries
 
 Creator=Lite; Studio=Full; Vids=Desktop. I19's technical label “Creator Skill

@@ -330,6 +330,12 @@ async function finalExport(fixture, name, expectedIds) {
 }
 
 try {
+  assert.equal((await engine.healthcheck()).status, "ready", "The actual sealed runtime must be ready before acceptance.");
+  const availableCapabilities = await engine.capabilities();
+  for (const id of ["media.cevra-render-manual-video-sequence", "media.cevra-render-manual-video-preview"]) {
+    const capability = availableCapabilities.find(value => value.id === id);
+    assert.equal(capability?.available, true, `The Host requires available ${id}: ${capability?.detail ?? "missing"}`);
+  }
   const audio = path.join(root, "stereo-44100-offset.wav"); stereoPulses(audio);
   const lateAudio = path.join(root, "late-stereo-44100-offset.wav");
   stereoPulses(lateAudio, { durationMs: 34940, startMs: framesToMilliseconds(1000) });
@@ -397,6 +403,7 @@ try {
     platform: `${process.platform}-${process.arch}`, runtime: await client.info(),
     ...(release ? { runtimeManifestSha256: sha(path.join(runtime, "manifest.json")), sealedWorkerSha256: sha(workerScript) } : {}),
     sampler: "independent rational display-PTS barcode oracle",
+    actualRuntimeHealthAndManualCapabilitiesVerified: true,
     cfr24BFrames: true, originalSourceClockAndCacheVerified: true, ntsc30000Over1001: true, lateNtscSourceClockVerified: true, vfrPictures: true, repeatedRangeAndSingleFrame: true,
     independent44100StereoOffsetAndPulseClock: true, pulseMeasurements, sourceSha256Preserved: true,
     auditedExportAndArchiveReopenUndoWithoutReplay: true, sixtySecondPreviewAndFinal: true, measurements,

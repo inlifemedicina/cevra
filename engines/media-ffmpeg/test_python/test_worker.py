@@ -71,6 +71,20 @@ class WorkerContractTests(unittest.TestCase):
         for name in ("CEVRA_VIDEO_ENCODER_H264", "CEVRA_VIDEO_ENCODER_HEVC", "CEVRA_VIDEO_ENCODER_AV1", "CEVRA_DECODE_ACCELERATION"):
             os.environ.pop(name, None)
 
+    def test_filter_inventory_accepts_ffmpeg9_and_legacy_flag_columns(self) -> None:
+        inventories = [
+            "Filters:\n  T. = Timeline support\n .. atrim A->A Trim the input\n .. fps V->V Force framerate\n TS scale V->V Scale input\n .. fps V->V Duplicate\n",
+            "Filters:\n ... atrim A->A Trim the input\n ... fps V->V Force framerate\n TSC scale V->V Scale input\n",
+        ]
+        for inventory in inventories:
+            with self.subTest(inventory=inventory), mock.patch.object(worker, "_tool", return_value="pinned-ffmpeg"), mock.patch.object(worker, "_run", return_value=mock.Mock(stdout=inventory)):
+                self.assertEqual(worker._filters(), ["atrim", "fps", "scale"])
+
+    def test_filter_inventory_rejects_legends_and_malformed_columns(self) -> None:
+        inventory = "Filters:\n T. = Timeline support\n .S = Slice threading\n . fps V->V Short flags\n .... fps V->V Long flags\n XX scale V->V Unknown flags\n"
+        with mock.patch.object(worker, "_tool", return_value="pinned-ffmpeg"), mock.patch.object(worker, "_run", return_value=mock.Mock(stdout=inventory)):
+            self.assertEqual(worker._filters(), [])
+
     def test_resource_limits_are_explicit_in_rpc_schemas(self) -> None:
         transcode = worker._schema_for_tool("cevra-transcode")
         self.assertEqual(transcode["properties"]["width"]["maximum"], worker.MAX_MEDIA_WIDTH)
