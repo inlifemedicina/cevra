@@ -7,7 +7,7 @@ import { MediaApplicationService } from "./media-service.js";
 import type { MediaExecutionOutcome } from "./types.js";
 import { localSourceProbeInput } from "./local-source-uri.js";
 
-/** Approved delivery profile; the editable visual clock is CFR30. */
+/** Initial approved validation budgets. RSS is sampled; these are not proved commercial ceilings. */
 export const MANUAL_EXPORT_LIMITS = Object.freeze({
   rendererRssBytes: 512 * 1024 * 1024,
   ownedJobBytes: 2 * 1024 * 1024 * 1024,

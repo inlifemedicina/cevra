@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -286,7 +286,7 @@ function destination(output) {
     async revalidatePublication(target, publication) { assert.equal(target, issued); sameParent(); assert.equal(await artifacts.matchesPublication(output, publication), true); }
   };
 }
-async function finalExport(fixture, name, expectedIds) {
+async function finalExport(fixture, name, expectedIds, { compareBarcode = true } = {}) {
   const { history, media, executions } = fixture, before = history.toArchive(), beforeCount = history.entries.length;
   const output = path.join(root, `${name}.mp4`), owned = workspace(name);
   const service = new ManualSequenceExportApplicationService({ history, identity: artifacts, media });
@@ -302,11 +302,17 @@ async function finalExport(fixture, name, expectedIds) {
   assert.equal(history.entries.at(-1).command.type, "export.add"); assert.equal(history.current.exports.length, 1);
   assert.equal(history.current.exports[0].outputUri, output);
   const file = result.record.attempts.at(-1).result;
-  assert.deepEqual(frameIds(output), expectedIds, "Final must use original pictures with the same sampling as preview.");
+  if (compareBarcode) assert.deepEqual(frameIds(output), expectedIds, "Final must use original pictures with the same sampling as preview.");
   const clock = assertOutputClock(output, expectedIds.length, false), receipt = file.manualSequence;
   assert.equal(receipt.profile, "manual-cfr30-export-v1"); assert.equal(receipt.targetVideoBitsPerSecond, 20_000_000);
   assert.equal(receipt.totalFrames, expectedIds.length); assert.equal(receipt.totalPcmSamples, clock.expectedSamples);
   assert.equal(receipt.outputAudioSampleCount, clock.expectedSamples); assert.equal(receipt.durationMs, framesToMilliseconds(expectedIds.length));
+  assert.equal(receipt.logicalBudget.enforcement, "reserved-logical-space");
+  assert.equal(receipt.logicalBudget.budgetBytes, 2 * 1024 ** 3);
+  assert.ok(receipt.logicalBudget.peakReservedBytes <= receipt.logicalBudget.budgetBytes);
+  assert.equal(receipt.logicalBudget.accountingOverlapReserved, true);
+  assert.equal(receipt.logicalBudget.allocatedBlockQuota, false);
+  measurements.at(-1).logicalReservations = receipt.logicalBudget;
   assert.equal(receipt.outputSha256, sha(output)); assert.equal(file.probe.videoCodec, "h264"); assert.equal(file.probe.audioCodec, "aac");
   assert.equal(file.effectiveProfile.videoEncoder, "h264_videotoolbox"); assert.equal(file.effectiveProfile.audioEncoder, "aac");
   assert.equal(await artifacts.matchesPublication(output, file.publication), true);
@@ -398,6 +404,23 @@ try {
     sourceId: "source-0", sourceStartFrame: 0, sourceEndFrame: 1800 });
   await finalExport(longFixture, "final-60-seconds", stressOracle.interval(0, 1800));
   assert.equal(sha(stress), stressDigest);
+  if (process.env.CEVRA_MANUAL_RESOURCE_REPRESENTATIVE === "1") {
+    const detailed = path.join(root, "synthetic-fullhd-motion-60s.mov");
+    run(["-y", "-f", "lavfi", "-i", "testsrc2=s=1920x1080:r=30:d=60", "-f", "lavfi", "-i", "aevalsrc=0.01*sin(2*PI*440*t)|0.01*sin(2*PI*660*t):s=48000:d=60",
+      "-map", "0:v:0", "-map", "1:a:0", "-c:v", "mpeg4", "-q:v", "3", "-bf", "2", "-c:a", "pcm_s16le", detailed], 180_000);
+    const originalHash = sha(detailed), fixture = await projectFor([detailed], "manual-fullhd-resource-validation");
+    await fixture.sequence.edit({ version: 2, type: "append", expectedSnapshotId: fixture.history.current.history.headSnapshotId,
+      sourceId: "source-0", sourceStartFrame: 0, sourceEndFrame: 1800 });
+    const rendered = await finalExport(fixture, "final-fullhd-motion-60s", Array(1800), { compareBarcode: false });
+    const comparison = spawnSync(ffmpeg, ["-v", "info", "-nostdin", "-threads", "2", "-filter_complex_threads", "2", "-i", detailed, "-i", rendered.output,
+      "-filter_complex", "[0:v]setpts=PTS-STARTPTS[ref];[1:v]setpts=PTS-STARTPTS[out];[ref][out]psnr", "-an", "-f", "null", "-"], { timeout: 180_000, encoding: "utf8", maxBuffer: 4 * 1024 ** 2 });
+    assert.equal(comparison.status, 0, comparison.stderr);
+    const match = comparison.stderr.match(/PSNR[^\n]*average:([0-9.]+|inf)/u);
+    assert.ok(match, "Independent full-program quality comparison must report PSNR.");
+    const psnr = match[1] === "inf" ? "infinite" : Number(match[1]);
+    assert.equal(sha(detailed), originalHash);
+    measurements.at(-1).quality = { comparison: "decoded original versus decoded final, whole 60-s 1080p moving test pattern", psnrDb: psnr, perceptualAcceptance: "NOT EXECUTED", sourceSha256Preserved: true, sourceBytes: statSync(detailed).size };
+  }
   for (const original of originals) { assert.equal(sha(original.uri), original.sha256); assert.equal(statSync(original.uri).size, original.sizeBytes); }
   process.stdout.write(JSON.stringify({ status: "PASS", mode: release ? "exact-release-runtime" : "development-current-worker-with-explicit-tools",
     platform: `${process.platform}-${process.arch}`, runtime: await client.info(),

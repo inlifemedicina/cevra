@@ -1170,5 +1170,7 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
         text = "\n".join(stderr.getvalue().strip().splitlines()[-12:]) or stdout.getvalue().strip()
         return {"isError": True, "content": [{"type": "text", "text": f"{name} failed (exit {code})\n{text}"}]}
     except Exception as exc:
+        if name in {"cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"} and job_control.is_logical_file_budget_failure(exc):
+            raise
         return {"isError": True, "content": [{"type": "text", "text": f"{name} failed: {type(exc).__name__}: {exc}"}]}
     return {"isError": True, "content": [{"type": "text", "text": f"{name} failed without a result"}]}

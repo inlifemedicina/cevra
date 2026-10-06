@@ -320,7 +320,9 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       this.pending.delete(response.id);
       pending.cleanup();
       if (pending.terminalError) pending.reject(pending.terminalError);
-      else if (response.error) pending.reject(Object.assign(new Error(response.error.message), { code: response.error.code }));
+      else if (response.error) pending.reject(response.error.code === -32002 && response.error.message === "MEDIA_RENDER_DISK_LIMIT"
+        ? new OwnedRenderResourceError("MEDIA_RENDER_DISK_LIMIT")
+        : Object.assign(new Error(response.error.message), { code: response.error.code }));
       else pending.resolve(response.result);
     }
   }

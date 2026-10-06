@@ -1010,6 +1010,8 @@ def _job_response(request_id: Any, job_id: str, name: str, arguments: Dict[str, 
         cancelled = job_control.finish_job(job_id)
         code = -32800 if cancelled else -32000
         message = f"media job {job_id} was cancelled" if cancelled else str(exc)
+        if not cancelled and job_control.is_logical_file_budget_failure(exc):
+            code, message = -32002, "MEDIA_RENDER_DISK_LIMIT"
         response = {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
     finally:
         _JOB_THREAD = None

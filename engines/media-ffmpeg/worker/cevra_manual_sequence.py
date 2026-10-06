@@ -107,7 +107,7 @@ def _root_current(root: Path, expected: os.stat_result) -> None:
         raise RuntimeError("manual owned workspace identity changed")
 
 
-def _admit_owned_disk(root: Path, expected: os.stat_result, prospective_account: Path | None = None) -> None:
+def _owned_disk_bytes(root: Path, expected: os.stat_result, prospective_account: Path | None = None) -> tuple[int, int]:
     """Quiescent pre-publication admission; not a quota on earlier writes.
 
     Count each name, including hardlinks, like the Host watchdog. The projected
@@ -174,11 +174,115 @@ def _admit_owned_disk(root: Path, expected: os.stat_result, prospective_account:
         logical += metadata.st_size
         allocated += metadata.st_blocks * 512
     _root_current(root, expected)
-    if max(logical, allocated) > OWNED_BYTES:
-        raise RuntimeError("manual owned job disk budget exceeded before publication")
+    return logical, allocated
 
 
-def _seal(source: Path, target: Path, content: dict) -> os.stat_result:
+def _admit_owned_disk(root: Path, expected: os.stat_result, prospective_account: Path | None = None) -> None:
+    if max(_owned_disk_bytes(root, expected, prospective_account)) > OWNED_BYTES:
+        raise jobs.LogicalFileBudgetError()
+
+
+class _LogicalBudget:
+    """One job's closed producers; logical reservations, not allocated-block quotas."""
+    def __init__(self, root: Path, expected: os.stat_result, maximum: int):
+        self.root, self.expected, self.maximum = root, expected, maximum
+        self.baseline = _owned_disk_bytes(root, expected)[0]
+        self.charges: dict[Path, tuple[int, int]] = {}
+        self.peak_reserved = self.baseline
+        self.producers = 0
+        if self.baseline > maximum:
+            raise jobs.LogicalFileBudgetError()
+
+    @property
+    def remaining(self) -> int:
+        return self.maximum - self.baseline - sum(size * names for size, names in self.charges.values())
+
+    def _path_current(self, path: Path) -> None:
+        _root_current(self.root, self.expected)
+        if not path.is_relative_to(self.root) or path.parent.resolve() != path.parent or path.parent.stat().st_dev != self.expected.st_dev:
+            raise RuntimeError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED")
+
+    def reserve(self, path: Path, maximum: int, *, names: int = 1) -> None:
+        self._path_current(path)
+        if path in self.charges or path.exists() or path.is_symlink() or not isinstance(maximum, int) or isinstance(maximum, bool) or maximum < 1 or names not in (1, 2):
+            raise RuntimeError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED")
+        if maximum * names > self.remaining:
+            raise jobs.LogicalFileBudgetError()
+        self.charges[path] = (maximum, names)
+        self.peak_reserved = max(self.peak_reserved, self.maximum - self.remaining)
+
+    def reserve_available(self, path: Path, *, names: int = 1) -> None:
+        available = self.remaining // names
+        if available < 1:
+            raise jobs.LogicalFileBudgetError()
+        self.reserve(path, available, names=names)
+
+    def check_write(self, path: Path, offset: int, count: int) -> None:
+        self._path_current(path)
+        if path not in self.charges or offset < 0 or count < 0 or offset + count > self.charges[path][0]:
+            raise jobs.LogicalFileBudgetError()
+
+    def settle(self, path: Path) -> None:
+        self._path_current(path)
+        metadata = path.lstat()
+        maximum, names = self.charges[path]
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_dev != self.expected.st_dev:
+            raise RuntimeError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED")
+        if metadata.st_size > maximum:
+            raise jobs.LogicalFileBudgetError()
+        self.charges[path] = (metadata.st_size, names)
+
+    def write_text(self, path: Path, text: str) -> None:
+        data = text.encode("utf-8")
+        self.reserve(path, len(data))
+        self.check_write(path, 0, len(data))
+        self.producers += 1
+        with path.open("xb") as handle:
+            if handle.write(data) != len(data):
+                raise RuntimeError("manual instruction write was incomplete")
+        self.settle(path)
+
+    def run_native(self, common: Any, command: list[str], *, names: int = 1, **kwargs):
+        path = Path(command[-1])
+        if path not in self.charges:
+            self.reserve_available(path, names=names)
+        elif self.charges[path][1] != names:
+            raise RuntimeError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED")
+        maximum = self.charges[path][0]
+        self._path_current(path)
+        self.producers += 1
+        with jobs.native_file_budget(maximum, path.parent) as scope:
+            try:
+                result = common.run(command, **kwargs)
+            except BaseException:
+                scope.assert_not_exceeded()
+                raise
+            scope.assert_not_exceeded()
+        self.settle(path)
+        return result
+
+    def evidence(self) -> dict:
+        return {"version": 1, "enforcement": "reserved-logical-space", "budgetBytes": self.maximum,
+                "peakReservedBytes": self.peak_reserved, "producerCount": self.producers,
+                "accountingOverlapReserved": True, "allocatedBlockQuota": False}
+
+
+class _BudgetMuxCommon:
+    """Only the existing mux producer writes through this internal projection."""
+    def __init__(self, common: Any, budget: _LogicalBudget):
+        self.common, self.budget = common, budget
+
+    def __getattr__(self, name):
+        return getattr(self.common, name)
+
+    def run(self, command, **kwargs):
+        if command == [self.common.require_tool("ffmpeg"), "-hide_banner", "-encoders"]:
+            return self.common.run(command, **kwargs)
+        # Candidate and retained accounting name coexist before publication.
+        return self.budget.run_native(self.common, command, names=2, **kwargs)
+
+
+def _seal(source: Path, target: Path, content: dict, budget: _LogicalBudget | None = None) -> os.stat_result:
     initial = source.lstat()
     if content["size_bytes"] > SOURCE_BYTES or not stat.S_ISREG(initial.st_mode) or initial.st_size != content["size_bytes"]:
         raise ValueError("manual original is outside existing admitted source byte bounds")
@@ -191,6 +295,8 @@ def _seal(source: Path, target: Path, content: dict) -> os.stat_result:
             jobs.check_cancelled()
             if copied + len(chunk) > content["size_bytes"] or copied + len(chunk) > SOURCE_BYTES:
                 raise RuntimeError("manual original grew beyond its sealed content bound")
+            if budget is not None:
+                budget.check_write(target, copied, len(chunk))
             digest.update(chunk); private.write(chunk); copied += len(chunk)
         if copied != content["size_bytes"]:
             raise RuntimeError("manual original ended before its sealed content bound")
@@ -362,16 +468,31 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
     if not encoder:
         raise RuntimeError("manual render requires the existing approved H.264 encoder")
     directory = Path(tempfile.mkdtemp(prefix="manual-render-", dir=root))
+    directory_stamp = directory.lstat()
     owned_files: list[Path] = []
     sources, metadata, segments, original_stamps, receipts = {}, {}, {}, {}, []
     accounting = root / "published-account.mp4"
     publication = None
     try:
+        budget = _LogicalBudget(root, root_stamp, OWNED_BYTES)
+        source_targets = {}
+        # Admit all mandatory copies and the conservative stereo PCM allowance
+        # before copying/encoding. Encoder targets are not file-size bounds.
+        for index, original in enumerate(originals):
+            item = next(item for item in items if item["input"] == str(original))
+            sealed = directory / f"source-{index}{original.suffix.lower()}"
+            budget.reserve(sealed, item["source_content"]["size_bytes"])
+            source_targets[original] = sealed; owned_files.append(sealed)
+        pcm = directory / "sequence.wav"
+        budget.reserve(pcm, total * 1600 * 8 + 1024 * 1024)
+        owned_files.append(pcm)
         colour = None
         for index, original in enumerate(originals):
             item = next(item for item in items if item["input"] == str(original))
-            sealed = directory / f"source-{index}{original.suffix.lower()}"; owned_files.append(sealed)
-            stamp = _seal(original, sealed, item["source_content"]); original_stamps[original] = stamp
+            sealed = source_targets[original]
+            budget.producers += 1
+            stamp = _seal(original, sealed, item["source_content"], budget); original_stamps[original] = stamp
+            budget.settle(sealed)
             meta, times, durations, _, _, coverage = inspection._inspect_source(common, sealed, sealed.lstat(), item["source_content"]["sha256"])
             streams = _streams(common, sealed)
             videos, audios = [s for s in streams if s.get("codec_type") == "video"], [s for s in streams if s.get("codec_type") == "audio"]
@@ -413,29 +534,25 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
                 profile[profile.index("-b:v") + 1] = str(bitrate)
                 if preview:
                     profile += ["-maxrate", "700k", "-bufsize", "1400k"]
-                common.run(common.ffmpeg_base(overwrite=False) + ["-threads", "2", "-filter_threads", "2", "-copyts", "-i", str(sealed), "-map", f"0:{receipts[int(source_id[1:])]['videoStreamIndex']}", "-an", "-vf", _video_filter(start, end, width, height), *profile, *_colour_args(metadata[source_id]["video"]), "-bf", "0", "-fps_mode", "passthrough", "-video_track_timescale", "30000", "-metadata:s:v:0", "rotate=0", str(segment)])
+                budget.run_native(common, common.ffmpeg_base(overwrite=False) + ["-threads", "2", "-filter_threads", "2", "-copyts", "-i", str(sealed), "-map", f"0:{receipts[int(source_id[1:])]['videoStreamIndex']}", "-an", "-vf", _video_filter(start, end, width, height), *profile, *_colour_args(metadata[source_id]["video"]), "-bf", "0", "-fps_mode", "passthrough", "-video_track_timescale", "30000", "-metadata:s:v:0", "rotate=0", str(segment)])
                 _video_clock(common, segment, end - start, width, height)
                 segments[key] = segment
             occurrences.append(segments[key])
-        graph_path, pcm = directory / "sequence.ffgraph", directory / "sequence.wav"; owned_files.extend([graph_path, pcm])
+        graph_path = directory / "sequence.ffgraph"; owned_files.append(graph_path)
         graph = tools._audio_sequence_graph({}, {source_id: index for index, (source_id, *_rest) in enumerate(sources.values())}, metadata,
             sample_plan={"items": pcm_items, "output_channel_layout": layout})
-        with graph_path.open("x", encoding="utf-8") as handle:
-            handle.write(graph)
+        budget.write_text(graph_path, graph)
         command = common.ffmpeg_base(overwrite=False) + ["-copyts"]
         for _id, sealed, *_rest in sources.values():
             command += ["-i", str(sealed)]
-        common.run(command + ["-/filter_complex", str(graph_path), "-map", "[cevra_audio_out]", "-vn", "-c:a", "pcm_f32le", "-ar", "48000", "-ac", str(channels), "-f", "wav", str(pcm)])
+        budget.run_native(common, command + ["-/filter_complex", str(graph_path), "-map", "[cevra_audio_out]", "-vn", "-c:a", "pcm_f32le", "-ar", "48000", "-ac", str(channels), "-f", "wav", str(pcm)])
         samples, data_bytes = tools._measure_pcm_f32le_wav(pcm)
         if samples != total * 1600 or data_bytes != samples * channels * 4:
             raise RuntimeError("manual measured PCM count is not exactly 1600 samples per frame")
         listing, video = directory / "sequence.ffconcat", directory / "sequence.mp4"; owned_files.extend([listing, video])
-        with listing.open("x", encoding="utf-8") as handle:
-            handle.write("ffconcat version 1.0\n")
-            for segment in occurrences:
-                # Generated relative names contain no caller text or quoting surface.
-                handle.write(f"file {segment.name}\n")
-        common.run(common.ffmpeg_base(overwrite=False) + ["-f", "concat", "-safe", "1", "-auto_convert", "0", "-i", str(listing), "-map", "0:v:0", "-c:v", "copy", "-an", "-video_track_timescale", "30000", str(video)])
+        # Generated relative names contain no caller text or quoting surface.
+        budget.write_text(listing, "ffconcat version 1.0\n" + "".join(f"file {segment.name}\n" for segment in occurrences))
+        budget.run_native(common, common.ffmpeg_base(overwrite=False) + ["-f", "concat", "-safe", "1", "-auto_convert", "0", "-i", str(listing), "-map", "0:v:0", "-c:v", "copy", "-an", "-video_track_timescale", "30000", str(video)])
         _video_clock(common, video, total, width, height)
         measured = {}
         def admit(candidate: Path, probe: dict) -> None:
@@ -472,7 +589,7 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
             publication = tools._publication_evidence(accounting)
             _admit_owned_disk(root, root_stamp)
             jobs.check_cancelled()
-        result = tools._run_mux_audio(common, {"video": str(video), "audio": str(pcm), "output": str(output), "container": "mp4", "audio_codec": "aac", "replace_existing": True}, owned_staging_parent=directory, before_publish=admit,
+        result = tools._run_mux_audio(_BudgetMuxCommon(common, budget), {"video": str(video), "audio": str(pcm), "output": str(output), "container": "mp4", "audio_codec": "aac", "replace_existing": True}, owned_staging_parent=directory, before_publish=admit,
             owned_aac_bits_per_second=96_000 if preview else None, retain_published_on_error=True)
         if publication is None or not tools._matches_publication(output, publication) or not tools._matches_publication(accounting, publication):
             raise RuntimeError("manual final/accounting publication identity is unproved")
@@ -484,7 +601,8 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
             "width": width, "height": height, "targetVideoBitsPerSecond": bitrate, "totalFrames": total, "outputFrameCount": total,
             "totalPcmSamples": samples, "outputAudioSampleCount": int(measured["audio"] * 48000), "audioSampleRate": 48000, "audioChannelLayout": layout,
             "durationMs": total * 1000 / 30, "muxVideoDurationMs": float(measured["video"] * 1000), "muxAudioDurationMs": float(measured["audio"] * 1000),
-            "itemCount": len(items), "uniqueSegmentCount": len(segments), "sources": receipts}
+            "itemCount": len(items), "uniqueSegmentCount": len(segments), "sources": receipts,
+            "logicalBudget": budget.evidence()}
         result["structuredContent"]["manualSequence"] = evidence
         result["content"] = [{"type": "text", "text": json.dumps(result["structuredContent"])}]
         return result
@@ -494,6 +612,9 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
         raise
     finally:
         errors = []
+        # A replaced root cannot confer cleanup authority over its new contents.
+        _root_current(root, root_stamp)
+        _root_current(directory, directory_stamp)
         # Never path-unlink a public manual destination after publication.
         # Its retained private accounting link permits conservative recovery;
         # only normal successful Host settlement removes that issued workspace.

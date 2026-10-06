@@ -63,6 +63,23 @@ class JobControlTests(unittest.TestCase):
 
 
 class WorkerContractTests(unittest.TestCase):
+    def test_logical_budget_rpc_is_closed_through_explicit_cause_and_cancellation_wins(self) -> None:
+        failure = job_control.LogicalFileBudgetError()
+        wrapped = RuntimeError("private-path-and-native-stderr")
+        wrapped.__cause__ = failure
+        for error, cancelled, code in ((failure, False, -32002), (wrapped, False, -32002), (wrapped, True, -32800)):
+            with self.subTest(cancelled=cancelled, wrapped=error is wrapped):
+                job_control.begin_job("budget-test")
+                if cancelled:
+                    job_control.cancel("budget-test")
+                with mock.patch.object(worker, "_call_tool_in_process", side_effect=error), mock.patch.object(worker, "_write_response") as response:
+                    worker._job_response(1, "budget-test", "render-manual-video-sequence", {})
+                payload = response.call_args.args[0]
+                self.assertEqual(payload["error"]["code"], code)
+                self.assertNotIn("private-path", json.dumps(payload))
+                if not cancelled:
+                    self.assertEqual(payload["error"]["message"], "MEDIA_RENDER_DISK_LIMIT")
+
     def tearDown(self) -> None:
         active = job_control.active_job_id()
         if active:

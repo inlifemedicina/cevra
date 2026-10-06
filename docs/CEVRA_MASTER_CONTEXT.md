@@ -2658,6 +2658,29 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
+**Active resource decision — 2026-10-06 10:38:21 UTC:** the Owner approved the
+proposed operational contract: reserve logical space before each producer writes,
+and supervise renderer RAM with interruption after observed excess. Initial
+512-MiB/2-GiB values are validation budgets, not proved commercial limits or
+instantaneous physical/GPU guarantees. Material value changes require an explicit
+recommendation before adoption. [ADR0034](adr/0034-operational-manual-render-resources.md)
+records the accepted direction, mechanisms and bounded validation plan. Its
+implementation now has bounded offline validation: logical reservations cover
+declared producers and candidate/accounting overlap; fresh exec wrappers limit
+native output file size; closed budget failures reach the Host without committing
+an export or replay. Sealed R5 synthetic release-mode validation passed, including
+60 s Full HD: 171507712 B sampled RSS, 627486319 B logical/633491456 B allocated,
+25.702 s render and 52.512757-dB decoded-original/final PSNR. The controlled RAM
+fault overshot by 87015424 B before observed abort; latency/overshoot have no
+guaranteed bound. Python136, Media142, Host172 and UI157 passed. Independent
+review, published-head CI/package closeout and native/human gates remain open.
+Earlier strict
+blocked evidence and the `a7a0003` offline package/CI PASS remain historical.
+Use only synthetic/authorized fixtures, preserve originals and retained History,
+keep failures recoverable and report observed peaks/overshoot honestly. No merge,
+real AI, private project access or foreground GUI action is included. Human/native
+acceptance remains pending. Director impact compatible; progress55%, F-A02 1/1.
+
 **Current priority — 2026-10-05:** after the complete code/EDVID/market audit,
 the Product Owner approved complete workflow blocks. Foundation and manual G1
 (continuous multi-clip edit, sequence preview and simple original-master export)

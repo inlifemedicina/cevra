@@ -39,6 +39,37 @@ test("transport budget rejection retires only its worker and preserves originals
   assert.equal(await readFile(join(root, "original.mp4"), "utf8"), "preserved original"); assert.equal(await readFile(join(root, "prior.mp4"), "utf8"), "preserved prior");
 });
 
+test("sample evidence records observed excess and actual timing, including failure", async t => {
+  const root = await directory(t); let calls = 0, terminal;
+  const guard = new OwnedRenderResourceWatchdog({ ...limits, ownedDirectory: root, processGroupId: 1,
+    observe: async () => { await new Promise(resolve => setTimeout(resolve, 25)); return { rendererRssBytes: ++calls === 1 ? 1 : limits.rendererRssLimitBytes + 4096, ownedLogicalBytes: 0, ownedAllocatedBytes: 0, processIds: [1] }; },
+    onFailure: error => { terminal = error; } });
+  await guard.start(); const first = guard.evidenceSnapshot;
+  await assert.rejects(guard.check(), error => error === terminal && error.code === "MEDIA_RENDER_MEMORY_LIMIT");
+  await assert.rejects(guard.stop(), error => error === terminal);
+  assert.equal(first.samples, 1); assert.equal(terminal.resourceEvidence.samples, 2);
+  assert.equal(terminal.resourceEvidence.observedRssOvershootBytes, 4096);
+  assert.equal(terminal.resourceEvidence.memoryBudgetBytes, limits.rendererRssLimitBytes);
+  assert.ok(terminal.resourceEvidence.maxObservationDurationMs >= 20);
+  assert.ok(terminal.resourceEvidence.maxCompletedSampleIntervalMs >= 20);
+  assert.ok(Object.isFrozen(first)); assert.ok(Object.isFrozen(terminal.resourceEvidence));
+});
+
+test("closed logical budget RPC error retires the scope and a later request starts a fresh worker", async t => {
+  const root = await directory(t), worker = transport(t); let failedPid;
+  const observe = async () => ({ rendererRssBytes: 100, ownedLogicalBytes: 1, ownedAllocatedBytes: 1, processIds: [worker.workerPid] });
+  await assert.rejects(worker.withOwnedRenderBudget({ ...limits, ownedDirectory: root, observe }, async () => {
+    failedPid = worker.workerPid;
+    await worker.request("tools/call", { jobId: "logical-budget", root, mode: "logical-budget-error" });
+  }), { code: "MEDIA_RENDER_DISK_LIMIT" });
+  assert.equal(worker.workerPid, undefined); await waitDead(failedPid);
+  const result = await worker.withOwnedRenderBudget({ ...limits, ownedDirectory: root, observe }, async () => {
+    assert.notEqual(worker.workerPid, failedPid); return worker.request("ping");
+  });
+  assert.equal(result.result.activeJobId, null);
+  await assert.rejects(worker.request("tools/call", { jobId: "wrong-code", root, mode: "logical-budget-error", errorCode: -32000 }), { code: -32000 });
+});
+
 test("one trusted budget scope spans preparation/result verification and rejects overlap", async t => {
   const root = await directory(t), worker = transport(t); let release, started;
   const gate = new Promise(resolve => { release = resolve; }), begin = new Promise(resolve => { started = resolve; });
@@ -99,16 +130,17 @@ test("request racing owned stop cannot restart a generation after its admission 
 });
 
 test("native aggregate guard catches two individually sub-limit descendants exceeding 512 MiB", { skip: process.platform === "win32" }, async t => {
-  const root = await directory(t), worker = transport(t); const ownedPids = [], observations = [];
+  const root = await directory(t), worker = transport(t); const ownedPids = [], observations = []; let terminal;
   await assert.rejects(worker.withOwnedRenderBudget({ ...limits, ownedDirectory: root, observe: async (...args) => { const sample = await observeOwnedRenderResources(...args); observations.push(sample); return sample; } }, async () => {
     const pending = worker.request("tools/call", { jobId: "joint-memory", root });
     const rejected = assert.rejects(pending, { code: "MEDIA_RENDER_MEMORY_LIMIT" });
     for (let i = 0; i < 2; ++i) ownedPids.push(Number(await waitFile(join(root, `child-${i}.pid`))));
     await rejected;
-  }), { code: "MEDIA_RENDER_MEMORY_LIMIT" });
+  }), error => { terminal = error; return error.code === "MEDIA_RENDER_MEMORY_LIMIT"; });
   const witness = observations.find(sample => sample.rendererRssBytes > limits.rendererRssLimitBytes);
   assert.ok(witness); assert.ok(witness.processRssBytes.every(process => process.rssBytes < limits.rendererRssLimitBytes));
-  t.diagnostic(JSON.stringify({ observedAggregateRssBytes: witness.rendererRssBytes, largestObservedMemberRssBytes: Math.max(...witness.processRssBytes.map(process => process.rssBytes)), members: witness.processIds.length, configuredLimitBytes: limits.rendererRssLimitBytes, instantaneousHardCapProved: false }));
+  assert.ok(terminal.resourceEvidence.observedRssOvershootBytes > 0);
+  t.diagnostic(JSON.stringify({ observedAggregateRssBytes: witness.rendererRssBytes, largestObservedMemberRssBytes: Math.max(...witness.processRssBytes.map(process => process.rssBytes)), members: witness.processIds.length, configuredLimitBytes: limits.rendererRssLimitBytes, resourceEvidence: terminal.resourceEvidence, instantaneousHardCapProved: false }));
   await worker.settle(); for (const pid of ownedPids) await waitDead(pid);
 });
 

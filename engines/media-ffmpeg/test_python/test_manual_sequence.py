@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import os
 import struct
+import signal
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -84,6 +86,23 @@ class Runtime:
 
 
 class ManualSequenceTests(unittest.TestCase):
+    def test_mux_encoder_inventory_is_a_reader_and_native_router_preserves_budget_error(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); root.chmod(0o700)
+            budget = manual._LogicalBudget(root, root.lstat(), 64)
+            common = mock.Mock()
+            common.require_tool.return_value = "/pinned/ffmpeg"
+            common.run.return_value = mock.Mock(stdout=" V..... h264_videotoolbox native encoder\n")
+            self.assertEqual(tools._ffmpeg_encoders(manual._BudgetMuxCommon(common, budget)), ["h264_videotoolbox"])
+            self.assertEqual(budget.producers, 0)
+            self.assertEqual(list(root.iterdir()), [])
+        failure = RuntimeError("retained-publication-details")
+        failure.__cause__ = manual.jobs.LogicalFileBudgetError()
+        with mock.patch.object(tools, "_load_common"), mock.patch.object(tools, "_load_runtime"), mock.patch.object(manual, "run", side_effect=failure):
+            with self.assertRaises(RuntimeError) as caught:
+                tools.call_custom_tool("cevra-render-manual-video-sequence", {}, Path("/unused"))
+        self.assertIs(caught.exception, failure)
+
     def test_closed_native_boundary_matches_typed_frame_and_identity_contract(self) -> None:
         args = {"version": 1, "items": [item(), item()], "output": "/final.mp4", "owned_workspace": "/private-job"}
         self.assertEqual(manual.validate(args, False)[1], 2)
@@ -231,14 +250,14 @@ class ManualSequenceTests(unittest.TestCase):
             with mock.patch.object(manual, "OWNED_BYTES", 32_768):
                 manual._admit_owned_disk(root, stamp, candidate)
             with mock.patch.object(manual, "OWNED_BYTES", 32_767):
-                with self.assertRaisesRegex(RuntimeError, "disk budget exceeded before publication"):
+                with self.assertRaisesRegex(manual.jobs.LogicalFileBudgetError, "MEDIA_RENDER_DISK_LIMIT"):
                     manual._admit_owned_disk(root, stamp, candidate)
             self.assertFalse((root / "published-account.mp4").exists())
             os.link(candidate, root / "published-account.mp4")
             with mock.patch.object(manual, "OWNED_BYTES", 32_768):
                 manual._admit_owned_disk(root, stamp)
             with mock.patch.object(manual, "OWNED_BYTES", 32_767):
-                with self.assertRaisesRegex(RuntimeError, "disk budget exceeded before publication"):
+                with self.assertRaisesRegex(manual.jobs.LogicalFileBudgetError, "MEDIA_RENDER_DISK_LIMIT"):
                     manual._admit_owned_disk(root, stamp)
 
     @unittest.skipUnless(os.name == "posix", "allocated disk accounting")
@@ -252,7 +271,7 @@ class ManualSequenceTests(unittest.TestCase):
             with mock.patch.object(manual, "OWNED_BYTES", allocated):
                 manual._admit_owned_disk(root, root.lstat(), candidate)
             with mock.patch.object(manual, "OWNED_BYTES", allocated - 1):
-                with self.assertRaisesRegex(RuntimeError, "disk budget exceeded before publication"):
+                with self.assertRaisesRegex(manual.jobs.LogicalFileBudgetError, "MEDIA_RENDER_DISK_LIMIT"):
                     manual._admit_owned_disk(root, root.lstat(), candidate)
 
     @unittest.skipUnless(os.name == "posix", "nofollow owned tree observation")
@@ -287,15 +306,107 @@ class ManualSequenceTests(unittest.TestCase):
         def inject(root, stamp, prospective_account=None):
             if prospective_account is None:
                 with (root / "unsettled-private-growth").open("xb") as handle:
-                    handle.truncate(2 * 1024 * 1024)
+                    handle.truncate(8 * 1024 * 1024)
             return admit(root, stamp, prospective_account)
-        with tempfile.TemporaryDirectory() as directory, mock.patch.object(manual, "OWNED_BYTES", 1024 * 1024), \
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(manual, "OWNED_BYTES", 4 * 1024 * 1024), \
                 mock.patch.object(manual, "_admit_owned_disk", inject):
             args, _common, _result, content = self._pipeline(directory, failure="post-account-budget")
             self.assertFalse(Path(args["output"]).exists())
             account = Path(args["owned_workspace"]) / "published-account.mp4"
             self.assertEqual(account.read_bytes(), b"owned synthetic encoded bytes")
             self.assertEqual(Path(args["items"][0]["input"]).read_bytes(), content)
+
+    @unittest.skipUnless(os.name == "posix", "logical producer admission")
+    def test_mandatory_reservations_fail_before_any_native_producer_and_preserve_original(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(manual, "OWNED_BYTES", 1024 * 1024):
+            args, common, _result, content = self._pipeline(directory, failure="mandatory-budget")
+            self.assertEqual(common.commands, [])
+            self.assertFalse(Path(args["output"]).exists())
+            self.assertEqual(list(Path(args["owned_workspace"]).iterdir()), [])
+            self.assertEqual(Path(args["items"][0]["input"]).read_bytes(), content)
+
+    @unittest.skipUnless(os.name == "posix", "per-producer native file reservation")
+    def test_native_file_budget_stops_real_writer_and_does_not_limit_the_persistent_parent(self) -> None:
+        import resource
+        before = resource.getrlimit(resource.RLIMIT_FSIZE)
+        script = "import os,signal,sys;signal.signal(signal.SIGXFSZ,signal.SIG_DFL);f=os.open(sys.argv[1],os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.write(f,b'x'*65536);os.write(f,b'x')"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); root.chmod(0o700)
+            target = root / "limited"
+            manual.jobs.begin_job("file-budget-test")
+            try:
+                with manual.jobs.native_file_budget(4096, root) as scope:
+                    result = manual.jobs.run([sys.executable, "-I", "-B", "-c", script, str(target)], timeout=5)
+                    self.assertEqual(result.returncode, -signal.SIGXFSZ)
+                    with self.assertRaises(manual.jobs.LogicalFileBudgetError):
+                        scope.assert_not_exceeded()
+                self.assertLessEqual(target.stat().st_size, 4096)
+                self.assertEqual(resource.getrlimit(resource.RLIMIT_FSIZE), before)
+                larger = root / "following-unlimited-job"
+                result = manual.jobs.run([sys.executable, "-I", "-B", "-c", "import sys;open(sys.argv[1],'xb').write(b'x'*8192)", str(larger)], timeout=5)
+                self.assertEqual(result.returncode, 0)
+                self.assertEqual(larger.stat().st_size, 8192)
+            finally:
+                manual.jobs.finish_job("file-budget-test")
+
+    @unittest.skipUnless(os.name == "posix", "real bounded producer")
+    def test_ledger_reports_real_producer_excess_and_releases_no_unsettled_charge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); root.chmod(0o700)
+            target = root / "partial"
+            budget = manual._LogicalBudget(root, root.lstat(), 4096)
+            class Writer:
+                @staticmethod
+                def run(command):
+                    return manual.jobs.run(command, check=True, timeout=5)
+            script = "import os,signal,sys;signal.signal(signal.SIGXFSZ,signal.SIG_DFL);f=os.open(sys.argv[1],os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600);os.write(f,b'x'*65536);os.write(f,b'x')"
+            manual.jobs.begin_job("ledger-real-producer")
+            try:
+                with self.assertRaises(manual.jobs.LogicalFileBudgetError):
+                    budget.run_native(Writer(), [sys.executable, "-I", "-B", "-c", script, str(target)])
+                self.assertLessEqual(target.stat().st_size, 4096)
+                self.assertEqual(budget.remaining, 0)
+                target.unlink()
+            finally:
+                manual.jobs.finish_job("ledger-real-producer")
+
+    @unittest.skipUnless(os.name == "posix", "logical accounting overlap")
+    def test_candidate_reservation_counts_two_names_before_producer_and_never_writes_on_exhaustion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); root.chmod(0o700)
+            (root / "retained").write_bytes(b"x" * 48)
+            budget = manual._LogicalBudget(root, root.lstat(), 64)
+            candidate = root / "candidate"
+            class Writer:
+                called = False
+                def run(self, command):
+                    self.called = True; Path(command[-1]).write_bytes(b"x" * 8)
+            writer = Writer()
+            budget.run_native(writer, ["native", str(candidate)], names=2)
+            self.assertTrue(writer.called)
+            self.assertEqual(budget.remaining, 0)
+            self.assertEqual(budget.evidence()["peakReservedBytes"], 64)
+            another = Writer()
+            with self.assertRaises(manual.jobs.LogicalFileBudgetError):
+                budget.run_native(another, ["native", str(root / "unstarted")])
+            self.assertFalse(another.called)
+            self.assertFalse((root / "unstarted").exists())
+
+    @unittest.skipUnless(os.name == "posix", "closed native process environment")
+    def test_native_producer_sanitizes_report_file_and_binds_temporary_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); root.chmod(0o700)
+            manual.jobs.begin_job("producer-environment-test")
+            try:
+                with manual.jobs.native_file_budget(4096, root):
+                    result = manual.jobs.run([sys.executable, "-I", "-B", "-c", "import os;print('FFREPORT' in os.environ);print(os.environ['TMPDIR'])"],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5,
+                        env={"FFREPORT": "file=unregistered-report.log:level=32"})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.splitlines(), ["False", str(root)])
+                self.assertEqual(list(root.iterdir()), [])
+            finally:
+                manual.jobs.finish_job("producer-environment-test")
 
     def test_extract_frame_closed_dimension_schema_and_native_filter(self) -> None:
         base = {"input": "/preview.mp4", "output": "/frame.png", "at": 0}
@@ -371,6 +482,20 @@ class ManualSequenceTests(unittest.TestCase):
         return args, common, result, content
 
     @unittest.skipUnless(os.name == "posix", "private POSIX publication scope")
+    def test_replaced_private_directory_cannot_grant_cleanup_authority_over_foreign_files(self) -> None:
+        def replace_directory(common, command, **_kwargs):
+            private = Path(command[-1]).parent
+            private.rename(private.with_name(private.name + "-old"))
+            private.mkdir(mode=0o700)
+            (private / "source-0.mp4").write_bytes(b"foreign replacement")
+            raise RuntimeError("simulated private directory replacement")
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(manual._LogicalBudget, "run_native", side_effect=replace_directory):
+            args, _common, _result, content = self._pipeline(directory, failure="private-directory-replacement")
+            self.assertFalse(Path(args["output"]).exists())
+            self.assertEqual(Path(args["items"][0]["input"]).read_bytes(), content)
+            new_private = next(path for path in Path(args["owned_workspace"]).iterdir() if not path.name.endswith("-old"))
+            self.assertEqual((new_private / "source-0.mp4").read_bytes(), b"foreign replacement")
+
     def test_complete_orchestrator_reuses_repeated_segment_and_retains_only_same_inode_accounting(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             args, common, result, content = self._pipeline(directory)

@@ -5,7 +5,8 @@ import { isAbsolute, join } from "node:path";
 
 const execute = promisify(execFile);
 export class OwnedRenderResourceError extends Error {
-  constructor(readonly code: "MEDIA_RENDER_MEMORY_LIMIT" | "MEDIA_RENDER_DISK_LIMIT" | "MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED" | "MEDIA_RENDER_RESOURCE_BUSY") {
+  constructor(readonly code: "MEDIA_RENDER_MEMORY_LIMIT" | "MEDIA_RENDER_DISK_LIMIT" | "MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED" | "MEDIA_RENDER_RESOURCE_BUSY",
+    readonly resourceEvidence?: Readonly<OwnedRenderResourceEvidence>) {
     super(code); this.name = "OwnedRenderResourceError";
   }
 }
@@ -16,6 +17,9 @@ export interface OwnedRenderResourceSample {
 export interface OwnedRenderResourceEvidence {
   samples: number; peakRendererRssBytes: number; peakOwnedLogicalBytes: number; peakOwnedAllocatedBytes: number;
   enforcement: "sampled-watchdog"; intervalMs: 100;
+  memoryBudgetBytes: number; ownedFileBudgetBytes: number;
+  maxObservationDurationMs: number; maxCompletedSampleIntervalMs: number;
+  observedRssOvershootBytes: number; observedLogicalOvershootBytes: number; observedAllocatedOvershootBytes: number;
 }
 export type OwnedRenderResourceObserver = (processGroupId: number, ownedDirectory: string) => Promise<OwnedRenderResourceSample>;
 
@@ -80,15 +84,22 @@ export class OwnedRenderResourceWatchdog {
   private pending: Promise<void> | undefined;
   private stopped = false;
   private failure: OwnedRenderResourceError | undefined;
-  private readonly evidence: OwnedRenderResourceEvidence = { samples: 0, peakRendererRssBytes: 0, peakOwnedLogicalBytes: 0, peakOwnedAllocatedBytes: 0, enforcement: "sampled-watchdog", intervalMs: 100 };
+  private readonly evidence: OwnedRenderResourceEvidence = { samples: 0, peakRendererRssBytes: 0, peakOwnedLogicalBytes: 0, peakOwnedAllocatedBytes: 0, enforcement: "sampled-watchdog", intervalMs: 100,
+    memoryBudgetBytes: 0, ownedFileBudgetBytes: 0, maxObservationDurationMs: 0, maxCompletedSampleIntervalMs: 0,
+    observedRssOvershootBytes: 0, observedLogicalOvershootBytes: 0, observedAllocatedOvershootBytes: 0 };
+  private lastCompletedObservation: number | undefined;
   private rootIdentity: { device: bigint; inode: bigint } | undefined;
   private latestProcessIds: readonly number[] = [];
   get processIds(): readonly number[] { return this.latestProcessIds; }
+  /** Sampled evidence remains available after failure; it is never a physical cap. */
+  get evidenceSnapshot(): Readonly<OwnedRenderResourceEvidence> { return Object.freeze({ ...this.evidence }); }
   constructor(private readonly options: {
     processGroupId: number; ownedDirectory: string; rendererRssLimitBytes: number; ownedFileLimitBytes: number;
     observe?: OwnedRenderResourceObserver; onFailure(error: OwnedRenderResourceError): void;
   }) {
     if (![options.rendererRssLimitBytes, options.ownedFileLimitBytes].every(value => Number.isSafeInteger(value) && value > 0)) throw new RangeError("Resource limits must be positive safe integers.");
+    this.evidence.memoryBudgetBytes = options.rendererRssLimitBytes;
+    this.evidence.ownedFileBudgetBytes = options.ownedFileLimitBytes;
   }
   async start(): Promise<void> {
     try {
@@ -100,7 +111,7 @@ export class OwnedRenderResourceWatchdog {
   }
   async stop(): Promise<OwnedRenderResourceEvidence> {
     this.stopped = true; if (this.timer) clearTimeout(this.timer); await this.pending;
-    this.assertHealthy(); return Object.freeze({ ...this.evidence });
+    this.assertHealthy(); return this.evidenceSnapshot;
   }
   async check(): Promise<void> {
     await this.pending; if (this.timer) clearTimeout(this.timer);
@@ -115,6 +126,7 @@ export class OwnedRenderResourceWatchdog {
   }
   private async sample(): Promise<void> {
     if (this.failure) return;
+    const started = performance.now(); let timingRecorded = false;
     try {
       const root = await lstat(this.options.ownedDirectory, { bigint: true });
       if (!this.rootIdentity || root.dev !== this.rootIdentity.device || root.ino !== this.rootIdentity.inode || !root.isDirectory() || root.isSymbolicLink()) throw Error();
@@ -128,12 +140,25 @@ export class OwnedRenderResourceWatchdog {
       this.evidence.peakRendererRssBytes = Math.max(this.evidence.peakRendererRssBytes, result.rendererRssBytes);
       this.evidence.peakOwnedLogicalBytes = Math.max(this.evidence.peakOwnedLogicalBytes, result.ownedLogicalBytes);
       this.evidence.peakOwnedAllocatedBytes = Math.max(this.evidence.peakOwnedAllocatedBytes, result.ownedAllocatedBytes);
+      this.evidence.observedRssOvershootBytes = Math.max(0, this.evidence.peakRendererRssBytes - this.options.rendererRssLimitBytes);
+      this.evidence.observedLogicalOvershootBytes = Math.max(0, this.evidence.peakOwnedLogicalBytes - this.options.ownedFileLimitBytes);
+      this.evidence.observedAllocatedOvershootBytes = Math.max(0, this.evidence.peakOwnedAllocatedBytes - this.options.ownedFileLimitBytes);
+      this.recordObservationTiming(started); timingRecorded = true;
       if (result.rendererRssBytes > this.options.rendererRssLimitBytes) this.fail(new OwnedRenderResourceError("MEDIA_RENDER_MEMORY_LIMIT"));
       else if (Math.max(result.ownedLogicalBytes, result.ownedAllocatedBytes) > this.options.ownedFileLimitBytes) this.fail(new OwnedRenderResourceError("MEDIA_RENDER_DISK_LIMIT"));
-    } catch { this.fail(new OwnedRenderResourceError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED")); }
+    } catch {
+      if (!timingRecorded) this.recordObservationTiming(started);
+      this.fail(new OwnedRenderResourceError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED"));
+    }
+  }
+  private recordObservationTiming(started: number): void {
+    const completed = performance.now();
+    this.evidence.maxObservationDurationMs = Math.max(this.evidence.maxObservationDurationMs, completed - started);
+    if (this.lastCompletedObservation !== undefined) this.evidence.maxCompletedSampleIntervalMs = Math.max(this.evidence.maxCompletedSampleIntervalMs, completed - this.lastCompletedObservation);
+    this.lastCompletedObservation = completed;
   }
   private fail(error: OwnedRenderResourceError): void {
     if (this.failure) return;
-    this.failure = error; this.options.onFailure(error);
+    this.failure = new OwnedRenderResourceError(error.code, this.evidenceSnapshot); this.options.onFailure(this.failure);
   }
 }

@@ -32,6 +32,12 @@ def job(request):
     global active
     root = pathlib.Path(request["params"]["root"])
     mode = request["params"].get("mode", "memory")
+    if mode == "logical-budget-error":
+        active = None
+        with output_lock:
+            print(json.dumps({"jsonrpc": "2.0", "id": request["id"], "error": {
+                "code": request["params"].get("errorCode", -32002), "message": "MEDIA_RENDER_DISK_LIMIT"}}), flush=True)
+        return
     children = [subprocess.Popen([sys.executable, "-I", "-B", __file__, "memory-child" if mode == "memory" else "idle-child", str(root / f"child-{i}.pid")]) for i in range(2 if mode == "memory" else 1)]
     for child in children:
         child.wait()

@@ -139,7 +139,15 @@ research, versus an explicitly weaker operational contract for the present stack
 No guarantee was relaxed or runtime changed; the frozen signed package and its
 export/recovery receipts stay preserved. No render proofs were repeated;
 focus-isolated UI/picker automation remains NOT_RUN, human Take untouched.
-Director impact: Owner decision required for the resource guarantee; existing
+At 10:38:21 UTC the Owner approved the operational route, superseding that pending
+choice. [ADR0034](adr/0034-operational-manual-render-resources.md) now has logical
+pre-write reservations and sampled memory abort, with initial validation budgets
+512 MiB/2 GiB. Sealed R5 synthetic evidence passed: 60-s Full HD sampled peaks
+171507712 B RSS and 627486319 B logical files, with 52.512757-dB decoded PSNR.
+Controlled RAM excess overshot by 87015424 B before abort; no instantaneous
+physical quota or commercial limit is claimed. Review, exact-head CI/current
+package and native/human gates remain open. Old R4/fb34610 receipts stay frozen.
+Director impact: compatible internal extension; existing
 typed/IR/History/provider boundaries and 55%/F-A02 1/1 remain unchanged.
 No G1 PASS,
 real AI, dependency, human

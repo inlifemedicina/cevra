@@ -330,11 +330,20 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    **Tentar salvar**, aguardar **Salvo** e fechar normalmente; não repetir export.
    **Falha esperada a detectar nessa futura variante:** perda de estado/histórico ou
    repetição do render. Aposentadoria/fechamento incerto mantém o projeto aberto.
-7. **D8-T2, I19-T1, X-T3/T5/T6/T9 — aceite completo:** **BLOCKED** pelos limites
-   instantâneos não provados e variantes nativas/perceptuais ainda pendentes.
+7. **D8-T2, I19-T1, X-T3/T5/T6/T9 — aceite completo:** **BLOCKED** pela revisão,
+   closeout do pacote/CI e variantes nativas/perceptuais ainda pendentes.
    A revisão limitada do item 5 não aprova export geral, projetos arbitrários,
    qualidade/voz/lip-sync ou G1 completo. Não pedir ao Owner provocar excesso de
-   RAM/disco. O contrato de recursos permanece intacto até decisão explícita.
+   RAM/disco. Em 6/10 às 10:38:21 UTC o Owner aprovou o contrato operacional
+   de [ADR0034](adr/0034-operational-manual-render-resources.md): reserva lógica
+   antes da escrita e interrupção após observar excesso de RAM. Os 512 MiB/2 GiB
+   são orçamentos iniciais de validação, sem teto físico instantâneo prometido.
+   A equipe obteve prova sintética selada R5, Python136/Media142/Host172/UI157;
+   60 s Full HD mediram 171507712 B RSS, 627486319 B lógicos e PSNR52.512757 dB.
+   Excesso controlado de RAM atingiu 87015424 B acima do orçamento antes do aborto.
+   Isso não promove limites comerciais, percepção ou variantes humanas. O pacote
+   fb34610 abaixo é histórico e não contém a nova implementação de recursos;
+   aguardar o pacote atualizado e coordenado para executar esta rodada.
 
 Pacote atual para a futura rodada: `CEVRA Vids G1 Review fb34610.app`, launcher
 `/private/tmp/vids-g1-compact-export-fb34610/launch-fb34610.command`. Build offline,

@@ -1154,6 +1154,48 @@ provider authority remain unchanged. Progress stays 55%, F-A02 exhausted 1/1;
 Draft #86/#87 stay unmerged. No further native proof run, real AI, device, account,
 GUI or human-session action occurred during this investigation.
 
+## Approved operational resources and bounded measurements — 2026-10-06
+
+The Owner approved the operational route at 10:38:21 UTC; the preceding pending
+choice is historical. [ADR0034](adr/0034-operational-manual-render-resources.md)
+records its contract. Initial validation settings remain 512 MiB sampled group
+RSS and 2 GiB per-name logical owned space. They are not adopted commercial
+limits, an allocated-block quota, all-framework/GPU coverage or an instantaneous
+RAM ceiling. A material budget-value change must be explicitly recommended
+before adoption; these measured workloads do not justify one.
+
+The closed pipeline now reserves copies/PCM before producers and reserves graphs,
+segments, concatenation and mux output before each write. Candidate/accounting
+overlap counts twice. Native producers use a fresh managed-Python exec wrapper
+with a per-file size limit; the persistent worker's limit is unchanged. Read-only
+encoder inventory bypasses producer reservation. Closed disk faults propagate
+through native dispatch/RPC into recoverable Host failures. Source immutability,
+quality targets, safe partial cleanup, existing publication recovery and History
+remain mandatory; no automatic retry is added.
+
+The new sealed R5 release-mode catalog passed rational CFR24/NTSC/VFR sampling,
+single-frame/repeated ranges, stereo offset/pulses, 60-second preview/final and
+History archive reopen/Undo/Redo without replay. Its worker hashes match the new
+source; the old R4/fb34610 runtime/app/receipts remain frozen. R5 manifest:
+`72384edf213936bc93bf891dbc8729110ac9521d4cf2e8206179a22c81cb2898`.
+
+| Measured workload | Sampled RSS peak (B) | Logical / allocated peak (B) | Other evidence |
+| --- | ---: | ---: | --- |
+| 60-s flat barcode final | 132628480 | 39407529 / 39481344 | 11.086 s; exact decoded clock |
+| 60-s 1080p moving synthetic final | 171507712 | 627486319 / 633491456 | 25.702 s; 1800 pictures; 2880000 effective audio samples/channel; 52.512757-dB whole-program decoded PSNR |
+| Controlled aggregate RSS excess | 623886336 | 10 / 8192 | Abort/retirement; observed RSS overshoot 87015424 B; longest completed-sample interval 115.577 ms |
+
+These are observations on macOS arm64, with no maximum overshoot/reaction promise
+or arbitrary-source/perceptual acceptance. `peakReservedBytes` can equal 2 GiB
+because an unknown encoded producer reserves available capacity; it is not disk
+usage. Real partial-writer size enforcement was tested at a scaled 4096 B bound;
+exact 2-GiB observation separately rejected owned sparse-file/name excess.
+Python136/Media142/Host172/UI157 passed. A failed first functional attempt found
+and fixed encoder inventory routing; tests also caught native dispatch swallowing
+the typed fault. Failed receipts are preserved. Independent review, exact-head
+CI/current package and native/human gates remain open; no G1 PASS or merge is
+implied. Director impact compatible internal extension; progress55%, F-A021/1.
+
 ## Product and Director boundaries
 
 Creator=Lite; Studio=Full; Vids=Desktop. I19's technical label “Creator Skill

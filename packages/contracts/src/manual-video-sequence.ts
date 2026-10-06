@@ -65,6 +65,12 @@ export interface ManualSequenceExecutionEvidenceV1 {
   itemCount: number;
   uniqueSegmentCount: number;
   sources: ManualSequenceSourceEvidenceV1[];
+  /** Optional operational evidence; historical results remain valid without it. */
+  logicalBudget?: {
+    version: 1; enforcement: "reserved-logical-space"; budgetBytes: number;
+    peakReservedBytes: number; producerCount: number;
+    accountingOverlapReserved: true; allocatedBlockQuota: false;
+  };
 }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function closed(value: unknown, fields: string[], label: string): asserts value is Record<string, unknown> {
@@ -110,7 +116,16 @@ export function validateManualVideoOperation(value: unknown): RenderManualVideoS
   return value as unknown as RenderManualVideoSequenceOperationV1 | RenderManualVideoPreviewOperationV1;
 }
 export function validateManualSequenceExecutionEvidence(value: unknown): ManualSequenceExecutionEvidenceV1 {
-  closed(value, ["version", "outputSha256", "profile", "samplingPolicy", "frameRate", "container", "videoCodec", "audioCodec", "dynamicRange", "width", "height", "targetVideoBitsPerSecond", "totalFrames", "outputFrameCount", "totalPcmSamples", "outputAudioSampleCount", "audioSampleRate", "audioChannelLayout", "durationMs", "muxVideoDurationMs", "muxAudioDurationMs", "itemCount", "uniqueSegmentCount", "sources"], "Manual sequence evidence");
+  const hasBudget = record(value) && Object.hasOwn(value, "logicalBudget");
+  closed(value, ["version", "outputSha256", "profile", "samplingPolicy", "frameRate", "container", "videoCodec", "audioCodec", "dynamicRange", "width", "height", "targetVideoBitsPerSecond", "totalFrames", "outputFrameCount", "totalPcmSamples", "outputAudioSampleCount", "audioSampleRate", "audioChannelLayout", "durationMs", "muxVideoDurationMs", "muxAudioDurationMs", "itemCount", "uniqueSegmentCount", "sources", ...(hasBudget ? ["logicalBudget"] : [])], "Manual sequence evidence");
+  if (hasBudget) {
+    const budget = value.logicalBudget;
+    closed(budget, ["version", "enforcement", "budgetBytes", "peakReservedBytes", "producerCount", "accountingOverlapReserved", "allocatedBlockQuota"], "Manual logical budget evidence");
+    if (budget.version !== 1 || budget.enforcement !== "reserved-logical-space" || budget.accountingOverlapReserved !== true || budget.allocatedBlockQuota !== false) throw Error("Manual logical budget guarantee is invalid.");
+    integer(budget.budgetBytes, 1, Number.MAX_SAFE_INTEGER, "logical budgetBytes");
+    integer(budget.peakReservedBytes, 1, budget.budgetBytes, "peakReservedBytes");
+    integer(budget.producerCount, 1, 4096, "producerCount");
+  }
   if (typeof value.outputSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.outputSha256)) throw Error("Manual output SHA-256 is invalid.");
   const preview = value.profile === "manual-cfr30-preview-v1";
   if (value.version !== 1 || (!preview && value.profile !== "manual-cfr30-export-v1") || value.samplingPolicy !== MANUAL_SEQUENCE_SAMPLING_POLICY

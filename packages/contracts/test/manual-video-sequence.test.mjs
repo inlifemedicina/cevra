@@ -39,3 +39,16 @@ test("extract-frame exposes only the closed optional 720 bound", () => {
   assert.equal(validateMediaOperation(base).maxDimension, undefined);
   for (const maxDimension of [0, 719, 721, 1080, true, "720"]) assert.throws(() => validateMediaOperation({ ...base, maxDimension }));
 });
+
+test("logical budget evidence preserves legacy results and rejects stronger unproved guarantees", () => {
+  assert.equal(validateManualSequenceExecutionEvidence(evidence()).logicalBudget, undefined);
+  const budget = { version: 1, enforcement: "reserved-logical-space", budgetBytes: 2 * 1024 ** 3,
+    peakReservedBytes: 2 * 1024 ** 3, producerCount: 8, accountingOverlapReserved: true, allocatedBlockQuota: false };
+  assert.equal(validateManualSequenceExecutionEvidence({ ...evidence(), logicalBudget: budget }).logicalBudget.allocatedBlockQuota, false);
+  for (const change of [{ peakReservedBytes: budget.budgetBytes + 1 }, { budgetBytes: 0 }, { producerCount: 0 },
+    { enforcement: "physical-filesystem-quota" }, { allocatedBlockQuota: true }, { accountingOverlapReserved: false },
+    { nativeCommand: "untrusted" }, { producerCount: 1.5 }]) {
+    assert.throws(() => validateManualSequenceExecutionEvidence({ ...evidence(), logicalBudget: { ...budget, ...change } }));
+  }
+  assert.throws(() => validateManualSequenceExecutionEvidence({ ...evidence(), logicalBudget: undefined }));
+});
