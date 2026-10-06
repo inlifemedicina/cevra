@@ -108,6 +108,18 @@ declared ad-hoc signed Node copy passed strict verification/version while the
 original pin, official manifests and sealed Media/Python remain unchanged.
 Whole-bundle/Host verification is separate. Exact-head package/Host/review/CI
 receipts accompany the Draft; no GUI/Owner or hard-cap PASS follows.
+The subsequent read-only resource-feasibility finding against `22e3c431` leaves
+the strict gate BLOCKED. Reservation/child file-size limits can contain logical
+writes, while allocated blocks and aggregate physical/framework RAM remain
+unproved. The
+[single decision proposal](CEVRA_MANUAL_SEQUENCE_G1.md#resource-ceiling-feasibility-and-pending-decision--2026-10-06)
+compares unchanged strict guarantees with separately approved isolation/quota
+research, versus an explicitly weaker operational contract for the present stack.
+No guarantee was relaxed or runtime changed; the frozen signed package and its
+export/recovery receipts stay preserved. No render proofs were repeated;
+focus-isolated UI/picker automation remains NOT_RUN, human Take untouched.
+Director impact: Owner decision required for the resource guarantee; existing
+typed/IR/History/provider boundaries and 55%/F-A02 1/1 remain unchanged.
 No G1 PASS,
 real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,

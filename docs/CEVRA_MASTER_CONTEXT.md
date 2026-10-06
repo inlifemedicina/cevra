@@ -2850,6 +2850,26 @@ credential is used. Node-only signing does not prove whole-bundle/Host acceptanc
 do not declare GUI READY based on headless tests. Fresh exact-head package/Host/review/CI
 receipts accompany the Draft; actual GUI/Owner and strict resource gates stay open.
 
+**Resource-ceiling feasibility — 2026-10-06:** source/official-document review of
+`22e3c43142cbdd28d8d600e658cc65864629bab2` found no proved in-scope mechanism for
+instantaneous aggregate 512-MiB physical renderer memory and 2-GiB owned logical/
+allocated files. An exclusive reservation ledger plus per-child `RLIMIT_FSIZE`
+wrapper and closed writers can limit logical files, including the temporary
+account name; it does not establish an allocated-block quota. Darwin per-process
+virtual limits and FFmpeg per-allocation controls do not establish aggregate
+physical/framework coverage. The
+[single decision proposal](CEVRA_MANUAL_SEQUENCE_G1.md#resource-ceiling-feasibility-and-pending-decision--2026-10-06)
+records exact mechanisms, source findings, category comparison and impacts:
+retain the strict blocked gate with separately approved isolation/quota research,
+or explicitly accept an operational contract with hard logical admission plus
+sampled RSS/allocated supervision. The latter is recommended for the current
+stack only after explicit acceptance of its weaker guarantee. No policy or
+runtime change was made, test proofs were not repeated, and the frozen signed
+`22e3c43` package/export/recovery evidence remains preserved. Focus-isolated native
+UI/picker automation is NOT_RUN; no human Take session was touched. Resource
+acceptance stays BLOCKED; Director impact requires Owner decision for the
+guarantee, with typed boundaries unchanged, progress 55% and F-A02 1/1.
+
 1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved admission of the designated F-A02 result/history into a temporary native session is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.

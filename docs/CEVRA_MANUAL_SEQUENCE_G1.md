@@ -922,6 +922,130 @@ PASS. Tauri platform resource resolution passed in the canonical
 No GUI opening or full READY follows from a headless Host result. Existing resource
 ceilings, broader source and Owner/native gates remain open.
 
+## Resource-ceiling feasibility and pending decision — 2026-10-06
+
+Read-only source and primary-documentation review against
+`22e3c43142cbdd28d8d600e658cc65864629bab2` found no demonstrated mechanism within
+the current stack/scope that prevents both approved instantaneous ceilings from
+being exceeded. The strict gate remains **BLOCKED**. No budget, metric, preset,
+runtime or publication policy has been changed. The frozen signed package and
+its packaged export/recovery receipts retain their source binding to that head;
+this finding does not repeat their render/resource tests or promote GUI/Owner
+acceptance. AppHandle/WebView/native-picker automation remains **NOT_RUN**: no
+supported automation with proved focus isolation was available, so the app was
+not launched. The human Take session and media remain untouched.
+
+### Disk: viable logical containment, allocated-byte proof still absent
+
+The explicit producers are sequential, but their outputs accumulate: sealed
+original copies, unique encoded segments, graph/list files, sequence WAV,
+concatenated video and final mux candidate survive until cleanup. Repeated clips
+expand the concatenated payload. The existing 20-Mb/s target is not a byte cap.
+Publication temporarily adds a second name for the candidate inside the owned
+tree; the existing accounting sums both names even though they share an inode.
+
+A scoped internal extension is technically plausible: an exclusive job ledger
+reserves every output before creation; Python copies/text writes consume only
+their reservation; a fresh pinned-Python wrapper sets soft/hard `RLIMIT_FSIZE`
+and `RLIMIT_CORE=0`, restores normal `SIGXFSZ` handling, then `execve`s the
+validated FFmpeg binary without changing its private group. Unknown encoded
+outputs receive reserved caps, and reservations are reconciled only after the
+child is reaped and output identity/cleanup proved. If existing logical bytes
+plus other reservations are `L`, the mux cap must be at most
+`floor((2147483648 - L) / 2)` from its start, accounting for staging plus the
+future account name. Exact PCM data is `frames * 1600 * channels * 4`; headers
+and metadata must also fit a reservation. Limits must reject incomplete output,
+never publish a silently shortened or lower-quality export. This mechanism is
+**proposed, not implemented or proved**.
+
+Darwin's regular-file write path clips writes at the file-size boundary, but
+this is a per-file logical limit, not a filesystem allocation quota.
+[XNU write implementation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/vfs/vfs_vnops.c#L1323).
+FFmpeg's `-fs` explicitly permits output beyond the requested value, so it is
+not an equivalent hard limit.
+[FFmpeg options](https://ffmpeg.org/ffmpeg.html#Main-options).
+The threaded worker must not use `preexec_fn` for this change; Python documents
+the possibility of deadlock before exec.
+[Python 3.12 subprocess](https://docs.python.org/3.12/library/subprocess.html#subprocess.Popen).
+
+The writer inventory also needs closing. The current worker environment can
+inherit `FFREPORT`; whether it is actually set was not inspected. That option
+can create an extra report at an independently chosen path and enable debug
+logging. A logical-containment implementation must cover FFmpeg and ffprobe,
+remove this option in each child
+environment, use owned cwd/temp paths, disable core files, and prevent additional
+unregistered writers. The current captured probe/diagnostic output also needs
+incremental byte limits before collection, rather than a check after allocation.
+[FFmpeg reporting](https://ffmpeg.org/ffmpeg.html#Generic-options),
+[Python capture semantics](https://docs.python.org/3.12/library/subprocess.html#subprocess.Popen.communicate).
+No real environment, credentials or account configuration was read.
+
+The approved current disk test uses the maximum of aggregate logical size and
+aggregate `st_blocks * 512`, counted per name. `st_size` and allocated blocks are
+different fields; file-size limits do not establish a bound for allocations on
+an arbitrary destination filesystem. Checking blocks after a write permits an
+earlier excess. [Apple stat](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/stat.2.html).
+Apple exposes an allocation quota for an **APFS volume**, not this existing job
+directory. A separate quota volume/image would require lifecycle/placement and
+same-filesystem publication redesign; its physical quota also does not directly
+prove this per-name accounting metric. It was not created or mounted.
+[Apple APFS allocation options](https://support.apple.com/guide/disk-utility/add-delete-or-erase-apfs-volumes-dskua9e6a110/mac).
+
+### RAM: current controls do not supply a shared physical quota
+
+XNU `RLIMIT_RSS` aliases `RLIMIT_AS`; the implementation applies the limit to
+the current process's virtual map. Applying 512 MiB independently to Python and
+FFmpeg would not limit their sum to 512 MiB, and partitioning virtual budgets
+could reject library/framework mapping without proving the required physical
+coverage. `RLIMIT_DATA` and `RLIMIT_MEMLOCK` also do not create a shared group
+quota. This is a source-level finding against XNU `main`, not a measurement of
+the installed kernel.
+[Apple resource definitions](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/resource.h#L486),
+[Apple limit setter](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_resource.c#L1560).
+
+FFmpeg `-max_alloc` checks each allocation, not the accumulated total.
+[FFmpeg allocation source](https://github.com/FFmpeg/FFmpeg/blob/n9.0.1/libavutil/mem.c#L68).
+Threads and filter queue controls bound concurrency/queues, not all bytes.
+[FFmpeg threads and filter queues](https://ffmpeg.org/ffmpeg-all.html).
+VideoToolbox uses CoreVideo pools and a default framework allocator. From that
+code we infer that complete memory coverage cannot be proved by `-max_alloc`.
+[FFmpeg VideoToolbox implementation](https://github.com/FFmpeg/FFmpeg/blob/n9.0.1/libavcodec/videotoolboxenc.c).
+Privileged footprint/Jetsam controls are per task and react to exceeded limits;
+they do not provide the requested public, unprivileged aggregate guarantee.
+[Apple memory-status authorization](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_memorystatus.c),
+[Apple task footprint](https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/kern/task.c).
+Observed group RSS also does not prove coverage of external OS services/GPU
+allocations, and shared mapped pages can be counted more than once. The watchdog's
+100-ms wait follows the completed scan; scheduling and enumeration delay prevent
+a promised maximum reaction time or overshoot bound.
+
+### Concrete choice for the Product Owner
+
+| Unapproved route | Mechanism and minimum work | Impact and risk |
+| --- | --- | --- |
+| Retain both instantaneous guarantees | Keep G1 resource acceptance BLOCKED; authorize a separate bounded architecture feasibility effort for kernel/OS isolation and quota-backed storage, defining exact process/framework and per-name versus physical metrics before implementation. | Current per-process limits or polling cannot close the gate. Storage changes affect placement/publication/recovery; whole-renderer memory containment may affect hardware acceleration and runtime/distribution. No feasible complete design, new dependency/license or cost is assumed approved. |
+| Explicitly adopt an operational resource contract for the current stack | Retain the numeric thresholds; implement the reservation/wrapper/writer/capture work above for hard logical admission, retain sampled group RSS/allocated-block supervision and quiescent publication checks, and report cancellation/error on excess or failed observation. | This changes the guarantee: allocated blocks and group RSS can exceed thresholds between observations, and framework memory outside the group is not covered. No bound on overshoot/reaction time is proved. Targets/quality, original immutability, IR/History and exclusive publication remain required. This route needs explicit acceptance, targeted kernel-boundary/cancellation/publication tests and a new sealed runtime/package after implementation. |
+
+The practical recommendation for the present stack is the second route **only
+if the Owner explicitly accepts its weaker guarantee**; otherwise retain the
+first route and the blocked gate. No implementation was started that could be
+misrepresented as closing the approved contract. This is a scope/feasibility
+conclusion, not a proof that every future architecture is impossible.
+For category context, Premiere exposes available/reserved RAM and Adobe's shared
+memory balancer manages registered application requirements cooperatively; those
+documents do not establish a 512-MiB instantaneous whole-renderer quota.
+[Premiere memory preferences](https://helpx.adobe.com/premiere/desktop/get-started/preferences-and-settings/memory-preferences.html),
+[Adobe shared memory](https://helpx.adobe.com/after-effects/desktop/memory-storage-performance/memory-and-storage/memory-storage1.html).
+
+FIX NOW/DEFER: logical hardening is a bounded existing-runtime extension, but it
+does not close the requested allocated-disk/global-RAM blocker. Its acceptance
+metric and required proof depend on the choice above; quota/isolation changes
+cannot be added as an unapproved workaround. Director impact is **Product Owner
+decision required** for the resource guarantee; typed commands, IR/History and
+provider authority remain unchanged. Progress stays 55%, F-A02 exhausted 1/1;
+Draft #86/#87 stay unmerged. No further native proof run, real AI, device, account,
+GUI or human-session action occurred during this investigation.
+
 ## Product and Director boundaries
 
 Creator=Lite; Studio=Full; Vids=Desktop. I19's technical label “Creator Skill
