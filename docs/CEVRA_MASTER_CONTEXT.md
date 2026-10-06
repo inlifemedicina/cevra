@@ -2737,8 +2737,14 @@ retirement races and Inspector clipping, with regressions.
 
 The resource watchdog is not an instantaneous cap: a native excessive group was
 observed at 623673344 B and interrupted, so the approved 512-MiB requirement is not
-proved as a no-overshoot ceiling. Complete live-allocation registration, external
-temporary graphs, publication and sealed 0.3.4 integration remain export work.
+proved as a no-overshoot ceiling. Complete live-allocation registration,
+publication and sealed 0.3.4 integration remain export work. The next independent
+fix keeps Audio Sequence's instruction graph beside its PCM under the existing
+private staging tree and captures cleanup authority before writing, covering
+partial graph writes and render cancellation. Worker tests 44/44 and the full
+Media Python suite 103/103 PASS; the new live-location regression fails against
+`80ee7c8`. These are filesystem fixtures with simulated FFmpeg, not a strict
+resource ceiling or final pipeline proof. Caller registration remains necessary.
 A synthetic whole-frame 60-s/1080p30/H264/AAC/20-Mb/s fixture included sealed copies
 and candidate/staging: 155 observations, peak RSS 159744000 B, logical/allocated
 files 608503930/609619968 B, unchanged originals and packet/time identity. Mean
@@ -2750,6 +2756,16 @@ boundaries are in the [G1 plan](CEVRA_MANUAL_SEQUENCE_G1.md#independent-export-p
 One grouped human script is prepared, not executed. #86/#87 stay unmerged; no
 human session/app/device, real AI/provider/account or install occurred. Director
 impact compatible, progress 55%, F-A02 exhausted 1/1.
+
+Existing ADR0027/0028 contracts already provide exclusive publication identity,
+`export.add`, post-checkpoint durable success and restart reconciliation without
+replay; the final manual-export path will reuse them. The missing real visual
+producer must bind its duration/clock to the pending temporal policy before mux.
+Existing Resolved Audio Plan reads canonical audio tracks only; G1's manual
+video track cannot silently become an inferred audio mix. Explicit source-audio
+mapping through the approved typed executor, or a material admission decision,
+is required. No new publisher/journal/intent/preparatory service, silent audio
+policy or temporal adoption was introduced for this continuation.
 
 1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved admission of the designated F-A02 result/history into a temporary native session is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.

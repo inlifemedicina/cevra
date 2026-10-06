@@ -55,7 +55,14 @@ candidate/staging; scoped fully tagged BT709 preservation passed. These do not
 prove instantaneous 512-MiB/2-GiB ceilings, mixed-colour compatibility, final
 pipeline or G1/G5/G6/owner acceptance. Complete live-file registration, sealed
 0.3.4 integration and final admission remain engineering work alongside the
-temporal decision. The [single grouped G1 script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+temporal decision. A subsequent executor correction keeps Audio Sequence's graph
+and PCM inside the existing private staging tree, including partial-write/cancel
+cleanup (44 worker / 103 full Media Python tests PASS; filesystem fixtures).
+Publication, `export.add`, durable checkpoint and no-replay recovery already exist
+under ADR0027/0028 and will be reused. A real cadence-bound visual producer and
+explicit audio binding for the video-only G1 sequence remain required; no new
+audio admission policy or unused publisher/journal/service was introduced.
+The [single grouped G1 script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
 is prepared, not executed. #86/#87 stay unmerged; progress 55%, F-A02 exhausted 1/1.
 Final render/publication/resource-budget integration remains open. No G1 PASS,
 real AI, dependency, human

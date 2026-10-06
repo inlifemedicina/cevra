@@ -292,6 +292,107 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
                 native_tools._run_audio_sequence(ShortOutputCommon(metadata), args)
             self.assertFalse(Path(str(args["output"])).exists())
 
+    def test_all_live_audio_sequence_allocations_share_the_owned_output_tree(self) -> None:
+        test = self
+
+        class ObservedCommon:
+            def __init__(self, metadata: dict[str, object], root: Path, cancel: bool) -> None:
+                self.metadata, self.root, self.cancel = metadata, root, cancel
+
+            def probe(self, path: str, role: str = "input") -> dict[str, object]:
+                if role == "output":
+                    return {"file": path, "duration": 0.3, "audio": {
+                        "codec": "pcm_f32le", "sample_rate": 48_000, "channels": 2}}
+                return self.metadata[path]
+
+            def verify_output(self, path: str) -> dict[str, object]:
+                return self.probe(path, "output")
+
+            def ffmpeg_base(self, overwrite: bool = True) -> list[str]:
+                return ["ffmpeg", "-n"]
+
+            def run(self, command: list[str]) -> None:
+                graph = Path(command[command.index("-/filter_complex") + 1])
+                staged = Path(command[-1])
+                test.assertTrue(graph.is_relative_to(self.root))
+                test.assertEqual(graph.parent, staged.parent)
+                if os.name == "posix":
+                    test.assertEqual(graph.parent.stat().st_mode & 0o777, 0o700)
+                test.assertIn("[cevra_audio_out]", graph.read_text(encoding="utf-8"))
+                write_sparse_float_wav(staged, 14_400)
+                live_owned = {p for p in self.root.rglob("*") if p.is_file()
+                              and p.name.startswith(("sequence.", "output."))}
+                test.assertEqual(live_owned, {graph, staged})
+                if self.cancel:
+                    job_control.cancel("owned-audio-graph-cancel")
+                    raise InterruptedError("injected cancelled render")
+
+        for cancel in (False, True):
+            with self.subTest(cancel=cancel), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                args = self.arguments(root)
+                metadata = args.pop("_metadata")
+                originals = {Path(source["uri"]): Path(source["uri"]).read_bytes()
+                             for source in args["sources"]}
+                if cancel:
+                    job_control.begin_job("owned-audio-graph-cancel")
+                try:
+                    if cancel:
+                        with self.assertRaisesRegex(InterruptedError, "cancelled render"):
+                            native_tools._run_audio_sequence(ObservedCommon(metadata, root, cancel), args)
+                        self.assertFalse(Path(args["output"]).exists())
+                    else:
+                        result = native_tools._run_audio_sequence(ObservedCommon(metadata, root, cancel), args)
+                        self.assertEqual(result["structuredContent"]["output"], args["output"])
+                    self.assertEqual(list(root.glob(".cevra-audio-sequence-*")), [])
+                    for path, content in originals.items():
+                        self.assertEqual(path.read_bytes(), content)
+                finally:
+                    if cancel:
+                        job_control.finish_job("owned-audio-graph-cancel")
+
+    def test_partial_graph_write_failure_leaves_no_unregistered_artifact(self) -> None:
+        class ProbeCommon:
+            def __init__(self, metadata: dict[str, object]) -> None:
+                self.metadata = metadata
+
+            def probe(self, path: str, role: str = "input") -> dict[str, object]:
+                return self.metadata[path]
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            args = self.arguments(root)
+            metadata = args.pop("_metadata")
+            originals = {p: p.read_bytes() for p in root.iterdir()}
+            original_open = Path.open
+
+            class FailedWrite:
+                def __init__(self, path: Path, *call_args: object, **kwargs: object) -> None:
+                    self.handle = original_open(path, *call_args, **kwargs)
+
+                def __enter__(self) -> "FailedWrite":
+                    return self
+
+                def __exit__(self, *exception: object) -> None:
+                    self.handle.close()
+
+                def write(self, data: str) -> None:
+                    self.handle.write(data[:16])
+                    self.handle.flush()
+                    raise OSError("ENOSPC: injected partial graph write")
+
+            def fail_graph_write(path: Path, *call_args: object, **kwargs: object) -> object:
+                if path.suffix == ".ffgraph":
+                    return FailedWrite(path, *call_args, **kwargs)
+                return original_open(path, *call_args, **kwargs)
+
+            with mock.patch.object(Path, "open", fail_graph_write):
+                with self.assertRaisesRegex(OSError, "partial graph write"):
+                    native_tools._run_audio_sequence(ProbeCommon(metadata), args)
+            self.assertEqual(set(root.iterdir()), set(originals))
+            for path, content in originals.items():
+                self.assertEqual(path.read_bytes(), content)
+
     def test_eacces_and_enospc_are_fail_closed_at_the_custom_tool_boundary(self) -> None:
         class FailingCommon:
             def __init__(self, metadata: dict[str, object], message: str) -> None:

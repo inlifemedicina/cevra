@@ -574,8 +574,9 @@ against the approved 536870912-B requirement; its largest member was 302219264 B
 The owned group was interrupted and settled. Reparented group membership was
 observed. Sparse staging plus input copies crossed 2147483648 logical B and was
 refused while originals/prior output stayed intact. Production export must
-register every live allocation, including current temporary graphs outside a
-job tree, and retain the lease through admission/publication. Open-unlinked
+register every live allocation and retain the lease through admission/publication.
+The Audio Sequence graph-location correction below closes one concrete allocation
+gap; it does not establish complete job registration. Open-unlinked
 allocations, processes escaping that group and OS/GPU/service memory are not
 proved by this observer. The approved requirements have not been weakened.
 
@@ -640,6 +641,52 @@ The [single grouped G1 human script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#sin
 is prepared for a coordinated future build, reusing existing IDs. No new owner
 round or saved human/Take session operation is requested. Director impact is
 compatible; progress stays 55%, F-A02 stays exhausted 1/1.
+
+### Existing execution reuse and owned Audio Sequence allocation correction
+
+The next independent continuation fixes the actual Audio Sequence executor,
+rather than adding another preparatory service. Its instruction graph previously
+used the global temporary directory, outside the PCM output's staging tree, and
+its cleanup path was captured only after writing. It now creates the existing
+private operation staging directory first, assigns the graph path before an
+exclusive write, and keeps graph and PCM in that directory. Existing `finally`
+cleanup therefore covers a partial graph write as well as render cancellation.
+The graph will be included in owned-tree accounting when the caller's output
+parent is registered; that caller integration and strict resource proof remain
+open. No audio samples, cadence, delivery profile or admission rules change.
+
+Worker regressions passed 44/44 and the complete Media Python suite 103/103.
+The new live-allocation test was deliberately run against `80ee7c8`'s executor:
+both success/cancellation cases failed at the out-of-tree graph assertion.
+Corrected filesystem fixtures verify graph/PCM coexistence under private POSIX
+`0700` staging, original preservation, cleanup after cancellation and an injected
+partial-write ENOSPC error. FFmpeg is simulated in these tests; this does not
+claim real storage exhaustion, native process cancellation or full export limits.
+At this local correction checkpoint, sealed-runtime execution of the corrected
+commit is pending; the Draft/receipt separately records its terminal CI gates.
+
+Publication/history/recovery are existing approved primitives, not absent
+infrastructure: ADR0027's `render-audio-sequence`/`mux-audio` use exclusive
+owner-scoped staging links with POSIX identity re-proof; Media Application commits
+`export.add`, and ADR0028's operational archive reconciles against restored
+ProjectHistory without replay. Desktop marks durable success only after the
+canonical checkpoint. These contracts will be reused; a new parallel publisher,
+journal, archive or generic preparatory export service was not added.
+
+The real manual-export caller still needs a validated visual producer. The
+existing final mux requires explicit same-binding visual and PCM durations;
+choosing strict CFR grid mapping versus exact boundary exposure changes that
+producer's clock proof. Existing `ResolvedAudioPlan` compiles only canonical
+audio tracks and deliberately refuses to infer audio from a video track. The
+current G1 manual sequence is a video track, so it cannot simply be passed to
+that compiler. Final integration must explicitly bind source audio to the
+canonical occurrences through the approved typed Audio Sequence contract, or
+report a material unsupported source/mapping decision. It must not invent
+silence, stream selection, fades, normalization, ducking or a second editable
+timeline. Apart from the concrete graph correction, connecting resources,
+publication and recovery without that actual producer would be unused
+infrastructure. The next useful end-to-end work therefore follows the temporal
+decision and explicit source/audio admission; final Export remains unavailable.
 
 ## Automated acceptance package
 

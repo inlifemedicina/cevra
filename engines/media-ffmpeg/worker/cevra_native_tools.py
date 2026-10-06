@@ -967,12 +967,14 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     promoted_evidence: Optional[Dict[str, Any]] = None
     cleanup_errors: List[str] = []
     try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="cevra-audio-sequence-", suffix=".ffgraph", delete=False) as handle:
+        # Keep every allocation under the existing operation-owned staging tree.
+        # Capture paths before writing so partial graph writes are cleaned too.
+        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-audio-sequence-", dir=output.parent))
+        graph_path = staging_directory / "sequence.ffgraph"
+        with graph_path.open("x", encoding="utf-8") as handle:
             handle.write(graph)
             handle.write("\n")
-            graph_path = Path(handle.name)
         job_control.register_artifacts([str(graph_path)])
-        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-audio-sequence-", dir=output.parent))
         staging_output = staging_directory / "output.wav"
         cmd = common.ffmpeg_base(overwrite=False) + ["-xerror"]
         for source in sources:
