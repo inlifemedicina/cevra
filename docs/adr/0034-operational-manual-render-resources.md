@@ -104,7 +104,9 @@ values, not guaranteed bounds. Exact 2-GiB accounting observation rejected an
 owned sparse file plus retained names; a scaled real 4096-byte producer limit
 also interrupted a partial native writer without changing the parent's limit.
 136 Python and 142 Media tests passed, including closed RPC errors, retirement,
-restart, mandatory pre-write refusal and cleanup ownership. Host172/UI157 passed.
+restart, mandatory pre-write refusal and cleanup ownership. Host173/UI157 passed.
+The production Host guard also supervises the manual frame preview; Original/Take
+keeps its existing path. A routing/fault/retry regression verifies that boundary.
 
 `peakReservedBytes` is reservation capacity, not measured disk consumption;
 unknown encoded outputs may reserve all remaining capacity then settle smaller.

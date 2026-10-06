@@ -338,7 +338,7 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    de [ADR0034](adr/0034-operational-manual-render-resources.md): reserva lógica
    antes da escrita e interrupção após observar excesso de RAM. Os 512 MiB/2 GiB
    são orçamentos iniciais de validação, sem teto físico instantâneo prometido.
-   A equipe obteve prova sintética selada R5, Python136/Media142/Host172/UI157;
+   A equipe obteve prova sintética selada R5, Python136/Media142/Host173/UI157;
    60 s Full HD mediram 171507712 B RSS, 627486319 B lógicos e PSNR52.512757 dB.
    Excesso controlado de RAM atingiu 87015424 B acima do orçamento antes do aborto.
    Isso não promove limites comerciais, percepção ou variantes humanas. O pacote

@@ -2672,7 +2672,8 @@ an export or replay. Sealed R5 synthetic release-mode validation passed, includi
 60 s Full HD: 171507712 B sampled RSS, 627486319 B logical/633491456 B allocated,
 25.702 s render and 52.512757-dB decoded-original/final PSNR. The controlled RAM
 fault overshot by 87015424 B before observed abort; latency/overshoot have no
-guaranteed bound. Python136, Media142, Host172 and UI157 passed. Independent
+guaranteed bound. Python136, Media142, Host173 and UI157 passed. The Host guard
+also covers manual frame preview; Original/Take retains its existing path. Independent
 review, published-head CI/package closeout and native/human gates remain open.
 Earlier strict
 blocked evidence and the `a7a0003` offline package/CI PASS remain historical.

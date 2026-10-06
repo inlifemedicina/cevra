@@ -1190,7 +1190,9 @@ or arbitrary-source/perceptual acceptance. `peakReservedBytes` can equal 2 GiB
 because an unknown encoded producer reserves available capacity; it is not disk
 usage. Real partial-writer size enforcement was tested at a scaled 4096 B bound;
 exact 2-GiB observation separately rejected owned sparse-file/name excess.
-Python136/Media142/Host172/UI157 passed. A failed first functional attempt found
+Python136/Media142/Host173/UI157 passed. The production Host guard now supervises
+manual frame preview as well as final render, with an explicit fault/retry/routing
+regression; Original/Take retains its existing path. A failed first functional attempt found
 and fixed encoder inventory routing; tests also caught native dispatch swallowing
 the typed fault. Failed receipts are preserved. Independent review, exact-head
 CI/current package and native/human gates remain open; no G1 PASS or merge is

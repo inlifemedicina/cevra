@@ -2,13 +2,13 @@ import type { MediaEngineAdapter } from "@cevra/contracts";
 import { MANUAL_EXPORT_LIMITS } from "@cevra/application";
 import type { ProcessMediaWorkerTransport } from "@cevra/media-ffmpeg";
 
-/** Finish sampled resource admission before Media Application can record a successful export. */
+/** Admit manual CFR30 preview/final renders; Original/Take operations retain their existing path. */
 export function guardManualExportEngine(engine: MediaEngineAdapter,
   transport: Pick<ProcessMediaWorkerTransport, "withOwnedRenderBudget">): MediaEngineAdapter {
   return {
     identity: () => engine.identity(), healthcheck: () => engine.healthcheck(), capabilities: () => engine.capabilities(),
     async execute(operation, context) {
-      if (operation.type !== "render-manual-video-sequence") return engine.execute(operation, context);
+      if (operation.type !== "render-manual-video-sequence" && operation.type !== "render-manual-video-preview") return engine.execute(operation, context);
       // A final observer failure can follow publication. The transport retires
       // its generation; retain final/account evidence for Host reconciliation.
       // This wrapper has no authority to unlink a public destination.

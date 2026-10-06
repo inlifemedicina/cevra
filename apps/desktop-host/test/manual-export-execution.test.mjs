@@ -8,6 +8,28 @@ import { ManualSequenceExportApplicationService, ManualVideoSequenceApplicationS
 import { NodeMediaArtifactStore, OwnedRenderResourceError } from "@cevra/media-ffmpeg";
 import { DesktopSession, DesktopProjectPersistence, DesktopHostProtocolServer, NativeManualExportDestination, guardManualExportEngine } from "../dist/index.js";
 
+test("production guard supervises manual frame preview and leaves Original/Take on its existing path", async () => {
+  const observations = [], calls = []; let excessive = true;
+  const engine = { identity() {}, healthcheck() {}, capabilities() {}, async execute(operation) { calls.push(operation.type); return { type: "fixture-result" }; } };
+  const transport = { async withOwnedRenderBudget(options, action) {
+    observations.push(options);
+    if (excessive) throw new OwnedRenderResourceError("MEDIA_RENDER_MEMORY_LIMIT");
+    return { result: await action(), resourceEvidence: {} };
+  } };
+  const guarded = guardManualExportEngine(engine, transport);
+  const preview = { type: "render-manual-video-preview", ownedWorkspaceUri: "/issued-preview-job" };
+  await assert.rejects(guarded.execute(preview, {}), { code: "MEDIA_RENDER_MEMORY_LIMIT" });
+  assert.deepEqual(calls, []);
+  assert.equal(observations[0].ownedDirectory, preview.ownedWorkspaceUri);
+  assert.equal(observations[0].rendererRssLimitBytes, 512 * 1024 ** 2);
+  assert.equal(observations[0].ownedFileLimitBytes, 2 * 1024 ** 3);
+  excessive = false;
+  assert.deepEqual(await guarded.execute(preview, {}), { type: "fixture-result" });
+  await guarded.execute({ type: "trim", previewProfile: "take-v1" }, {});
+  assert.equal(observations.length, 2);
+  assert.deepEqual(calls, ["render-manual-video-preview", "trim"]);
+});
+
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const publication = async path => { const stamp = await lstat(path, { bigint: true }); return { version: 1, scheme: "posix-dev-inode", device: String(stamp.dev), inode: String(stamp.ino) }; };
 const available = { available: true, reason: "available" }, unavailable = { available: false, reason: "runtime-not-configured" };
