@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-10-05
+**Updated:** 2026-10-06
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 **Current global weighted roadmap progress:** 55%.
 
@@ -43,6 +43,20 @@ approved execution outside the sandbox; identical sandbox commands retained the
 `-12908` failure. No encoder/profile change was adopted. The same plan recommends
 exact project cuts with nominal-30 variable boundary exposure, or explicit
 export-only quantization for strict CFR30; owner decision is still required.
+
+Independent destination preparation now spans Application/Host/native/UI without
+creating output/history/archive/checkpoint or exposing a WebView path. Picker
+cancel/Close, Host supersession and late-result/journal guards preserve unsaved
+state; final Export remains unavailable. The existing transport adds a trusted,
+generation-bound sampled resource scope for a registered owned POSIX job. Review
+corrected lifecycle/restart/empty-group/retirement races and Inspector clipping.
+Synthetic 60-s whole-frame quality/resource probes include sealed originals and
+candidate/staging; scoped fully tagged BT709 preservation passed. These do not
+prove instantaneous 512-MiB/2-GiB ceilings, mixed-colour compatibility, final
+pipeline or G1/G5/G6/owner acceptance. Complete live-file registration, sealed
+0.3.4 integration and final admission remain engineering work alongside the
+temporal decision. The [single grouped G1 script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+is prepared, not executed. #86/#87 stay unmerged; progress 55%, F-A02 exhausted 1/1.
 Final render/publication/resource-budget integration remains open. No G1 PASS,
 real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,

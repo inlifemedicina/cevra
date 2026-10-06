@@ -218,6 +218,42 @@ G1/G5/G6 completos continuam NÃO EXECUTADO/BLOCKED conforme a variante.
 O perfil de bordas do export permanece pendente; a prova H.264 B-frames/7 ms é
 RUNTIME sintético, não aceite do export pelo app. Nenhum teste humano foi feito.
 
+### Single grouped G1 script
+
+Roteiro único preparado para uma build futura coordenada e identificada por
+SHA/runtime. Usar somente projeto descartável e duas fixtures locais admitidas,
+com hashes registrados; preservar o projeto humano e a rodada Take existentes.
+Não instalar/abrir agora nem repetir aceites históricos. Registrar por ID e
+variante os resultados técnicos e o julgamento perceptual separado.
+
+1. **I4-T1, X-T1/T7:** abrir a build coordenada sem IA; alternar PT/EN e coluna
+   aberta/compacta. Conferir timeline, seleção e acesso aos controles por scroll.
+2. **D1-T1, X-T5:** importar as duas fixtures admitidas; marcar quatro trechos,
+   incluindo repetição de uma fonte e um trecho da segunda. Conferir conteúdo,
+   ordem, numeração e hashes dos originais.
+3. **D14-T2, X-T1/T2:** percorrer append/insert/duplicate/split/trim/reorder/remove
+   em uma montagem contínua. Undo/Redo deve desfazer/refazer uma ação por vez;
+   salvar/reabrir preserva sequência, cursor e fontes.
+4. **X-T6/T9, I8-T3/T6:** ouvir/ver Sequência, buscar nas junções e no OUT, repetir
+   explicitamente e voltar a Original para novas marcas. Registrar continuidade,
+   voz/imagem, conteúdo e tempo percebido; a junção pode aguardar preparação.
+   Nenhum resultado fake substitui esse julgamento nativo/perceptual.
+5. **X-T3/T5/T7:** escolher um destino novo em “Preparar destino”; cancelar pelo
+   seletor e durante preparo; editar/Undo enquanto prepara; tentar uma saída já
+   existente. Deve haver estado/erro honesto, nenhuma saída/história criada pelo
+   preparo e nenhum original/arquivo anterior alterado. O Export final segue
+   indisponível nesta preparação.
+6. **I17-T8/T9, X-T2/T4:** usar uma falha de save preparada pela equipe técnica,
+   Retry e novo Close; conferir preservação do projeto/Undo/Redo/reabertura.
+   Timeout/retirement desconhecido mantém o projeto aberto; não forçar descarte.
+7. **D8-T2, I19-T1, X-T3/T5/T6/T9:** export final e oráculos de ordem/IN/OUT/
+   duração/áudio/cor/qualidade/recursos ficam **BLOCKED** até decisão temporal,
+   pipeline/runtime/envelope e provas de publicação/limites concluídos. Depois,
+   executar essa variante na mesma rodada agrupada; não alegar PASS antecipado.
+
+Estado deste roteiro: **NÃO EXECUTADO / preparação documental**. Não promove G1,
+G5/G6, native/owner, progresso ou F-A02. A política temporal continua OPEN.
+
 Este roteiro agrega os IDs de A–E; não substitui nem duplica os casos canônicos. Preencher um registro por ID/variante/target, inclusive quando vários IDs forem percorridos no mesmo fluxo. Nenhum cenário foi executado nesta reconciliação.
 
 **Execução** começa como `NÃO EXECUTADO`; isso não é resultado. Depois do teste, registrar o resultado objetivo das Regras e, quando necessário, o julgamento humano separado. Marcar `BLOCKED` com a dependência concreta antes de tentar uma função ausente. Uma fundação implementada ou um PASS de CI/fake não equivale a PASS do fluxo no app. A build deve declarar as capabilities realmente disponíveis.

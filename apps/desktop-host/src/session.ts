@@ -8,6 +8,7 @@ import {
   ManualVideoClipApplicationService,
   ManualVideoSequenceApplicationService,
   ManualSequencePreviewApplicationService,
+  ManualSequenceExportPreparationApplicationService,
   resolveManualVideo,
   TranscriptionApplicationService
 } from "@cevra/application";
@@ -22,6 +23,7 @@ import type {
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
 import type { ManualVideoSequenceEdit } from "@cevra/application";
+import { validateManualExportPreparationRequest, type ManualExportPreparationRequest, type ManualExportPreparation } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
   FfmpegMediaEngine,
@@ -51,6 +53,7 @@ import type { CapabilityState, DesktopHostState } from "./protocol.js";
 import { readDesignatedFa02Pair } from "./fa02-review-admission.js";
 import { readLocalVideoPreview } from "./local-video-preview.js";
 import { DerivedVideoPreview, resolvePreviewRange, supportsOriginalProxy } from "./derived-video-preview.js";
+import { NativeManualExportDestination } from "./manual-export-destination.js";
 
 type Locale = "pt-BR" | "en-US";
 
@@ -66,6 +69,7 @@ export interface DesktopSessionServices {
   manualVideoClip?: Pick<ManualVideoClipApplicationService, "create" | "trim">;
   manualVideoSequence?: Pick<ManualVideoSequenceApplicationService, "edit">;
   manualSequencePreview?: Pick<ManualSequencePreviewApplicationService, "prepare" | "assertCurrent" | "revalidate">;
+  manualExportPreparation?: Pick<ManualSequenceExportPreparationApplicationService, "prepare">;
   derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare"> & Partial<Pick<DerivedVideoPreview, "close">>;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
@@ -81,6 +85,8 @@ export class DesktopSession {
   private previewTask: Promise<LocalVideoPreview> | null = null;
   private previewOperationId: string | null = null;
   private legacyPreviewSequence = 0;
+  private exportPreparationTask: Promise<ManualExportPreparation> | null = null;
+  private exportPreparationOperationId: string | null = null;
   private closing = false;
   private closeAttempt: { id: string; checkpointToken?: string; committed: boolean } | null = null;
 
@@ -227,6 +233,35 @@ export class DesktopSession {
     if (!controller) return { operationId, cancelled: false };
     controller.abort();
     return { operationId, cancelled: true };
+  }
+
+  /** Destination comes from the native picker; this route never renders or checkpoints. */
+  async prepareManualExport(request: ManualExportPreparationRequest, destinationUri: string): Promise<ManualExportPreparation> {
+    if (this.closing) throw safeError("OPERATION_CANCELLED");
+    if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
+    if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+    if (!this.services.manualExportPreparation) throw safeError("MANUAL_EXPORT_UNAVAILABLE");
+    const stable = validateManualExportPreparationRequest(request);
+    if (this.operations.has(stable.operationId)) throw safeError("OPERATION_DUPLICATE");
+    const journal = this.services.history.journalIdentity;
+    const previous = this.exportPreparationTask;
+    if (this.exportPreparationOperationId) this.cancel(this.exportPreparationOperationId);
+    const task = this.runOperation(stable.operationId, async signal => {
+      await previous?.catch(() => undefined);
+      signal.throwIfAborted();
+      if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+      if (journal !== this.services.history.journalIdentity) throw safeError("MANUAL_EXPORT_STALE");
+      const preparation = await this.services.manualExportPreparation!.prepare(stable, new NativeManualExportDestination(destinationUri), signal);
+      signal.throwIfAborted();
+      if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+      if (journal !== this.services.history.journalIdentity) throw safeError("MANUAL_EXPORT_STALE");
+      return preparation;
+    });
+    this.exportPreparationTask = task;
+    this.exportPreparationOperationId = stable.operationId;
+    try { return await task; } finally {
+      if (this.exportPreparationTask === task) { this.exportPreparationTask = null; this.exportPreparationOperationId = null; }
+    }
   }
 
   async undo(): Promise<DesktopHostState> {
@@ -446,6 +481,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       manualVideoClip: new ManualVideoClipApplicationService({ history, identity: sourceIdentity }),
       manualVideoSequence: new ManualVideoSequenceApplicationService({ history, identity: sourceIdentity }),
       manualSequencePreview: new ManualSequencePreviewApplicationService({ history, identity: sourceIdentity }),
+      manualExportPreparation: new ManualSequenceExportPreparationApplicationService({ history, identity: sourceIdentity }),
       ...(media?.ingest ? { ingest: media.ingest } : {}),
       ...(media?.sourceTechnicalDescriptor ? { sourceTechnicalDescriptor: media.sourceTechnicalDescriptor } : {}),
       ...(transcription.service ? { transcription: transcription.service } : {}),

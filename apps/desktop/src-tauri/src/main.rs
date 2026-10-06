@@ -13,7 +13,7 @@ use commands::{
     desktop_cancel_operation, desktop_get_state, desktop_pick_and_ingest_media, desktop_redo,
     desktop_transcribe_source, desktop_undo,
     desktop_get_editorial_draft, desktop_revise_editorial_draft,
-    desktop_preview_local_video, desktop_create_manual_video_clip, desktop_trim_manual_video_clip,
+    desktop_preview_local_video, desktop_prepare_manual_export, desktop_create_manual_video_clip, desktop_trim_manual_video_clip,
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -41,6 +41,7 @@ fn main() {
             desktop_get_editorial_draft,
             desktop_revise_editorial_draft,
             desktop_preview_local_video,
+            desktop_prepare_manual_export,
             desktop_create_manual_video_clip,
             desktop_trim_manual_video_clip,
         ])

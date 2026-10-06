@@ -2,6 +2,7 @@ import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
 import type { ManualVideoSequenceEdit } from "@cevra/application";
+import type { ManualExportPreparation, ManualExportPreparationRequest } from "@cevra/application";
 
 export type DesktopCapability = "media.import" | "director.execute" | "changes.apply" | "project.export";
 export type DesktopRuntimeCapability = DesktopCapability | "transcription.transcribe";
@@ -40,6 +41,8 @@ export interface DesktopBackend {
   loadEditorialDraft(): Promise<EditorialDraftState>;
   reviseEditorialDraft(request: ReviseEditorialDraftRequest): Promise<EditorialDraftState>;
   previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview>;
+  prepareManualExport?(request: ManualExportPreparationRequest): Promise<
+    { readonly outcome: "cancelled" } | { readonly outcome: "prepared"; readonly preparation: ManualExportPreparation }>;
   createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }>;
   trimManualVideoClip(request: TrimManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }>;
   editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopBackendState; changedClipIds: string[] }>;

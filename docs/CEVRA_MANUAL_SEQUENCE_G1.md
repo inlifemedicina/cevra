@@ -528,6 +528,119 @@ on recovery head 230c3ff in Draft #87; their bounded technical evidence does not
 close final export admission. No real AI/provider/account request or human
 media/app/device action occurred.
 
+## Independent export preparation — 2026-10-06
+
+This continuation stays in stacked Draft #87; #86/#87 are not authorized for
+merge. It delivers read-only destination preparation while the boundary-cadence
+decision stays OPEN. Final Export remains unavailable. Preparation neither
+renders nor creates an output, export record, execution archive intent or
+checkpoint. It does not admit source compatibility for final delivery. Exact
+canonical cuts, including seven-millisecond ranges, remain intact.
+
+The closed Application service reuses canonical sequence/original identity
+checks, binds the complete journal and rechecks every original after destination
+I/O. Its immutable summary has `renderAvailable:false`. The native save picker
+supplies the path privately; WebView arguments contain only version/snapshot/
+operation/locale. Host checks an absent MP4 target, canonical directory dev/inode,
+writable destination/temporary volumes and free bytes without a write probe or
+reservation. Existing outputs, original aliases, hard links and dangling links
+are refused. Only proved mandatory-copy impossibility is rejected; bitrate
+estimates are not a VBR bound, duration restriction or promise that render fits.
+
+A native picker lease participates in Close before a Host operation exists.
+Cancellation and Host admission are serialized; late success is discarded.
+Host supersession waits for settlement and checks full journal identity,
+including edit/Undo ABA. Native timeout retains unsaved Host memory and unknown
+retirement receivers. The UI holds the request through cancellation, retains
+unsettled warnings and ignores stale/unmounted results. The panel is inside the
+existing Inspector scroll area in PT/EN. Collision, original availability, job
+limit and filesystem space have distinct errors; no prior output is replaced.
+
+### Resource and integrity infrastructure, with proof limits
+
+The existing Process Media transport offers one trusted owned-job budget scope.
+Its captured generation cannot restart within a terminal scope; every abnormal
+exit retires/settles that generation before releasing admission or observation.
+Success requires the same healthy worker and no descendant left in its private
+POSIX group. Aggregate RSS and all files in a registered owned tree are counted,
+including copies, graphs, intermediates and staging. Hard links count per name;
+both logical and allocated bytes are checked. Symlinks, directory replacement or
+measurement failure stop the scope. Streamed candidate SHA and POSIX publication
+ownership remain separate; matching bytes never grant deletion authority.
+
+This is a **sampled watchdog**: 100-ms delay plus observation time, not a proved
+instantaneous hard cap. A negative native fixture observed aggregate 623673344 B
+against the approved 536870912-B requirement; its largest member was 302219264 B.
+The owned group was interrupted and settled. Reparented group membership was
+observed. Sparse staging plus input copies crossed 2147483648 logical B and was
+refused while originals/prior output stayed intact. Production export must
+register every live allocation, including current temporary graphs outside a
+job tree, and retain the lease through admission/publication. Open-unlinked
+allocations, processes escaping that group and OS/GPU/service memory are not
+proved by this observer. The approved requirements have not been weakened.
+
+Review found early observation release on caller validation failure, respawn
+after overrun, empty-group success and restart racing retirement. Generation
+binding/abnormal retirement were corrected with regressions. The first complete
+Host run found a stale exact ACL expectation; only the approved preparation
+command was added. Initial layout fixtures used an ambiguous tab selector and
+ran during build reloads; corrected stable receipts remain separate. Historical
+failures are retained rather than promoted to PASS.
+
+Complete offline checks passed: Application 300/300, Host 154/154, Media 136/136
+(including ten resource/lifecycle cases), Desktop 142/142, Rust 42/42 and i18n
+2/2; Host/Desktop builds passed. Twelve owned headless App cases at 900/1120/
+1440 px, PT/EN and open/compact passed: preparation, cancel and status are
+reachable/hit-testable inside Inspector scroll, with preview/timeline retained.
+These are UNIT/FAKE/browser/native-process fixtures, not APP/OWNER acceptance.
+Publication/exact-head CI is recorded separately in the Draft and local receipt.
+
+### Isolated quality/resource measurements
+
+An owned whole-frame-aligned fixture uses two synthetic 1080p30 originals,
+four occurrences/three unique ranges and 60 s at the approved 20-Mb/s target.
+Sealed input copies, float32 PCM, intermediates, candidate and publication
+staging coexist in the owned job. Across 155 live/phase-boundary observations,
+peak aggregate renderer RSS was 159744000 B; logical/allocated job bytes peaked
+at 608503930/609619968. Staging matched the streamed candidate hash, actual
+original hashes stayed intact and video packet payload/PTS/DTS/duration matched
+through concat/final mux. Video ended at 60000000 us with 1800 pictures; audio
+at 2880000 samples. The encoded ranges measured mean PSNR 54.07–54.60 dB and
+mean SSIM 0.99946–0.99953 against decoded originals. These are synthetic technical
+measurements, not perceptual acceptance, natural-content coverage, arbitrary-edge
+proof, a latency SLA or a general source envelope.
+
+The first two live-budget attempts stopped on observer failure before encoding:
+macOS pgrep omits ancestors when the observer runs inside the synthetic renderer.
+That fixture now includes its known own PID; the production observer runs outside
+the renderer. Both failures remain retained. Successful receipt:
+`quality20-live-budget-_0ew17dl/quality-results.json` in the owned prototype folder.
+Separate per-source range/matrix preservation passed for BT709 and SMPTE170M
+fixtures whose transfer/primaries were absent. A fully tagged BT709 fixture
+then verified all four source signalling fields under the unforced profile,
+unchanged original hash and unchanged decoded frames after optional packet-copy
+VUI carry. Receipts: `tagged-colour-kpq9gi13/receipt.json` and
+`full-tag-preservation-ba8eyol5/receipt.json`. Mixed signalling/HDR and perceptual
+admission remain unproved. Probes use the available pinned 0.3.3 runtime; sealed
+0.3.4 export integration is separate. No fallback encoder, provider or install.
+
+### Ready, temporal-dependent and remaining engineering closure
+
+| Area | Current boundary |
+|---|---|
+| Destination/state/errors/cancel | Implemented read-only; final file generation unavailable. |
+| Exact project cuts and originals | Preserved; preparation does not quantize or edit them. |
+| Resource/integrity primitives | Tested for a registered private POSIX job; not a complete pipeline or hard-cap proof. |
+| Delivery cadence/active boundary exposures | Requires the pending exact-cut/nominal30 versus strict-CFR30 owner choice. |
+| Final pipeline, source envelope, colour/audio admission | Engineering integration/oracles required; no silent compatibility or profile downgrade. |
+| Live allocations/publication/resource ceiling | Complete runtime/Host integration/proof required; sampled excess interruption does not meet a strict no-overshoot ceiling. |
+| APP/OWNER, native montage decoding/sync, G1/G5/G6 | Pending/BLOCKED; unit/browser/isolated encoder evidence does not promote these IDs. |
+
+The [single grouped G1 human script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+is prepared for a coordinated future build, reusing existing IDs. No new owner
+round or saved human/Take session operation is requested. Director impact is
+compatible; progress stays 55%, F-A02 stays exhausted 1/1.
+
 ## Automated acceptance package
 
 Reuse I4-T1, D14-T2, D8-T2, I19-T1, I8-T3/T6/T11, I17-T8/T9 and

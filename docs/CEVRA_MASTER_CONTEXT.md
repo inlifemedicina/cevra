@@ -2710,8 +2710,8 @@ cuts, measured quality/size and provisional bounded-failure policy for owner
 decision, separate from technical tuning. A 7-ms source range proves that strict
 30-Hz frame exposure and arbitrary exact cuts cannot both hold; the profile's
 boundary-cadence interpretation remains open before production admission.
-Tagged-colour preservation, general
-display-order admission and combined active-frame/export integration remain open.
+General display-order admission and combined active-frame/export integration
+remain open; later scoped colour measurements are not general source admission.
 Owned B-frame diagnosis proved the earlier `-12908` error sandbox-dependent:
 identical H.264 commands passed under approved execution outside the sandbox;
 software MPEG-4 passed inside. H.264 reordered display-clock/7-ms active-picture
@@ -2723,6 +2723,33 @@ adopted and final render/publication/resource-budget integration remains open.
 Naming: Creator=Lite, Studio=Full, Vids=Desktop; I19's Full visual workspace/final
 output remains independent of Vids. No G1 PASS is implied; F-A02 and progress
 remain unchanged. Historical actions below retain their scope and evidence.
+
+The 2026-10-06 independent continuation adds read-only Application/Host/native/UI
+destination preparation in Draft #87. Exact cuts, journal/ABA, original identity,
+redo and checkpoint remain authoritative; final Export stays unavailable with
+temporal choice OPEN. Native picker cancel/Close precedes Host admission; timeout
+and unknown retirement preserve unsaved memory. Existing targets/original aliases
+are refused without writing/reserving bytes; WebView receives no path or render
+authority. The existing transport adds a generation-bound sampled owned-job
+resource scope, with aggregate POSIX-group RSS and conservative logical/allocated
+file accounting. Review corrected abnormal release, respawn, empty-group success,
+retirement races and Inspector clipping, with regressions.
+
+The resource watchdog is not an instantaneous cap: a native excessive group was
+observed at 623673344 B and interrupted, so the approved 512-MiB requirement is not
+proved as a no-overshoot ceiling. Complete live-allocation registration, external
+temporary graphs, publication and sealed 0.3.4 integration remain export work.
+A synthetic whole-frame 60-s/1080p30/H264/AAC/20-Mb/s fixture included sealed copies
+and candidate/staging: 155 observations, peak RSS 159744000 B, logical/allocated
+files 608503930/609619968 B, unchanged originals and packet/time identity. Mean
+PSNR 54.07–54.60 dB and SSIM 0.99946–0.99953 are measurements, not perceptual PASS.
+Per-source colour probes also preserved absent tags/range/matrix and all four
+fields on fully tagged BT709; mixed signalling/HDR/source-envelope admission
+remains unproved. Failures/corrected receipts and the ready/temporal/engineering
+boundaries are in the [G1 plan](CEVRA_MANUAL_SEQUENCE_G1.md#independent-export-preparation--2026-10-06).
+One grouped human script is prepared, not executed. #86/#87 stay unmerged; no
+human session/app/device, real AI/provider/account or install occurred. Director
+impact compatible, progress 55%, F-A02 exhausted 1/1.
 
 1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved admission of the designated F-A02 result/history into a temporary native session is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.

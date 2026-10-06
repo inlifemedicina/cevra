@@ -390,5 +390,20 @@
   "sequence.repeat": "Repeat sequence",
   "sequence.seek": "Sequence position",
   "sequence.position": "Sequence {time}",
-  "sequence.unavailable": "This montage edit is unavailable. Select a compatible clip or source and try again."
+  "sequence.unavailable": "This montage edit is unavailable. Select a compatible clip or source and try again.",
+  "export.prepareTitle": "Export destination",
+  "export.prepareUnavailable": "You can prepare the destination. Final file generation is still unavailable.",
+  "export.prepareChoose": "Prepare destination",
+  "export.prepareCancel": "Cancel preparation",
+  "export.preparing": "Choose a new file and wait while the montage is verified.",
+  "export.prepareCancelling": "Cancelling; wait for preparation to settle.",
+  "export.prepareCancelled": "Preparation cancelled.",
+  "export.prepareReady": "Destination checked; no file generated:",
+  "export.prepareExists": "This file already exists. Choose another name to preserve the previous output.",
+  "export.prepareSpace": "There is not enough space to prepare this montage. Free space or choose another destination.",
+  "export.prepareLimit": "The source files exceed this preparation's 2 GiB limit. Use smaller sources.",
+  "export.prepareSourceOffline": "An original is unavailable. Reconnect the file before preparing the destination.",
+  "export.prepareChanged": "The montage or an original changed. Prepare the destination again.",
+  "export.prepareSettling": "Preparation has not settled after cancellation. Keep the project open and wait.",
+  "export.prepareFailed": "This destination could not be prepared. Check the folder and try again."
 }

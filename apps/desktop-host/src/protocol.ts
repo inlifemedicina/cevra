@@ -2,6 +2,7 @@ import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
 import type { LocalVideoPreviewRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
 import { validateManualVideoSequenceEdit, type ManualVideoSequenceEdit } from "@cevra/application";
+import { validateManualExportPreparationRequest, type ManualExportPreparationRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
 export const DESKTOP_HOST_IDENTITY = "cevra.desktop-host" as const;
@@ -22,6 +23,7 @@ export type HostMethod =
   | "editorial.revise"
   | "media.ingestLocal"
   | "video.previewLocal"
+  | "video.prepareManualExport"
   | "video.trimManualClip"
   | "video.createManualClip"
   | "video.editManualSequence"
@@ -91,6 +93,7 @@ const METHODS = new Set<HostMethod>([
   "editorial.revise",
   "media.ingestLocal",
   "video.previewLocal",
+  "video.prepareManualExport",
   "video.createManualClip",
   "video.trimManualClip",
   "video.editManualSequence",
@@ -192,6 +195,14 @@ export function validateTranscriptionParams(params: Record<string, unknown>, id:
 export function validateCancelParams(params: Record<string, unknown>, id: string): { operationId: string } {
   exactKeys(params, ["operationId"], id);
   return { operationId: operationId(params.operationId, id) };
+}
+
+/** Trusted native route. No command takes a WebView-supplied destination. */
+export function validateManualExportParams(params: Record<string, unknown>, id: string): { request: ManualExportPreparationRequest; destinationUri: string } {
+  exactKeys(params, ["version", "expectedSnapshotId", "operationId", "locale", "destinationUri"], id);
+  const { destinationUri, ...request } = params;
+  const stable = validateManualExportPreparationRequest(request);
+  return { request: stable, destinationUri: boundedString(destinationUri, 8192, "destinationUri", id) };
 }
 
 export function validateVideoPreviewParams(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {

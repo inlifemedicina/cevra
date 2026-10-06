@@ -69,6 +69,54 @@ pub struct VideoPreviewArgs {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualExportPreparationArgs {
+    version: u8,
+    expected_snapshot_id: String,
+    operation_id: String,
+    locale: String,
+}
+
+fn validate_export_preparation(args: &ManualExportPreparationArgs) -> Result<(), DesktopCommandError> {
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    validate_locale(&args.locale)?;
+    let operation = args.operation_id.as_bytes();
+    if args.version != 1 || operation.is_empty() || operation.len() > 128
+        || !operation[0].is_ascii_alphanumeric()
+        || !operation.iter().all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(byte)) {
+        return Err(DesktopCommandError::new("MANUAL_EXPORT_INVALID_REQUEST", "Export preparation arguments are invalid."));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn desktop_prepare_manual_export(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualExportPreparationArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_export_preparation(&args)?;
+    supervisor.ensure_started(&app).await?;
+    let lease = supervisor.begin_preparation_picker(&args.operation_id)?;
+    // Modal system picker owns its cancellation; the WebView has no path permission.
+    let picked = app.dialog().file().set_title("CEVRA Vids")
+        .set_file_name("CEVRA.mp4").add_filter("MP4", &["mp4"]).blocking_save_file();
+    let Some(picked) = picked else { return Ok(json!({ "outcome": "cancelled" })); };
+    let path = picked.into_path().map_err(|_| DesktopCommandError::new("MANUAL_EXPORT_DESTINATION_INVALID", "The destination is invalid."))?;
+    let path_text = path.to_str().filter(|_| path.is_absolute())
+        .ok_or_else(|| DesktopCommandError::new("MANUAL_EXPORT_DESTINATION_INVALID", "The destination is invalid."))?;
+    let result = supervisor.request_picked_preparation(&lease, "video.prepareManualExport", json!({
+        "version": args.version, "expectedSnapshotId": args.expected_snapshot_id,
+        "operationId": args.operation_id, "locale": args.locale, "destinationUri": path_text
+    })).await.map_err(|error| match error.code.as_str() {
+        "MANUAL_VIDEO_PREVIEW_TIMEOUT" => DesktopCommandError::new("MANUAL_EXPORT_PREPARATION_TIMEOUT", "The preparation timed out and settled."),
+        "MANUAL_VIDEO_PREVIEW_SETTLING" => DesktopCommandError::new("MANUAL_EXPORT_PREPARATION_SETTLING", "The preparation has not settled; keep the project open."),
+        _ => error
+    })?;
+    Ok(json!({ "outcome": "prepared", "preparation": result }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ManualVideoClipArgs {
     source_id: String,
     expected_snapshot_id: String,
@@ -410,10 +458,7 @@ pub async fn desktop_cancel_operation(
     validate_id(&args.operation_id, "operationId")?;
     supervisor.ensure_started(&app).await?;
     match supervisor
-        .request_control(
-            "operation.cancel",
-            json!({ "operationId": args.operation_id }),
-        )
+        .cancel_operation(&args.operation_id)
         .await
     {
         Ok(result) => Ok(result),
@@ -477,6 +522,20 @@ fn file_name(path: &Path) -> Result<String, DesktopCommandError> {
 #[cfg(test)]
 mod video_boundary_tests {
     use super::*;
+
+    #[test]
+    fn export_preparation_boundary_rejects_paths_render_overrides_and_invalid_operation_ids() {
+        let valid = json!({ "version": 1, "expectedSnapshotId": "snapshot", "operationId": "prepare-1", "locale": "pt-BR" });
+        assert!(validate_export_preparation(&serde_json::from_value::<ManualExportPreparationArgs>(valid.clone()).unwrap()).is_ok());
+        for extra in ["uri", "destinationUri", "path", "commands", "fps", "renderAvailable"] {
+            let mut injected = valid.clone(); injected[extra] = json!("injected");
+            assert!(serde_json::from_value::<ManualExportPreparationArgs>(injected).is_err());
+        }
+        for operation in ["", "../foreign", "/tmp/path", "bad\nidentifier"] {
+            let mut injected = valid.clone(); injected["operationId"] = json!(operation);
+            assert!(validate_export_preparation(&serde_json::from_value::<ManualExportPreparationArgs>(injected).unwrap()).is_err());
+        }
+    }
 
     #[test]
     fn local_video_args_reject_paths_commands_and_duration_overrides() {

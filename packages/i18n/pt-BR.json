@@ -390,5 +390,20 @@
   "sequence.repeat": "Repetir sequência",
   "sequence.seek": "Posição na sequência",
   "sequence.position": "Sequência {time}",
-  "sequence.unavailable": "Esta edição da montagem está indisponível. Selecione um clip ou fonte compatível e tente novamente."
+  "sequence.unavailable": "Esta edição da montagem está indisponível. Selecione um clip ou fonte compatível e tente novamente.",
+  "export.prepareTitle": "Destino da exportação",
+  "export.prepareUnavailable": "Você pode preparar o destino. A geração do arquivo final ainda está indisponível.",
+  "export.prepareChoose": "Preparar destino",
+  "export.prepareCancel": "Cancelar preparo",
+  "export.preparing": "Escolha um arquivo novo e aguarde a verificação da montagem.",
+  "export.prepareCancelling": "Cancelando; aguarde a conclusão do preparo.",
+  "export.prepareCancelled": "Preparo cancelado.",
+  "export.prepareReady": "Destino verificado, sem arquivo gerado:",
+  "export.prepareExists": "Esse arquivo já existe. Escolha outro nome para preservar a saída anterior.",
+  "export.prepareSpace": "Não há espaço suficiente para preparar esta montagem. Libere espaço ou escolha outro destino.",
+  "export.prepareLimit": "Os arquivos de origem excedem o limite de 2 GiB deste preparo. Use fontes menores.",
+  "export.prepareSourceOffline": "Um original está indisponível. Reconecte o arquivo antes de preparar o destino.",
+  "export.prepareChanged": "A montagem ou um original mudou. Prepare o destino novamente.",
+  "export.prepareSettling": "O preparo ainda não terminou após o cancelamento. Mantenha o projeto aberto e aguarde.",
+  "export.prepareFailed": "Não foi possível preparar esse destino. Confira a pasta e tente novamente."
 }

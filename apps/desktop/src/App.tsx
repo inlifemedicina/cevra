@@ -17,6 +17,7 @@ import { TopBar } from "./components/TopBar";
 import { WorkspaceStage } from "./components/WorkspaceStage";
 import { ManualVideoPreview, supportsManualClipPreview } from "./components/ManualVideoPreview";
 import { ManualSequenceVideoPreview } from "./components/ManualSequenceVideoPreview";
+import { ManualExportPreparationPanel } from "./components/ManualExportPreparationPanel";
 import { capabilityReasonKey, workspaceKeys, type Workspace } from "./ui-model";
 
 import { presentSources } from "./source-presentation";
@@ -442,7 +443,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       </div>
       <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} t={t} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
         directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || mutationBusy} error={editorialError} t={t} onRefresh={() => void refreshEditorial()} onRevise={reviseEditorial} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
-        contextualPanel={<Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t} />} />
+        contextualPanel={<Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t}
+          exportPreparation={realPreview && sequenceClips && sequenceClips.length > 0 && backend.prepareManualExport && <ManualExportPreparationPanel key={project.history.headSnapshotId} backend={backend} snapshotId={project.history.headSnapshotId!} locale={locale} busy={mutationBusy} t={t} />} />} />
       <Timeline presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} trimAvailable={realPreview} trimBusy={mutationBusy} onTrim={trimManualClip} sequenceClips={sequenceClips} onSequenceEdit={editManualSequence} />
     </main>
   );
