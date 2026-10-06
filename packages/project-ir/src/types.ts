@@ -1,5 +1,6 @@
 export const PROJECT_IR_SCHEMA_VERSION_V1 = 1 as const;
-export const CURRENT_SCHEMA_VERSION = 2 as const;
+export const PROJECT_IR_SCHEMA_VERSION_V2 = 2 as const;
+export const CURRENT_SCHEMA_VERSION = 3 as const;
 export const TRANSCRIPT_DIGEST_VERSION = 1 as const;
 export const MAX_TRANSCRIPT_PROVENANCE_STAGES = 5 as const;
 
@@ -143,7 +144,7 @@ export type TranscriptProvenanceStage =
   | {
       kind: "migration";
       fromSchemaVersion: typeof PROJECT_IR_SCHEMA_VERSION_V1;
-      toSchemaVersion: typeof CURRENT_SCHEMA_VERSION;
+      toSchemaVersion: typeof PROJECT_IR_SCHEMA_VERSION_V2;
     };
 
 export interface SourceTranscriptProvenance {
@@ -185,6 +186,16 @@ export interface TimelineTrack {
   muted: boolean;
 }
 
+export type TimelineTimingPolicy = "legacy-milliseconds" | "cfr30";
+
+export interface ClipFrameTimingV1 {
+  version: 1;
+  timelineStartFrame: number;
+  timelineEndFrame: number;
+  sourceStartFrame: number;
+  sourceEndFrame: number;
+}
+
 export interface TimelineClip {
   id: Id;
   trackId: Id;
@@ -193,6 +204,8 @@ export interface TimelineClip {
   timelineEndMs: Milliseconds;
   sourceStartMs: Milliseconds;
   sourceEndMs: Milliseconds;
+  /** Authoritative visual timing on CFR30 projects; Ms fields are projections. */
+  frameTiming?: ClipFrameTimingV1;
   speed: number;
   volume: number;
   opacity: number;
@@ -200,6 +213,7 @@ export interface TimelineClip {
 }
 
 export interface TimelineState {
+  timingPolicy: TimelineTimingPolicy;
   durationMs: Milliseconds;
   tracks: TimelineTrack[];
   clips: TimelineClip[];
@@ -318,17 +332,24 @@ interface ProjectIRSharedState {
   extensions: ExtensionMap;
 }
 
-export interface ProjectIRv1 extends ProjectIRSharedState {
+export interface ProjectIRv1 extends Omit<ProjectIRSharedState, "timeline"> {
   schemaVersion: typeof PROJECT_IR_SCHEMA_VERSION_V1;
+  timeline: Omit<TimelineState, "timingPolicy">;
   transcript: TranscriptState;
 }
 
-export interface ProjectIRv2 extends ProjectIRSharedState {
+export interface ProjectIRv2 extends Omit<ProjectIRSharedState, "timeline"> {
+  schemaVersion: typeof PROJECT_IR_SCHEMA_VERSION_V2;
+  timeline: Omit<TimelineState, "timingPolicy">;
+  sourceTranscripts: SourceTranscript[];
+}
+
+export interface ProjectIRv3 extends ProjectIRSharedState {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION;
   sourceTranscripts: SourceTranscript[];
 }
 
-export type ProjectIR = ProjectIRv2;
+export type ProjectIR = ProjectIRv3;
 
 /** Closed, nonrecursive operations for one atomic timeline action. */
 export type TimelineEditOperation =
@@ -336,6 +357,10 @@ export type TimelineEditOperation =
   | { type: "clip.add"; clip: TimelineClip }
   | { type: "clip.remove"; clipId: Id }
   | { type: "clip.trim"; clipId: Id; timelineStartMs: Milliseconds; timelineEndMs: Milliseconds; sourceStartMs: Milliseconds; sourceEndMs: Milliseconds };
+
+export type TimelineEditOperationV2 = TimelineEditOperation
+  | { type: "timeline.timingPolicy.set"; timingPolicy: TimelineTimingPolicy }
+  | { type: "clip.frameTiming.set"; clipId: Id; frameTiming: ClipFrameTimingV1 };
 
 export type EditCommand =
   | { type: "project.rename"; name: string }
@@ -354,6 +379,7 @@ export type EditCommand =
   | { type: "transcript.remove"; sourceId: Id; expectedTranscriptDigest: TranscriptDigest }
   | TimelineEditOperation
   | { type: "timeline.edit"; version: 1; edits: readonly TimelineEditOperation[] }
+  | { type: "timeline.edit"; version: 2; edits: readonly TimelineEditOperationV2[] }
   | { type: "track.remove"; trackId: Id }
   | { type: "caption.upsert"; caption: CaptionCue }
   | { type: "caption.remove"; captionId: Id }

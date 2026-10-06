@@ -22,9 +22,10 @@ interface TopBarProps {
   onUndo(): void;
   onRedo(): void;
   onRetryCheckpoint(): void;
+  onExport?(): void;
 }
 
-export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOpen, exportAvailable, status, retryAvailable, retryBusy, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onSidebarToggle, onMediaToggle, onUndo, onRedo, onRetryCheckpoint }: TopBarProps) {
+export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOpen, exportAvailable, status, retryAvailable, retryBusy, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onSidebarToggle, onMediaToggle, onUndo, onRedo, onRetryCheckpoint, onExport }: TopBarProps) {
   function handleWorkspaceKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const currentIndex = workspaces.indexOf(workspace);
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
@@ -73,7 +74,7 @@ export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOp
         <button className="locale-button" type="button" onClick={() => onLocaleChange(locale === "pt-BR" ? "en-US" : "pt-BR")} aria-label={t("top.switchLanguage")} title={t("top.switchLanguage")}>
           {locale === "pt-BR" ? "EN" : "PT"}
         </button>
-        <button type="button" className="export-button" disabled={!exportAvailable} title={exportAvailable ? undefined : t("status.unavailableDetail")}>{t("action.export")}</button>
+        <button type="button" className="export-button" disabled={!exportAvailable} onClick={onExport} title={exportAvailable ? undefined : t("status.unavailableDetail")}>{t("action.export")}</button>
         <button type="button" className="icon-button settings-action" disabled aria-label={t("top.settings")} title={t("status.unavailableDetail")}><Icon name="settings" /></button>
       </div>
     </header>

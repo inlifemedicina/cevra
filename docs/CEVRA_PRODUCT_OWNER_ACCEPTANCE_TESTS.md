@@ -215,8 +215,12 @@ transições, seek nas junções, repetição explícita, seleção Original, ed
 preparação, redo preservado e eventos tardios. O app usa previews Take admitidos
 por clip e pode esperar na junção; APP/OWNER, reprodução nativa/gapless, sync e
 G1/G5/G6 completos continuam NÃO EXECUTADO/BLOCKED conforme a variante.
-O perfil de bordas do export permanece pendente; a prova H.264 B-frames/7 ms é
-RUNTIME sintético, não aceite do export pelo app. Nenhum teste humano foi feito.
+O Owner aprovou timeline/export CFR30 em 2026-10-06 00:51 UTC, com edição visível
+em frames e conversão explícita/reversível dos projetos antigos (ADR0033).
+O caminho final CFR30 está implementado no Draft #87 com testes offline e provas
+sintéticas do worker; a prova anterior H.264 B-frames/7 ms permanece histórica.
+Isso não constitui aceite perceptual/OWNER do export pelo app. Nenhum teste humano
+foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 
 ### Single grouped G1 script
 
@@ -238,21 +242,24 @@ variante os resultados técnicos e o julgamento perceptual separado.
    explicitamente e voltar a Original para novas marcas. Registrar continuidade,
    voz/imagem, conteúdo e tempo percebido; a junção pode aguardar preparação.
    Nenhum resultado fake substitui esse julgamento nativo/perceptual.
-5. **X-T3/T5/T7:** escolher um destino novo em “Preparar destino”; cancelar pelo
-   seletor e durante preparo; editar/Undo enquanto prepara; tentar uma saída já
-   existente. Deve haver estado/erro honesto, nenhuma saída/história criada pelo
-   preparo e nenhum original/arquivo anterior alterado. O Export final segue
-   indisponível nesta preparação.
+5. **X-T3/T5/T7:** conferir o alinhamento visível CFR30; para projeto legado,
+   revisar deltas e confirmar a conversão explícita, com Undo/reabertura. Em
+   “Exportar sequência”, escolher destino novo; cancelar no seletor e no render,
+   e tentar uma saída existente. Conferir o resultado real e estado/erro honesto:
+   um export confirmado gera uma única entrada e checkpoint; falha de save não
+   rerenderiza. Publicação incerta preserva arquivos e pede conferir o destino.
+   Nenhum original, arquivo anterior ou substituição alheia pode ser apagado.
 6. **I17-T8/T9, X-T2/T4:** usar uma falha de save preparada pela equipe técnica,
    Retry e novo Close; conferir preservação do projeto/Undo/Redo/reabertura.
    Timeout/retirement desconhecido mantém o projeto aberto; não forçar descarte.
 7. **D8-T2, I19-T1, X-T3/T5/T6/T9:** export final e oráculos de ordem/IN/OUT/
-   duração/áudio/cor/qualidade/recursos ficam **BLOCKED** até decisão temporal,
-   pipeline/runtime/envelope e provas de publicação/limites concluídos. Depois,
+   duração/áudio/cor/qualidade/recursos ficam **BLOCKED** até os gates de
+   pipeline/runtime/envelope e limites necessários à rodada serem concluídos. Depois,
    executar essa variante na mesma rodada agrupada; não alegar PASS antecipado.
 
 Estado deste roteiro: **NÃO EXECUTADO / preparação documental**. Não promove G1,
-G5/G6, native/owner, progresso ou F-A02. A política temporal continua OPEN.
+G5/G6, native/owner, progresso ou F-A02. A política temporal está aprovada;
+os gates técnicos e o julgamento humano continuam pendentes.
 
 Este roteiro agrega os IDs de A–E; não substitui nem duplica os casos canônicos. Preencher um registro por ID/variante/target, inclusive quando vários IDs forem percorridos no mesmo fluxo. Nenhum cenário foi executado nesta reconciliação.
 

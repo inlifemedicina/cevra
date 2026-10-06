@@ -1,4 +1,5 @@
 export * from "./types.js";
+export * from "./frame-time.js";
 export * from "./validation.js";
 export * from "./factory.js";
 export * from "./migrations.js";

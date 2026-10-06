@@ -662,6 +662,50 @@ class MuxAudioNativeToolTests(unittest.TestCase):
                 native_tools._run_mux_audio(common, args)
             self.assertEqual(output.read_bytes(), b"foreign replacement")
 
+    def test_internal_manual_retention_preserves_failed_publication_while_default_mux_still_rolls_back(self) -> None:
+        class ResultFailureCommon(self.Common):
+            verify_calls = 0
+            def verify_output(inner_self, path: str) -> dict[str, object]:
+                inner_self.verify_calls += 1
+                if inner_self.verify_calls == 2:
+                    raise RuntimeError("injected post-publication verification failure")
+                return super().verify_output(path)
+        for retain in (False, True):
+            with self.subTest(retain=retain), tempfile.TemporaryDirectory() as directory:
+                args, video, audio, output = self.arguments(Path(directory))
+                common = ResultFailureCommon(video, audio, output)
+                with mock.patch.object(native_tools, "_unlink_published", wraps=native_tools._unlink_published) as unlink:
+                    with self.assertRaisesRegex(RuntimeError, "post-publication verification failure"):
+                        native_tools._run_mux_audio(common, args, retain_published_on_error=retain)
+                    self.assertEqual(unlink.call_count, 0 if retain else 1)
+                self.assertEqual(output.exists(), retain)
+                if retain:
+                    self.assertEqual(output.read_bytes(), b"owned staged mux")
+                self.assertEqual(video.read_bytes(), b"video fixture")
+                self.assertEqual(audio.read_bytes(), b"audio fixture")
+                self.assertEqual(list(Path(directory).glob(".cevra-mux-audio-*")), [])
+
+    def test_internal_manual_retention_never_rolls_back_public_destination_on_staging_cleanup_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            args, video, audio, output = self.arguments(Path(directory))
+            common = self.Common(video, audio, output)
+            original_unlink = Path.unlink
+            def fail_staging_cleanup(path: Path, *call_args: object, **call_kwargs: object) -> None:
+                if path.name == "output.mp4" and path.parent.name.startswith(".cevra-mux-audio-"):
+                    raise OSError("injected private mux staging cleanup failure")
+                if path == output:
+                    raise AssertionError("manual retention must never unlink public destination")
+                original_unlink(path, *call_args, **call_kwargs)
+            with mock.patch.object(Path, "unlink", fail_staging_cleanup), mock.patch.object(native_tools, "_unlink_published", side_effect=AssertionError("manual retention must not use path rollback")):
+                with self.assertRaisesRegex(RuntimeError, "public destination retained for recovery"):
+                    native_tools._run_mux_audio(common, args, retain_published_on_error=True)
+            self.assertEqual(output.read_bytes(), b"owned staged mux")
+            self.assertEqual(video.read_bytes(), b"video fixture")
+            self.assertEqual(audio.read_bytes(), b"audio fixture")
+            for public_flag in ("retain_published_on_error", "retainPublishedOnError"):
+                with self.assertRaises(ValueError):
+                    worker._validate_tool_arguments("cevra-mux-audio", {**args, public_flag: True})
+
     def test_mux_staging_cleanup_failure_rolls_back_only_the_exact_published_inode(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             args, video, audio, output = self.arguments(Path(directory))

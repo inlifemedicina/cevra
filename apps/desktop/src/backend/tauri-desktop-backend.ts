@@ -1,14 +1,16 @@
 import { assertValidSourceNumbering, SourceNumberRegistry, type ProjectIR, type SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
-import type { ManualVideoSequenceEdit } from "@cevra/application";
+import type { ManualVideoSequenceEdit, ManualVideoSequenceConformPreview } from "@cevra/application";
 import type { ManualExportPreparation, ManualExportPreparationRequest } from "@cevra/application";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { isManualExportResourceCauseCode } from "./desktop-backend";
 import type {
   DesktopBackend,
   DesktopBackendState,
   DesktopCapabilityReason,
   DesktopOperationError,
+  ManualSequenceExportResult,
   ImportMediaResult
 } from "./desktop-backend";
 
@@ -25,6 +27,7 @@ interface HostState {
   capabilities: {
     mediaImport: { available: boolean; reason: DesktopCapabilityReason };
     transcription: { available: boolean; reason: DesktopCapabilityReason };
+    manualExport?: { available: boolean; reason: DesktopCapabilityReason };
   };
 }
 
@@ -49,6 +52,15 @@ export class TauriDesktopBackend implements DesktopBackend {
   async prepareManualExport(request: ManualExportPreparationRequest): Promise<
     { outcome: "cancelled" } | { outcome: "prepared"; preparation: ManualExportPreparation }> {
     return this.call("desktop_prepare_manual_export", { args: request });
+  }
+
+  async exportManualSequence(request: ManualExportPreparationRequest): Promise<ManualSequenceExportResult> {
+    const result = await this.call<{ outcome: "cancelled" } | { outcome: "exported"; state: HostState; executionId: string; exportId: string; destinationLabel: string }>("desktop_export_manual_sequence", { args: request });
+    return result.outcome === "cancelled" ? result : { ...result, state: fromHostState(result.state) };
+  }
+
+  async previewManualSequenceConform(request: { version: 1; expectedSnapshotId: string }): Promise<ManualVideoSequenceConformPreview> {
+    return this.call("desktop_preview_manual_sequence_conform", { args: request });
   }
 
   async createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }> {
@@ -123,8 +135,13 @@ export class TauriDesktopBackend implements DesktopBackend {
 function normalizeInvokeError(cause: unknown): DesktopOperationError {
   if (typeof cause !== "object" || cause === null) return { code: "HOST_OPERATION_FAILED" };
   const candidate = cause as { code?: unknown; message?: unknown; details?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "HOST_OPERATION_FAILED";
+  const causeCode = (code === "MANUAL_EXPORT_PUBLICATION_UNVERIFIED" || code === "MANUAL_EXPORT_CLEANUP_FAILED")
+    && typeof candidate.details === "object" && candidate.details !== null && !Array.isArray(candidate.details) && "causeCode" in candidate.details
+    && isManualExportResourceCauseCode(candidate.details.causeCode) ? candidate.details.causeCode : undefined;
   const error: DesktopOperationError = {
-    code: typeof candidate.code === "string" ? candidate.code : "HOST_OPERATION_FAILED",
+    code,
+    ...(causeCode ? { causeCode } : {}),
     ...(typeof candidate.message === "string" ? { message: candidate.message } : {})
   };
   const state = reconciledHostState(candidate.details);
@@ -154,7 +171,7 @@ function fromHostState(state: HostState): DesktopBackendState {
       "transcription.transcribe": { ...state.capabilities.transcription },
       "director.execute": { available: false, reason: "desktop-runtime-deferred" },
       "changes.apply": { available: false, reason: "desktop-runtime-deferred" },
-      "project.export": { available: false, reason: "desktop-runtime-deferred" }
+      "project.export": state.capabilities.manualExport ? { ...state.capabilities.manualExport } : { available: false, reason: "desktop-runtime-deferred" }
     }
   };
 }

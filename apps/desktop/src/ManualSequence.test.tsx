@@ -1,5 +1,5 @@
 import { ManualVideoSequenceApplicationService, type ManualVideoSequenceEdit, type SourceContentIdentityPort } from "@cevra/application";
-import { createEmptyProject, ProjectHistory, type SourceAsset } from "@cevra/project-ir";
+import { createEmptyProject, ProjectHistory, framesToMilliseconds, type SourceAsset } from "@cevra/project-ir";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -37,6 +37,7 @@ class SequenceBackend implements DesktopBackend {
     const result = await this.service.edit(request);
     return { state: await this.loadState(), changedClipIds: result.changedClipIds };
   }
+  async previewManualSequenceConform(request: { version: 1; expectedSnapshotId: string }) { return this.service.previewConform(request.expectedSnapshotId); }
   async loadEditorialDraft() { return { status: "empty" as const }; }
   async reviseEditorialDraft(): Promise<never> { throw { code: "EDITORIAL_DRAFT_UNAVAILABLE" }; }
   async previewLocalVideo(): Promise<never> { throw { code: "MANUAL_VIDEO_UNAVAILABLE" }; }
@@ -57,8 +58,9 @@ afterEach(() => vi.restoreAllMocks());
 
 function controls() { return within(screen.getByRole("region", { name: "Controles da montagem" })); }
 function range(start: string, end: string) {
-  fireEvent.change(controls().getByLabelText("IN (segundos)"), { target: { value: start } });
-  fireEvent.change(controls().getByLabelText("OUT (segundos)"), { target: { value: end } });
+  const grid = controls().queryByLabelText("IN (frames)") !== null;
+  fireEvent.change(controls().getByLabelText(grid ? "IN (frames)" : "IN (segundos)"), { target: { value: grid && start !== "" ? String(Number(start) * 30) : start } });
+  fireEvent.change(controls().getByLabelText(grid ? "OUT (frames)" : "OUT (segundos)"), { target: { value: grid && end !== "" ? String(Number(end) * 30) : end } });
 }
 function clips(backend: SequenceBackend) { return [...backend.history.current.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs); }
 async function action(backend: SequenceBackend, label: string) {
@@ -113,11 +115,11 @@ it("inserts another source before selection, ripples trim, splits at the cursor 
   const ruler = screen.getByRole("slider", { name: "Régua e cursor da linha do tempo" });
   fireEvent.keyDown(ruler, { key: "ArrowRight", shiftKey: true });
   await action(backend, "Dividir no cursor");
-  expect(clips(backend)[0]!.sourceEndMs).toBe(210);
-  expect(clips(backend)[1]!.sourceStartMs).toBe(210);
+  expect(clips(backend)[0]!.frameTiming!.sourceEndFrame).toBe(16);
+  expect(clips(backend)[1]!.frameTiming!.sourceStartFrame).toBe(16);
   await action(backend, "Remover selecionado");
   expect(clips(backend)[0]!.timelineStartMs).toBe(0);
-  expect(clips(backend).find(c => c.id === original)!.timelineStartMs).toBe(590);
+  expect(clips(backend).find(c => c.id === original)!.frameTiming!.timelineStartFrame).toBe(8);
   expect(container.querySelector('[data-testid="app-shell"]')!.getAttribute("data-selected-project-item-id")).toBe(clips(backend)[0]!.id);
 });
 
@@ -163,8 +165,8 @@ it("keeps the same controls and source range drafts after switching to English",
   await mount(); range("0.1", "1.2");
   fireEvent.click(screen.getByRole("button", { name: "Trocar idioma" }));
   const english = within(screen.getByRole("region", { name: "Montage controls" }));
-  expect((english.getByLabelText("IN (seconds)") as HTMLInputElement).value).toBe("0.1");
-  expect((english.getByLabelText("OUT (seconds)") as HTMLInputElement).value).toBe("1.2");
+  expect((english.getByLabelText("IN (frames)") as HTMLInputElement).value).toBe("3");
+  expect((english.getByLabelText("OUT (frames)") as HTMLInputElement).value).toBe("36");
   expect(english.getByRole("button", { name: "Append range" }).matches(":disabled")).toBe(false);
   expect(english.getByRole("button", { name: "Insert before selected" }).matches(":disabled")).toBe(true);
 });
@@ -185,4 +187,111 @@ it("retains source-clock IN/OUT marking and append after the montage already con
   video.currentTime = 2.5; fireEvent.click(screen.getByRole("button", { name: "Marcar OUT" }));
   fireEvent.click(screen.getByRole("button", { name: "Adicionar trecho ao final" }));
   expect(create).toHaveBeenCalledExactlyOnceWith({ sourceId: "s0", expectedSnapshotId: "snapshot", sourceStartMs: 1250, sourceEndMs: 2500 });
+});
+
+it("reviews all legacy boundaries, resolves a collapsed range explicitly and converts with one Undo and lossless reopen", async () => {
+  const backend = new SequenceBackend();
+  await backend.service.edit({ version: 1, expectedSnapshotId: backend.history.current.history.headSnapshotId!, type: "append", sourceId: "s0", sourceStartMs: 901, sourceEndMs: 908 });
+  const legacy = backend.history.current.timeline;
+  const entries = backend.history.entries.length;
+  await mount(backend);
+  fireEvent.click(controls().getByRole("button", { name: "Revisar conversão para 30 fps" }));
+  await screen.findByText(/Este trecho colapsa/);
+  expect(screen.getAllByText(/ajuste .* ms/)).toHaveLength(4);
+  const confirm = screen.getByRole("button", { name: "Confirmar cortes em frames revisados" });
+  expect(confirm.matches(":disabled")).toBe(true);
+  const review = within(screen.getByRole("region", { name: "Revise cada corte antes de converter" }));
+  fireEvent.change(review.getByLabelText("OUT (frames)"), { target: { value: "28" } });
+  expect(confirm.matches(":disabled")).toBe(false);
+  fireEvent.click(confirm);
+  await waitFor(() => expect(backend.history.current.timeline.timingPolicy).toBe("cfr30"));
+  expect(backend.requests).toHaveLength(1);
+  expect(backend.requests[0]).toMatchObject({ version: 2, type: "conform", clips: [{ clipId: legacy.clips[0]!.id, sourceStartFrame: 27, sourceEndFrame: 28 }] });
+  expect(backend.history.entries.length).toBe(entries + 1);
+  const reopened = ProjectHistory.fromArchive(backend.history.toArchive());
+  expect(reopened.current.timeline).toEqual(backend.history.current.timeline);
+  expect(reopened.current.timeline.clips[0]!.sourceEndMs).toBe(framesToMilliseconds(28));
+  reopened.undo(); expect(reopened.current.timeline).toEqual(legacy);
+  reopened.redo(); expect(reopened.current.timeline).toEqual(backend.history.current.timeline);
+});
+
+it("a new frame action adopts CFR30 atomically and keyboard edits step whole frames without changing originals", async () => {
+  const { backend } = await mount();
+  const before = backend.history.current.timeline;
+  fireEvent.change(controls().getByLabelText("IN (frames)"), { target: { value: "27" } });
+  fireEvent.change(controls().getByLabelText("OUT (frames)"), { target: { value: "58" } });
+  await action(backend, "Adicionar trecho ao final");
+  expect(backend.requests[0]).toMatchObject({ version: 2, type: "append", sourceStartFrame: 27, sourceEndFrame: 58 });
+  expect(backend.history.current.timeline.timingPolicy).toBe("cfr30");
+  const ruler = screen.getByRole("slider", { name: "Régua e cursor da linha do tempo" });
+  fireEvent.keyDown(ruler, { key: "ArrowRight" });
+  expect(ruler.getAttribute("aria-valuenow")).toBe("1");
+  fireEvent.keyDown(ruler, { key: "ArrowRight", shiftKey: true });
+  expect(ruler.getAttribute("aria-valuenow")).toBe("11");
+  const trim = screen.getByRole("slider", { name: "Ajustar IN do clip" });
+  fireEvent.keyDown(trim, { key: "ArrowRight" });
+  await waitFor(() => expect(backend.history.current.timeline.clips[0]!.frameTiming!.sourceStartFrame).toBe(28));
+  expect(backend.requests.at(-1)).toMatchObject({ version: 2, type: "trim", sourceStartFrame: 28, sourceEndFrame: 58 });
+  expect(backend.history.current.sources).toEqual(originals);
+  backend.history.undo(); backend.history.undo();
+  expect(backend.history.current.timeline).toEqual(before);
+});
+
+for (const committedFailure of [false, true]) {
+  it(`App retains a late ${committedFailure ? "committed failure and checkpoint" : "export receipt"} across the new export history head without replay`, async () => {
+    const backend = new SequenceBackend();
+    await backend.service.edit({ version: 2, expectedSnapshotId: backend.history.current.history.headSnapshotId!, type: "append", sourceId: "s0", sourceStartFrame: 27, sourceEndFrame: 58 });
+    let persistedError = false;
+    const read = backend.loadState.bind(backend);
+    backend.loadState = async () => ({ ...await read(), status: persistedError ? "persistence-error" : "local-saved", ...(persistedError ? { checkpoint: { token: "export-journal", pending: false } } : {}),
+      capabilities: { ...(await read()).capabilities, "project.export": { available: true, reason: "available" } } });
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const exportSequence = vi.fn(async () => {
+      await gate;
+      backend.history.commit({ type: "export.add", export: { id: "saved-export", presetId: "manual-cfr30", status: "completed", outputUri: "/tmp/offline-export.mp4", createdAt: "2026-10-06T00:00:00.000Z" } });
+      persistedError = committedFailure;
+      const state = await backend.loadState();
+      if (committedFailure) throw { code: "MANUAL_EXPORT_COMMITTED_ERROR", reconciledState: state };
+      return { outcome: "exported" as const, state, executionId: "execution", exportId: "saved-export", destinationLabel: "offline-export.mp4" };
+    });
+    Object.assign(backend, { exportManualSequence: exportSequence });
+    const { container } = await mount(backend);
+    const entries = backend.history.entries.length;
+    const exportButton = screen.getByRole("button", { name: translate("pt-BR", "action.export") });
+    await waitFor(() => expect(exportButton.matches(":disabled")).toBe(false));
+    fireEvent.click(exportButton);
+    expect(screen.getByRole("button", { name: "Desfazer" }).matches(":disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: translate("pt-BR", "export.cancel") }));
+    fireEvent.click(screen.getByRole("tab", { name: translate("pt-BR", "workspace.composition") }));
+    expect(screen.getByRole("button", { name: translate("pt-BR", "export.cancel") }).matches(":disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("tab", { name: translate("pt-BR", "workspace.edit") }));
+    fireEvent.click(screen.getByRole("button", { name: /Vídeo 2.*s1.mp4/ }));
+    await act(async () => release());
+    await waitFor(() => expect(container.querySelector('[data-testid="app-shell"]')!.getAttribute("data-project-revision")).toBe(String(backend.history.current.history.revision)));
+    expect(backend.history.entries.length).toBe(entries + 1);
+    expect(backend.history.current.exports).toHaveLength(1);
+    expect(exportSequence).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[data-testid="app-shell"]')!.getAttribute("data-selected-project-item-id")).toBe("s1");
+    expect(screen.queryByText(translate("pt-BR", "export.cancelled"))).toBeNull();
+    if (committedFailure) {
+      await screen.findAllByText(translate("pt-BR", "export.committedError"));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Tentar salvar" }).matches(":disabled")).toBe(false));
+    } else {
+      expect(await screen.findByText("offline-export.mp4")).toBeTruthy();
+      expect(screen.getByText(translate("pt-BR", "export.complete"), { exact: false })).toBeTruthy();
+    }
+    expect(ProjectHistory.fromArchive(backend.history.toArchive()).current).toEqual(backend.history.current);
+  });
+}
+
+it("keeps a larger legacy source duration intact while bounding disposable frame inputs", async () => {
+  const backend = new SequenceBackend();
+  backend.history.commit({ type: "source.add", source: { ...originals[0]!, id: "large-clock", uri: "/tmp/offline-large-clock.mp4", durationMs: Number.MAX_SAFE_INTEGER } });
+  await mount(backend);
+  const before = backend.history.toArchive();
+  fireEvent.change(controls().getByRole("combobox", { name: "Fonte" }), { target: { value: "large-clock" } });
+  expect((controls().getByLabelText("OUT (frames)") as HTMLInputElement).value).toBe(String(Math.floor(Number.MAX_SAFE_INTEGER / 1000)));
+  expect(backend.history.toArchive()).toEqual(before);
+  expect(backend.history.current.sources.at(-1)!.durationMs).toBe(Number.MAX_SAFE_INTEGER);
 });

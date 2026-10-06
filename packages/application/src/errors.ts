@@ -1,5 +1,5 @@
 import { translate, type CevraLocale, type TranslationKey, type TranslationParameters } from "@cevra/i18n";
-import type { MediaApplicationErrorCode } from "./types.js";
+import type { MediaApplicationErrorCode, MediaExecutionRecord } from "./types.js";
 
 const ERROR_KEYS: Readonly<Record<MediaApplicationErrorCode, TranslationKey>> = {
   MEDIA_OPERATION_CANCELLED: "media.error.cancelled",
@@ -32,5 +32,16 @@ export class MediaApplicationError extends Error {
     super(translate(locale, ERROR_KEYS[code], parameters));
     this.name = "MediaApplicationError";
     this.cause = cause;
+  }
+}
+
+/** Trusted in-process evidence: canonical commit occurred before archive finalization failed. */
+export class MediaExecutionCommitError extends MediaApplicationError {
+  readonly committedRecord: MediaExecutionRecord;
+  constructor(record: MediaExecutionRecord, cause: unknown) {
+    super("MEDIA_RECOVERY_FAILED", record.locale, record.id, {}, cause);
+    const committed = structuredClone(record);
+    this.committedRecord = committed;
+    Object.defineProperty(this, "committedRecord", { value: committed, enumerable: false });
   }
 }

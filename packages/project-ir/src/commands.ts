@@ -1,4 +1,5 @@
-import type { CaptionCue, EditCommand, ProjectIR, SourceTechnicalDescriptorV1, SourceTranscript, StyleState, TimelineClip, TimelineEditOperation, TranscriptProvenanceStage } from "./types.js";
+import type { CaptionCue, EditCommand, ProjectIR, SourceTechnicalDescriptorV1, SourceTranscript, StyleState, TimelineClip, TimelineEditOperationV2, TranscriptProvenanceStage } from "./types.js";
+import { frameTimingMilliseconds } from "./frame-time.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
 import { assertValidProjectIR, validateProjectIR, validateTimelineEditOperation } from "./validation.js";
 
@@ -108,14 +109,15 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
 }
 
 function applyTimelineEdit(project: ProjectIR, command: Extract<EditCommand, { type: "timeline.edit" }>): void {
-  if (command.version !== 1 || !Array.isArray(command.edits) || command.edits.length === 0
+  if (![1, 2].includes(command.version) || !Array.isArray(command.edits) || command.edits.length === 0
     || Object.keys(command).some((key) => !["type", "version", "edits"].includes(key))) {
-    throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_INVALID", "Atomic timeline edit requires version 1 and a nonempty operation list.");
+    throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_INVALID", "Atomic timeline edit requires a supported version and a nonempty operation list.");
   }
-  const edits: readonly TimelineEditOperation[] = command.edits;
+  if (command.version === 1 && project.timeline.timingPolicy === "cfr30") throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_INVALID", "CFR30 edits require frame-aware version 2 operations.");
+  const edits: readonly TimelineEditOperationV2[] = command.edits;
   // Validate every payload even if a later operation would remove or replace it.
   for (const edit of edits) {
-    const validation = validateTimelineEditOperation(edit);
+    const validation = validateTimelineEditOperation(edit, command.version);
     if (!validation.ok) throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_INVALID", validation.issues.map((issue) => `${issue.path}: ${issue.message}`).join("\n"));
   }
   const before = JSON.stringify(project.timeline);
@@ -140,6 +142,16 @@ function applyTimelineEdit(project: ProjectIR, command: Extract<EditCommand, { t
         const clip = clips.get(edit.clipId);
         if (!clip) throw new Error(`Unknown clip ${edit.clipId}.`);
         applyTrim(clip, edit);
+        break;
+      }
+      case "timeline.timingPolicy.set":
+        project.timeline.timingPolicy = edit.timingPolicy;
+        break;
+      case "clip.frameTiming.set": {
+        const clip = clips.get(edit.clipId);
+        if (!clip) throw new Error(`Unknown clip ${edit.clipId}.`);
+        clip.frameTiming = clone(edit.frameTiming);
+        Object.assign(clip, frameTimingMilliseconds(edit.frameTiming));
         break;
       }
       default:

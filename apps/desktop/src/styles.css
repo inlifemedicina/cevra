@@ -362,6 +362,11 @@ h1, h2, h3, p { margin: 0; }
 .manual-sequence-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .manual-sequence-actions span, .manual-sequence-controls fieldset > span { color: var(--cevra-fg-muted); }
 .manual-preview-marks output { font-size: 11px; font-variant-numeric: tabular-nums; color: #b7c3d4; }
+.manual-sequence-conform { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--cevra-border); }
+.manual-sequence-conform fieldset { margin: 8px 0; padding: 8px; border: 1px solid var(--cevra-border); border-radius: 4px; }
+.manual-sequence-conform output { flex: 1 0 100%; white-space: normal; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.manual-sequence-conform p { margin: 4px 0; }
+.manual-sequence-conform > button { margin-right: 6px; }
 .manual-create-clip-button { height: 29px; padding: 0 9px; border: 1px solid var(--cevra-accent); border-radius: var(--cevra-radius-sm); background: var(--cevra-accent); color: var(--cevra-accent-contrast); font-size: 11px; font-weight: 700; cursor: pointer; }
 .manual-create-clip-button:hover:not(:disabled) { background: var(--cevra-accent-strong); border-color: var(--cevra-accent-strong); }
 .manual-create-clip-button:disabled { background: var(--cevra-surface-3); border-color: var(--cevra-border); color: var(--cevra-fg-muted); }

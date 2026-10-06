@@ -23,7 +23,7 @@ test("V3 save/reopen retains retired identities and redo, with unchanged audiovi
   assert.deepEqual(manifest.sourceNumbering, history.sourceNumbering);
   assert.deepEqual(JSON.parse(pkg.files["project.json"]), history.current);
   assert(!Object.hasOwn(history.current, "sourceNumbering"));
-  assert.equal(history.current.schemaVersion, 2);
+  assert.equal(history.current.schemaVersion, 3);
   const loaded = deserializeProjectPackage(pkg);
   assert.deepEqual(loaded.current, history.current);
   assert.deepEqual(loaded.sourceNumbering, history.sourceNumbering);

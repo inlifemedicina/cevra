@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-preview-manual-sequence-conform"
+description = "Enables the desktop_preview_manual_sequence_conform command without any pre-configured scope."
+commands.allow = ["desktop_preview_manual_sequence_conform"]
+
+[[permission]]
+identifier = "deny-desktop-preview-manual-sequence-conform"
+description = "Denies the desktop_preview_manual_sequence_conform command without any pre-configured scope."
+commands.deny = ["desktop_preview_manual_sequence_conform"]

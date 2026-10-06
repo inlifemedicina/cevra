@@ -137,3 +137,28 @@ test("source clock near MAX_SAFE stays inside IN/OUT at a nonzero program placem
     assert.equal(preview.position(plan, 1001 + duration), null);
   }
 });
+
+test("CFR30 preview maps finite decoder time to integer frames, half-open joins and exact OUT without drift", async () => {
+  const f = await setup();
+  const history = new ProjectHistory(createEmptyProject({ id: "cfr30-preview" }));
+  for (const source of f.history.current.sources) history.commit({ type: "source.add", source });
+  const editor = new ManualVideoSequenceApplicationService({ history, identity: f.identity });
+  for (const [sourceStartFrame, sourceEndFrame] of [[27, 28], [55, 58], [91, 92]]) {
+    await editor.edit({ version: 2, expectedSnapshotId: history.current.history.headSnapshotId, type: "append", sourceId: "v0", sourceStartFrame, sourceEndFrame });
+  }
+  const preview = new ManualSequencePreviewApplicationService({ history, identity: f.identity });
+  const plan = await preview.prepare({ version: 1, expectedSnapshotId: history.current.history.headSnapshotId });
+  assert.equal(plan.timingPolicy, "cfr30");
+  assert.deepEqual(preview.position(plan, 0), { clipId: plan.clips[0].id, sourceId: "v0", timelineFrame: 0, sourceFrame: 27, sourceTimeMs: 900 });
+  for (const ms of [0.01, 7, 1000 / 30 - 1e-10]) assert.equal(preview.position(plan, ms).sourceFrame, 27);
+  assert.equal(preview.position(plan, 1000 / 30).sourceFrame, 55);
+  assert.equal(preview.position(plan, 3999 / 30).sourceFrame, 57);
+  assert.equal(preview.position(plan, 4000 / 30).sourceFrame, 91);
+  assert.equal(preview.position(plan, 4999 / 30).sourceFrame, 91);
+  assert.equal(preview.position(plan, 5000 / 30), null);
+  for (const ms of [-1, NaN, Infinity, plan.durationMs + 0.01]) assert.throws(() => preview.position(plan, ms), { code: "MANUAL_SEQUENCE_INVALID_RANGE" });
+  const archive = history.toArchive();
+  const reopened = ProjectHistory.fromArchive(archive);
+  assert.deepEqual(reopened.current.timeline, history.current.timeline);
+  assert.deepEqual(history.toArchive(), archive);
+});

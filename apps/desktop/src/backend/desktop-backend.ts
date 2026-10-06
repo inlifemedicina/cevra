@@ -1,7 +1,7 @@
 import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
-import type { ManualVideoSequenceEdit } from "@cevra/application";
+import type { ManualVideoSequenceEdit, ManualVideoSequenceConformPreview } from "@cevra/application";
 import type { ManualExportPreparation, ManualExportPreparationRequest } from "@cevra/application";
 
 export type DesktopCapability = "media.import" | "director.execute" | "changes.apply" | "project.export";
@@ -28,10 +28,25 @@ export type ImportMediaResult =
   | { readonly outcome: "cancelled" }
   | { readonly outcome: "imported"; readonly state: DesktopBackendState; readonly importedSourceId: string };
 
+export type ManualSequenceExportResult = { readonly outcome: "cancelled" } | {
+  readonly outcome: "exported";
+  readonly state: DesktopBackendState;
+  readonly executionId: string;
+  readonly exportId: string;
+  readonly destinationLabel: string;
+};
+
+export type ManualExportResourceCauseCode = "MANUAL_EXPORT_MEMORY_LIMIT" | "MANUAL_EXPORT_DISK_LIMIT" | "MANUAL_EXPORT_RESOURCE_UNAVAILABLE";
+
+export function isManualExportResourceCauseCode(value: unknown): value is ManualExportResourceCauseCode {
+  return value === "MANUAL_EXPORT_MEMORY_LIMIT" || value === "MANUAL_EXPORT_DISK_LIMIT" || value === "MANUAL_EXPORT_RESOURCE_UNAVAILABLE";
+}
+
 export interface DesktopOperationError {
   readonly code: string;
   readonly message?: string;
   readonly reconciledState?: DesktopBackendState;
+  readonly causeCode?: ManualExportResourceCauseCode;
 }
 
 export interface DesktopBackend {
@@ -43,6 +58,8 @@ export interface DesktopBackend {
   previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview>;
   prepareManualExport?(request: ManualExportPreparationRequest): Promise<
     { readonly outcome: "cancelled" } | { readonly outcome: "prepared"; readonly preparation: ManualExportPreparation }>;
+  exportManualSequence?(request: ManualExportPreparationRequest): Promise<ManualSequenceExportResult>;
+  previewManualSequenceConform?(request: { version: 1; expectedSnapshotId: string }): Promise<ManualVideoSequenceConformPreview>;
   createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }>;
   trimManualVideoClip(request: TrimManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }>;
   editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopBackendState; changedClipIds: string[] }>;

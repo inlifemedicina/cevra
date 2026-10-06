@@ -9,6 +9,9 @@ import {
   ManualVideoSequenceApplicationService,
   ManualSequencePreviewApplicationService,
   ManualSequenceExportPreparationApplicationService,
+  ManualSequenceExportApplicationService,
+  MediaApplicationError,
+  MediaExecutionCommitError,
   resolveManualVideo,
   TranscriptionApplicationService
 } from "@cevra/application";
@@ -18,6 +21,7 @@ import type {
   ExecuteResolvedAudioPlanOutcome,
   ExecuteResolvedAudioPlanRequest,
   MediaExecutionRepository,
+  MediaExecutionRecord,
   MediaExecutionIntentRepository
 } from "@cevra/application";
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
@@ -29,7 +33,8 @@ import {
   FfmpegMediaEngine,
   NodeMediaArtifactStore,
   PersistentMediaWorkerClient,
-  ProcessMediaWorkerTransport
+  ProcessMediaWorkerTransport,
+  OwnedRenderResourceError
 } from "@cevra/media-ffmpeg";
 import { ProjectHistory } from "@cevra/project-ir";
 import {
@@ -43,7 +48,8 @@ import {
 import { FileTranscriptCache } from "@cevra/transcript-cache";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { DesktopPersistenceError, DesktopProjectPersistence, historyCheckpointToken } from "./persistence.js";
 import {
   DesktopMediaExecutionArchiveFullError,
@@ -54,8 +60,17 @@ import { readDesignatedFa02Pair } from "./fa02-review-admission.js";
 import { readLocalVideoPreview } from "./local-video-preview.js";
 import { DerivedVideoPreview, resolvePreviewRange, supportsOriginalProxy } from "./derived-video-preview.js";
 import { NativeManualExportDestination } from "./manual-export-destination.js";
+import { guardManualExportEngine } from "./manual-export-resources.js";
 
 type Locale = "pt-BR" | "en-US";
+
+function nativeDestinationPath(uri: string): string {
+  try {
+    const path = uri.startsWith("file:") ? fileURLToPath(uri) : uri;
+    if (!isAbsolute(path) || path.includes("\0")) throw Error();
+    return path;
+  } catch { throw safeError("MANUAL_EXPORT_DESTINATION_INVALID"); }
+}
 
 export interface DesktopSessionServices {
   history: ProjectHistory;
@@ -67,9 +82,12 @@ export interface DesktopSessionServices {
   persistence?: DesktopProjectPersistence;
   temporaryEditorialReview?: true;
   manualVideoClip?: Pick<ManualVideoClipApplicationService, "create" | "trim">;
-  manualVideoSequence?: Pick<ManualVideoSequenceApplicationService, "edit">;
+  manualVideoSequence?: Pick<ManualVideoSequenceApplicationService, "edit"> & Partial<Pick<ManualVideoSequenceApplicationService, "previewConform">>;
   manualSequencePreview?: Pick<ManualSequencePreviewApplicationService, "prepare" | "assertCurrent" | "revalidate">;
   manualExportPreparation?: Pick<ManualSequenceExportPreparationApplicationService, "prepare">;
+  manualExport?: Pick<ManualSequenceExportApplicationService, "execute">;
+  manualExportCapability?: CapabilityState;
+  manualExportSettle?: () => Promise<void>;
   derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare"> & Partial<Pick<DerivedVideoPreview, "close">>;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
@@ -85,6 +103,7 @@ export class DesktopSession {
   private previewTask: Promise<LocalVideoPreview> | null = null;
   private previewOperationId: string | null = null;
   private legacyPreviewSequence = 0;
+  private readonly legacyPreviewOperationIds = new Set<string>();
   private exportPreparationTask: Promise<ManualExportPreparation> | null = null;
   private exportPreparationOperationId: string | null = null;
   private closing = false;
@@ -139,7 +158,10 @@ export class DesktopSession {
       closePending: this.closeAttempt !== null,
       capabilities: {
         mediaImport: { ...this.services.mediaCapability },
-        transcription: { ...this.services.transcriptionCapability }
+        transcription: { ...this.services.transcriptionCapability },
+        manualExport: this.services.manualExport && this.services.manualExportSettle && !this.services.temporaryEditorialReview
+          ? { ...(this.services.manualExportCapability ?? unavailable("runtime-not-configured")) }
+          : unavailable(this.services.temporaryEditorialReview ? "review-session" : "runtime-not-configured")
       }
     };
   }
@@ -264,6 +286,115 @@ export class DesktopSession {
     }
   }
 
+  previewManualSequenceConform(request: { version: 1; expectedSnapshotId: string }) {
+    if (!this.services.manualVideoSequence?.previewConform || this.services.temporaryEditorialReview) throw safeError("MANUAL_SEQUENCE_UNAVAILABLE");
+    return this.services.manualVideoSequence.previewConform(request.expectedSnapshotId);
+  }
+
+  /** Only a native-picked destination enters this mutating, checkpointed route. */
+  async exportManualSequence(request: ManualExportPreparationRequest, destinationUri: string) {
+    if (!this.services.manualExport || !this.services.manualExportSettle || !this.services.manualExportCapability?.available) {
+      throw safeError("MANUAL_EXPORT_UNAVAILABLE");
+    }
+    const stable = validateManualExportPreparationRequest(request);
+    return this.runOperation(stable.operationId, signal => this.runMutation(async () => {
+      // Reserve the mutation gate before cancellation listeners or retirement
+      // can admit another read-only media job.
+      await Promise.resolve();
+      try { await this.retireManualPreviews(); }
+      catch (cause) { throw Object.assign(safeError("MANUAL_EXPORT_RESOURCE_UNAVAILABLE", { state: this.state() }), { cause }); }
+      signal.throwIfAborted();
+      const pickedPath = nativeDestinationPath(destinationUri);
+      const destination = new NativeManualExportDestination(pickedPath, { temporaryRoot: dirname(pickedPath) });
+      const workspace = await destination.createOwnedWorkspace(signal);
+      const before = this.services.history.entries.length;
+      const exportId = `manual-export-${stable.operationId}`;
+      const absentBefore = !this.services.history.current.exports.some(item => item.id === exportId);
+      let primary: unknown;
+      let checkpointAttempted = false;
+      let completedRecord: MediaExecutionRecord | undefined;
+      let canonicalCommitted = false;
+      let resourceFailureCode: string | undefined;
+      try {
+        await workspace.revalidate(signal);
+        const outcome = await this.services.manualExport!.execute(stable, destination, workspace.uri, signal);
+        completedRecord = outcome.record;
+        canonicalCommitted = absentBefore && this.matchesCommittedManualExport(outcome.record, stable, destination, workspace.uri, before);
+        // Publication/commit can precede cancellation; save the authoritative
+        // mutation rather than report a false cancellation after success.
+        checkpointAttempted = true;
+        await this.persistMutation();
+        return { outcome: "exported" as const, state: this.state(), executionId: outcome.record.id,
+          exportId: `manual-export-${stable.operationId}`, destinationLabel: basename(pickedPath) };
+      } catch (error) {
+        const record = completedRecord ?? (error instanceof MediaExecutionCommitError ? error.committedRecord : undefined);
+        if (absentBefore && record && this.matchesCommittedManualExport(record, stable, destination, workspace.uri, before)) {
+          canonicalCommitted = true;
+          // The canonical export is authoritative even if its archive's final
+          // save failed. Checkpoint it once; never replay or auto-retry a save.
+          let checkpointError: unknown;
+          if (!checkpointAttempted) {
+            checkpointAttempted = true;
+            try { await this.persistMutation(); } catch (failure) { checkpointError = failure; }
+          }
+          primary = safeError("MANUAL_EXPORT_COMMITTED_ERROR", { state: this.state(), executionId: record.id,
+            exportId, destinationLabel: basename(pickedPath), checkpointStatus: this.state().status.persistence });
+          Object.defineProperty(primary, "cause", { value: error });
+          if (checkpointError) Object.defineProperty(primary, "checkpointError", { value: checkpointError });
+        } else {
+          resourceFailureCode = manualExportResourceCode(error);
+          primary = resourceFailureCode ? Object.assign(safeError(resourceFailureCode, { state: this.state() }), { cause: error }) : error;
+        }
+        throw primary;
+      } finally {
+        try {
+          await this.services.manualExportSettle!();
+          if (primary && !canonicalCommitted && await workspace.hasUnsettledPublication(pickedPath)) {
+            const uncertain = Object.assign(safeError("MANUAL_EXPORT_PUBLICATION_UNVERIFIED", { state: this.state(),
+              ...(resourceFailureCode ? { causeCode: resourceFailureCode } : {}) }), { cause: primary });
+            primary = uncertain;
+            throw uncertain;
+          }
+          await workspace.remove();
+        } catch (cleanupError) {
+          if (cleanupError === primary) throw primary;
+          if (primary && typeof primary === "object") {
+            try { Object.defineProperty(primary, "cleanupError", { value: cleanupError, configurable: true }); } catch { /* Keep the execution/checkpoint failure. */ }
+            if (!canonicalCommitted) throw Object.assign(safeError("MANUAL_EXPORT_CLEANUP_FAILED", { state: this.state(),
+              ...(resourceFailureCode ? { causeCode: resourceFailureCode } : {}) }), { cause: primary, cleanupError });
+          } else { throw safeError("MANUAL_EXPORT_CLEANUP_FAILED", { state: this.state() }); }
+        }
+      }
+    }));
+  }
+
+  private async retireManualPreviews(): Promise<void> {
+    const previous = this.previewTask;
+    if (this.previewOperationId) this.cancel(this.previewOperationId);
+    const legacy = [...this.activeTasks.entries()].filter(([id]) => this.legacyPreviewOperationIds.has(id));
+    for (const [id] of legacy) this.cancel(id);
+    await Promise.allSettled([...(previous ? [previous] : []), ...legacy.map(([, task]) => task)]);
+    // The preview promise may reject before process retirement; do not start a
+    // resource scope until the production transport proves quiescence too.
+    await this.services.manualExportSettle!();
+  }
+
+  private matchesCommittedManualExport(record: MediaExecutionRecord, request: ManualExportPreparationRequest,
+    destination: NativeManualExportDestination, workspaceUri: string, before: number): boolean {
+    const id = `manual-export-${request.operationId}`, entries = this.services.history.entries, entry = entries.at(-1);
+    const project = this.services.history.current, exported = project.exports.filter(item => item.id === id), attempt = record.attempts.at(-1);
+    return record.id === id && record.projectId === project.project.id && record.operation.type === "render-manual-video-sequence"
+      && record.operation.ownedWorkspaceUri === workspaceUri && destination.ownsOutputUri(record.operation.outputUri)
+      && record.mutation.type === "export.add" && record.mutation.exportId === id
+      && record.mutation.presetId === "cevra.manual.cfr30.sdr1080.h264-aac.v1"
+      && record.projectBinding?.projectSnapshotId === request.expectedSnapshotId && record.projectBinding.projectJournalEntryCount === before
+      && entries.length === before + 1 && entry?.command.type === "export.add" && entry.command.export.id === id
+      && entry.command.export.outputUri === record.operation.outputUri && entry.command.export.presetId === record.mutation.presetId
+      && exported.length === 1 && exported[0]!.status === "completed" && exported[0]!.outputUri === record.operation.outputUri
+      && attempt?.status === "succeeded" && attempt.projectJournalEntryId === entry.id
+      && attempt.projectSnapshotAfter === project.history.headSnapshotId && attempt.projectRevisionAfter === project.history.revision;
+  }
+
   async undo(): Promise<DesktopHostState> {
     return this.runMutation(async () => {
       const changed = this.services.history.canUndo;
@@ -317,13 +448,17 @@ export class DesktopSession {
         if (this.previewTask === task) { this.previewTask = null; this.previewOperationId = null; }
       }
     }
-    return this.runOperation(`legacy-preview-${++this.legacyPreviewSequence}`, async (signal) => {
-      const source = resolveManualVideo(this.services.history.current, stable);
-      const preview = await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
-      if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
-      resolveManualVideo(this.services.history.current, stable);
-      return preview;
-    });
+    const legacyId = `legacy-preview-${++this.legacyPreviewSequence}`;
+    this.legacyPreviewOperationIds.add(legacyId);
+    try {
+      return await this.runOperation(legacyId, async (signal) => {
+        const source = resolveManualVideo(this.services.history.current, stable);
+        const preview = await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
+        if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+        resolveManualVideo(this.services.history.current, stable);
+        return preview;
+      });
+    } finally { this.legacyPreviewOperationIds.delete(legacyId); }
   }
 
   async createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopHostState; clipId: string }> {
@@ -482,6 +617,10 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       manualVideoSequence: new ManualVideoSequenceApplicationService({ history, identity: sourceIdentity }),
       manualSequencePreview: new ManualSequencePreviewApplicationService({ history, identity: sourceIdentity }),
       manualExportPreparation: new ManualSequenceExportPreparationApplicationService({ history, identity: sourceIdentity }),
+      ...(media?.manualExportCapability?.available && media.settle ? {
+        manualExport: new ManualSequenceExportApplicationService({ history, identity: sourceIdentity, media: media.application }),
+        manualExportCapability: media.manualExportCapability, manualExportSettle: media.settle
+      } : {}),
       ...(media?.ingest ? { ingest: media.ingest } : {}),
       ...(media?.sourceTechnicalDescriptor ? { sourceTechnicalDescriptor: media.sourceTechnicalDescriptor } : {}),
       ...(transcription.service ? { transcription: transcription.service } : {}),
@@ -510,6 +649,7 @@ async function createMediaServices(
   sourceIdentity: NodeMediaArtifactStore
 ): Promise<{
   capability: CapabilityState;
+  manualExportCapability?: CapabilityState;
   engine?: MediaEngineAdapter;
   settle?: () => Promise<void>;
   ingest?: LocalSourceIngestService;
@@ -536,7 +676,7 @@ async function createMediaServices(
       env: environment
     });
     const worker = new PersistentMediaWorkerClient(transport);
-    const engine = new FfmpegMediaEngine(worker);
+    const engine = guardManualExportEngine(new FfmpegMediaEngine(worker), transport);
     const health = await engine.healthcheck();
     if (health.status === "unavailable") {
       await worker.close();
@@ -545,6 +685,8 @@ async function createMediaServices(
     const services = composeMediaApplicationServices(history, executions, engine, sourceIdentity);
     return {
       capability: available(),
+      manualExportCapability: (await engine.capabilities()).some(capability => capability.id === "media.cevra-render-manual-video-sequence" && capability.available)
+        ? available() : unavailable("runtime-invalid"),
       engine,
       settle: () => transport.settle(),
       ingest: new LocalSourceIngestService({ media: services.application, history, identity: services.artifacts }),
@@ -740,4 +882,15 @@ function unavailable(reason: Exclude<CapabilityState["reason"], "available">): C
 
 function safeError(code: string, details?: Record<string, unknown>): Error {
   return Object.assign(new Error(code), { code, ...(details ? { details } : {}) });
+}
+
+function manualExportResourceCode(error: unknown): string | undefined {
+  const cause = error instanceof MediaApplicationError ? error.cause : error;
+  if (!(cause instanceof OwnedRenderResourceError)) return undefined;
+  switch (cause.code) {
+    case "MEDIA_RENDER_MEMORY_LIMIT": return "MANUAL_EXPORT_MEMORY_LIMIT";
+    case "MEDIA_RENDER_DISK_LIMIT": return "MANUAL_EXPORT_DISK_LIMIT";
+    case "MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED":
+    case "MEDIA_RENDER_RESOURCE_BUSY": return "MANUAL_EXPORT_RESOURCE_UNAVAILABLE";
+  }
 }

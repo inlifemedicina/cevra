@@ -21,6 +21,8 @@ export function mediaOperationOutputUris(operation: MediaOperation): string[] {
     case "extract-frame":
     case "overlay-media":
     case "render-audio-sequence":
+    case "render-manual-video-sequence":
+    case "render-manual-video-preview":
       return [operation.outputUri];
   }
 }

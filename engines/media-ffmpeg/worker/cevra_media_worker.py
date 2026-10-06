@@ -468,6 +468,18 @@ def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ff
         "usable": "no" if missing_audio_sequence else "yes",
         **({"missing": sorted(set(missing_audio_sequence))} if missing_audio_sequence else {"detail": "pcm_f32le/48000 with fixed bounded audio graph"}),
     }
+    required_manual = {"fps", "trim", "setpts", "scale", "pad", "setsar", "concat", "asplit", "atrim", "aresample", "asetpts", "aformat", "pan"}
+    missing_manual = sorted(required_manual - available_filters)
+    if not h264:
+        missing_manual.append("approved H.264 encoder")
+    if "aac" not in available_encoders or "pcm_f32le" not in available_encoders:
+        missing_manual.append("AAC/float32 PCM encoders")
+    if not ffmpeg_present:
+        missing_manual.extend(["ffmpeg", "ffprobe"])
+    if os.name != "posix":
+        missing_manual.append("private POSIX publication ownership")
+    for name in ("cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"):
+        tools[name] = {"usable": "no" if missing_manual else "yes", **({"missing": sorted(set(missing_manual))} if missing_manual else {"detail": "closed original-derived CFR30 H264/AAC; explicit source admission and sampled owned-job guards required"})}
     required_measurement = {"astats", "ebur128", "aeval", "aresample", "aformat", "asplit", "asettb", "atrim", "asetpts", "ametadata", "anullsink"}
     missing_measurement = sorted(required_measurement - available_filters)
     if "pcm_f64le" not in available_encoders:
@@ -739,6 +751,20 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
     non_negative_integer = {"type": "integer", "minimum": 0}
     millisecond = {"type": "integer", "minimum": 0, "maximum": MAX_MEDIA_DURATION_SECONDS * 1000}
     positive_millisecond = {"type": "integer", "minimum": 1, "maximum": MAX_MEDIA_DURATION_SECONDS * 1000}
+    manual_item = {
+        "type": "object", "additionalProperties": False,
+        "properties": {"input": path,
+            "source_start_frame": {"type": "integer", "minimum": 0, "maximum": 18144000},
+            "source_end_frame": {"type": "integer", "minimum": 1, "maximum": 18144000},
+            "audio_selection": {"type": "string", "enum": ["single-source-stream"]},
+            "source_content": {"type": "object", "additionalProperties": False,
+                "properties": {"sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "size_bytes": {"type": "integer", "minimum": 1, "maximum": 9007199254740991}},
+                "required": ["sha256", "size_bytes"]}},
+        "required": ["input", "source_start_frame", "source_end_frame", "audio_selection", "source_content"]}
+    def manual_schema(preview: bool) -> Dict[str, Any]:
+        return {"properties": {"version": {"type": "integer", "enum": [1]}, "output": path, "owned_workspace": path,
+            "items": {"type": "array", "minItems": 1, "maxItems": 1 if preview else 2048, "items": manual_item}},
+            "required": ["version", "output", "owned_workspace", "items"]}
     audio_source = {
         "type": "object", "additionalProperties": False,
         "properties": {
@@ -779,7 +805,7 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
             "required": ["version", "input", "stream_index", "start_ms", "end_ms"],
         },
         "cevra-extract-frame": {
-            "properties": {"input": path, "output": path, "at": non_negative},
+            "properties": {"input": path, "output": path, "at": non_negative, "max_dimension": {"type": "integer", "enum": [720]}},
             "required": ["input", "output", "at"],
         },
         "cevra-scale": {
@@ -813,6 +839,8 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
             },
             "required": ["version", "sources", "items", "output", "output_duration_ms", "output_channel_layout"],
         },
+        "cevra-render-manual-video-sequence": manual_schema(False),
+        "cevra-render-manual-video-preview": manual_schema(True),
     }
     return [
         {"name": name, "description": f"CEVRA typed media operation: {name}", "inputSchema": {"type": "object", "additionalProperties": False, **schemas[name]}}

@@ -3,6 +3,9 @@ import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
 import { useEffect, useState } from "react";
 import type { SourcePresentation } from "../source-presentation";
 import type { Translate } from "../ui-model";
+import type { DesktopBackend } from "../backend/desktop-backend";
+import { maximumSourceFrame, floorMsToFrames, frameInput, framesToMilliseconds, isCfr30Frame } from "../frame-timing";
+import { ManualSequenceConformReview } from "./ManualSequenceConformReview";
 
 interface Props {
   project: Readonly<ProjectIR>;
@@ -13,41 +16,49 @@ interface Props {
   busy: boolean;
   t: Translate;
   onEdit(request: ManualVideoSequenceEdit): Promise<void>;
+  backend?: DesktopBackend;
 }
 type Unbound<T> = T extends unknown ? Omit<T, "version" | "expectedSnapshotId"> : never;
 type Intent = Unbound<ManualVideoSequenceEdit>;
 
 /** Inputs are disposable drafts; only the typed backend publishes the timeline. */
-export function ManualSequenceControls({ project, clips, presentations, selectedId, playheadMs, busy, t, onEdit }: Props) {
+export function ManualSequenceControls({ project, clips, presentations, selectedId, playheadMs, busy, t, onEdit, backend }: Props) {
+  const grid = project.timeline.timingPolicy === "cfr30" || clips.length === 0;
   const selected = clips.find(clip => clip.id === selectedId);
   const sources = manualSequenceSources(project);
   const initialSource = sources.find(source => source.id === (selected?.sourceId ?? selectedId)) ?? sources[0];
   const [sourceId, setSourceId] = useState(initialSource?.id ?? "");
-  const [start, setStart] = useState(String((selected?.sourceStartMs ?? 0) / 1000));
-  const [end, setEnd] = useState(String((selected?.sourceEndMs ?? initialSource?.durationMs ?? 0) / 1000));
+  const initialStart = () => String(grid ? selected?.frameTiming?.sourceStartFrame ?? 0 : (selected?.sourceStartMs ?? 0) / 1000);
+  const initialEnd = () => String(grid ? selected?.frameTiming?.sourceEndFrame ?? maximumSourceFrame(initialSource?.durationMs ?? 0) : (selected?.sourceEndMs ?? initialSource?.durationMs ?? 0) / 1000);
+  const [start, setStart] = useState(initialStart);
+  const [end, setEnd] = useState(initialEnd);
   const [pending, setPending] = useState(false);
   const source = sources.find(item => item.id === sourceId);
   useEffect(() => {
     setSourceId(initialSource?.id ?? "");
-    setStart(String((selected?.sourceStartMs ?? 0) / 1000));
-    setEnd(String((selected?.sourceEndMs ?? initialSource?.durationMs ?? 0) / 1000));
-  }, [selectedId, selected?.sourceStartMs, selected?.sourceEndMs, initialSource?.id, initialSource?.durationMs]);
+    setStart(initialStart()); setEnd(initialEnd());
+  }, [selectedId, selected?.sourceStartMs, selected?.sourceEndMs, initialSource?.id, initialSource?.durationMs, grid]);
 
-  const sourceStartMs = milliseconds(start), sourceEndMs = milliseconds(end);
-  const valid = Boolean(source) && sourceStartMs !== null && sourceEndMs !== null
-    && sourceStartMs >= 0 && sourceStartMs < sourceEndMs && sourceEndMs <= source!.durationMs!;
+  const begin = grid ? frameInput(start) : milliseconds(start), finish = grid ? frameInput(end) : milliseconds(end);
+  const maximum = source ? grid ? maximumSourceFrame(source.durationMs!) : source.durationMs! : 0;
+  const valid = Boolean(source) && begin !== null && finish !== null && begin >= 0 && begin < finish && finish <= maximum;
+  const sourceStartMs = grid && begin !== null ? framesToMilliseconds(begin) : begin;
+  const sourceEndMs = grid && finish !== null ? framesToMilliseconds(finish) : finish;
   const disabled = busy || pending;
   const selectedIndex = selected ? clips.findIndex(clip => clip.id === selected.id) : -1;
+  const splitFrame = grid && Number.isFinite(playheadMs) && playheadMs >= 0 ? floorMsToFrames(playheadMs) : null;
+  const canSplit = Boolean(selected && (grid ? splitFrame !== null && selected.frameTiming && splitFrame > selected.frameTiming.timelineStartFrame && splitFrame < selected.frameTiming.timelineEndFrame
+    : Number.isSafeInteger(playheadMs) && playheadMs > selected.timelineStartMs && playheadMs < selected.timelineEndMs));
   async function edit(intent: Intent) {
     if (disabled) return;
     setPending(true);
-    try { await onEdit({ ...intent, version: 1, expectedSnapshotId: project.history.headSnapshotId! } as ManualVideoSequenceEdit); }
+    try { await onEdit({ ...intent, version: grid ? 2 : 1, expectedSnapshotId: project.history.headSnapshotId! } as ManualVideoSequenceEdit); }
     catch { /* App reconciles canonical state and displays the operation error. */ }
     finally { setPending(false); }
   }
   function range(type: "append" | "insert" | "trim") {
     if (!valid) return;
-    const bounds = { sourceStartMs: sourceStartMs!, sourceEndMs: sourceEndMs! };
+    const bounds = grid ? { sourceStartFrame: begin!, sourceEndFrame: finish! } : { sourceStartMs: sourceStartMs!, sourceEndMs: sourceEndMs! };
     if (type === "append") void edit({ type, sourceId, ...bounds });
     else if (type === "insert" && selected) void edit({ type, sourceId, beforeClipId: selected.id, ...bounds });
     else if (type === "trim" && selected && sourceId === selected.sourceId) void edit({ type, clipId: selected.id, ...bounds });
@@ -60,14 +71,15 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     void edit({ type: "reorder", clipIds: ids });
   }
   return <section className="manual-sequence-controls" aria-label={t("sequence.controls")}>
+    <p>{t(grid ? "sequence.frameGrid" : "sequence.legacyTiming")}</p>
     <fieldset disabled={disabled}>
       <legend>{t("sequence.sourceRange")}</legend>
       <label>{t("sequence.source")}<select aria-label={t("sequence.source")} value={sourceId} onChange={event => {
         const next = sources.find(item => item.id === event.target.value);
-        setSourceId(next?.id ?? ""); setStart("0"); setEnd(String((next?.durationMs ?? 0) / 1000));
+        setSourceId(next?.id ?? ""); setStart("0"); setEnd(String(grid ? maximumSourceFrame(next?.durationMs ?? 0) : (next?.durationMs ?? 0) / 1000));
       }}>{sources.map(item => <option key={item.id} value={item.id}>{presentations.get(item.id)?.label ?? item.displayName}</option>)}</select></label>
-      <label>{t("sequence.inSeconds")}<input type="number" step="0.001" min="0" value={start} onChange={event => setStart(event.target.value)} /></label>
-      <label>{t("sequence.outSeconds")}<input type="number" step="0.001" min="0" max={(source?.durationMs ?? 0) / 1000} value={end} onChange={event => setEnd(event.target.value)} /></label>
+      <label>{t(grid ? "sequence.inFrames" : "sequence.inSeconds")}<input type="number" step={grid ? "1" : "0.001"} min="0" value={start} onChange={event => setStart(event.target.value)} /></label>
+      <label>{t(grid ? "sequence.outFrames" : "sequence.outSeconds")}<input type="number" step={grid ? "1" : "0.001"} min="0" max={grid ? maximum : maximum / 1000} value={end} onChange={event => setEnd(event.target.value)} /></label>
       <button type="button" className="secondary-button" disabled={!valid} onClick={() => range("append")}>{t("sequence.append")}</button>
       <button type="button" className="secondary-button" disabled={!valid || !selected} onClick={() => range("insert")}>{t("sequence.insert")}</button>
       <button type="button" className="secondary-button" disabled={!valid || !selected || sourceId !== selected.sourceId || sourceStartMs === selected.sourceStartMs && sourceEndMs === selected.sourceEndMs} onClick={() => range("trim")}>{t("sequence.trim")}</button>
@@ -75,12 +87,13 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     </fieldset>
     <div className="manual-sequence-actions">
       <button type="button" className="secondary-button" disabled={disabled || !selected} onClick={() => { if (selected) void edit({ type: "duplicate", clipId: selected.id }); }}>{t("sequence.duplicate")}</button>
-      <button type="button" className="secondary-button" disabled={disabled || !selected || !Number.isSafeInteger(playheadMs) || playheadMs <= selected.timelineStartMs || playheadMs >= selected.timelineEndMs} onClick={() => { if (selected) void edit({ type: "split", clipId: selected.id, timelineAtMs: playheadMs }); }}>{t("sequence.split")}</button>
+      <button type="button" className="secondary-button" disabled={disabled || !canSplit} onClick={() => { if (selected) void edit(grid ? { type: "split", clipId: selected.id, timelineAtFrame: splitFrame! } : { type: "split", clipId: selected.id, timelineAtMs: playheadMs }); }}>{t("sequence.split")}</button>
       <button type="button" className="secondary-button" disabled={disabled || selectedIndex <= 0} onClick={() => move(-1)}>{t("sequence.earlier")}</button>
       <button type="button" className="secondary-button" disabled={disabled || selectedIndex < 0 || selectedIndex >= clips.length - 1} onClick={() => move(1)}>{t("sequence.later")}</button>
       <button type="button" className="secondary-button" disabled={disabled || !selected} onClick={() => { if (selected) void edit({ type: "remove", clipId: selected.id }); }}>{t("sequence.remove")}</button>
       {!selected && <span>{t("sequence.selectClip")}</span>}
     </div>
+    {!grid && <ManualSequenceConformReview backend={backend} project={project} busy={disabled} t={t} onEdit={onEdit} />}
   </section>;
 }
 
@@ -113,12 +126,22 @@ export function manualSequenceClips(project: Readonly<ProjectIR>): TimelineClip[
   const track = project.timeline.tracks.find(item => item.id === clips[0]?.trackId);
   if (clips.length && (!track || track.kind !== "video" || track.locked || track.hidden || track.muted)) return undefined;
   let end = 0;
+  let endFrame = 0;
+  const grid = project.timeline.timingPolicy === "cfr30";
   for (const clip of clips) {
     const source = sources.get(clip.sourceId);
     if (!source || clip.trackId !== track!.id || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || Object.keys(clip.extensions ?? {}).length
-      || ![clip.timelineStartMs, clip.timelineEndMs, clip.sourceStartMs, clip.sourceEndMs].every(Number.isSafeInteger)
-      || clip.timelineStartMs !== end || clip.sourceStartMs < 0 || clip.sourceStartMs >= clip.sourceEndMs || clip.sourceEndMs > source.durationMs!
-      || clip.timelineEndMs - clip.timelineStartMs !== clip.sourceEndMs - clip.sourceStartMs) return undefined;
+      || ![clip.timelineStartMs, clip.timelineEndMs, clip.sourceStartMs, clip.sourceEndMs].every(grid ? Number.isFinite : Number.isSafeInteger)
+      || clip.timelineStartMs !== end || clip.sourceStartMs < 0 || clip.sourceStartMs >= clip.sourceEndMs || clip.sourceEndMs > source.durationMs!) return undefined;
+    if (grid) {
+      const timing = clip.frameTiming;
+      if (!timing || timing.version !== 1 || ![timing.timelineStartFrame, timing.timelineEndFrame, timing.sourceStartFrame, timing.sourceEndFrame].every(isCfr30Frame)
+        || timing.timelineStartFrame !== endFrame || timing.timelineEndFrame - timing.timelineStartFrame !== timing.sourceEndFrame - timing.sourceStartFrame
+        || timing.sourceStartFrame >= timing.sourceEndFrame || timing.sourceEndFrame > maximumSourceFrame(source.durationMs!)
+        || clip.timelineStartMs !== framesToMilliseconds(timing.timelineStartFrame) || clip.timelineEndMs !== framesToMilliseconds(timing.timelineEndFrame)
+        || clip.sourceStartMs !== framesToMilliseconds(timing.sourceStartFrame) || clip.sourceEndMs !== framesToMilliseconds(timing.sourceEndFrame)) return undefined;
+      endFrame = timing.timelineEndFrame;
+    } else if (clip.frameTiming || clip.timelineEndMs - clip.timelineStartMs !== clip.sourceEndMs - clip.sourceStartMs) return undefined;
     end = clip.timelineEndMs;
   }
   return project.timeline.durationMs === end ? clips : undefined;

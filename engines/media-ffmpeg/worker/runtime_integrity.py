@@ -59,6 +59,7 @@ CRITICAL_WORKER_FILES = (
     "worker/cevra_streaming_process.py",
     "worker/cevra_job_control.py",
     "worker/cevra_media_worker.py",
+    "worker/cevra_manual_sequence.py",
     "worker/cevra_native_tools.py",
     "worker/runtime_integrity.py",
     "worker/runtime_profile.py",

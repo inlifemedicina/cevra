@@ -1,7 +1,17 @@
 # Manual sequence — foundation and G1
 
-Status: APPROVED BLOCK DIRECTION / IN DEVELOPMENT, 2026-10-05 UTC.
-No new functional PASS or product-ready claim is recorded by this plan.
+Status: APPROVED BLOCK DIRECTION / IN DEVELOPMENT, 2026-10-06 UTC.
+No whole-product or owner PASS is recorded by this plan.
+
+**Current decision, 2026-10-06 00:51 UTC:** the Owner approved a fixed CFR30
+visual timeline and export, visible frame-aligned editing, the same PTS sampling
+in preview/export, independent audio timing and explicit reversible conversion of
+old projects. [ADR0033](adr/0033-manual-sequence-cfr30-clock.md) records the
+category comparison, actual baseline feasibility and integration contract.
+The real implementation is in the same Draft #87; #86/#87 remain unmerged.
+Earlier OPEN temporal alternatives and seven-millisecond experiments below are
+historical evidence, superseded for this workflow. This approval does not prove
+every source, strict resource ceilings or product/owner acceptance gates.
 
 The Product Owner approved evolving the application by complete workflow blocks
 after the code/EDVID/market audit. Current scope is foundation plus continuous
@@ -632,7 +642,7 @@ admission remain unproved. Probes use the available pinned 0.3.3 runtime; sealed
 | Destination/state/errors/cancel | Implemented read-only; final file generation unavailable. |
 | Exact project cuts and originals | Preserved; preparation does not quantize or edit them. |
 | Resource/integrity primitives | Tested for a registered private POSIX job; not a complete pipeline or hard-cap proof. |
-| Delivery cadence/active boundary exposures | Requires the pending exact-cut/nominal30 versus strict-CFR30 owner choice. |
+| Delivery cadence/active boundary exposures | Owner approved CFR30 timeline/export on 2026-10-06; visible frame edits and explicit reversible legacy conversion are implemented under ADR0033. |
 | Final pipeline, source envelope, colour/audio admission | Engineering integration/oracles required; no silent compatibility or profile downgrade. |
 | Live allocations/publication/resource ceiling | Complete runtime/Host integration/proof required; sampled excess interruption does not meet a strict no-overshoot ceiling. |
 | APP/OWNER, native montage decoding/sync, G1/G5/G6 | Pending/BLOCKED; unit/browser/isolated encoder evidence does not promote these IDs. |
@@ -685,8 +695,126 @@ report a material unsupported source/mapping decision. It must not invent
 silence, stream selection, fades, normalization, ducking or a second editable
 timeline. Apart from the concrete graph correction, connecting resources,
 publication and recovery without that actual producer would be unused
-infrastructure. The next useful end-to-end work therefore follows the temporal
-decision and explicit source/audio admission; final Export remains unavailable.
+infrastructure. The accepted CFR30 decision now drives the real end-to-end path,
+explicit single-source audio admission and reuse of those existing contracts.
+Final Export was unavailable on the preceding preparation head `4e6f58d`.
+The subsequent CFR30 implementation is described in the current checkpoint below.
+
+## Current CFR30 implementation and technical evidence — 2026-10-06
+
+Project IR schema 3 preserves v1/v2 retained snapshots, journal, cursor and redo
+with `legacy-milliseconds` timing. Its explicit `cfr30` policy makes integer,
+half-open frame ranges authoritative and strictly validates the existing
+millisecond projections. New manual edits use typed V2 commands; an old sequence
+requires a visible, reviewed, reversible conform action. Audio clip timing stays
+independent. No opening-time or export-only rounding changes old edits.
+
+The actual Normal editing surface and closed native/Host path now connect frame
+editing, reviewed conform, original/sequence preview and the native Save picker
+to `ManualSequenceExportApplicationService`, existing durable Media execution,
+`export.add` and checkpoint/recovery. UI sends no filesystem path, filter graph,
+resource override or provider instruction. A mutation gate retires and awaits
+prior previews before admitting the final resource scope. Post-commit execution
+archive failure carries trusted canonical evidence and checkpoints once; explicit
+save retry does not rerender. Lost publication proof preserves the owned root,
+accounting link and possible final, reporting uncertainty without `export.add`.
+Manual-final failure handling never checks an inode and then unlinks the public
+name: a concurrent replacement could race those separate operations. Possible
+post-publication failures conservatively preserve the public destination. An
+uncertain publication without a confirmed canonical commit, or unproved process
+retirement, also retains the accounting link and private root. After a confirmed
+commit and proved retirement, Host may remove those private artifacts while
+preserving the final and `export.add`. Errors report a sanitized resource reason
+when relevant. Explicit failure cleanup also preserves that public name. Private
+intermediates remain independently owned and cleaned after retirement; legacy
+mux rollback is unchanged. Native mutation timeout reconciliation preserves a late
+Host publication/commit error and its sanitized details, replaces only the state
+with the current snapshot, and never dispatches a second export.
+
+The original-master worker seals and revalidates each original, samples actual
+source PTS with the shared preview/final CFR30 rule, encodes each unique interval
+once and packet-concatenates occurrences. It renders explicitly admitted source
+audio to 48000-Hz float PCM, exactly 1600 samples per output frame, then uses the
+existing exclusive MP4/H264/AAC publisher. Final video stays SDR 1920×1080 at a
+20-Mb/s target. Disposable preview inherits the 720-side/8-MiB transport envelope
+(720×404, H264 700-kb/s target, AAC 96-kb/s), with a measured pre-publication size
+gate. It never substitutes for the final original inputs. AAC priming, edit-list
+and terminal padding are checked against contiguous decoded frame PTS and actual
+sample counts, including FFmpeg 9's already-clipped terminal packet duration.
+
+Admission is deliberately bounded by the existing source inspector: each source
+is at most 60 s/256 MiB, admitted SDR8 video with exactly one measured video and
+one mono/stereo 44100/48000-Hz audio stream. Requested ranges must be covered by
+both clocks; no silence is invented. Missing/ambiguous audio, HDR, unsupported
+layout, mixed source colour/pixel signalling or uncovered ranges fail clearly.
+All copies, graphs, segments, PCM, candidates and the final accounting hard link
+stay in the issued private job tree through the final sampled resource check.
+Original retains the existing Take source-clock route, including its existing
+bounded leading/trailing preview padding. A source with a 30-ms audio origin can
+remain visible and markable in Original while only actually covered canonical
+cuts enter the final renderer. This preview allowance does not invent silence in
+final output. Sequence/excerpt previews and final share the CFR30 sampler;
+Original retains actual source picture cadence and PTS.
+
+Local offline evidence: all workspace builds passed; IR 70/70, Store 18/18,
+Application 314/314 (including final export 9/9), Contracts 25/25, Host 172/172,
+UI 155/155 and i18n 2/2 passed. Media Node passed 138 inside the sandbox plus two
+native observer tests in the approved own-process context (140/140 combined);
+Media Python passed 121/121. Rust passed 48/48, including late native timeout
+publication/resource and committed-error reconciliation. Offline agent regressions passed
+391/391 with no live provider execution. The first whole-workspace run
+retained four environment failures: system Python 3.9 failed two model-fixture
+checks and sandbox-denied `ps` blocked two observer checks. The pinned Python
+3.12 Host run and scoped native observer rerun resolved those exact failures.
+These are offline/fixture results, not owner playback or release acceptance.
+The first final UI run retained a corrected fixture-accessor failure and one
+existing unsaved-refresh assertion failure; the corrected-tree complete rerun
+passed 155/155. No unrelated product source was changed to hide that result.
+
+The current-source native worker, using already verified pinned tools, passed
+CFR24/B-frame, 30000/1001 and VFR original fixtures; 31-frame and one-frame cuts,
+repeated intervals and a 60-s Full HD sequence. Independent decoded comparisons
+against originals measured mean PSNR 49.90–51.23 dB on the short ranges and
+58.18 dB (minimum 50.41 dB) on 1800 Full HD frames. Each final and the 60-s preview
+had exact frame/decoded-AAC counts and unchanged original hashes; preview measured
+4,452,793 bytes, 1800 frames and 2,880,000 samples. This probe is current source
+plus pinned tools, not by itself a sealed current-bundle or subjective PASS.
+
+The final R2 run made 436 resource observations: peak aggregate owned-process RSS
+178,257,920 B, logical job files 583,955,456 B and allocated job files
+604,991,488 B. These bounded observations fit 512 MiB/2 GiB; they do not establish
+an instantaneous ceiling. The deliberate observer regression detected aggregate
+RSS 623,558,656 B before retiring its owned group, explicitly disproving a
+no-overshoot claim. VBR target estimates are not reservations or global maxima.
+
+The checked-in `manual-sequence-runtime.mjs` separately passed the exact sealed
+0.3.4 R2 runtime (manifest SHA256
+`aa9f8bc1fc52a085551d4623e842822a4d56a3da6f3f601d8a3072fb73e5b844`). All nine
+sealed worker module hashes match current source. It drives production ingest,
+V2 edits, the actual Host guard before `export.add`, Application/Media/artifact
+identity and persisted ProjectStore/execution archives. Independent rational PTS
+barcode oracles verify CFR24/B frames, late NTSC frames 1000–1031 (with a naive
+index negative control), VFR, a one-frame occurrence and repeated ranges. Actual
+44100-Hz stereo with 30-ms origin verifies channel pulses and cut exclusions;
+AAC/PCM counts are exact, with a declared 6-ms lossy-waveform localization window.
+The real `DerivedVideoPreview` verifies Original's 72 pictures/24fps/source PTS,
+whole-source audio pulses, initial PNG, unchanged histories and cache without
+replay. Save/reopen/Undo/Redo preserves sources, receipts and output without new
+render. Its 60-s flat-barcode stress measured 11.246 s final render, sampled RSS
+133,627,904 B and logical/allocated job files 39,407,529/39,481,344 B. This smaller
+entropy fixture complements the separate Full HD quality/allocation probe;
+neither measurement proves worst-case resource use or subjective playback.
+
+The existing exact-runtime workflow now includes that catalog and its existing
+Host/Store build dependencies, without a new engine or dependency. Historical
+setup failures, first AAC failure (priming-field parsing/terminal double-discard)
+and R1 receipts remain retained; final R2 checks do not rewrite those outcomes.
+
+Strict resource-ceiling proof, broader source/envelope and native perceptual/
+gapless/owner acceptance remain open. G1/G5/G6, NATIVE and OWNER stay unpromoted;
+progress 55%, F-A02 exhausted 1/1. No AI, dependency, merge or human media/app/device
+action occurred. The exact-tree review, sealed functional catalog and terminal
+published-head CI receipts accompany the same Draft publication.
 
 ## Automated acceptance package
 

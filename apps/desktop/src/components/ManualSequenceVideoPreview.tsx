@@ -5,6 +5,7 @@ import type { DesktopBackend } from "../backend/desktop-backend";
 import type { SourcePresentation } from "../source-presentation";
 import type { Translate } from "../ui-model";
 import { ManualVideoPreview } from "./ManualVideoPreview";
+import { floorMsToFrames, framesToMilliseconds } from "../frame-timing";
 
 interface Props {
   backend: DesktopBackend;
@@ -25,13 +26,15 @@ export function ManualSequenceVideoPreview({ backend, project, clips, presentati
   const durationMs = project.timeline.durationMs;
   const [mode, setMode] = useState<"sequence" | "original">(originalSelected ? "original" : "sequence");
   const [loop, setLoop] = useState(false);
-  const [transport, setTransport] = useState({ timelineMs: seek.sequence ? Math.min(durationMs, Math.max(0, seek.timelineMs)) : 0, sequence: 1, resume: false });
+  const [transport, setTransport] = useState({ timelineMs: Math.min(durationMs, Math.max(0, seek.timelineMs)), sequence: 1, resume: false });
   const external = useRef({ sequence: seek.sequence, sourceId: originalSourceId });
   const position = useRef(transport.timelineMs);
   const clip = clips.find(item => transport.timelineMs < item.timelineEndMs) ?? clips.at(-1)!;
   function go(value: number, resume = false) {
-    if (!Number.isSafeInteger(value)) return;
-    const timelineMs = Math.min(durationMs, Math.max(0, value));
+    const grid = project.timeline.timingPolicy === "cfr30";
+    if (!(grid ? Number.isFinite(value) : Number.isSafeInteger(value))) return;
+    const bounded = Math.min(durationMs, Math.max(0, value));
+    const timelineMs = grid ? framesToMilliseconds(floorMsToFrames(bounded)) : bounded;
     position.current = timelineMs;
     setTransport(old => ({ timelineMs, sequence: old.sequence + 1, resume }));
     onPlayheadChange(timelineMs);
@@ -58,7 +61,7 @@ export function ManualSequenceVideoPreview({ backend, project, clips, presentati
     <ManualVideoPreview key={`${mode}:${sourceId}:${mode === "sequence" ? clip.id : "original"}`} backend={backend}
       source={project.sources.find(source => source.id === sourceId)} sourceLabel={sourceId ? presentations.get(sourceId)?.label : undefined}
       snapshotId={project.history.headSnapshotId!} clip={mode === "sequence" ? clip : undefined}
-      timelineOccupied sequenceEditing busy={busy} seek={mode === "sequence" ? transport : { sequence: 0, timelineMs: 0 }} t={t}
+      timelineOccupied sequenceEditing frameEditing={project.timeline.timingPolicy === "cfr30"} busy={busy} seek={mode === "sequence" ? transport : { sequence: 0, timelineMs: 0 }} t={t}
       onPlayheadChange={value => { if (mode === "sequence") position.current = value; onPlayheadChange(value); }} onCreate={onCreate}
       program={mode === "sequence" ? { durationMs, resume: transport.resume,
         onPlaybackIntent: resume => setTransport(value => ({ ...value, resume })), onSeek: go,

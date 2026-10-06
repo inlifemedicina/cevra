@@ -2767,6 +2767,48 @@ mapping through the approved typed executor, or a material admission decision,
 is required. No new publisher/journal/intent/preparatory service, silent audio
 policy or temporal adoption was introduced for this continuation.
 
+**Active superseding decision — 2026-10-06 00:51 UTC:** after comparing the
+official Premiere/Final Cut project-timebase and audio-editing behavior, the Owner
+approved the conventional CFR30 picture timeline and matching export. Edits show
+their alignment before commitment; preview and export share actual-source-PTS
+sampling. Audio keeps an independent clock. Old projects retain exact historical
+times until an explicit reviewed, reversible History conversion; opening and
+export never silently round them. [ADR0033](adr/0033-manual-sequence-cfr30-clock.md)
+records the accepted approach and actual feasibility check. The preceding OPEN
+choice, variable-boundary recommendation and 7-ms experiment remain historical,
+superseded for G1. Implementation now covers the canonical schema/migrations,
+typed frame edits, preview, original-source visual/audio production and existing
+publication/archive/`export.add`/checkpoint/recovery integration in Draft #87.
+No new engine/dependency/AI, merge or human-session action is included. The
+sampled resource watchdog still does not prove instantaneous 512-MiB/2-GiB
+ceilings. Current local evidence is IR 70/70, Store 18/18, Application 314/314,
+Contracts 25/25, Host 172/172, UI 155/155, Media Node 140/140 combined across
+sandbox/approved native contexts, Media Python 121/121, Rust 48/48 and offline
+agent regressions 391/391. Existing
+environment failures are retained with their targeted successful reruns. The
+current-source native render passed B-frame/fractional/VFR, repeated and one-frame
+ranges plus 60-s Full HD final/preview with exact decoded frames/audio, unchanged
+original hashes and mean PSNR 58.18 dB for the long final. Sampled owned peaks were
+178257920 B RSS, 583955456 B logical and 604991488 B allocated; the 60-s preview
+was 4452793 B. These bounded source-worker measurements do not by themselves prove
+a sealed current bundle, strict ceilings, perceptual/gapless or owner acceptance.
+The exact sealed 0.3.4 R2 catalog separately passed production ingest/edit/export,
+actual Host resource admission before commit, independent CFR/B-frame/late-NTSC/
+VFR barcode and audio clocks, whole-source Original with 30-ms audio origin, and
+persisted reopen/Undo without replay. Its 60-s flat-barcode case sampled RSS
+133627904 B and 39407529 B logical files; nine sealed modules match source.
+Manual-final post-publication errors preserve the public name, eliminating
+check-then-unlink replacement races from this new path. Uncertain uncommitted
+publication or unproved retirement also retains the accounting link/private root;
+confirmed commit and proved retirement allow private cleanup while retaining the
+final and `export.add`. Native timeout reconciliation preserves late sanitized
+Host publication/commit errors and their evidence with the current state. Original
+keeps its existing source-clock/padding contract; final audio requires actual
+covered ranges. Existing legacy rollback and human Take history remain unchanged.
+The [current G1 checkpoint](CEVRA_MANUAL_SEQUENCE_G1.md#current-cfr30-implementation-and-technical-evidence--2026-10-06)
+and Draft #87 hold final-tree review, sealed functional and published-head CI
+receipts. G1/OWNER/NATIVE remain unpromoted, progress 55%, F-A02 1/1.
+
 1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved admission of the designated F-A02 result/history into a temporary native session is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.

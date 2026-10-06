@@ -1,4 +1,4 @@
-import type { ProjectHistory, SourceAsset, TimelineClip } from "@cevra/project-ir";
+import { floorMsToFrames, framesToMilliseconds, type ProjectHistory, type SourceAsset, type TimelineClip, type TimelineTimingPolicy } from "@cevra/project-ir";
 import { manualVideoError, verifyManualVideoSources } from "./manual-video-clip.js";
 import { resolveManualVideoSequence } from "./manual-video-sequence.js";
 import type { SourceContentIdentityPort } from "./source-technical-descriptor.js";
@@ -11,6 +11,7 @@ export interface ManualSequencePreviewPlan {
   readonly projectId: string;
   readonly snapshotId: string;
   readonly durationMs: number;
+  readonly timingPolicy: TimelineTimingPolicy;
   readonly sources: readonly Readonly<SourceAsset>[];
   readonly clips: readonly Readonly<TimelineClip>[];
 }
@@ -19,9 +20,11 @@ export interface ManualSequencePreviewPosition {
   clipId: string;
   sourceId: string;
   sourceTimeMs: number;
+  timelineFrame?: number;
+  sourceFrame?: number;
 }
 
-/** Read-only canonical sequence binding, independent of the pending frame policy. */
+/** Read-only canonical sequence binding for legacy or explicitly conformed frame timing. */
 export class ManualSequencePreviewApplicationService {
   private readonly prepared = new WeakMap<ManualSequencePreviewPlan, string>();
   constructor(private readonly options: { history: ProjectHistory; identity: SourceContentIdentityPort }) {}
@@ -45,7 +48,7 @@ export class ManualSequencePreviewApplicationService {
     if (journal !== this.options.history.journalIdentity) throw manualVideoError("MANUAL_SEQUENCE_STALE");
     resolveManualVideoSequence(this.options.history.current, stable.expectedSnapshotId);
     const plan: ManualSequencePreviewPlan = freeze(structuredClone({ version: 1 as const, projectId: project.project.id,
-      snapshotId: stable.expectedSnapshotId, durationMs: project.timeline.durationMs, sources, clips }));
+      snapshotId: stable.expectedSnapshotId, durationMs: project.timeline.durationMs, timingPolicy: project.timeline.timingPolicy, sources, clips }));
     this.prepared.set(plan, journal);
     return plan;
   }
@@ -68,15 +71,21 @@ export class ManualSequencePreviewApplicationService {
   /** Half-open program intervals: a join belongs to the next clip; OUT has no frame. */
   position(plan: ManualSequencePreviewPlan, timelineMs: number): ManualSequencePreviewPosition | null {
     this.assertCurrent(plan);
-    if (!Number.isSafeInteger(timelineMs) || timelineMs < 0 || timelineMs > plan.durationMs) throw manualVideoError("MANUAL_SEQUENCE_INVALID_RANGE");
+    if (!(plan.timingPolicy === "cfr30" ? Number.isFinite(timelineMs) : Number.isSafeInteger(timelineMs)) || timelineMs < 0 || timelineMs > plan.durationMs) throw manualVideoError("MANUAL_SEQUENCE_INVALID_RANGE");
     if (timelineMs === plan.durationMs) return null;
+    const timelineFrame = plan.timingPolicy === "cfr30" ? floorMsToFrames(timelineMs) : undefined;
     let first = 0, end = plan.clips.length;
     while (first < end) {
       const middle = Math.floor((first + end) / 2);
-      if (plan.clips[middle]!.timelineEndMs <= timelineMs) first = middle + 1;
+      if (timelineFrame !== undefined ? plan.clips[middle]!.frameTiming!.timelineEndFrame <= timelineFrame : plan.clips[middle]!.timelineEndMs <= timelineMs) first = middle + 1;
       else end = middle;
     }
     const clip = plan.clips[first]!;
+    if (timelineFrame !== undefined) {
+      const timing = clip.frameTiming!;
+      const sourceFrame = timing.sourceStartFrame + (timelineFrame - timing.timelineStartFrame);
+      return { clipId: clip.id, sourceId: clip.sourceId, sourceTimeMs: framesToMilliseconds(sourceFrame), timelineFrame, sourceFrame };
+    }
     return { clipId: clip.id, sourceId: clip.sourceId, sourceTimeMs: clip.sourceStartMs + (timelineMs - clip.timelineStartMs) };
   }
 }

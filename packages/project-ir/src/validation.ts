@@ -3,6 +3,7 @@ import {
   MAX_SOURCE_TECHNICAL_DESCRIPTOR_BYTES,
   MAX_TRANSCRIPT_PROVENANCE_STAGES,
   PROJECT_IR_SCHEMA_VERSION_V1,
+  PROJECT_IR_SCHEMA_VERSION_V2,
   SOURCE_TECHNICAL_DESCRIPTOR_PROFILE,
   SOURCE_TECHNICAL_DESCRIPTOR_VERSION,
   type ProjectIR,
@@ -11,9 +12,12 @@ import {
   type SourceTechnicalDescriptorV1,
   type SourceTranscript,
   type TimelineEditOperation,
+  type TimelineEditOperationV2,
+  type ClipFrameTimingV1,
   type TranscriptSpeakerState
 } from "./types.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
+import { frameTimingMilliseconds, isCfr30Frame } from "./frame-time.js";
 
 export const V1_UNASSIGNED_TRANSCRIPT_EXTENSION = "cevra.migration.v1UnassignedTranscript" as const;
 
@@ -188,19 +192,44 @@ function validateTrack(track: unknown, index: number, issues: ValidationIssue[])
   for (const key of ["locked", "hidden", "muted"] as const) if (typeof track[key] !== "boolean") push(issues, `${path}.${key}`, "type", `${key} must be boolean.`);
 }
 
+export function validateClipFrameTiming(value: unknown): ValidationResult<ClipFrameTimingV1> {
+  const issues: ValidationIssue[] = [];
+  if (!isRecord(value)) return { ok: false, issues: [{ path: "frameTiming", code: "type", message: "Frame timing must be an object." }] };
+  rejectUnexpectedKeys(value, ["version", "timelineStartFrame", "timelineEndFrame", "sourceStartFrame", "sourceEndFrame"], "frameTiming", issues);
+  if (value.version !== 1) push(issues, "frameTiming.version", "version", "Frame timing requires version 1.");
+  for (const key of ["timelineStartFrame", "timelineEndFrame", "sourceStartFrame", "sourceEndFrame"]) {
+    if (!isCfr30Frame(value[key])) push(issues, `frameTiming.${key}`, "frame", "Frame must be a bounded non-negative safe integer.");
+  }
+  for (const [start, end] of [["timelineStartFrame", "timelineEndFrame"], ["sourceStartFrame", "sourceEndFrame"]]) {
+    const begin = value[start!], finish = value[end!];
+    if (typeof begin === "number" && typeof finish === "number" && finish <= begin) push(issues, "frameTiming", "range", "Frame ranges must have positive length.");
+  }
+  return issues.length ? { ok: false, issues } : { ok: true, value: value as unknown as ClipFrameTimingV1 };
+}
+
 function validateClip(clip: unknown, index: number, issues: ValidationIssue[]): void {
   const path = `timeline.clips[${index}]`;
   if (!isRecord(clip)) return push(issues, path, "type", "Clip must be an object.");
   for (const key of ["id", "trackId", "sourceId"] as const) requireString(clip, key, path, issues);
-  validateLegacyTimeRange(clip, "timelineStartMs", "timelineEndMs", path, issues);
-  validateLegacyTimeRange(clip, "sourceStartMs", "sourceEndMs", path, issues);
+  if (clip.frameTiming !== undefined) {
+    const timing = validateClipFrameTiming(clip.frameTiming);
+    if (!timing.ok) issues.push(...timing.issues.map(issue => ({ ...issue, path: `${path}.${issue.path}` })));
+    else {
+      for (const [key, projected] of Object.entries(frameTimingMilliseconds(timing.value))) {
+        if (clip[key] !== projected || Object.is(clip[key], -0)) push(issues, `${path}.${key}`, "projection", "Milliseconds must exactly match authoritative CFR30 frames.");
+      }
+    }
+  } else {
+    validateLegacyTimeRange(clip, "timelineStartMs", "timelineEndMs", path, issues);
+    validateLegacyTimeRange(clip, "sourceStartMs", "sourceEndMs", path, issues);
+  }
   if (!isFiniteNumber(clip.speed) || clip.speed <= 0) push(issues, `${path}.speed`, "range", "speed must be greater than 0.");
   if (!isFiniteNumber(clip.volume) || clip.volume < 0) push(issues, `${path}.volume`, "range", "volume must be 0 or greater.");
   if (!isFiniteNumber(clip.opacity) || clip.opacity < 0 || clip.opacity > 1) push(issues, `${path}.opacity`, "range", "opacity must be between 0 and 1.");
 }
 
 /** Payload validation only; references and the final project are checked by the reducer. */
-export function validateTimelineEditOperation(value: unknown): ValidationResult<TimelineEditOperation> {
+export function validateTimelineEditOperation(value: unknown, version: 1 | 2 = 1): ValidationResult<TimelineEditOperation | TimelineEditOperationV2> {
   const issues: ValidationIssue[] = [];
   if (!isRecord(value)) return { ok: false, issues: [{ path: "edit", code: "type", message: "Timeline edit must be an object." }] };
   switch (value.type) {
@@ -216,9 +245,9 @@ export function validateTimelineEditOperation(value: unknown): ValidationResult<
       rejectUnexpectedKeys(value, ["type", "clip"], "edit", issues);
       validateClip(value.clip, 0, issues);
       if (isRecord(value.clip)) {
-        rejectUnexpectedKeys(value.clip, ["id", "trackId", "sourceId", "timelineStartMs", "timelineEndMs", "sourceStartMs", "sourceEndMs", "speed", "volume", "opacity", "extensions"], "edit.clip", issues);
+        rejectUnexpectedKeys(value.clip, ["id", "trackId", "sourceId", "timelineStartMs", "timelineEndMs", "sourceStartMs", "sourceEndMs", "speed", "volume", "opacity", "extensions", ...(version === 2 ? ["frameTiming"] : [])], "edit.clip", issues);
         for (const key of ["timelineStartMs", "timelineEndMs", "sourceStartMs", "sourceEndMs"]) {
-          if (!Number.isSafeInteger(value.clip[key])) push(issues, `edit.clip.${key}`, "time", "Timeline time must be a safe integer.");
+          if (value.clip.frameTiming === undefined && !Number.isSafeInteger(value.clip[key])) push(issues, `edit.clip.${key}`, "time", "Timeline time must be a safe integer.");
         }
         if (value.clip.extensions !== undefined && !isRecord(value.clip.extensions)) push(issues, "edit.clip.extensions", "type", "Clip extensions must be an object.");
       }
@@ -236,10 +265,22 @@ export function validateTimelineEditOperation(value: unknown): ValidationResult<
         if (!Number.isSafeInteger(value[key])) push(issues, `edit.${key}`, "time", "Timeline time must be a safe integer.");
       }
       break;
+    case "timeline.timingPolicy.set":
+      rejectUnexpectedKeys(value, ["type", "timingPolicy"], "edit", issues);
+      if (version !== 2 || !["legacy-milliseconds", "cfr30"].includes(String(value.timingPolicy))) push(issues, "edit.timingPolicy", "policy", "Timing policy requires a typed V2 operation.");
+      break;
+    case "clip.frameTiming.set": {
+      rejectUnexpectedKeys(value, ["type", "clipId", "frameTiming"], "edit", issues);
+      requireString(value, "clipId", "edit", issues);
+      if (version !== 2) push(issues, "edit.type", "version", "Frame timing requires a V2 operation.");
+      const timing = validateClipFrameTiming(value.frameTiming);
+      if (!timing.ok) issues.push(...timing.issues);
+      break;
+    }
     default:
       push(issues, "edit.type", "enum", "Unsupported atomic timeline operation.");
   }
-  return issues.length ? { ok: false, issues } : { ok: true, value: value as unknown as TimelineEditOperation };
+  return issues.length ? { ok: false, issues } : { ok: true, value: value as unknown as TimelineEditOperationV2 };
 }
 
 function validateLegacyTranscript(transcript: unknown, issues: ValidationIssue[]): void {
@@ -312,11 +353,26 @@ function validateSharedProject(value: RawProject, issues: ValidationIssue[]): vo
 
   if (!isRecord(value.timeline)) push(issues, "timeline", "type", "timeline must be an object.");
   else {
-    if (!isNonNegativeIntegerV1(value.timeline.durationMs)) push(issues, "timeline.durationMs", "time", "durationMs must be a non-negative integer.");
+    const cfr30 = value.schemaVersion === CURRENT_SCHEMA_VERSION && value.timeline.timingPolicy === "cfr30";
+    if (value.schemaVersion === CURRENT_SCHEMA_VERSION && !["legacy-milliseconds", "cfr30"].includes(String(value.timeline.timingPolicy))) push(issues, "timeline.timingPolicy", "policy", "Timeline timing policy is required.");
+    if (!(cfr30 ? isFiniteNumber(value.timeline.durationMs) && value.timeline.durationMs >= 0 && !Object.is(value.timeline.durationMs, -0) : isNonNegativeIntegerV1(value.timeline.durationMs))) push(issues, "timeline.durationMs", "time", "Timeline duration is invalid.");
     if (!Array.isArray(value.timeline.tracks)) push(issues, "timeline.tracks", "type", "timeline.tracks must be an array.");
     else value.timeline.tracks.forEach((track, index) => validateTrack(track, index, issues));
     if (!Array.isArray(value.timeline.clips)) push(issues, "timeline.clips", "type", "timeline.clips must be an array.");
     else value.timeline.clips.forEach((clip, index) => validateClip(clip, index, issues));
+    if (Array.isArray(value.timeline.clips) && Array.isArray(value.timeline.tracks)) {
+      const tracks = new Map(value.timeline.tracks.filter(isRecord).map(track => [track.id, track.kind]));
+      value.timeline.clips.forEach((clip, index) => {
+        if (!isRecord(clip)) return;
+        const visual = ["video", "overlay"].includes(String(tracks.get(clip.trackId)));
+        if (cfr30 && visual && clip.frameTiming === undefined) push(issues, `timeline.clips[${index}].frameTiming`, "required", "Visual CFR30 clips require frame timing.");
+        if ((!cfr30 || !visual) && clip.frameTiming !== undefined) push(issues, `timeline.clips[${index}].frameTiming`, "policy", "Frame timing is only canonical for visual CFR30 clips.");
+      });
+      if (cfr30 && value.timeline.clips.every(clip => isRecord(clip) && isFiniteNumber(clip.timelineEndMs))) {
+        const duration = value.timeline.clips.reduce((end, clip) => Math.max(end, (clip as Record<string, number>).timelineEndMs!), 0);
+        if (value.timeline.durationMs !== duration) push(issues, "timeline.durationMs", "projection", "Timeline duration must equal its canonical clip endpoints.");
+      }
+    }
   }
 
   if (!Array.isArray(value.captions)) push(issues, "captions", "type", "captions must be an array.");
@@ -390,6 +446,9 @@ function validateSharedReferences(value: RawProject, issues: ValidationIssue[]):
   clips.forEach((clip, index) => {
     if (!sourceIds.has(clip.sourceId as string)) push(issues, `timeline.clips[${index}].sourceId`, "reference", `Unknown source ${String(clip.sourceId)}.`);
     if (!trackIds.has(clip.trackId as string)) push(issues, `timeline.clips[${index}].trackId`, "reference", `Unknown track ${String(clip.trackId)}.`);
+    const source = sources.find(source => source.id === clip.sourceId);
+    if (clip.frameTiming !== undefined && source && isFiniteNumber(source.durationMs) && isFiniteNumber(clip.sourceEndMs)
+      && clip.sourceEndMs > source.durationMs) push(issues, `timeline.clips[${index}].sourceEndMs`, "range", "Frame range exceeds the original source duration.");
   });
   graphics.forEach((graphic, index) => {
     if (graphic.sourceId && !sourceIds.has(graphic.sourceId as string)) push(issues, `graphics[${index}].sourceId`, "reference", `Unknown source ${String(graphic.sourceId)}.`);
@@ -436,10 +495,10 @@ export function assertValidProjectIRv1(value: unknown): RawProject {
   return result.value;
 }
 
-function validateProjectIRv2(value: unknown): ValidationResult<ProjectIRv2> {
+function validateModernProject(value: unknown, schemaVersion: number): ValidationResult<RawProject> {
   const issues: ValidationIssue[] = [];
   if (!isRecord(value)) return { ok: false, issues: [{ path: "$", code: "type", message: "Project must be an object." }] };
-  if (value.schemaVersion !== CURRENT_SCHEMA_VERSION) push(issues, "schemaVersion", "schema", `Expected schemaVersion ${CURRENT_SCHEMA_VERSION}.`);
+  if (value.schemaVersion !== schemaVersion) push(issues, "schemaVersion", "schema", `Expected schemaVersion ${schemaVersion}.`);
   if (hasOwn(value, "transcript")) push(issues, "transcript", "legacy", "Legacy top-level transcript is not allowed in schema v2.");
   validateSharedProject(value, issues);
 
@@ -464,7 +523,13 @@ function validateProjectIRv2(value: unknown): ValidationResult<ProjectIRv2> {
     });
     validateQuarantine((value.extensions as Record<string, unknown>)[V1_UNASSIGNED_TRANSCRIPT_EXTENSION], issues);
   }
-  return issues.length > 0 ? { ok: false, issues } : { ok: true, value: value as unknown as ProjectIRv2 };
+  return issues.length > 0 ? { ok: false, issues } : { ok: true, value };
+}
+
+export function assertValidProjectIRv2(value: unknown): ProjectIRv2 {
+  const result = validateModernProject(value, PROJECT_IR_SCHEMA_VERSION_V2);
+  if (!result.ok) throwValidation(result.issues);
+  return result.value as unknown as ProjectIRv2;
 }
 
 function validateSourceTranscriptValue(
@@ -662,7 +727,7 @@ function validateProvenanceStage(stage: Record<string, unknown>, path: string, i
   const executed = ["executionId", "engineId", "engineVersion", "engineApiVersion", "createdAt"];
   if (stage.kind === "migration") {
     rejectUnexpectedKeys(stage, ["kind", "fromSchemaVersion", "toSchemaVersion"], path, issues);
-    if (stage.fromSchemaVersion !== PROJECT_IR_SCHEMA_VERSION_V1 || stage.toSchemaVersion !== CURRENT_SCHEMA_VERSION) push(issues, path, "migration", "Migration provenance must record schema 1 to 2.");
+    if (stage.fromSchemaVersion !== PROJECT_IR_SCHEMA_VERSION_V1 || stage.toSchemaVersion !== PROJECT_IR_SCHEMA_VERSION_V2) push(issues, path, "migration", "Migration provenance must record schema 1 to 2.");
     return;
   }
   if (stage.kind === "manual-correction") {
@@ -735,17 +800,17 @@ function hasValidUnicodeScalars(value: string): boolean {
   return true;
 }
 
-export function validateProjectIR(value: unknown): ValidationResult<RawProject | ProjectIRv2> {
+export function validateProjectIR(value: unknown): ValidationResult<RawProject> {
   if (!isRecord(value)) return { ok: false, issues: [{ path: "$", code: "type", message: "Project must be an object." }] };
   if (value.schemaVersion === PROJECT_IR_SCHEMA_VERSION_V1) return validateProjectIRv1(value);
-  if (value.schemaVersion === CURRENT_SCHEMA_VERSION) return validateProjectIRv2(value);
+  if (value.schemaVersion === PROJECT_IR_SCHEMA_VERSION_V2 || value.schemaVersion === CURRENT_SCHEMA_VERSION) return validateModernProject(value, value.schemaVersion);
   return { ok: false, issues: [{ path: "schemaVersion", code: "schema", message: `Unsupported schemaVersion ${String(value.schemaVersion)}.` }] };
 }
 
 export function assertValidProjectIR(value: unknown): ProjectIR {
-  const result = validateProjectIRv2(value);
+  const result = validateModernProject(value, CURRENT_SCHEMA_VERSION);
   if (!result.ok) throwValidation(result.issues);
-  return result.value;
+  return result.value as unknown as ProjectIR;
 }
 
 export function assertValidSourceTranscriptForCreation(value: SourceTranscript): SourceTranscript {

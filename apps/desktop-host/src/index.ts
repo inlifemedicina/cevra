@@ -13,3 +13,4 @@ export * from "./protocol.js";
 export * from "./server.js";
 export * from "./session.js";
 export * from "./manual-export-destination.js";
+export * from "./manual-export-resources.js";

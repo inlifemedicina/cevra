@@ -24,6 +24,8 @@ export type HostMethod =
   | "media.ingestLocal"
   | "video.previewLocal"
   | "video.prepareManualExport"
+  | "video.exportManualSequence"
+  | "video.previewManualSequenceConform"
   | "video.trimManualClip"
   | "video.createManualClip"
   | "video.editManualSequence"
@@ -61,6 +63,7 @@ export interface DesktopHostState {
   capabilities: {
     mediaImport: CapabilityState;
     transcription: CapabilityState;
+    manualExport?: CapabilityState;
   };
 }
 
@@ -94,6 +97,8 @@ const METHODS = new Set<HostMethod>([
   "media.ingestLocal",
   "video.previewLocal",
   "video.prepareManualExport",
+  "video.exportManualSequence",
+  "video.previewManualSequenceConform",
   "video.createManualClip",
   "video.trimManualClip",
   "video.editManualSequence",
@@ -203,6 +208,12 @@ export function validateManualExportParams(params: Record<string, unknown>, id: 
   const { destinationUri, ...request } = params;
   const stable = validateManualExportPreparationRequest(request);
   return { request: stable, destinationUri: boundedString(destinationUri, 8192, "destinationUri", id) };
+}
+
+export function validateConformPreviewParams(params: Record<string, unknown>, id: string): { version: 1; expectedSnapshotId: string } {
+  exactKeys(params, ["version", "expectedSnapshotId"], id);
+  if (params.version !== 1) throw new ProtocolValidationError("HOST_INVALID_PARAMS", "Conform preview version is invalid.", id);
+  return { version: 1, expectedSnapshotId: boundedString(params.expectedSnapshotId, 128, "expectedSnapshotId", id) };
 }
 
 export function validateVideoPreviewParams(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {

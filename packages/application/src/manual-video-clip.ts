@@ -1,4 +1,4 @@
-import { type ProjectHistory, type ProjectIR, type SourceAsset, type TimelineEditOperation } from "@cevra/project-ir";
+import { type ProjectHistory, type ProjectIR, type SourceAsset, type TimelineEditOperation, type ClipFrameTimingV1 } from "@cevra/project-ir";
 import { createSourceContentVerificationMemo, SourceTechnicalDescriptorResolver, type SourceContentIdentityPort, type SourceFileOperationalStampV1 } from "./source-technical-descriptor.js";
 
 /** Bounded first-video preview; streaming/composition remain separate work. */
@@ -20,10 +20,10 @@ export interface LocalVideoPreview {
   durationMs: number;
   mimeType: "video/mp4" | "video/quicktime" | "video/webm";
   base64: string;
-  proxy?: { profile: "take-v1"; sourceDurationMs: number };
+  proxy?: { profile: "take-v1" | "manual-cfr30-preview-v1"; sourceDurationMs: number };
   /** Ephemeral first admitted frame; never a source, poster asset or project edit. */
   initialFrame?: { mimeType: "image/png"; base64: string; width: number; height: number; sourceTimeMs: number };
-  clip?: { id: string; sourceStartMs: number; sourceEndMs: number; firstFrameMs: number; lastFrameMs: number; frameCount: number };
+  clip?: { id: string; sourceStartMs: number; sourceEndMs: number; firstFrameMs: number; lastFrameMs: number; frameCount: number; frameTiming?: ClipFrameTimingV1 };
 }
 
 export interface CreateManualVideoClipRequest extends LocalVideoPreviewRequest {

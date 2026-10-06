@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createEmptyProject, ProjectHistory } from "@cevra/project-ir";
+import { createEmptyProject, ProjectHistory, framesToMilliseconds, frameTimingMilliseconds } from "@cevra/project-ir";
 import { ManualVideoSequenceApplicationService } from "../dist/index.js";
 
 function setup(identityOverrides = {}, idGenerator) {
@@ -189,3 +189,100 @@ for (const change of ["gap", "overlap", "locked", "hidden", "speed", "volume", "
     assert.deepEqual(history.toArchive(), before);
   });
 }
+
+function frameSetup(overrides = {}) {
+  const f = setup(overrides);
+  f.request = intent => ({ version: 2, expectedSnapshotId: f.history.current.history.headSnapshotId, ...intent });
+  return f;
+}
+async function frameAction(f, intent, expected) {
+  await action(f, intent, expected.map(([id, source, ...frames]) => [id, source, ...frames.map(framesToMilliseconds)]));
+  assert.deepEqual([...f.history.current.timeline.clips].sort((a, b) => a.frameTiming.timelineStartFrame - b.frameTiming.timelineStartFrame)
+    .map(c => [c.id, c.sourceId, c.frameTiming.sourceStartFrame, c.frameTiming.sourceEndFrame, c.frameTiming.timelineStartFrame, c.frameTiming.timelineEndFrame]), expected);
+  assert.equal(f.history.current.timeline.timingPolicy, "cfr30");
+  assert.equal(f.history.entries.at(-1).command.version, 2);
+}
+
+test("all seven CFR30 intents use integer frame counts and one reversible atomic action", async () => {
+  const f = frameSetup();
+  await frameAction(f, { type: "append", sourceId: "s0", sourceStartFrame: 0, sourceEndFrame: 3 }, [["clip-1", "s0", 0, 3, 0, 3]]);
+  await frameAction(f, { type: "append", sourceId: "s1", sourceStartFrame: 3, sourceEndFrame: 6 }, [["clip-1", "s0", 0, 3, 0, 3], ["clip-2", "s1", 3, 6, 3, 6]]);
+  await frameAction(f, { type: "insert", beforeClipId: "clip-2", sourceId: "s0", sourceStartFrame: 1, sourceEndFrame: 2 },
+    [["clip-1", "s0", 0, 3, 0, 3], ["clip-3", "s0", 1, 2, 3, 4], ["clip-2", "s1", 3, 6, 4, 7]]);
+  await frameAction(f, { type: "duplicate", clipId: "clip-3" },
+    [["clip-1", "s0", 0, 3, 0, 3], ["clip-3", "s0", 1, 2, 3, 4], ["clip-4", "s0", 1, 2, 4, 5], ["clip-2", "s1", 3, 6, 5, 8]]);
+  await frameAction(f, { type: "trim", clipId: "clip-1", sourceStartFrame: 0, sourceEndFrame: 2 },
+    [["clip-1", "s0", 0, 2, 0, 2], ["clip-3", "s0", 1, 2, 2, 3], ["clip-4", "s0", 1, 2, 3, 4], ["clip-2", "s1", 3, 6, 4, 7]]);
+  await frameAction(f, { type: "split", clipId: "clip-2", timelineAtFrame: 5 },
+    [["clip-1", "s0", 0, 2, 0, 2], ["clip-3", "s0", 1, 2, 2, 3], ["clip-4", "s0", 1, 2, 3, 4], ["clip-2", "s1", 3, 4, 4, 5], ["clip-5", "s1", 4, 6, 5, 7]]);
+  await frameAction(f, { type: "reorder", clipIds: ["clip-5", "clip-1", "clip-3", "clip-4", "clip-2"] },
+    [["clip-5", "s1", 4, 6, 0, 2], ["clip-1", "s0", 0, 2, 2, 4], ["clip-3", "s0", 1, 2, 4, 5], ["clip-4", "s0", 1, 2, 5, 6], ["clip-2", "s1", 3, 4, 6, 7]]);
+  await frameAction(f, { type: "remove", clipId: "clip-3" },
+    [["clip-5", "s1", 4, 6, 0, 2], ["clip-1", "s0", 0, 2, 2, 4], ["clip-4", "s0", 1, 2, 4, 5], ["clip-2", "s1", 3, 4, 5, 6]]);
+});
+
+test("legacy conform previews every boundary without mutation, requires reviewed positive complete ranges, and retains legacy Undo", async () => {
+  const f = setup();
+  await f.service.edit(f.request({ type: "append", sourceId: "s0", sourceStartMs: 0, sourceEndMs: 7 }));
+  const archive = f.history.toArchive(), snapshot = f.history.current.history.headSnapshotId;
+  const preview = f.service.previewConform(snapshot);
+  assert.equal(preview.canConform, false); assert.equal(preview.clips[0].collapsed, true);
+  assert.deepEqual(Object.keys(preview.clips[0].boundaries).sort(), ["sourceEnd", "sourceStart", "timelineEnd", "timelineStart"]);
+  assert.equal(preview.clips[0].boundaries.sourceEnd.originalMs, 7);
+  assert.equal(preview.clips[0].boundaries.sourceEnd.nearestFrame, 0);
+  assert.equal(preview.clips[0].boundaries.sourceEnd.deltaMs, -7);
+  assert.deepEqual(f.history.toArchive(), archive);
+  const base = { version: 2, type: "conform", expectedSnapshotId: snapshot };
+  for (const clips of [[], [{ clipId: "foreign", sourceStartFrame: 0, sourceEndFrame: 1 }],
+    [{ clipId: "clip-1", sourceStartFrame: 0, sourceEndFrame: 0 }],
+    [{ clipId: "clip-1", sourceStartFrame: 0, sourceEndFrame: 1 }, { clipId: "clip-1", sourceStartFrame: 0, sourceEndFrame: 1 }]]) {
+    await assert.rejects(f.service.edit({ ...base, clips })); assert.deepEqual(f.history.toArchive(), archive);
+  }
+  await assert.rejects(f.service.edit({ version: 2, type: "duplicate", clipId: "clip-1", expectedSnapshotId: snapshot }), { code: "MANUAL_SEQUENCE_CONFORM_REQUIRED" });
+  await f.service.edit({ ...base, clips: [{ clipId: "clip-1", sourceStartFrame: 0, sourceEndFrame: 1 }] });
+  const after = f.history.current;
+  assert.equal(after.timeline.durationMs, framesToMilliseconds(1)); assert.equal(f.history.entries.length, archive.entries.length + 1);
+  await assert.rejects(f.service.edit(f.request({ type: "remove", clipId: "clip-1" })), { code: "MANUAL_SEQUENCE_UNSUPPORTED" });
+  f.history.undo(); assert.deepEqual(f.history.toArchive().entries.slice(0, archive.entries.length), archive.entries);
+  assert.equal(f.history.current.timeline.durationMs, 7); assert.equal(f.history.current.timeline.timingPolicy, "legacy-milliseconds");
+  const restored = ProjectHistory.fromArchive(f.history.toArchive()); assert.deepEqual(restored.redo(), after);
+});
+
+test("CFR30 no-ops preserve redo, closed intents reject before media reads, and async ABA is stale", async () => {
+  const f = frameSetup(); await f.service.edit(f.request({ type: "append", sourceId: "s0", sourceStartFrame: 1, sourceEndFrame: 8 }));
+  f.history.commit({ type: "project.rename", name: "Retain redo" }); f.history.undo();
+  const archive = f.history.toArchive();
+  const capture = f.identity.captureSource;
+  f.identity.captureSource = async () => assert.fail("no source reads for no-op/invalid work");
+  await f.service.edit(f.request({ type: "trim", clipId: "clip-1", sourceStartFrame: 1, sourceEndFrame: 8 }));
+  await f.service.edit(f.request({ type: "reorder", clipIds: ["clip-1"] }));
+  for (const intent of [
+    { type: "append", sourceId: "s0", sourceStartFrame: 0.5, sourceEndFrame: 1 },
+    { type: "append", sourceId: "s0", sourceStartFrame: 0, sourceEndFrame: 1, sourceEndMs: 33 },
+    { type: "trim", clipId: "clip-1", sourceStartFrame: 0, sourceEndFrame: 181 },
+    { type: "split", clipId: "clip-1", timelineAtFrame: 0 },
+    { type: "conform", clips: [{ clipId: "clip-1", sourceStartFrame: 0, sourceEndFrame: 1, extensions: {} }] }
+  ]) await assert.rejects(f.service.edit(f.request(intent)));
+  assert.deepEqual(f.history.toArchive(), archive);
+  f.identity.captureSource = capture;
+  const identify = f.identity.identifySource;
+  f.identity.identifySource = async (...args) => { f.history.commit({ type: "project.rename", name: "ABA" }); f.history.undo(); return identify(...args); };
+  await assert.rejects(f.service.edit(f.request({ type: "duplicate", clipId: "clip-1" })), { code: "MANUAL_SEQUENCE_STALE" });
+  assert.equal(f.history.canRedo, true); assert.equal(f.history.current.timeline.clips.length, 1);
+});
+
+test("3000 canonical one-frame occurrences resolve without rounded-ms duration comparisons", async () => {
+  const f = frameSetup();
+  const clips = Array.from({ length: 3000 }, (_, frame) => {
+    const frameTiming = { version: 1, timelineStartFrame: frame, timelineEndFrame: frame + 1, sourceStartFrame: 0, sourceEndFrame: 1 };
+    return { id: `single-${frame}`, trackId: "v", sourceId: "s0", frameTiming, ...frameTimingMilliseconds(frameTiming), speed: 1, volume: 1, opacity: 1 };
+  });
+  f.history.commit({ type: "timeline.edit", version: 2, edits: [
+    { type: "timeline.timingPolicy.set", timingPolicy: "cfr30" },
+    { type: "track.add", track: { id: "v", kind: "video", name: "V", locked: false, hidden: false, muted: false } },
+    ...clips.map(clip => ({ type: "clip.add", clip }))
+  ] });
+  const archive = f.history.toArchive();
+  await f.service.edit(f.request({ type: "reorder", clipIds: clips.map(c => c.id) }));
+  assert.deepEqual(f.history.toArchive(), archive); assert.equal(f.history.current.timeline.durationMs, 100000);
+});

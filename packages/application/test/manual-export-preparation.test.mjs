@@ -28,7 +28,7 @@ test("read-only preparation preserves exact seven-ms cuts, redo and numbering an
   const result = await f.service.prepare(f.request(), f.port);
   assert.equal(result.durationMs, 714); assert.equal(result.clipCount, 3); assert.equal(result.originalCount, 2);
   assert.equal(result.originalCopyBytes, 20); assert.equal(result.renderAvailable, false);
-  assert.equal(result.blockingReason, "delivery-timing-unresolved"); assert.equal(result.destinationLabel, "new.mp4");
+  assert.equal(result.blockingReason, "legacy-timing-requires-conform"); assert.equal(result.destinationLabel, "new.mp4");
   assert.equal(Object.isFrozen(result), true); assert.equal("destinationUri" in result, false);
   await f.service.revalidate(result); assert.deepEqual(f.history.toArchive(), before); assert.equal(f.history.canRedo, true);
   await assert.rejects(f.service.revalidate(structuredClone(result)), { code: "MANUAL_EXPORT_STALE" });

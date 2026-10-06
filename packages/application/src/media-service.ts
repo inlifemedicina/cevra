@@ -11,13 +11,14 @@ import {
   resolveTranscodeDelivery,
   validateMediaOperation,
   validateAudioMeasurementReport,
+  validateManualSequenceExecutionEvidence,
   type MediaEngineAdapter,
   type MediaOperation,
   type MediaOperationResult,
   type MediaPublicationEvidenceV1
 } from "@cevra/contracts";
 import { applyCommand, type EditCommand, type JournalActor, type ProjectHistory, type ProjectIR } from "@cevra/project-ir";
-import { MediaApplicationError } from "./errors.js";
+import { MediaApplicationError, MediaExecutionCommitError } from "./errors.js";
 import { MediaExecutionAlreadyExistsError, type MediaExecutionRepository } from "./repository.js";
 import { mediaOperationOutputUris } from "./media-operation.js";
 import {
@@ -53,6 +54,8 @@ export interface MediaApplicationServiceOptions {
 export interface MediaExecutionGuards {
   beforeEngine?: { verify(signal?: AbortSignal): Promise<void> };
   beforeCommit?: { verify(signal?: AbortSignal): Promise<void> };
+  /** Synchronous full-journal assertion immediately beside the canonical commit. */
+  assertCurrent?: () => void;
 }
 
 export class MediaExecutionGuardError extends Error {
@@ -99,6 +102,7 @@ export class MediaApplicationService {
       candidate = clone(request);
       stableRequest = snapshotExecutionRequest(candidate, defaultLocale, this.idGenerator);
       if (stableRequest.operation.type === "trim" && stableRequest.operation.boundedPreview) throw new Error("Ephemeral preview preparation cannot enter the durable Media execution service.");
+      if (stableRequest.operation.type === "render-manual-video-preview") throw new Error("Ephemeral frame-grid preview cannot enter the durable Media execution service.");
     } catch (cause) {
       const locale = candidate?.locale === "en-US" ? "en-US" : defaultLocale;
       const executionId = typeof candidate?.id === "string" ? candidate.id : "invalid-media-execution";
@@ -188,6 +192,11 @@ export class MediaApplicationService {
     // A validated mux can depend on transient Application guards that are not
     // serialized. Isolated retry cannot safely reconstruct those guards.
     if (record.operation.type === "mux-audio" && record.operation.durationValidation !== undefined) {
+      throw new MediaApplicationError("MEDIA_OPERATION_NOT_RETRYABLE", locale, executionId);
+    }
+    if (record.operation.type === "render-manual-video-sequence" || record.operation.type === "render-manual-video-preview") {
+      // Native workspace ownership and original/full-journal guards are execution-local.
+      // A fresh explicit product action must issue them again; restart never replays.
       throw new MediaApplicationError("MEDIA_OPERATION_NOT_RETRYABLE", locale, executionId);
     }
     try {
@@ -381,6 +390,7 @@ export class MediaApplicationService {
         throw new AttemptFailure("MEDIA_PROJECT_CONFLICT", "Project changed before the canonical commit.");
       }
       assertProjectBinding(this.history, commitProject, record.projectBinding);
+      guards?.assertCurrent?.();
       if (command) {
         try {
           this.history.commit(command, record.actor);
@@ -402,7 +412,7 @@ export class MediaApplicationService {
       return { record: clone(record), project };
     } catch (cause) {
       if (projectStateFinalized) {
-        throw new MediaApplicationError("MEDIA_RECOVERY_FAILED", record.locale, record.id, {}, cause);
+        throw new MediaExecutionCommitError(record, cause);
       }
       const cancelled = isAbort(cause, signal);
       const failure = cause instanceof AttemptFailure ? cause : undefined;
@@ -495,6 +505,18 @@ export class MediaApplicationService {
     for (const uri of this.history.retainedMediaUris()) protectedUris.add(uri);
     const removed: string[] = [];
     const failed: string[] = [];
+    if (operation.type === "render-manual-video-sequence") {
+      // POSIX dev/inode re-proof followed by pathname unlink is not atomic.
+      // Never race an external replacement of a manual export's public name.
+      // The Host retains its account/root and reports the possible publication;
+      // no failed render is automatically replayed or promoted to export.add.
+      for (const uri of allowedUris) {
+        if (protectedUris.has(uri)) continue;
+        try { if (await this.artifacts.kind(uri) !== "missing") failed.push(uri); }
+        catch { failed.push(uri); }
+      }
+      return { removed, failed };
+    }
     const evidencedUris = new Set(publications.filter(({ uri }) => allowed.has(uri)).map(({ uri }) => uri));
     for (const uri of allowedUris) {
       if (protectedUris.has(uri) || evidencedUris.has(uri)) continue;
@@ -622,10 +644,14 @@ function assertProjectBinding(history: ProjectHistory, project: ProjectIR, bindi
 }
 
 function hasExclusivePublication(operation: MediaOperation): boolean {
-  return operation.type === "render-audio-sequence" || operation.type === "mux-audio";
+  return operation.type === "render-audio-sequence" || operation.type === "mux-audio"
+    || operation.type === "render-manual-video-sequence" || operation.type === "render-manual-video-preview";
 }
 
 function validateMutation(operation: MediaOperation, mutation: MediaProjectMutation): void {
+  if (operation.type === "render-manual-video-sequence" && mutation.type !== "export.add") {
+    throw new Error("Manual final delivery requires its canonical export mutation.");
+  }
   if (operation.type === "render-audio-sequence") {
     if (mutation.type !== "none") throw new Error("Audio sequence PCM is a derived intermediate and must not mutate Project IR.");
     return;
@@ -787,6 +813,41 @@ function samePublicationEvidence(left: MediaPublicationEvidenceV1, right: MediaP
 
 function validateDeliveryPostcondition(operation: MediaOperation, result: Extract<MediaOperationResult, { type: "file" }>): void {
   if (!result.probe.hasVideo && !result.probe.hasAudio) throw new AttemptFailure("MEDIA_OUTPUT_MISSING", "Output contains no audio or video stream.");
+  if (operation.type === "render-manual-video-sequence") {
+    let evidence;
+    try { evidence = validateManualSequenceExecutionEvidence(result.manualSequence); }
+    catch { throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Manual export has no valid frame/sample delivery evidence."); }
+    const frames = operation.items.reduce((total, item) => total + item.sourceEndFrame - item.sourceStartFrame, 0);
+    const expectedSources = new Map(operation.items.map(item => [item.inputUri, item.sourceContent]));
+    const actualSources = new Map(evidence.sources.map(source => [source.inputUri, source]));
+    const channels = evidence.audioChannelLayout === "stereo" ? 2 : 1;
+    if (evidence.profile !== "manual-cfr30-export-v1" || evidence.totalFrames !== frames || evidence.itemCount !== operation.items.length
+      || evidence.sources.length !== expectedSources.size || evidence.totalPcmSamples !== frames * 1600
+      || evidence.audioChannelLayout !== (evidence.sources.some(source => source.channelLayout === "stereo") ? "stereo" : "mono")
+      || !result.publication || !result.probe.hasVideo || !result.probe.hasAudio
+      || normalizeVideoCodec(result.probe.videoCodec) !== "h264" || normalizeAudioCodec(result.probe.audioCodec) !== "aac"
+      || result.probe.width !== 1920 || result.probe.height !== 1080 || result.probe.frameRate !== 30
+      || result.probe.sampleRate !== 48000 || result.probe.channels !== channels || result.probe.hdr === true
+      || result.durationMs === undefined || Math.abs(result.durationMs - frames * 1000 / 30) > 1
+      || result.effectiveProfile.container !== "mp4" || result.effectiveProfile.videoCodec !== "h264" || result.effectiveProfile.audioCodec !== "aac") {
+      throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Manual export disagrees with its original-source CFR30 profile.");
+    }
+    for (const [uri, content] of expectedSources) {
+      const actual = actualSources.get(uri);
+      if (!actual || actual.sha256 !== content.sha256 || actual.sizeBytes !== content.sizeBytes) {
+        throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Manual source evidence disagrees with adopted original identity.");
+      }
+    }
+    for (const item of operation.items) {
+      const source = actualSources.get(item.inputUri)!;
+      if (item.sourceEndFrame * 1000 / 30 > source.sourceVideoEndMs + 1
+        || item.sourceStartFrame * source.sampleRate / 30 < source.sourceAudioFirstSample
+        || item.sourceEndFrame * source.sampleRate / 30 > source.sourceAudioFirstSample + source.sourceAudioSampleCount) {
+        throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Manual source range is outside measured picture/audio coverage.");
+      }
+    }
+    return;
+  }
   if (operation.type === "extract-frame") {
     if (!result.probe.hasVideo || result.probe.videoCodec?.toLowerCase() !== "png" || result.probe.hasAudio) {
       throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Extracted frame does not satisfy the PNG output contract.");

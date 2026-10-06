@@ -17,6 +17,8 @@
     "allow-desktop-revise-editorial-draft",
     "allow-desktop-preview-local-video",
     "allow-desktop-prepare-manual-export",
+    "allow-desktop-export-manual-sequence",
+    "allow-desktop-preview-manual-sequence-conform",
     "allow-desktop-create-manual-video-clip",
     "allow-desktop-trim-manual-video-clip"
   ]

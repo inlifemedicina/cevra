@@ -1,5 +1,6 @@
 export * from "./base.js";
 export * from "./media.js";
+export * from "./manual-video-sequence.js";
 export * from "./composition.js";
 export * from "./transcription.js";
 export * from "./alignment.js";

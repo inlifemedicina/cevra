@@ -25,7 +25,7 @@ export function createEmptyProject(options: CreateProjectOptions = {}): ProjectI
     },
     sources: [],
     sourceTranscripts: [],
-    timeline: { durationMs: 0, tracks: [], clips: [] },
+    timeline: { timingPolicy: "legacy-milliseconds", durationMs: 0, tracks: [], clips: [] },
     captions: [],
     graphics: [],
     layouts: [],

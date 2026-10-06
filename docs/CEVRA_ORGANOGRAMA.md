@@ -15,6 +15,7 @@ After explicit approval of their exact heads, #84→#85 merged at `6e2cce16` and
 attempts remain preserved.
 Insert before selection, duplicate
 after selection and explicit Retry after failed save are approved.
+**Historical M0/M1 checkpoints before the CFR30 implementation:**
 M0 is published as [technical Draft #86](https://github.com/inlifemedicina/cevra/pull/86)
 now targeting main, with bounded automated/exact-tree-review evidence and a
 private-Node CI smoke close-handshake correction recorded in the plan. Corrected
@@ -64,7 +65,32 @@ explicit audio binding for the video-only G1 sequence remain required; no new
 audio admission policy or unused publisher/journal/service was introduced.
 The [single grouped G1 script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
 is prepared, not executed. #86/#87 stay unmerged; progress 55%, F-A02 exhausted 1/1.
-Final render/publication/resource-budget integration remains open. No G1 PASS,
+Final render/publication/resource-budget integration remains open.
+The subsequent Owner decision at 2026-10-06 00:51 UTC supersedes the OPEN temporal
+alternatives above: CFR30 visual timeline and matching export, visible frame
+edits, shared actual-PTS preview/render sampling, independent audio timing and
+explicit reversible review/conversion of legacy cuts. [ADR0033](adr/0033-manual-sequence-cfr30-clock.md)
+records the category comparison and actual feasibility. The real path now uses
+existing Project IR/History/Media publication/archive and checkpoint/recovery
+contracts in Draft #87, including source-master render and explicit source audio.
+Local evidence: IR70, Store18, Application314, Contracts25, Host172, UI155,
+MediaNode140 (combined native/sandbox), Python121, Rust48 and offline-agent391
+tests passed. Current
+source-worker fixtures passed B-frame/fractional/VFR/one-frame/repeated cuts and
+60-s Full HD final/preview, exact decoded counts, immutable originals and measured
+quality/resources. The long preview was 4452793 B; sampled peaks were 178257920 B
+RSS and 604991488 B allocated job files. Exact sealed R2 functional passed the
+production guard before commit, late NTSC/source-PTS barcode and stereo clocks,
+Original with audio offset, persisted reopen/Undo without replay and 60-s output.
+Manual failure cleanup preserves the public final. Uncertain uncommitted
+publication or unproved retirement also retains account/root; confirmed commit
+and proved retirement allow private cleanup with final/`export.add` preserved.
+Native timeout reconciliation retains late sanitized publication/commit errors
+and their evidence with the current state; Original keeps Take source timing. Independent exact-tree
+review and published-head CI receipts accompany the Draft. Sampled supervision
+does not establish instantaneous ceilings; broader source/perceptual/gapless/
+owner acceptance remains open.
+No G1 PASS,
 real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,
 Vids=Desktop; Lite/Full share core and Full visual output does not require Vids.
