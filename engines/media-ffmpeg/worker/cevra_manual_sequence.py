@@ -107,6 +107,77 @@ def _root_current(root: Path, expected: os.stat_result) -> None:
         raise RuntimeError("manual owned workspace identity changed")
 
 
+def _admit_owned_disk(root: Path, expected: os.stat_result, prospective_account: Path | None = None) -> None:
+    """Quiescent pre-publication admission; not a quota on earlier writes.
+
+    Count each name, including hardlinks, like the Host watchdog. The projected
+    accounting link adds the candidate's logical and allocated size once more.
+    Directory descriptors prevent following a replaced directory or symlink.
+    """
+    _root_current(root, expected)
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    logical, allocated, entries = 0, 0, 0
+
+    def stable(metadata: os.stat_result) -> tuple:
+        return (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_size,
+                metadata.st_mtime_ns, metadata.st_ctime_ns, metadata.st_blocks)
+
+    def visit(descriptor: int, depth: int) -> None:
+        nonlocal logical, allocated, entries
+        if depth > 32:
+            raise RuntimeError("manual owned disk observation exceeds depth bound")
+        initial = os.fstat(descriptor)
+        if not stat.S_ISDIR(initial.st_mode) or initial.st_dev != expected.st_dev:
+            raise RuntimeError("manual owned disk directory identity changed")
+        with os.scandir(descriptor) as contents:
+            for entry in contents:
+                entries += 1
+                if entries > 100_000:
+                    raise RuntimeError("manual owned disk observation exceeds entry bound")
+                metadata = entry.stat(follow_symlinks=False)
+                if metadata.st_dev != expected.st_dev:
+                    raise RuntimeError("manual owned disk entry crossed its filesystem")
+                if stat.S_ISDIR(metadata.st_mode):
+                    child = os.open(entry.name, flags, dir_fd=descriptor)
+                    try:
+                        if stable(os.fstat(child)) != stable(metadata):
+                            raise RuntimeError("manual owned disk directory changed during observation")
+                        visit(child, depth + 1)
+                    finally:
+                        os.close(child)
+                elif stat.S_ISREG(metadata.st_mode):
+                    if metadata.st_size < 0 or metadata.st_blocks < 0:
+                        raise RuntimeError("manual owned disk file accounting is invalid")
+                    logical += metadata.st_size
+                    allocated += metadata.st_blocks * 512
+                else:
+                    raise RuntimeError("manual owned disk observation rejects symlinks and special files")
+                if stable(os.stat(entry.name, dir_fd=descriptor, follow_symlinks=False)) != stable(metadata):
+                    raise RuntimeError("manual owned disk entry changed during observation")
+        if stable(os.fstat(descriptor)) != stable(initial):
+            raise RuntimeError("manual owned disk directory changed during observation")
+
+    descriptor = os.open(root, flags)
+    try:
+        current = os.fstat(descriptor)
+        if (current.st_dev, current.st_ino) != (expected.st_dev, expected.st_ino):
+            raise RuntimeError("manual owned workspace identity changed")
+        visit(descriptor, 0)
+    finally:
+        os.close(descriptor)
+    if prospective_account is not None:
+        if not prospective_account.is_relative_to(root):
+            raise RuntimeError("manual accounting candidate escaped its workspace")
+        metadata = prospective_account.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_dev != expected.st_dev or metadata.st_size < 0 or metadata.st_blocks < 0:
+            raise RuntimeError("manual accounting candidate is invalid")
+        logical += metadata.st_size
+        allocated += metadata.st_blocks * 512
+    _root_current(root, expected)
+    if max(logical, allocated) > OWNED_BYTES:
+        raise RuntimeError("manual owned job disk budget exceeded before publication")
+
+
 def _seal(source: Path, target: Path, content: dict) -> os.stat_result:
     initial = source.lstat()
     if content["size_bytes"] > SOURCE_BYTES or not stat.S_ISREG(initial.st_mode) or initial.st_size != content["size_bytes"]:
@@ -392,10 +463,14 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
                 elif actual != expected:
                     raise RuntimeError("manual output did not preserve common source colour signalling")
             measured["sha256"] = inspection._hash_stable(candidate, candidate.lstat(), OWNED_BYTES)
+            # All media producers have settled. Admit the complete owned tree,
+            # including the future accounting name, before any public link.
+            _admit_owned_disk(root, root_stamp, candidate)
             # Keep this identity-bound hard link through Host final budget check.
             # It adds no payload allocation, and never grants authority over final.
             os.link(candidate, accounting, follow_symlinks=False)
             publication = tools._publication_evidence(accounting)
+            _admit_owned_disk(root, root_stamp)
             jobs.check_cancelled()
         result = tools._run_mux_audio(common, {"video": str(video), "audio": str(pcm), "output": str(output), "container": "mp4", "audio_codec": "aac", "replace_existing": True}, owned_staging_parent=directory, before_publish=admit,
             owned_aac_bits_per_second=96_000 if preview else None, retain_published_on_error=True)

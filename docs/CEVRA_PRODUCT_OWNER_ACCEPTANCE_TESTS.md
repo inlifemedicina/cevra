@@ -257,7 +257,19 @@ variante os resultados técnicos e o julgamento perceptual separado.
    pipeline/runtime/envelope e limites necessários à rodada serem concluídos. Depois,
    executar essa variante na mesma rodada agrupada; não alegar PASS antecipado.
 
-Estado deste roteiro: **NÃO EXECUTADO / preparação documental**. Não promove G1,
+Preparação nativa de 2026-10-06: pacote macOS arm64 isolado em construção/verificação,
+sem abrir a janela e com diretório/identificador próprios. Duas fixtures sintéticas
+H264/SDR/BT709/1080p/AAC48k estéreo, A em 24 fps e B em 30000/1001, possuem hashes
+registrados no manifesto do pacote. O plano de referência A[15,60), B[30,75),
+A[15,60), A[120,150) soma 165 frames CFR30, 5,5 s e 264000 amostras por canal.
+Flashes/beeps permitem observar ordem/sync; não substituem julgamento de voz/lip.
+O scan antes de publicação bloqueia excesso agregado persistente; a supervisão
+RAM/disco continua amostrada, sem teto instantâneo provado. O item 7 mantém esse
+gate explicitamente aberto; o pacote não declara READY para G1 completo ou projeto
+real arbitrário. Os receipts técnicos de build/Host/runtime e comandos de abertura
+posterior acompanham a mesma variante, sem duplicar este catálogo.
+
+Estado deste roteiro: **NÃO EXECUTADO / preparação nativa agrupada**. Não promove G1,
 G5/G6, native/owner, progresso ou F-A02. A política temporal está aprovada;
 os gates técnicos e o julgamento humano continuam pendentes.
 

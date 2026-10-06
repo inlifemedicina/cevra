@@ -90,6 +90,13 @@ and their evidence with the current state; Original keeps Take source timing. In
 review and published-head CI receipts accompany the Draft. Sampled supervision
 does not establish instantaneous ceilings; broader source/perceptual/gapless/
 owner acceptance remains open.
+The subsequent isolated native-package preparation adds quiescent aggregate disk
+admission before public publication, including projected/actual accounting links.
+Python126 and the sealed R3 functional catalog passed; R2 quality receipts retain
+their historical binding. Native packaging/Host validation and final-head review/CI
+receipts accompany the same Draft. The 100-ms watchdog waits after each scan;
+instantaneous RAM/disk ceilings and real-project/perceptual/Owner acceptance stay
+open. Two synthetic flash/beep fixtures are prepared; no human app was opened.
 No G1 PASS,
 real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,

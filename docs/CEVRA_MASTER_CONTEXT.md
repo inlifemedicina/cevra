@@ -2809,6 +2809,28 @@ The [current G1 checkpoint](CEVRA_MANUAL_SEQUENCE_G1.md#current-cfr30-implementa
 and Draft #87 hold final-tree review, sealed functional and published-head CI
 receipts. G1/OWNER/NATIVE remain unpromoted, progress 55%, F-A02 1/1.
 
+**Native grouped G1 preparation — 2026-10-06:** the preceding implementation
+was published at `cb774cad53e6cdf3ac535d08bc4e12d9e9122391`; its push/PR/exact
+runtime CI passed 11/11 jobs, attempt 1. The isolated human-validation package
+adds a bounded internal fix: before public publication, scan all owned files
+without following symlinks, project the accounting hardlink's logical/allocated
+bytes, and check again after creating that link. Excess blocks publication.
+This is quiescent admission, not a quota intercepting earlier writes. Python
+126/126 and the exact sealed R3 manual functional catalog passed; manifest SHA
+`ac2663fe25458970b153557b7255fe35f48a8152f533ca84f811112ec4e73cf0` binds the
+current worker modules. R3 again proved actual decoded picture/audio counts,
+source identity, Original timing and checkpoint/archive reopen without replay.
+Its 60-s flat-barcode final sampled 133562368 B RSS and 39407529 B logical files.
+The earlier R2 Full HD PSNR/resource measurements remain their own historical
+receipts. Two authored flash/beep fixtures prepare the existing grouped script;
+they do not prove voice/lip perception. Native build/packaged-Host receipts and
+final-head review/CI accompany Draft #87. No app was opened or human Take session
+touched during preparation. A real project can exceed resources between scans;
+the 100-ms delay follows each scan and is not a maximum observation interval.
+Instantaneous 512-MiB/2-GiB, arbitrary-source/perceptual and Owner gates stay open.
+Director impact is a compatible internal extension: existing typed operations,
+IR/History and preset boundaries remain authoritative, with no new AI authority.
+
 1. Preserve the accepted F-A02 direct PT-BR textual result and its limits (§24.1): citation support PARTIAL, literal helper unchanged, budget exhausted 1/1. The whole real-agent gate remains open; complete analysis, I1-T1 plan/Change Set and strategy/takes/cuts are not delivered or implicitly authorized. The bounded offline evidence-linked Application draft service is integrated through #75; the owner-approved offline review consumer under D9 is integrated through #77. The subsequently approved admission of the designated F-A02 result/history into a temporary native session is implemented on the current branch, with review/integration pending. Do not infer broader strategy authority, invent alignment or spend another provider slot. PR #70/#72 and their green post-merge CI close the diagnostic/preparation work. Phase A and the bounded V1 transport remain closed; V1 remains terminal 8/8, original lost receipts and prior failures preserved. Any further live scenario requires a separately approved scope, allocation and genuine consent. INT-CLOUD-01–05 retain their existing prerequisites; progress stays 55%.
 2. Keep the coordinated Media Runtime gate active in parallel for Slice 5B, HDR/export, audio policy, assembled-plan QA, Composition/preview and release consumers; do not treat those residual items as a serial blocker for semantic editorial analysis.
 3. Preserve Editorial Transcript Projection V1 as the closed bounded evidence boundary; semantic analysis must consume it without making the projection a new canonical authority.

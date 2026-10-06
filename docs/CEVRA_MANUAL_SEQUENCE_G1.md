@@ -838,6 +838,53 @@ Drive production application/IPC, not direct fixture IR edits.
   ambiguous/redo-retained assets. No automatic replay or empty replacement over
   corruption; crash restores only a proved checkpoint.
 
+## Subsequent isolated native-package preparation — 2026-10-06
+
+The preceding CFR30 implementation was published at
+`cb774cad53e6cdf3ac535d08bc4e12d9e9122391`, with all 11 push/PR/exact-runtime CI
+jobs successful on attempt 1. The next bounded preparation fixes a concrete
+publication-admission gap: the original callback checked the candidate alone,
+while the Host aggregate check followed public publication. The callback now
+scans the full private tree through no-follow directory descriptors, counts
+logical/allocated bytes per name, projects the accounting hardlink, and scans
+again after linking account and before the existing public publisher. Persistent
+aggregate excess prevents publication. Identity changes, symlinks, special files,
+filesystem crossing and bounded-scan failures reject admission. No engine,
+publisher, DTO, preset, resource requirement or editing/history policy changes.
+
+Python 126/126 passed, including sparse/logical and allocated boundaries,
+hardlink projection, rejected aliases/replaced roots, complete pipeline rejection
+before account/publication, and post-account rejection preserving private evidence.
+Exact sealed R3 native functional acceptance passed the existing CFR/B-frame/
+late-NTSC/VFR barcodes, independent stereo audio, Original source clock, audited
+export/reopen/Undo/Redo without replay and 60-s output. All nine sealed modules
+match source; R3 manifest SHA-256 is
+`ac2663fe25458970b153557b7255fe35f48a8152f533ca84f811112ec4e73cf0`.
+The R3 long flat-barcode final sampled 133562368 B RSS, 39407529 B logical and
+39481344 B allocated. The separate higher-entropy Full HD PSNR and resource
+measurements above remain their R2 receipts; they are not a repeated R3 stress test.
+
+The package uses an isolated native identifier, project root and copied runtimes;
+build/packaged-Host validation and exact-head review/CI receipts accompany Draft #87.
+Two original authored flash/beep fixtures have recorded hashes and explicit SDR
+BT709 signalling: A 8 s/CFR24 and B 6.006 s/30000/1001, both 1080p/AAC48k stereo.
+The grouped script's reference sequence totals 165 frames/5.5 s/264000 samples per
+channel. These inputs support bounded order/timing/UX review, not voice/lip or
+arbitrary-content acceptance. No app/window/device or human Take session is operated.
+
+The existing watchdog waits 100 ms after a completed scan, so observation gaps
+include filesystem/process enumeration and scheduling. It covers the private
+worker group and owned file tree, not Host/UI or external OS services. Real
+projects can exceed RSS or disk between scans; source limits and target-bitrate
+estimates do not prove total job bounds. The new check is quiescent publication
+admission, not an instantaneous quota on writes or RSS. Strict 512-MiB/2-GiB and
+full G1/OWNER/NATIVE readiness remain OPEN. On Apple XNU, RLIMIT_RSS aliases
+RLIMIT_AS and limits each process's virtual map; it does not supply aggregate
+renderer RSS enforcement ([header](https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/bsd/sys/resource.h),
+[implementation](https://raw.githubusercontent.com/apple-oss-distributions/xnu/main/bsd/kern/kern_resource.c)).
+Treating it as equivalent would require a different policy/proof and is not part
+of this bounded fix. Director impact remains a compatible internal extension.
+
 ## Product and Director boundaries
 
 Creator=Lite; Studio=Full; Vids=Desktop. I19's technical label “Creator Skill

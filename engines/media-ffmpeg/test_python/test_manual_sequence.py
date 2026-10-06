@@ -218,6 +218,85 @@ class ManualSequenceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 manual._workspace(str(workspace), root / "final.mp4", [original])
 
+    @unittest.skipUnless(os.name == "posix", "descriptor-relative owned disk admission")
+    def test_prepublication_disk_admission_counts_projected_account_and_sparse_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); root.chmod(0o700)
+            original, candidate = root / "source-copy", root / "candidate"
+            with original.open("xb") as handle:
+                handle.truncate(16_384)
+            with candidate.open("xb") as handle:
+                handle.truncate(8192)
+            stamp = root.lstat()
+            with mock.patch.object(manual, "OWNED_BYTES", 32_768):
+                manual._admit_owned_disk(root, stamp, candidate)
+            with mock.patch.object(manual, "OWNED_BYTES", 32_767):
+                with self.assertRaisesRegex(RuntimeError, "disk budget exceeded before publication"):
+                    manual._admit_owned_disk(root, stamp, candidate)
+            self.assertFalse((root / "published-account.mp4").exists())
+            os.link(candidate, root / "published-account.mp4")
+            with mock.patch.object(manual, "OWNED_BYTES", 32_768):
+                manual._admit_owned_disk(root, stamp)
+            with mock.patch.object(manual, "OWNED_BYTES", 32_767):
+                with self.assertRaisesRegex(RuntimeError, "disk budget exceeded before publication"):
+                    manual._admit_owned_disk(root, stamp)
+
+    @unittest.skipUnless(os.name == "posix", "allocated disk accounting")
+    def test_prepublication_disk_admission_rejects_allocated_overage_below_logical_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); root.chmod(0o700)
+            source, candidate = root / "source", root / "candidate"
+            source.write_bytes(b"s"); candidate.write_bytes(b"c")
+            allocated = (source.stat().st_blocks + candidate.stat().st_blocks * 2) * 512
+            self.assertGreater(allocated, 3)
+            with mock.patch.object(manual, "OWNED_BYTES", allocated):
+                manual._admit_owned_disk(root, root.lstat(), candidate)
+            with mock.patch.object(manual, "OWNED_BYTES", allocated - 1):
+                with self.assertRaisesRegex(RuntimeError, "disk budget exceeded before publication"):
+                    manual._admit_owned_disk(root, root.lstat(), candidate)
+
+    @unittest.skipUnless(os.name == "posix", "nofollow owned tree observation")
+    def test_prepublication_disk_admission_rejects_symlink_special_file_and_replaced_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory).resolve(); root = parent / "job"; root.mkdir(mode=0o700)
+            foreign = parent / "foreign"; foreign.mkdir()
+            (foreign / "must-not-follow").write_bytes(b"foreign immutable")
+            link = root / "alias"; link.symlink_to(foreign, target_is_directory=True)
+            with self.assertRaisesRegex(RuntimeError, "rejects symlinks and special files"):
+                manual._admit_owned_disk(root, root.lstat())
+            link.unlink(); os.mkfifo(root / "fifo")
+            with self.assertRaisesRegex(RuntimeError, "rejects symlinks and special files"):
+                manual._admit_owned_disk(root, root.lstat())
+            (root / "fifo").unlink(); stamp = root.lstat()
+            root.rename(parent / "old-job"); root.mkdir(mode=0o700)
+            with self.assertRaisesRegex(RuntimeError, "workspace identity changed"):
+                manual._admit_owned_disk(root, stamp)
+            self.assertEqual((foreign / "must-not-follow").read_bytes(), b"foreign immutable")
+
+    @unittest.skipUnless(os.name == "posix", "quiescent native publisher admission")
+    def test_aggregate_disk_overage_is_rejected_before_account_or_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(manual, "OWNED_BYTES", 20_000):
+            args, _common, _result, content = self._pipeline(directory, failure="aggregate-budget")
+            self.assertFalse(Path(args["output"]).exists())
+            self.assertEqual(list(Path(args["owned_workspace"]).iterdir()), [])
+            self.assertEqual(Path(args["items"][0]["input"]).read_bytes(), content)
+
+    @unittest.skipUnless(os.name == "posix", "post-account admission before public publisher")
+    def test_post_account_overage_blocks_publication_and_preserves_private_evidence(self) -> None:
+        admit = manual._admit_owned_disk
+        def inject(root, stamp, prospective_account=None):
+            if prospective_account is None:
+                with (root / "unsettled-private-growth").open("xb") as handle:
+                    handle.truncate(2 * 1024 * 1024)
+            return admit(root, stamp, prospective_account)
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(manual, "OWNED_BYTES", 1024 * 1024), \
+                mock.patch.object(manual, "_admit_owned_disk", inject):
+            args, _common, _result, content = self._pipeline(directory, failure="post-account-budget")
+            self.assertFalse(Path(args["output"]).exists())
+            account = Path(args["owned_workspace"]) / "published-account.mp4"
+            self.assertEqual(account.read_bytes(), b"owned synthetic encoded bytes")
+            self.assertEqual(Path(args["items"][0]["input"]).read_bytes(), content)
+
     def test_extract_frame_closed_dimension_schema_and_native_filter(self) -> None:
         base = {"input": "/preview.mp4", "output": "/frame.png", "at": 0}
         worker._validate_tool_arguments("cevra-extract-frame", {**base, "max_dimension": 720})
