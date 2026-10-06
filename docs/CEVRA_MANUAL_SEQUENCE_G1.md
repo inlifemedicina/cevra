@@ -1194,9 +1194,40 @@ Python136/Media142/Host173/UI157 passed. The production Host guard now supervise
 manual frame preview as well as final render, with an explicit fault/retry/routing
 regression; Original/Take retains its existing path. A failed first functional attempt found
 and fixed encoder inventory routing; tests also caught native dispatch swallowing
-the typed fault. Failed receipts are preserved. Independent review, exact-head
-CI/current package and native/human gates remain open; no G1 PASS or merge is
-implied. Director impact compatible internal extension; progress55%, F-A021/1.
+the typed fault. Failed receipts are preserved. The bounded technical gate is now
+closed as recorded below; native/human acceptance remains pending. Director
+impact compatible internal extension; progress55%, F-A021/1.
+
+### Technical closeout and human handoff — 2026-10-06
+
+Coordination supplied independent APPROVE for code head
+`26c07e55f2b1b633d8163bbfe9a93a144422ae5a` / tree
+`38cab89a68bca7cb1029c23165f8b68dfd4009db`; exact provenance and the reviewed
+diff digest are recorded in [ADR0034](adr/0034-operational-manual-render-resources.md#technical-closeout-and-human-handoff--2026-10-06).
+This records the unsigned handoff rather than inventing a signed review receipt.
+All 11 exact-head jobs passed in push `37456482760`, PR `37456490354` and macOS
+runtime `37456490357`; the temporary PR checkout has the same tree. The current
+isolated package is `CEVRA Vids G1 Resources 26c07e5.app`, arm64, namespace
+`com.cevra.vids.g1.resources.review`, with strict/deep signatures verified. Its
+native SHA256 is `33391e191a98d25e482b90ef1dc6c58fd03771f960614d1431ccfe7564ab3e2c`;
+app tree SHA256 is `9b988049c56eba0b231906fd5ddf6c82b2c342b2865d4e1c84eb6e9bd788ad31`.
+Packaged Host passed 29 responses, actual manual frame preview/final export,
+165 frames/264000 audio samples per channel, original hashes, save recovery and
+checkpoint reopen/Undo/Redo without replay. Closeout documentation does not
+change the reviewed production bytes; its final published-head CI is bound
+separately in the package handoff.
+
+The package is **READY FOR HUMAN VALIDATION**. The
+[single Portuguese human script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+uses a disposable project, synthetic A/B and a separate export directory.
+Automatic background opening is BLOCKED: pinned Tao 0.35.3 activates the app and
+makes visible windows key/front at startup. The application was not launched;
+no active session or iPhone/Take/Xcode was operated. A metadata-only check found
+no review-namespace project directory. A human may open it during the coordinated
+validation window, stopping if any unexpected project appears. Window/picker,
+perception, voice/lip-sync, legacy UI conversion and prepared UI fault variants
+remain unexecuted/BLOCKED by their concrete dependencies. This does not promote
+full G1, commercial limits, progress, F-A02 or merge authorization.
 
 ## Product and Director boundaries
 

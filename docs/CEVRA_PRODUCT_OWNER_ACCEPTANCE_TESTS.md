@@ -227,17 +227,18 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 Roteiro único para a futura rodada coordenada; **não abrir agora** nem interromper
 o teste Take existente. G1 é o bloco de montagem manual com prévia e exportação;
 os IDs de teste abaixo servem ao registro da equipe, não são botões do aplicativo.
-A equipe fornece o launcher da build isolada corrigida `fb34610` e os dois vídeos sintéticos
-do manifesto. Abrir somente essa variante quando a rodada estiver coordenada.
-Ela deve começar no projeto descartável vazio. Se aparecer outro projeto,
+A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
+os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
+está concluída; a rodada humana ainda não começou. Abrir somente esse aplicativo,
+manualmente, quando a rodada estiver coordenada: sua abertura pode tomar o foco.
+O aplicativo deve começar no projeto descartável vazio. Se aparecer outro projeto,
 **parar e informar a equipe**, sem apagar, substituir ou importar projeto pessoal.
 
 Termos usados nesta rodada:
 
 | Termo | O que significa e o que fazer |
 | --- | --- |
-| Fixture A/B | Vídeos de teste fornecidos pela equipe: `Fonte-A-CFR24-8s.mp4` tem faixa vermelha; `Fonte-B-NTSC-6s.mp4` tem faixa azul. Não é necessário criar vídeos ou usar mídia pessoal. |
-| `fixtures-r2`, runtime R4, métricas R2 | São três rótulos técnicos diferentes: `fixtures-r2` identifica o segundo lote de vídeos válidos; R4 identifica a montagem selada do runtime do pacote; R2 nas medições identifica uma prova anterior. Nenhum deles é um botão ou etapa a executar. Não renomear pastas nem trocar runtime. |
+| Vídeos A/B | Vídeos de teste fornecidos pela equipe: `Fonte-A-CFR24-8s.mp4` tem faixa vermelha; `Fonte-B-NTSC-6s.mp4` tem faixa azul. Não é necessário criar vídeos ou usar mídia pessoal. |
 | CFR30 / frames | A timeline usa 30 quadros por segundo; o primeiro quadro tem número 0. Os originais A/B têm outra cadência, e continuam intactos. Digitar números inteiros nos campos **IN (frames)** e **OUT (frames)**. |
 | IN / OUT | IN inclui o primeiro quadro; OUT indica o primeiro quadro excluído. IN 15 / OUT 60 produz 45 quadros, de 0,5 s até antes de 2 s da fonte. |
 | Tempo `00:05:15` | A indicação em frames é **minutos:segundos:quadros**; isso significa 5 segundos mais 15 quadros, portanto 5,5 s. Não significa 5 minutos e 15 segundos. |
@@ -261,7 +262,7 @@ O esperado dessa montagem é **quatro clips, 165 quadros / 5,5 s**, sem espaços
 As junções estão em 1,5 s, 3 s e 4,5 s. Experimentos de edição mudam esse esperado:
 restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exportação.
 
-1. **I4-T1, X-T1/T7 — abertura e acesso:** abrir somente o launcher fornecido,
+1. **I4-T1, X-T1/T7 — abertura e acesso:** abrir somente o aplicativo fornecido,
    sem IA. No topo, **EN** muda para inglês e **PT** volta ao português. Alternar
    **Modo compacto / Modo aberto**; no compacto, selecionar **Controles** para o
    painel de edição e **Diretor** para sua aba. Usar scroll quando necessário.
@@ -289,7 +290,7 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
 
    **Esperado:** uma ação por Desfazer/Refazer, fontes e numeração preservadas.
    Com as quatro linhas restauradas, aguardar **Salvo**, fechar normalmente a janela
-   isolada e reabrir pelo mesmo launcher. Conferir sequência/fontes e histórico
+   isolada e reabrir o mesmo aplicativo. Conferir sequência/fontes e histórico
    disponível; não exigir a antiga posição visual do cursor.
    **Falha:** conteúdo perdido, duas ações desfeitas juntas ou estado salvo diferente.
    Em **Salvando…**, **Alterações não salvas** ou fechamento pendente, manter aberto
@@ -302,11 +303,11 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    sem acrescentar outro clip; depois retornar à montagem de referência.
    **Esperado:** conteúdo e cortes corretos; pode haver espera pela preparação na
    junção. **Registrar separadamente:** pausas, sincronismo percebido, tela preta ou quadro
-   fora do trecho. Testes simulados não aprovam esse comportamento nativo. Estas fixtures não
+   fora do trecho. Testes simulados não aprovam esse comportamento nativo. Estes vídeos não
    têm voz: percepção de fala/lábios continua `BLOCKED` nesta variante.
-5. **X-T3/T5/T7 — exportação limitada às fixtures:** executar somente na rodada
+5. **X-T3/T5/T7 — exportação limitada aos vídeos de teste:** executar somente na rodada
    limitada coordenada, com o plano restaurado e a capacidade confirmada pela equipe.
-   No pacote corrigido `fb34610`, no modo compacto com **Diretor** selecionado,
+   No modo compacto com **Diretor** selecionado,
    clicar **Exportar** no topo deve revelar **Controles**, progresso e cancelamento.
    No modo aberto, usar o painel contextual já visível. Em **Exportar sequência**, clicar
    **Exportar MP4…**; o botão **Exportar** no topo usa a mesma operação.
@@ -319,7 +320,7 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    já existente deve recusá-lo e preservar o arquivo.
    **Falha:** saída errada, arquivo anterior modificado ou sucesso falso. Publicação
    incerta pede conferir o destino e preserva o arquivo; não repetir automaticamente.
-   Cancelamento durante render pode terminar rápido demais nestas fixtures: registrar
+   Cancelamento durante render pode terminar rápido demais nestes vídeos: registrar
    `NÃO EXECUTADO` para essa variante, sem iniciar um teste de carga maior. A conversão
    legada deste ID está **BLOCKED**: não há importador de projeto na UI Normal;
    não tentar abrir o arquivo técnico nem converter o projeto novo, já em CFR30.
@@ -329,23 +330,39 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    fabricá-la. Quando houver variante preparada, a equipe remove a causa e orienta
    **Tentar salvar**, aguardar **Salvo** e fechar normalmente; não repetir export.
    **Falha esperada a detectar nessa futura variante:** perda de estado/histórico ou
-   repetição do render. Aposentadoria/fechamento incerto mantém o projeto aberto.
-7. **D8-T2, I19-T1, X-T3/T5/T6/T9 — aceite completo:** **BLOCKED** pela revisão,
-   closeout do pacote/CI e variantes nativas/perceptuais ainda pendentes.
+   repetição da exportação. Se o fechamento ficar pendente, manter o projeto aberto.
+7. **D8-T2, I19-T1, X-T3/T5/T6/T9 — aceite completo:** **NÃO EXECUTADO**, com
+   as variantes ausentes descritas acima marcadas **BLOCKED**.
    A revisão limitada do item 5 não aprova export geral, projetos arbitrários,
    qualidade/voz/lip-sync ou G1 completo. Não pedir ao Owner provocar excesso de
-   RAM/disco. Em 6/10 às 10:38:21 UTC o Owner aprovou o contrato operacional
-   de [ADR0034](adr/0034-operational-manual-render-resources.md): reserva lógica
-   antes da escrita e interrupção após observar excesso de RAM. Os 512 MiB/2 GiB
-   são orçamentos iniciais de validação, sem teto físico instantâneo prometido.
-   A equipe obteve prova sintética selada R5, Python136/Media142/Host173/UI157;
-   60 s Full HD mediram 171507712 B RSS, 627486319 B lógicos e PSNR52.512757 dB.
-   Excesso controlado de RAM atingiu 87015424 B acima do orçamento antes do aborto.
-   Isso não promove limites comerciais, percepção ou variantes humanas. O pacote
-   fb34610 abaixo é histórico e não contém a nova implementação de recursos;
-   aguardar o pacote atualizado e coordenado para executar esta rodada.
+   RAM/disco. Registrar o que foi visto, a mensagem apresentada e o resultado
+   por variante. Se aparecer falha de recursos, aguardar a operação parar e
+   informar a equipe; não reduzir a qualidade nem repetir a exportação sozinho.
 
-Pacote atual para a futura rodada: `CEVRA Vids G1 Review fb34610.app`, launcher
+Estado deste roteiro: **NÃO EXECUTADO / READY FOR HUMAN VALIDATION**. A preparação
+técnica do pacote atual passou; a abertura coordenada, os controles nativos e o
+julgamento humano continuam pendentes. Este roteiro não promove G1, G5/G6,
+progresso ou F-A02.
+
+### Technical preparation and historical packages
+
+A revisão independente recebida por coordenação aprovou o código `26c07e55` /
+árvore `38cab89a`; CI desse commit passou 11/11. O pacote atual usa o runtime
+selado R5 e passou assinatura estrita/profunda, vínculo de 470 arquivos de fonte
+e 29 respostas do Host empacotado, incluindo prévia manual, exportação e
+falha/recuperação de salvamento sem repetir render. O
+[ADR0034](adr/0034-operational-manual-render-resources.md#technical-closeout-and-human-handoff--2026-10-06)
+registra o handoff sem assinatura, os limites da prova e os identificadores.
+O contrato operacional aprovado reserva espaço lógico antes da escrita e
+interrompe após observar excesso de RAM. 512 MiB/2 GiB continuam orçamentos
+iniciais de validação, sem teto físico instantâneo ou limite comercial.
+A prova sintética de 60 s Full HD mediu 171507712 B RSS, 627486319 B lógicos e
+PSNR52.512757 dB; o excesso controlado de RAM foi 87015424 B antes do aborto.
+Abertura em segundo plano ficou BLOCKED porque Tao ativa a janela ao iniciar;
+nenhum aplicativo foi aberto ou projeto/sessão existente substituído. A cópia
+local do roteiro é extraída desta seção canônica, sem criar catálogo concorrente.
+
+Pacote histórico anterior: `CEVRA Vids G1 Review fb34610.app`, launcher
 `/private/tmp/vids-g1-compact-export-fb34610/launch-fb34610.command`. Build offline,
 assinatura estrita/profunda, resolução de recursos, inventário e `--check-only`
 passaram; a correção de visibilidade está incorporada. A entrada anterior foi
@@ -381,9 +398,9 @@ antes de ser apresentada como comportamento daquela build. Nenhum render/CI,
 janela, projeto humano ou merge foi executado naquela revisão. O pacote corrigido
 acima sucede esse checkpoint e não promove os gates estritos ou humanos.
 
-Estado deste roteiro: **NÃO EXECUTADO / preparação nativa agrupada**. Não promove G1,
-G5/G6, native/owner, progresso ou F-A02. A política temporal está aprovada;
-os gates técnicos e o julgamento humano continuam pendentes.
+Estado histórico anterior: **NÃO EXECUTADO / preparação nativa agrupada**. A
+preparação técnica foi sucedida pelo pacote atual acima; o aceite humano continua
+pendente e não promove G1, G5/G6, progresso ou F-A02.
 
 Este roteiro agrega os IDs de A–E; não substitui nem duplica os casos canônicos. Preencher um registro por ID/variante/target, inclusive quando vários IDs forem percorridos no mesmo fluxo. Nenhum cenário foi executado nesta reconciliação.
 

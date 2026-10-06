@@ -145,8 +145,15 @@ pre-write reservations and sampled memory abort, with initial validation budgets
 512 MiB/2 GiB. Sealed R5 synthetic evidence passed: 60-s Full HD sampled peaks
 171507712 B RSS and 627486319 B logical files, with 52.512757-dB decoded PSNR.
 Controlled RAM excess overshot by 87015424 B before abort; no instantaneous
-physical quota or commercial limit is claimed. Review, exact-head CI/current
-package and native/human gates remain open. Old R4/fb34610 receipts stay frozen.
+physical quota or commercial limit is claimed. Independent APPROVE arrived via
+coordination for code `26c07e55` / tree `38cab89a`; exact-head CI passed 11/11,
+and the isolated arm64 package passed strict/deep signatures plus 29 Host
+responses. The bounded technical gate is closed and the package is READY FOR
+HUMAN VALIDATION; documentation closeout binds its CI separately without changing
+production bytes. Window/picker/perception remain unexecuted. Background opening
+is blocked by Tao startup activation, preserving the ongoing session and focus.
+The single human script uses the isolated package and synthetic A/B only.
+Old R4/fb34610 receipts stay frozen.
 Director impact: compatible internal extension; existing
 typed/IR/History/provider boundaries and 55%/F-A02 1/1 remain unchanged.
 No G1 PASS,

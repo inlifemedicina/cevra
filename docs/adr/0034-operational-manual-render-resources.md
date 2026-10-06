@@ -1,6 +1,6 @@
 # ADR 0034 — Operational resources for manual sequence rendering
 
-Status: **IMPLEMENTED / BOUNDED OFFLINE VALIDATION PASS / REVIEW AND PACKAGE GATES OPEN**
+Status: **IMPLEMENTED / BOUNDED TECHNICAL GATES PASS / HUMAN VALIDATION PENDING**
 
 Date: 2026-10-06
 
@@ -111,5 +111,36 @@ keeps its existing path. A routing/fault/retry regression verifies that boundary
 `peakReservedBytes` is reservation capacity, not measured disk consumption;
 unknown encoded outputs may reserve all remaining capacity then settle smaller.
 These workloads give no measured reason to change the initial numeric budgets.
-No new commercial value is adopted. Independent review, exact published-head CI,
-current package and relevant native/human variants remain explicit gates.
+No new commercial value is adopted.
+
+## Technical closeout and human handoff — 2026-10-06
+
+Independent **APPROVE** was received through the coordination handoff from
+executor `01a10247-cec5-75bc-b834-a64fb0fb5009`, turn
+`01a11106-ed82-7575-bb53-a984c7ec3e46`, for code head
+`26c07e55f2b1b633d8163bbfe9a93a144422ae5a`, tree
+`38cab89a68bca7cb1029c23165f8b68dfd4009db`, and reviewed diff SHA256
+`60e470d6def49a42effb0cd8a17a039d682180da88ccc60ca7683833f2bd1908`.
+The handoff reports verification of 28 artifacts, 470 source files, sealed R5,
+strict/deep signatures and no findings. This is an unsigned coordination record,
+not a signed receipt or a claim to have read the original review report.
+
+Exact-head CI passed all 11 jobs, attempt 1: push run `37456482760`, PR run
+`37456490354`, and exact macOS runtime run `37456490357`. The temporary PR checkout
+tree equals the reviewed source tree. The isolated arm64 package built from that
+head passed strict/deep verification and 29 packaged-Host protocol responses,
+including manual frame preview, final export and save/reopen/Undo/Redo without
+replay. Subsequent closeout changes affect documentation only and require their
+own exact published-head CI; they do not extend the independent review to a new
+tree or change the packaged production bytes.
+
+The operational technical gate is closed within this bounded contract. The
+package is **READY FOR HUMAN VALIDATION**, not complete G1 acceptance. Native
+window/picker and perception remain unexecuted. Background opening was not
+attempted: pinned Tao 0.35.3 activates the app on launch and makes visible windows
+key/front, so a macOS background-open option cannot preserve the required focus.
+The review namespace had no project directory at the metadata-only check; no
+project contents were read, session replaced or application opened. The human
+opens the isolated package only during a coordinated window, using the
+[single canonical script](../CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script).
+Draft #87 remains stacked on Draft #86; no merge or full G1 PASS is implied.

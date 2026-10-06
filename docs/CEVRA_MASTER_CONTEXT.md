@@ -2673,8 +2673,17 @@ an export or replay. Sealed R5 synthetic release-mode validation passed, includi
 25.702 s render and 52.512757-dB decoded-original/final PSNR. The controlled RAM
 fault overshot by 87015424 B before observed abort; latency/overshoot have no
 guaranteed bound. Python136, Media142, Host173 and UI157 passed. The Host guard
-also covers manual frame preview; Original/Take retains its existing path. Independent
-review, published-head CI/package closeout and native/human gates remain open.
+also covers manual frame preview; Original/Take retains its existing path.
+Independent APPROVE was received via coordination for code head `26c07e55` /
+tree `38cab89a`, with 28 artifacts and 470 source files verified as reported in
+[ADR0034](adr/0034-operational-manual-render-resources.md#technical-closeout-and-human-handoff--2026-10-06).
+Exact-head CI passed 11/11 and the current isolated arm64 package passed strict/deep
+signatures and 29 packaged-Host responses. Documentation closeout retains those
+production bytes and binds its own published-head CI separately. The bounded
+technical gate is closed; the package is READY FOR HUMAN VALIDATION. Native
+window/picker and human perception remain unexecuted. Background opening is
+blocked by pinned Tao startup activation; no GUI/session was opened or replaced.
+Use the single coordinated Portuguese script; this does not promote full G1.
 Earlier strict
 blocked evidence and the `a7a0003` offline package/CI PASS remain historical.
 Use only synthetic/authorized fixtures, preserve originals and retained History,
