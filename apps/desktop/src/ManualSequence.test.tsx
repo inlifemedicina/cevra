@@ -66,13 +66,18 @@ function clips(backend: SequenceBackend) { return [...backend.history.current.ti
 async function action(backend: SequenceBackend, label: string) {
   const count = backend.requests.length, entries = backend.history.entries.length;
   await waitFor(() => expect(controls().getByRole("button", { name: label }).matches(":disabled")).toBe(false));
-  fireEvent.click(controls().getByRole("button", { name: label }));
+  await act(async () => {
+    fireEvent.click(controls().getByRole("button", { name: label }));
+  });
   await waitFor(() => expect(backend.history.entries.length).toBe(entries + 1));
   await waitFor(() => expect(controls().getByRole("combobox", { name: "Fonte" }).matches(":disabled")).toBe(false));
   expect(backend.requests.length).toBe(count + 1);
 }
 async function mount(backend = new SequenceBackend()) {
-  const rendered = render(<App backend={backend} />);
+  let rendered!: ReturnType<typeof render>;
+  await act(async () => {
+    rendered = render(<App backend={backend} />);
+  });
   await waitFor(() => expect(controls().getByRole("combobox", { name: "Fonte" }).matches(":disabled")).toBe(false));
   return { backend, ...rendered };
 }

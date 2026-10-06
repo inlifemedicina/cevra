@@ -922,6 +922,37 @@ PASS. Tauri platform resource resolution passed in the canonical
 No GUI opening or full READY follows from a headless Host result. Existing resource
 ceilings, broader source and Owner/native gates remain open.
 
+## Exact-head CI and test synchronization — 2026-10-06
+
+Publication of `bbbb0dcde73e16ef396018879e85eaa901d4f45a` triggered attempt 1 of
+push CI ([37412753257](https://github.com/inlifemedicina/cevra/actions/runs/37412753257)),
+PR CI ([37412755773](https://github.com/inlifemedicina/cevra/actions/runs/37412755773))
+and exact macOS runtime ([37412755742](https://github.com/inlifemedicina/cevra/actions/runs/37412755742)).
+The two monorepo jobs failed different existing manual-sequence UI cases: the
+four-range assembly saw an initial OUT reset, and the committed-save-failure
+case saw an action suppressed during initialization. Each had 156 passes and
+one failure; the new PT/EN compact-export regressions passed in both. All other
+jobs, including the exact macOS runtime, completed successfully. The failed head
+is retained as failed evidence, not relabeled as a full CI PASS.
+
+Independent static review supports a race in the test harness: `mount()` waited
+for an enabled source field while asynchronous load and passive editorial effects
+could still reset the drafts or transition the controls to busy. The helpers now
+await async React `act` around mounting and completed clicks. Assertions on
+history entries, request count and enabled controls remain, and deliberately
+pending-operation clicks are unchanged. Full UI157 and typecheck passed locally.
+This is a supported synchronization diagnosis, not an executed reproduction or
+proof of a production defect. App/Sidebar production code is unchanged.
+
+The completion commit requires fresh exact-head CI, PENDING at this checkpoint.
+The isolated native build remains `fb346106`; its final binding explicitly permits
+only the test-harness and documentation delta. Host/Rust, worker/runtime assets,
+package dependencies and production frontend bytes remain identical, so no local
+native render or bundle rebuild is warranted for this test-only change. Terminal
+remote state will be recorded in Draft #87 and the new consolidated package
+receipt. Strict resource guarantees stay BLOCKED and human/native acceptance
+stays pending. No GUI, Take/device, real AI or merge action occurred.
+
 ## Compact-export package refresh and inherited backend evidence — 2026-10-06
 
 The reviewed local UI correction was authorized for the existing Draft #87 and

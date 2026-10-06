@@ -2850,6 +2850,21 @@ credential is used. Node-only signing does not prove whole-bundle/Host acceptanc
 do not declare GUI READY based on headless tests. Fresh exact-head package/Host/review/CI
 receipts accompany the Draft; actual GUI/Owner and strict resource gates stay open.
 
+**Exact-head CI and test synchronization — 2026-10-06:** the first published
+`bbbb0dcde73e16ef396018879e85eaa901d4f45a` attempt completed: both monorepo CI
+runs failed one existing manual-sequence UI case each; the PT/EN compact-export
+regressions passed, and every other job, including exact macOS runtime, passed.
+Independent static review supports a test-harness race: an enabled DOM predicate
+does not settle the asynchronous load/editorial effects before range typing or
+the next action. The test helpers now await async React `act` for mounting and
+completed actions, retaining journal/request/enabled assertions and deliberately
+pending clicks. Full UI157/typecheck passed locally; no production defect was
+demonstrated and no production/runtime bytes changed. Fresh exact-head CI is
+PENDING for this completion commit. Its source binding must describe both test
+and documentation deltas from the native build, rather than claim a docs-only
+delta. [Scoped record](CEVRA_MANUAL_SEQUENCE_G1.md#exact-head-ci-and-test-synchronization--2026-10-06).
+Strict resource and human/native gates remain unchanged; no local render/GUI/AI.
+
 **Corrected compact-export package — 2026-10-06:** the reviewed source fix was
 authorized for Draft #87 and isolated packaging. Functional build `fb346106`
 (tree `a6b19c5f15a44e9d959fafeef4a6373dc7e81bc9`) now exists as
