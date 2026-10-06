@@ -325,8 +325,8 @@ def _run_extract_frame(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     if not meta.get("video"):
         raise ValueError("input has no video stream")
     maximum = args.get("max_dimension")
-    if maximum is not None and (maximum != 720 or isinstance(maximum, bool)):
-        raise ValueError("extract-frame max_dimension must be the closed 720 profile")
+    if maximum is not None and (maximum not in (160, 720) or isinstance(maximum, bool)):
+        raise ValueError("extract-frame max_dimension must be a closed card/preview profile")
     cmd = common.ffmpeg_base() + [
         "-ss", f"{at:.6f}", "-i", input_path,
         "-map", "0:v:0", "-frames:v", "1",

@@ -5,7 +5,7 @@ import { link, lstat, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/
 import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createEmptyProject, framesToMilliseconds, ProjectHistory } from '@cevra/project-ir';
-import { ManualVideoSequenceApplicationService } from '@cevra/application';
+import { ManualVideoSequenceApplicationService, ManualSequencePreviewApplicationService } from '@cevra/application';
 import { NodeMediaArtifactStore } from '@cevra/media-ffmpeg';
 import { DesktopSession, DesktopHostProtocolServer } from '../dist/index.js';
 import { DerivedVideoPreview } from '../dist/derived-video-preview.js';
@@ -51,24 +51,25 @@ async function fixture(t, options = {}) {
           outputSha256: sha(bytes), audio: { sampleRate, channels: 1, inputSamples: samples, decodedSamples: samples + 360 } } };
     }
     assert.equal(operation.type, 'render-manual-video-preview');
+    const items = operation.version === 2 ? operation.items : [operation.item];
     // Manual audio admission is deliberately unchanged: no fabricated samples
     // before this source's measured origin, even for preview.
-    assert.ok(operation.item.sourceStartFrame * sampleRate / 30 >= audioOriginSamples);
+    assert.ok(items[0].sourceStartFrame * sampleRate / 30 >= audioOriginSamples);
     const job = operation.ownedWorkspaceUri, output = operation.outputUri;
     assert.equal(dirname(job), dirname(output)); assert.notEqual(dirname(output), job); assert.ok(relative(job, output).startsWith('..'));
     assert.equal((await lstat(job)).mode & 0o777, 0o700);
-    assert.equal(operation.item.inputUri, original); assert.deepEqual(operation.item.sourceContent, { sha256: sha(input), sizeBytes: input.length });
-    assert.equal(operation.item.audioSelection, 'single-source-stream');
+    assert.equal(items[0].inputUri, original); assert.deepEqual(items[0].sourceContent, { sha256: sha(input), sizeBytes: input.length });
+    assert.equal(items[0].audioSelection, 'single-source-stream');
     const bytes = Buffer.from('synthetic admitted CFR30 derivative'); await writeFile(output, bytes, { flag: 'wx' });
     await link(output, join(job, 'published-account.mp4'));
-    const frames = operation.item.sourceEndFrame - operation.item.sourceStartFrame, durationMs = framesToMilliseconds(frames);
+    const frames = items.reduce((total, item) => total + item.sourceEndFrame - item.sourceStartFrame, 0), durationMs = framesToMilliseconds(frames);
     const result = { type: 'file', outputUri: output, durationMs: Math.round(durationMs), publication: await publication(output),
       probe: { uri: output, width: 720, height: 404, frameRate: 30, rotationDegrees: 0, hasVideo: true, videoCodec: 'h264', hasAudio: true, audioCodec: 'aac', sampleRate: 48000, channels: 1 },
       effectiveProfile: { container: 'mp4', videoCodec: 'h264', audioCodec: 'aac', videoEncoder: 'h264_videotoolbox', audioEncoder: 'aac' },
       manualSequence: { version: 1, profile: 'manual-cfr30-preview-v1', samplingPolicy: 'source-pts-fps30-near-v1', frameRate: { numerator: 30, denominator: 1 },
         container: 'mp4', videoCodec: 'h264', audioCodec: 'aac', dynamicRange: 'sdr', width: 720, height: 404, targetVideoBitsPerSecond: 700000,
         totalFrames: frames, outputFrameCount: frames, totalPcmSamples: frames * 1600, outputAudioSampleCount: frames * 1600, audioSampleRate: 48000,
-        audioChannelLayout: 'mono', durationMs, muxVideoDurationMs: durationMs, muxAudioDurationMs: durationMs, outputSha256: sha(bytes), itemCount: 1, uniqueSegmentCount: 1,
+        audioChannelLayout: 'mono', durationMs, muxVideoDurationMs: durationMs, muxAudioDurationMs: durationMs, outputSha256: sha(bytes), itemCount: items.length, uniqueSegmentCount: new Set(items.map(item => [item.sourceStartFrame,item.sourceEndFrame].join(":"))).size,
         sources: [{ inputUri: original, sha256: sha(input), sizeBytes: input.length, videoStreamIndex: 0, audioStreamIndex: 1, audioStreamCount: 1,
           sampleRate, channelLayout: 'mono', sourceVideoFrameCount: 180, sourceVideoEndMs: sourceDurationMs, sourceAudioFirstSample: audioOriginSamples,
           sourceAudioSampleCount: Math.floor(sourceDurationMs * sampleRate / 1000) - audioOriginSamples }] } };
@@ -76,7 +77,7 @@ async function fixture(t, options = {}) {
   } };
   let settled = 0;
   const derived = new DerivedVideoPreview({ history, engine, temporaryRoot: root, runtimeIdentity: () => 'synthetic-sealed-runtime', settle: async () => { settled++; await hooks.beforeSettle?.(); } });
-  const session = new DesktopSession({ history, derivedVideoPreview: derived, manualVideoSequence: editor, mediaCapability: unavailable, transcriptionCapability: unavailable }); t.after(() => session.close());
+  const session = new DesktopSession({ history, derivedVideoPreview: derived, manualSequencePreview: new ManualSequencePreviewApplicationService({ history, identity: new NodeMediaArtifactStore() }), manualVideoSequence: editor, mediaCapability: unavailable, transcriptionCapability: unavailable }); t.after(() => session.close());
   const request = operationId => ({ sourceId: 'source', clipId: history.current.timeline.clips[0].id, operationId, expectedSnapshotId: history.current.history.headSnapshotId });
   return { root, original, input, history, editor, session, derived, calls, hooks, request, settled: () => settled };
 }
@@ -137,4 +138,43 @@ test('closed conform query returns review-only projection and rejects editing/pa
   assert.equal(lines[0].result.clips[0].boundaries.sourceStart.originalMs, 507);
   await server.handleLine(JSON.stringify({ protocolVersion: 1, id: 'bad-conform', method: 'video.previewManualSequenceConform', params: { ...params, outputUri: '/synthetic', clips: [] } }));
   assert.equal(lines[1].error.code, 'HOST_INVALID_PARAMS'); assert.equal(f.calls.length, 0); assert.deepEqual(f.history.toArchive(), before);
+});
+
+
+test('whole CFR30 montage is admitted once with all occurrences, exact program frames and no canonical mutation', async t => {
+  const f = await fixture(t);
+  for (const [sourceStartFrame, sourceEndFrame] of [[60,90],[15,46],[15,46]]) await f.editor.edit({ version:2,type:'append',sourceId:'source',expectedSnapshotId:f.history.current.history.headSnapshotId,sourceStartFrame,sourceEndFrame });
+  const before=f.history.toArchive(),request={sourceId:'source',expectedSnapshotId:f.history.current.history.headSnapshotId,operationId:'continuous',sequence:true};
+  const packet=await f.session.previewLocalVideo(request);
+  assert.deepEqual(packet.sequence,{timingPolicy:'cfr30',totalFrames:123,clipIds:f.history.current.timeline.clips.map(clip=>clip.id)});
+  assert.equal(packet.durationMs,4100);assert.equal(packet.clip,undefined);assert.equal(packet.initialFrame.sourceTimeMs,0);
+  assert.equal(f.calls[0].version,2);assert.equal(f.calls[0].items.length,4);assert.equal(f.calls.length,2);
+  const reused=await f.session.previewLocalVideo({...request,operationId:'continuous-cache'});
+  assert.deepEqual(reused,packet);assert.equal(f.calls.length,2);assert.deepEqual(f.history.toArchive(),before);assert.deepEqual(await readFile(f.original),f.input);
+});
+
+test('continuous packet cannot bypass sequence/source/snapshot binding or inject filesystem authority', async t => {
+  const f=await fixture(t),lines=[],server=new DesktopHostProtocolServer(f.session,{writeProtocolLine:line=>lines.push(JSON.parse(line)),writeLog(){},requestShutdown(){}});
+  const valid={sourceId:'source',expectedSnapshotId:f.history.current.history.headSnapshotId,operationId:'continuous',sequence:true};
+  for(const params of [{...valid,sequence:false},{...valid,clipId:f.history.current.timeline.clips[0].id},{...valid,operationId:undefined},{...valid,path:'/injected'},{...valid,sourceId:'foreign'},{...valid,expectedSnapshotId:'old'}]) {
+    await server.handleLine(JSON.stringify({protocolVersion:1,id:'bad-'+lines.length,method:'video.previewLocal',params}));assert.ok(lines.at(-1).error);
+  }
+  assert.equal(f.calls.length,0);
+});
+
+test('reimported source IDs sharing one original retain separate montage occurrences', async t => {
+  const f = await fixture(t);
+  const reimported = { ...structuredClone(f.history.current.sources[0]), id: 'source-reimported', displayName: 'Reimported original' };
+  f.history.commit({ type: 'source.add', source: reimported });
+  await f.editor.edit({ version: 2, type: 'append', sourceId: reimported.id,
+    expectedSnapshotId: f.history.current.history.headSnapshotId, sourceStartFrame: 60, sourceEndFrame: 90 });
+  const before = f.history.toArchive();
+  const packet = await f.session.previewLocalVideo({ sourceId: 'source', expectedSnapshotId: f.history.current.history.headSnapshotId,
+    operationId: 'reimported-continuous', sequence: true });
+  assert.equal(packet.sequence.totalFrames, 61);
+  assert.deepEqual(packet.sequence.clipIds, f.history.current.timeline.clips.map(clip => clip.id));
+  assert.equal(f.calls[0].items.length, 2);
+  assert.equal(new Set(f.calls[0].items.map(item => item.inputUri)).size, 1);
+  assert.equal(f.calls.length, 2);
+  assert.deepEqual(f.history.toArchive(), before);
 });

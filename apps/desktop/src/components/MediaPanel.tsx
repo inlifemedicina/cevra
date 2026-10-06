@@ -1,9 +1,11 @@
 import type { SourceAsset } from "@cevra/project-ir";
 import { useMemo, useState } from "react";
 import { capabilityReasonKey, workspaceKeys, type Translate, type Workspace } from "../ui-model";
-import type { DesktopCapabilityReason } from "../backend/desktop-backend";
+import type { DesktopBackend, DesktopCapabilityReason } from "../backend/desktop-backend";
 import { Icon } from "./Icon";
 import type { SourcePresentation } from "../source-presentation";
+
+import { useSourceThumbnails } from "../source-thumbnails";
 
 type MediaFilter = "all" | SourceAsset["kind"];
 
@@ -14,7 +16,8 @@ const filters = [
   ["image", "media.filter.image"]
 ] as const;
 
-export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, t, onSelect, onImport }: { sources: readonly SourceAsset[]; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; t: Translate; onSelect(id: string): void; onImport(): void }) {
+export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, thumbnailBusy = false, backend, snapshotId, t, onSelect, onImport }: { sources: readonly SourceAsset[]; backend?: DesktopBackend; snapshotId?: string; thumbnailBusy?: boolean; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; t: Translate; onSelect(id: string): void; onImport(): void }) {
+  const thumbnails = useSourceThumbnails(sources, backend, snapshotId, thumbnailBusy || importBusy);
   const [filter, setFilter] = useState<MediaFilter>("all");
   const [query, setQuery] = useState("");
   const visibleSources = useMemo(() => sources.filter((source) => {
@@ -43,9 +46,17 @@ export function MediaPanel({ sources, presentations, selectedId, workspace, impo
         {visibleSources.map((source) => (
           <button key={source.id} type="button" className={selectedId === source.id ? "media-card selected" : "media-card"} onClick={() => onSelect(source.id)} aria-pressed={selectedId === source.id} aria-label={`${presentations.get(source.id)!.label} · ${source.displayName}`} title={source.displayName}>
             <span className={`media-thumb media-thumb-${source.kind}`}>
-              <span aria-hidden="true">{source.kind === "video" ? "▶" : source.kind === "audio" ? "≋" : "▧"}</span>
+              {thumbnails.get(source) ? <img key={thumbnails.get(source)!.url} src={thumbnails.get(source)!.url} alt="" onLoad={event => {
+                const frame = thumbnails.get(source);
+                if (frame && event.currentTarget.getAttribute("src") === frame.url && (event.currentTarget.naturalWidth !== frame.width || event.currentTarget.naturalHeight !== frame.height)) thumbnails.reject(source);
+              }} onError={event => {
+                if (event.currentTarget.getAttribute("src") === thumbnails.get(source)?.url) thumbnails.reject(source);
+              }} /> : <>
+                <span aria-hidden="true">{source.kind === "video" ? "▶" : source.kind === "audio" ? "≋" : "▧"}</span>
+                {source.kind === "video" && backend?.thumbnailLocalVideo && <small>{t(thumbnails.failed(source) ? "media.thumbnailUnavailable" : "media.thumbnailLoading")}</small>}
+              </>}
             </span>
-            <span className="media-card-copy"><strong>{presentations.get(source.id)!.label}</strong><small>{metadata(source)}</small></span>
+            <span className="media-card-copy"><strong>{presentations.get(source.id)!.label}</strong><small className="media-source-name">{source.displayName}</small><small>{metadata(source)}</small></span>
           </button>
         ))}
         {visibleSources.length === 0 && <p className="empty-state">{t("media.empty")}</p>}

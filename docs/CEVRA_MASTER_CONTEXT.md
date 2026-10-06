@@ -2658,6 +2658,24 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
+**Active usability follow-up — 2026-10-06:** the Owner's coordinated G1 round
+reported opening/import, the implemented editing buttons and A/B/A/A export as
+working within that variant. In-app preview paused at joins; source cards lacked
+thumbnails; selection affected timeline scale and duration/ruler readability was
+insufficient. Human close/reopen persistence was **NOT TESTED**. The evidence and
+pending grouped regression are recorded in [issue #88](https://github.com/inlifemedicina/cevra/issues/88).
+Branch `feat/vids-timeline-usability-preview-continuity`, based on Draft #87 head
+`a6c099a5e37c669ed881443dd52b5aab7e2ce7d2`, now has offline-tested timeline
+interaction, atomic group removal, one continuous CFR30 program preview and
+automatic identity-bound thumbnails. See the [scoped technical record](CEVRA_MANUAL_SEQUENCE_G1.md#human-findings-and-usability-follow-up--2026-10-06).
+Seek follows the approved play/pause/drag/cancel policy; IN/OUT keeps explicit
+Apply-button confirmation pending the Owner's separate decision. Native bundle
+localization metadata is prepared, but the resulting picker language is untested.
+Independent review of this new diff and a coordinated future human round remain
+pending. The open app/project/export and earlier package receipts stay preserved;
+no new package has been installed or launched. Director impact compatible typed
+editing/ephemeral-preview extension; progress55%, F-A021/1, full G1 unaccepted.
+
 **Active resource decision — 2026-10-06 10:38:21 UTC:** the Owner approved the
 proposed operational contract: reserve logical space before each producer writes,
 and supervise renderer RAM with interruption after observed excess. Initial

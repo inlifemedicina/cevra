@@ -87,7 +87,7 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
       case "probe":
         return { type: "probe", probe: parseProbe(await call("probe", { inputs: [operation.inputUri] }), operation.inputUri) };
       case "render-manual-video-sequence": case "render-manual-video-preview": {
-        const items = operation.type === "render-manual-video-preview" ? [operation.item] : operation.items;
+        const items = operation.type === "render-manual-video-preview" && operation.version === 1 ? [operation.item] : operation.items;
         const result = fileResult(await call(operation.type === "render-manual-video-preview" ? "cevra-render-manual-video-preview" : "cevra-render-manual-video-sequence", {
           version: operation.version, output: operation.outputUri, owned_workspace: operation.ownedWorkspaceUri,
           items: items.map(item => ({ input: item.inputUri, source_start_frame: item.sourceStartFrame,

@@ -61,6 +61,7 @@ pub struct CancelArgs {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VideoPreviewArgs {
+    sequence: Option<bool>,
     source_id: String,
     expected_snapshot_id: String,
     clip_id: Option<String>,
@@ -167,6 +168,28 @@ pub struct ManualVideoClipArgs {
     source_end_ms: u64,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SourceThumbnailArgs {
+    source_id: String,
+    expected_snapshot_id: String,
+    operation_id: String,
+}
+
+#[tauri::command]
+pub async fn desktop_thumbnail_local_video(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: SourceThumbnailArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.source_id, "sourceId")?;
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    validate_id(&args.operation_id, "operationId")?;
+    supervisor.ensure_started(&app).await?;
+    supervisor.request_preparation("video.thumbnailLocal", json!({ "sourceId": args.source_id,
+        "expectedSnapshotId": args.expected_snapshot_id, "operationId": args.operation_id }), &args.operation_id).await
+}
+
 #[tauri::command]
 pub async fn desktop_preview_local_video(
     app: AppHandle,
@@ -186,6 +209,12 @@ pub async fn desktop_preview_local_video(
             return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_REQUEST", "A clip requires an operation identifier."));
         }
         params["clipId"] = json!(clip);
+    }
+    if let Some(sequence) = args.sequence {
+        if !sequence || args.clip_id.is_some() || args.operation_id.is_none() {
+            return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_REQUEST", "Sequence preview binding is invalid."));
+        }
+        params["sequence"] = json!(true);
     }
     supervisor.ensure_started(&app).await?;
     if let Some(operation) = args.operation_id {
@@ -269,6 +298,8 @@ pub enum ManualVideoSequenceAction {
     Insert { before_clip_id: String, source_id: String, source_start_ms: u64, source_end_ms: u64 },
     Duplicate { clip_id: String },
     Remove { clip_id: String },
+    #[serde(rename = "remove-many")]
+    RemoveMany { clip_ids: Vec<String> },
     Trim { clip_id: String, source_start_ms: u64, source_end_ms: u64 },
     Split { clip_id: String, timeline_at_ms: u64 },
     Reorder { clip_ids: Vec<String> },
@@ -289,6 +320,8 @@ pub enum ManualVideoSequenceFrameAction {
     Insert { before_clip_id: String, source_id: String, source_start_frame: u64, source_end_frame: u64 },
     Duplicate { clip_id: String },
     Remove { clip_id: String },
+    #[serde(rename = "remove-many")]
+    RemoveMany { clip_ids: Vec<String> },
     Trim { clip_id: String, source_start_frame: u64, source_end_frame: u64 },
     Split { clip_id: String, timeline_at_frame: u64 },
     Reorder { clip_ids: Vec<String> },
@@ -603,6 +636,26 @@ mod video_boundary_tests {
     use super::*;
 
     #[test]
+    fn thumbnail_boundary_requires_ids_and_rejects_paths_and_render_controls() {
+        let valid = json!({ "sourceId": "source", "expectedSnapshotId": "snapshot", "operationId": "thumbnail-1" });
+        let args = serde_json::from_value::<SourceThumbnailArgs>(valid.clone()).unwrap();
+        for (value, field) in [(&args.source_id, "sourceId"), (&args.expected_snapshot_id, "expectedSnapshotId"), (&args.operation_id, "operationId")] {
+            assert!(validate_id(value, field).is_ok());
+        }
+        for extra in ["uri", "path", "clipId", "sequence", "atMs", "maxDimension", "commands"] {
+            let mut injected = valid.clone(); injected[extra] = json!("injected");
+            assert!(serde_json::from_value::<SourceThumbnailArgs>(injected).is_err());
+        }
+        for field in ["sourceId", "expectedSnapshotId", "operationId"] {
+            let mut missing = valid.clone(); missing.as_object_mut().unwrap().remove(field);
+            assert!(serde_json::from_value::<SourceThumbnailArgs>(missing).is_err());
+            assert!(validate_id("", field).is_err());
+            assert!(validate_id("bad\nidentifier", field).is_err());
+            assert!(validate_id(&"x".repeat(129), field).is_err());
+        }
+    }
+
+    #[test]
     fn export_preparation_boundary_rejects_paths_render_overrides_and_invalid_operation_ids() {
         let valid = json!({ "version": 1, "expectedSnapshotId": "snapshot", "operationId": "prepare-1", "locale": "pt-BR" });
         assert!(validate_export_preparation(&serde_json::from_value::<ManualExportPreparationArgs>(valid.clone()).unwrap()).is_ok());
@@ -639,6 +692,7 @@ mod video_boundary_tests {
             json!({"type":"insert","beforeClipId":"clip","sourceId":"source","sourceStartMs":0,"sourceEndMs":700}),
             json!({"type":"duplicate","clipId":"clip"}),
             json!({"type":"remove","clipId":"clip"}),
+            json!({"type":"remove-many","clipIds":["clip","other"]}),
             json!({"type":"trim","clipId":"clip","sourceStartMs":0,"sourceEndMs":700}),
             json!({"type":"split","clipId":"clip","timelineAtMs":350}),
             json!({"type":"reorder","clipIds":["clip","other"]}),
@@ -673,6 +727,7 @@ mod video_boundary_tests {
             json!({"type":"trim","clipId":"clip","sourceStartFrame":1,"sourceEndFrame":3}),
             json!({"type":"split","clipId":"clip","timelineAtFrame":2}),
             json!({"type":"duplicate","clipId":"clip"}), json!({"type":"remove","clipId":"clip"}),
+            json!({"type":"remove-many","clipIds":["clip","other"]}),
             json!({"type":"reorder","clipIds":["clip","other"]}),
             json!({"type":"conform","clips":[{"clipId":"clip","sourceStartFrame":1,"sourceEndFrame":3}]}),
         ] {

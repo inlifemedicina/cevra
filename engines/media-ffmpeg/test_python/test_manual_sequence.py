@@ -117,6 +117,16 @@ class ManualSequenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             worker._validate_tool_arguments("cevra-render-manual-video-preview", args)
 
+    def test_whole_montage_preview_requires_explicit_v2_and_retains_closed_bounds(self) -> None:
+        args = {"version": 2, "items": [item(), item()], "output": "/preview.mp4", "owned_workspace": "/private-job"}
+        self.assertEqual(manual.validate(args, True)[1], 2)
+        worker._validate_tool_arguments("cevra-render-manual-video-preview", args)
+        for bad in ({**args, "version": 1}, {**args, "version": True}, {**args, "items": []}, {**args, "items": [item()] * 2049}, {**args, "filters": "raw"}):
+            with self.assertRaises(ValueError):
+                worker._validate_tool_arguments("cevra-render-manual-video-preview", bad)
+        with self.assertRaises(ValueError):
+            worker._validate_tool_arguments("cevra-render-manual-video-sequence", args)
+
     def test_preview_and_export_share_source_pts_sampling_before_frame_trim(self) -> None:
         for width, height in ((1920, 1080), (720, 404)):
             vf = manual._video_filter(1, 2, width, height)

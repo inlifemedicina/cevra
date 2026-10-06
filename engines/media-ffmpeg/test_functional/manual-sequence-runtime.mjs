@@ -13,6 +13,7 @@ import {
 } from "@cevra/application";
 import { FfmpegMediaEngine, NodeMediaArtifactStore, PersistentMediaWorkerClient, ProcessMediaWorkerTransport } from "../dist/index.js";
 import { guardManualExportEngine } from "../../../apps/desktop-host/dist/manual-export-resources.js";
+import { SourceThumbnailService } from "../../../apps/desktop-host/dist/source-thumbnail.js";
 import { DerivedVideoPreview } from "../../../apps/desktop-host/dist/derived-video-preview.js";
 
 // Synthetic inputs and all disposable outputs are exclusively owned by this test.
@@ -273,6 +274,43 @@ async function originalSourceClock(fixture, uri, oracle) {
     await assert.rejects(derived.prepare({ ...request, operationId: "original-closed" }, new AbortController().signal), { code: "OPERATION_CANCELLED" });
   } finally { derived.close(); await transport.settle(); rmSync(temporaryRoot, { recursive: true, force: true }); }
 }
+async function continuousMontagePreview(fixture, expectedIds, ranges, sources, originals) {
+  const before = fixture.history.toArchive(), executions = fixture.executions.toArchive(), count = executionCount;
+  const temporaryRoot = workspace("continuous-cache");
+  const derived = new DerivedVideoPreview({ history: fixture.history, engine: guardManualExportEngine(countedEngine, transport, artifacts), settle: () => transport.settle(), temporaryRoot });
+  const request = { sourceId: "source-0", expectedSnapshotId: fixture.history.current.history.headSnapshotId, operationId: "continuous-program", sequence: true };
+  try {
+    const started = performance.now(), packet = await derived.prepare(request, new AbortController().signal);
+    const output = path.join(root, "continuous-program.mp4"); writeFileSync(output, Buffer.from(packet.base64, "base64"), { flag: "wx" });
+    assert.deepEqual(packet.sequence, { timingPolicy: "cfr30", totalFrames: expectedIds.length, clipIds: fixture.history.current.timeline.clips.map(clip => clip.id) });
+    assert.equal(packet.clip, undefined); assert.equal(packet.initialFrame.sourceTimeMs, 0);
+    assert.deepEqual(frameIds(output), expectedIds, "One preview contains every original-sampled picture at its canonical program index.");
+    const clock = assertOutputClock(output, expectedIds.length, true);
+    let cursor = 0;
+    for (const [sourceIndex, start, end] of ranges) {
+      const sourceIn = sourceIndex === 1 ? framesToMilliseconds(1000) : 500;
+      for (const [channel, ms] of [[0, sourceIn + 250], [1, sourceIn + 700], [0, sourceIn + 1050]]) if (ms >= framesToMilliseconds(start) && ms < framesToMilliseconds(end)) pulseTime(clock.pcm, channel, framesToMilliseconds(cursor) + ms - framesToMilliseconds(start));
+      cursor += end - start;
+    }
+    assert.equal(executionCount, count + 2, "A montage render and one PNG replace per-cut preparations.");
+    const cached = await derived.prepare({ ...request, operationId: "continuous-cached" }, new AbortController().signal);
+    assert.deepEqual(cached, packet); assert.equal(executionCount, count + 2);
+    assert.deepEqual(fixture.history.toArchive(), before); assert.deepEqual(fixture.executions.toArchive(), executions);
+    assert.deepEqual(readdirSync(temporaryRoot), []); sources.forEach((uri, index) => assert.equal(sha(uri), originals[index].sha256));
+    measurements.push({ name: "continuous-montage-preview", totalFrames: expectedIds.length, itemCount: ranges.length, wallMs: Math.round(performance.now() - started), oneDecoderTransport: true, outputBytes: statSync(output).size, exactPictureAndPcmClock: true, perceptualAcceptance: "NOT EXECUTED" });
+  } finally { derived.close(); }
+  const thumbnail = new SourceThumbnailService({ history: fixture.history, engine: countedEngine, settle: () => transport.settle(), temporaryRoot });
+  try {
+    const request = { sourceId: "source-0", expectedSnapshotId: fixture.history.current.history.headSnapshotId, operationId: "source-card" };
+    const count = executionCount, packet = await thumbnail.prepare(request, new AbortController().signal);
+    assert.equal(packet.mimeType, "image/png"); assert.ok(Math.max(packet.width, packet.height) <= 160);
+    assert.equal(packet.sourceId, "source-0"); assert.equal(executionCount, count + 1);
+    assert.deepEqual(await thumbnail.prepare({ ...request, operationId: "source-card-cache" }, new AbortController().signal), packet); assert.equal(executionCount, count + 1);
+    assert.deepEqual(fixture.history.toArchive(), before); assert.deepEqual(readdirSync(temporaryRoot), []);
+    measurements.push({ name: "source-thumbnail", width: packet.width, height: packet.height, bytes: Buffer.from(packet.base64, "base64").length, sourceSha256Preserved: true, beforePlay: true });
+  } finally { thumbnail.close(); }
+}
+
 function destination(output) {
   const parent = lstatSync(root, { bigint: true });
   const issued = Object.freeze({ label: path.basename(output), availableBytes: 4 * 1024 * 1024 * 1024 });
@@ -378,6 +416,7 @@ try {
   }
   pulseTime(previews[3].clock.pcm, 0, 1550 - framesToMilliseconds(46));
   const expectedIds = ranges.flatMap(([index, start, end]) => oracles[index].interval(start, end));
+  await continuousMontagePreview(fixture, expectedIds, ranges, sources, originals);
   const final = await finalExport(fixture, "final-31-plus-1-repeated", expectedIds);
   assert.equal(final.receipt.itemCount, 5); assert.equal(final.receipt.uniqueSegmentCount, 4); assert.equal(final.receipt.sources.length, 3);
   for (const source of final.receipt.sources) {

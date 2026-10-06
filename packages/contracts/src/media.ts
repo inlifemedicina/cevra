@@ -1,6 +1,6 @@
 import type { EngineAdapter, ExecutionContext } from "./base.js";
 import type { MeasureAudioOperationV1, AudioMeasurementReportV1 } from "./audio-measurement.js";
-import { validateManualVideoOperation, type RenderManualVideoSequenceOperationV1, type RenderManualVideoPreviewOperationV1, type ManualSequenceExecutionEvidenceV1 } from "./manual-video-sequence.js";
+import { validateManualVideoOperation, type RenderManualVideoSequenceOperationV1, type RenderManualVideoPreviewOperationV1, type RenderManualVideoPreviewOperationV2, type ManualSequenceExecutionEvidenceV1 } from "./manual-video-sequence.js";
 
 export type FitMode = "contain" | "cover" | "stretch";
 export type MediaContainer = "mp4" | "mov" | "mkv" | "wav" | "m4a";
@@ -301,6 +301,7 @@ export interface EffectiveMediaProfile {
 export type MediaOperation =
   | RenderManualVideoSequenceOperationV1
   | RenderManualVideoPreviewOperationV1
+  | RenderManualVideoPreviewOperationV2
   | MeasureAudioOperationV1
   | { type: "probe"; inputUri: string }
   | { type: "trim"; inputUri: string; outputUri: string; startMs: number; endMs: number; boundedPreview?: true; previewProfile?: "take-v1" }
@@ -313,7 +314,7 @@ export type MediaOperation =
   | { type: "loudness-normalize"; inputUri: string; outputUri: string; targetLufs: number; truePeakDb?: number }
   | { type: "audio-fade"; inputUri: string; outputUri: string; fadeInMs?: number; fadeOutMs?: number }
   | { type: "extract-audio"; inputUri: string; outputUri: string; audioCodec?: AudioCodec }
-  | { type: "extract-frame"; inputUri: string; outputUri: string; atMs: number; maxDimension?: 720 }
+  | { type: "extract-frame"; inputUri: string; outputUri: string; atMs: number; maxDimension?: 160 | 720 }
   | { type: "detect-silence"; inputUri: string; thresholdDb: number; minDurationMs: number }
   | { type: "overlay-media"; baseUri: string; overlayUri: string; outputUri: string; startMs: number; endMs: number; x: number; y: number; width: number; height: number; opacity?: number }
   | { type: "mux-audio"; videoUri: string; audioUri: string; outputUri: string; replaceExisting?: boolean; durationValidation?: MuxAudioDurationValidationV1 }
@@ -335,7 +336,7 @@ const VIDEO_CODECS = new Set(["h264", "h265", "av1", "copy"]);
 const AUDIO_CODECS = new Set(["aac", "opus", "pcm", "copy"]);
 const OPERATION_FIELDS: Readonly<Record<MediaOperation["type"], ReadonlySet<string>>> = {
   "render-manual-video-sequence": new Set(["type", "version", "items", "outputUri", "ownedWorkspaceUri"]),
-  "render-manual-video-preview": new Set(["type", "version", "item", "outputUri", "ownedWorkspaceUri"]),
+  "render-manual-video-preview": new Set(["type", "version", "item", "items", "outputUri", "ownedWorkspaceUri"]),
   "measure-audio": new Set(["type", "version", "inputUri", "streamIndex", "startMs", "endMs"]),
   probe: new Set(["type", "inputUri"]),
   trim: new Set(["type", "inputUri", "outputUri", "startMs", "endMs", "boundedPreview", "previewProfile"]),
@@ -423,7 +424,7 @@ export function validateMediaOperation(value: unknown): MediaOperation {
     case "loudness-normalize": requireUri("inputUri"); requireUri("outputUri"); if (!isFiniteNumber(value.targetLufs)) throw new Error("targetLufs must be finite."); if (value.truePeakDb !== undefined && !isFiniteNumber(value.truePeakDb)) throw new Error("truePeakDb must be finite."); resolveAudioMutationDelivery(value.outputUri as string); break;
     case "audio-fade": requireUri("inputUri"); requireUri("outputUri"); if (value.fadeInMs !== undefined) requireTimestamp("fadeInMs"); if (value.fadeOutMs !== undefined) requireTimestamp("fadeOutMs"); resolveAudioMutationDelivery(value.outputUri as string); break;
     case "extract-audio": requireUri("inputUri"); requireUri("outputUri"); optionalEnum("audioCodec", AUDIO_CODECS, "audio codec"); resolveAudioDelivery(value.outputUri as string, value.audioCodec as AudioCodec | undefined); break;
-    case "extract-frame": requireUri("inputUri"); requireUri("outputUri"); requireTimestamp("atMs"); if (!/\.png(?:[?#]|$)/iu.test(value.outputUri as string)) throw new Error("extract-frame outputUri must use the PNG container."); if (value.maxDimension !== undefined && value.maxDimension !== 720) throw new Error("extract-frame maxDimension must be the closed 720 profile."); break;
+    case "extract-frame": requireUri("inputUri"); requireUri("outputUri"); requireTimestamp("atMs"); if (!/\.png(?:[?#]|$)/iu.test(value.outputUri as string)) throw new Error("extract-frame outputUri must use the PNG container."); if (value.maxDimension !== undefined && ![160, 720].includes(value.maxDimension as number)) throw new Error("extract-frame maxDimension must be a closed card/preview profile."); break;
     case "detect-silence": requireUri("inputUri"); if (!isFiniteNumber(value.thresholdDb)) throw new Error("thresholdDb must be finite."); requireTimestamp("minDurationMs"); if (value.minDurationMs === 0) throw new Error("minDurationMs must be greater than 0."); break;
     case "overlay-media": requireUri("baseUri"); requireUri("overlayUri"); requireUri("outputUri"); requireTimestamp("startMs"); requireTimestamp("endMs"); if ((value.endMs as number) <= (value.startMs as number)) throw new Error("endMs must be greater than startMs."); requireNonNegativeInteger("x"); requireNonNegativeInteger("y"); requireDimension("width"); requireDimension("height"); if (value.opacity !== undefined && (!isFiniteNumber(value.opacity) || value.opacity < 0 || value.opacity > 1)) throw new Error("opacity must be between 0 and 1."); resolveStandardAvDelivery(value.outputUri as string); break;
     case "mux-audio": {

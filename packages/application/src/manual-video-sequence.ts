@@ -10,6 +10,7 @@ export type ManualVideoSequenceEditV1 = Binding & (
   | ({ type: "insert"; beforeClipId: string } & SourceRange)
   | { type: "duplicate"; clipId: string }
   | { type: "remove"; clipId: string }
+  | { type: "remove-many"; clipIds: readonly string[] }
   | { type: "trim"; clipId: string; sourceStartMs: number; sourceEndMs: number }
   | { type: "split"; clipId: string; timelineAtMs: number }
   | { type: "reorder"; clipIds: readonly string[] }
@@ -20,6 +21,7 @@ export type ManualVideoSequenceEditV2 = { version: 2; expectedSnapshotId: string
   | { type: "insert"; beforeClipId: string; sourceId: string; sourceStartFrame: number; sourceEndFrame: number }
   | { type: "duplicate"; clipId: string }
   | { type: "remove"; clipId: string }
+  | { type: "remove-many"; clipIds: readonly string[] }
   | { type: "trim"; clipId: string; sourceStartFrame: number; sourceEndFrame: number }
   | { type: "split"; clipId: string; timelineAtFrame: number }
   | { type: "reorder"; clipIds: readonly string[] }
@@ -43,13 +45,13 @@ export interface ManualVideoSequenceConformPreview {
 const fields = {
   append: ["sourceId", "sourceStartMs", "sourceEndMs"],
   insert: ["beforeClipId", "sourceId", "sourceStartMs", "sourceEndMs"],
-  duplicate: ["clipId"], remove: ["clipId"],
+  duplicate: ["clipId"], remove: ["clipId"], "remove-many": ["clipIds"],
   trim: ["clipId", "sourceStartMs", "sourceEndMs"],
   split: ["clipId", "timelineAtMs"], reorder: ["clipIds"]
 } as const;
 const frameFields = {
   append: ["sourceId", "sourceStartFrame", "sourceEndFrame"], insert: ["beforeClipId", "sourceId", "sourceStartFrame", "sourceEndFrame"],
-  duplicate: ["clipId"], remove: ["clipId"], trim: ["clipId", "sourceStartFrame", "sourceEndFrame"],
+  duplicate: ["clipId"], remove: ["clipId"], "remove-many": ["clipIds"], trim: ["clipId", "sourceStartFrame", "sourceEndFrame"],
   split: ["clipId", "timelineAtFrame"], reorder: ["clipIds"], conform: ["clips"]
 } as const;
 const fail = (code: string): never => { throw manualVideoError(`MANUAL_SEQUENCE_${code}`); };
@@ -206,6 +208,17 @@ export class ManualVideoSequenceApplicationService {
         const [clip] = clips.splice(indexOf(stable.clipId), 1);
         edits.push({ type: "clip.remove", clipId: clip!.id }); changedClipIds.push(clip!.id); break;
       }
+      case "remove-many": {
+        if (!stable.clipIds.length || stable.clipIds.length > clips.length) fail("INVALID_SELECTION");
+        const selected = new Set(stable.clipIds);
+        if (!selected.size || selected.size !== stable.clipIds.length) fail("INVALID_SELECTION");
+        for (const id of selected) indexOf(id);
+        for (const clip of clips) if (selected.has(clip.id)) {
+          edits.push({ type: "clip.remove", clipId: clip.id }); changedClipIds.push(clip.id);
+        }
+        clips = clips.filter(clip => !selected.has(clip.id));
+        break;
+      }
       case "trim": {
         const clip = clips[indexOf(stable.clipId)]!;
         range(clip.sourceId, stable.sourceStartFrame, stable.sourceEndFrame);
@@ -293,6 +306,17 @@ export class ManualVideoSequenceApplicationService {
       case "remove": {
         const [clip] = clips.splice(indexOf(stable.clipId), 1);
         edits.push({ type: "clip.remove", clipId: clip!.id }); changedClipIds.push(clip!.id);
+        break;
+      }
+      case "remove-many": {
+        if (!stable.clipIds.length || stable.clipIds.length > clips.length) fail("INVALID_SELECTION");
+        const selected = new Set(stable.clipIds);
+        if (!selected.size || selected.size !== stable.clipIds.length) fail("INVALID_SELECTION");
+        for (const id of selected) indexOf(id);
+        for (const clip of clips) if (selected.has(clip.id)) {
+          edits.push({ type: "clip.remove", clipId: clip.id }); changedClipIds.push(clip.id);
+        }
+        clips = clips.filter(clip => !selected.has(clip.id));
         break;
       }
       case "trim": {

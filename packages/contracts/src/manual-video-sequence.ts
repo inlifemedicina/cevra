@@ -26,6 +26,14 @@ export interface RenderManualVideoPreviewOperationV1 {
   outputUri: string;
   ownedWorkspaceUri: string;
 }
+/** Whole canonical montage, prepared ephemerally with the existing preview profile. */
+export interface RenderManualVideoPreviewOperationV2 {
+  type: "render-manual-video-preview";
+  version: 2;
+  items: ManualVideoSequenceItem[];
+  outputUri: string;
+  ownedWorkspaceUri: string;
+}
 export interface ManualSequenceSourceEvidenceV1 {
   inputUri: string;
   sha256: string;
@@ -94,14 +102,15 @@ export function validateManualVideoSequenceItem(value: unknown): ManualVideoSequ
   if (value.audioSelection !== "single-source-stream") throw Error("Manual sequence audio requires explicit single-source-stream admission.");
   return value as unknown as ManualVideoSequenceItem;
 }
-export function validateManualVideoOperation(value: unknown): RenderManualVideoSequenceOperationV1 | RenderManualVideoPreviewOperationV1 {
+export function validateManualVideoOperation(value: unknown): RenderManualVideoSequenceOperationV1 | RenderManualVideoPreviewOperationV1 | RenderManualVideoPreviewOperationV2 {
   if (!record(value)) throw Error("Manual video operation is invalid.");
   const preview = value.type === "render-manual-video-preview";
-  closed(value, ["type", "version", preview ? "item" : "items", "outputUri", "ownedWorkspaceUri"], "Manual video operation");
-  if ((!preview && value.type !== "render-manual-video-sequence") || value.version !== 1) throw Error("Manual video operation version/type is invalid.");
+  const single = preview && value.version === 1;
+  closed(value, ["type", "version", single ? "item" : "items", "outputUri", "ownedWorkspaceUri"], "Manual video operation");
+  if ((!preview && value.type !== "render-manual-video-sequence") || (preview ? ![1, 2].includes(value.version as number) : value.version !== 1)) throw Error("Manual video operation version/type is invalid.");
   path(value.outputUri); path(value.ownedWorkspaceUri);
   if (!value.outputUri.toLowerCase().endsWith(".mp4") || value.outputUri === value.ownedWorkspaceUri) throw Error("Manual output must be a distinct MP4 path.");
-  const items = preview ? [value.item] : value.items;
+  const items = single ? [value.item] : value.items;
   if (!Array.isArray(items) || items.length < 1 || items.length > MAX_MANUAL_SEQUENCE_ITEMS) throw Error("Manual sequence item count exceeds its bound.");
   const identities = new Map<string, string>(); let frames = 0;
   for (const raw of items) {
@@ -113,7 +122,7 @@ export function validateManualVideoOperation(value: unknown): RenderManualVideoS
   }
   integer(frames, 1, MAX_MANUAL_SEQUENCE_FRAMES, "Program frames");
   if (identities.size > 128) throw Error("Manual sequence has too many originals.");
-  return value as unknown as RenderManualVideoSequenceOperationV1 | RenderManualVideoPreviewOperationV1;
+  return value as unknown as RenderManualVideoSequenceOperationV1 | RenderManualVideoPreviewOperationV1 | RenderManualVideoPreviewOperationV2;
 }
 export function validateManualSequenceExecutionEvidence(value: unknown): ManualSequenceExecutionEvidenceV1 {
   const hasBudget = record(value) && Object.hasOwn(value, "logicalBudget");
@@ -155,6 +164,5 @@ export function validateManualSequenceExecutionEvidence(value: unknown): ManualS
     if (source.videoStreamIndex === source.audioStreamIndex || typeof source.sourceVideoEndMs !== "number" || !Number.isFinite(source.sourceVideoEndMs) || source.sourceVideoEndMs <= 0 || source.sourceVideoEndMs > 60001) throw Error("Manual source clock evidence is invalid.");
   }
   if (value.audioChannelLayout !== (value.sources.some(source => source.channelLayout === "stereo") ? "stereo" : "mono")) throw Error("Manual output channel mapping disagrees with the measured sources.");
-  if (preview && value.itemCount !== 1) throw Error("Manual preview must contain one occurrence.");
   return value as unknown as ManualSequenceExecutionEvidenceV1;
 }

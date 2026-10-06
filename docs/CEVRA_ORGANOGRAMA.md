@@ -161,6 +161,20 @@ real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,
 Vids=Desktop; Lite/Full share core and Full visual output does not require Vids.
 
+**Current usability work — 2026-10-06:** the coordinated Owner round subsequently
+confirmed opening/import, implemented editing buttons and correct A/B/A/A export
+in the isolated variant, and reported preview waits at joins, absent thumbnails
+and timeline interaction/readability gaps. Human close/reopen remains NOT TESTED.
+[Issue #88](https://github.com/inlifemedicina/cevra/issues/88) records the scoped
+evidence and pending grouped regression. The new branch
+`feat/vids-timeline-usability-preview-continuity` adds offline-tested selection,
+drag/seek, atomic group removal, continuous CFR30 program preview and source
+thumbnails; [technical scope and limits](CEVRA_MANUAL_SEQUENCE_G1.md#human-findings-and-usability-follow-up--2026-10-06)
+remain explicit. IN/OUT retains Apply-button semantics pending a separate decision;
+native picker language and new perceptual acceptance are untested. Independent
+review is pending, with no replacement of the app/project in use. This is a
+compatible Director extension; progress55%, F-A021/1 and full G1 status are unchanged.
+
 ```text
 CEVRA VIDS
 │

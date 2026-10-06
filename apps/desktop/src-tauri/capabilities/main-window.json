@@ -15,6 +15,7 @@
     "allow-desktop-cancel-operation",
     "allow-desktop-get-editorial-draft",
     "allow-desktop-revise-editorial-draft",
+    "allow-desktop-thumbnail-local-video",
     "allow-desktop-preview-local-video",
     "allow-desktop-prepare-manual-export",
     "allow-desktop-export-manual-sequence",

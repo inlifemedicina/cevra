@@ -44,10 +44,10 @@ def _integer(value: Any, minimum: int, maximum: int, label: str) -> int:
 
 def validate(args: dict, preview: bool) -> tuple[list[dict], int]:
     _closed(args, {"version", "items", "output", "owned_workspace"}, "manual operation")
-    if args["version"] != 1 or isinstance(args["version"], bool):
-        raise ValueError("manual operation version must be 1")
+    if args["version"] not in ((1, 2) if preview else (1,)) or isinstance(args["version"], bool):
+        raise ValueError("manual operation version is invalid")
     items = args["items"]
-    if not isinstance(items, list) or not 1 <= len(items) <= (1 if preview else MAX_ITEMS):
+    if not isinstance(items, list) or not 1 <= len(items) <= (1 if preview and args["version"] == 1 else MAX_ITEMS):
         raise ValueError("manual item count exceeds its bound")
     identities, total = {}, 0
     for item in items:

@@ -5,12 +5,15 @@ import type { DesktopBackend } from "../backend/desktop-backend";
 import { formatMilliseconds, type Translate } from "../ui-model";
 import { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, formatFrames, snapSourceMark } from "../frame-timing";
 
+import type { TimelineSeekPhase } from "../timeline-interactions";
+
 interface Props {
   backend: DesktopBackend;
   source?: SourceAsset;
   sourceLabel?: string;
   snapshotId: string;
   clip?: TimelineClip;
+  sequencePreview?: readonly TimelineClip[];
   unsupportedClip?: boolean;
   timelineOccupied: boolean;
   sequenceEditing?: boolean;
@@ -25,12 +28,13 @@ interface Props {
     resume: boolean;
     onPlaybackIntent(value: boolean): void;
     onSeek(value: number, resume?: boolean): void;
+    onScrub?(value: number, phase: TimelineSeekPhase): void;
     onClipEnd(): void;
   };
 }
 
 /** Original bytes or a bounded, ephemeral derivative of the canonical clip. */
-export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, clip, unsupportedClip, timelineOccupied, sequenceEditing, frameEditing, busy, seek, t, onPlayheadChange, onCreate, program }: Props) {
+export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, clip, sequencePreview, unsupportedClip, timelineOccupied, sequenceEditing, frameEditing, busy, seek, t, onPlayheadChange, onCreate, program }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const metadataVerified = useRef(false);
@@ -38,6 +42,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
   const activePreviewUrl = useRef<string | null>(null);
   const programRef = useRef(program);
   programRef.current = program;
+  const sliderScrub = useRef<{ pointerId: number; originalMs: number; element: HTMLInputElement } | null>(null);
   const completed = useRef(false);
   const pendingSeek = useRef(false);
   const atProgramOut = useRef(false);
@@ -72,14 +77,18 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     setInitialFrame(null);
     setPreview(null); setUrl(null); setReady(false); setError(null); setPlaying(false); setSeeking(false); setInMs(null); setOutMs(null); setMarkDeltas({}); setCurrentMs(startMs);
     if (source?.kind === "video") {
-      void backend.previewLocalVideo({ sourceId: source.id, expectedSnapshotId: snapshotId, operationId, ...(clip ? { clipId: clip.id } : {}) }).then((result) => {
+      void backend.previewLocalVideo({ sourceId: source.id, expectedSnapshotId: snapshotId, operationId, ...(sequencePreview ? { sequence: true } : clip ? { clipId: clip.id } : {}) }).then((result) => {
         settled = true;
         if (!active) return;
-        if (timing && (result.proxy?.profile !== "manual-cfr30-preview-v1" || !result.clip?.frameTiming
+        if (!sequencePreview && timing && (result.proxy?.profile !== "manual-cfr30-preview-v1" || !result.clip?.frameTiming
           || result.clip.frameTiming.version !== 1 || (["timelineStartFrame", "timelineEndFrame", "sourceStartFrame", "sourceEndFrame"] as const).some(key => result.clip!.frameTiming![key] !== timing[key]) || result.clip.frameCount !== timing.sourceEndFrame - timing.sourceStartFrame
           || result.durationMs !== framesToMilliseconds(timing.sourceEndFrame - timing.sourceStartFrame))) throw { code: "MANUAL_VIDEO_FRAME_GRID_UNAVAILABLE" };
+        if (sequencePreview && (result.sequence?.timingPolicy !== "cfr30" || result.proxy?.profile !== "manual-cfr30-preview-v1" || result.clip !== undefined
+          || result.sequence.totalFrames !== timing?.sourceEndFrame || result.durationMs !== framesToMilliseconds(timing!.sourceEndFrame)
+          || result.sequence.clipIds.length !== sequencePreview.length || result.sequence.clipIds.some((id, index) => id !== sequencePreview[index]!.id))) throw { code: "MANUAL_VIDEO_STALE" };
+        if (!sequencePreview && result.sequence !== undefined) throw { code: "MANUAL_VIDEO_STALE" };
         if (result.sourceId !== source.id || result.snapshotId !== snapshotId || !(result.proxy?.profile === "manual-cfr30-preview-v1" ? Number.isFinite(result.durationMs) : Number.isSafeInteger(result.durationMs)) || result.durationMs <= 0
-          || (clip ? result.clip?.id !== clip.id || result.clip.sourceStartMs !== clip.sourceStartMs || result.clip.sourceEndMs !== clip.sourceEndMs
+          || (sequencePreview ? false : clip ? result.clip?.id !== clip.id || result.clip.sourceStartMs !== clip.sourceStartMs || result.clip.sourceEndMs !== clip.sourceEndMs
             || !Number.isFinite(result.clip.firstFrameMs) || result.clip.firstFrameMs < clip.sourceStartMs || !Number.isFinite(result.clip.lastFrameMs) || result.clip.lastFrameMs < result.clip.firstFrameMs || result.clip.lastFrameMs >= clip.sourceEndMs
             || !Number.isSafeInteger(result.clip.frameCount) || result.clip.frameCount < 1 : result.clip !== undefined || (result.proxy ? result.proxy.profile !== "take-v1" || result.proxy.sourceDurationMs !== source.durationMs : result.durationMs !== source.durationMs))
           || !["video/mp4", "video/quicktime", "video/webm"].includes(result.mimeType) || result.base64.length > 11_184_812) throw { code: "MANUAL_VIDEO_STALE" };
@@ -90,7 +99,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
         if (frame) {
           if (frame.mimeType !== "image/png" || frame.base64.length > 2_796_204 || !Number.isSafeInteger(frame.width) || !Number.isSafeInteger(frame.height)
             || Math.min(frame.width, frame.height) < 1 || Math.max(frame.width, frame.height) > 720 || !Number.isFinite(frame.sourceTimeMs)
-            || (clip ? frame.sourceTimeMs !== result.clip!.firstFrameMs : frame.sourceTimeMs < 0 || frame.sourceTimeMs >= source.durationMs!)) throw { code: "MANUAL_VIDEO_UNSUPPORTED" };
+            || (sequencePreview ? frame.sourceTimeMs !== 0 : clip ? frame.sourceTimeMs !== result.clip!.firstFrameMs : frame.sourceTimeMs < 0 || frame.sourceTimeMs >= source.durationMs!)) throw { code: "MANUAL_VIDEO_UNSUPPORTED" };
           const png = Uint8Array.from(atob(frame.base64), character => character.charCodeAt(0));
           const signature = [137, 80, 78, 71, 13, 10, 26, 10];
           if (png.length < 24 || png.length > 2 * 1024 * 1024 || signature.some((value, i) => png[i] !== value)) throw { code: "MANUAL_VIDEO_UNSUPPORTED" };
@@ -113,9 +122,22 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
       if (video && objectUrl) { video.pause(); video.removeAttribute("src"); video.load(); }
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [backend, source?.id, snapshotId, clip?.id, clip?.sourceStartMs, clip?.sourceEndMs, retry]);
+  }, [backend, source?.id, snapshotId, clip?.id, clip?.sourceStartMs, clip?.sourceEndMs, Boolean(sequencePreview), retry]);
 
+  function cancelSliderScrub(restore = true) {
+    const active = sliderScrub.current; sliderScrub.current = null;
+    if (!active) return;
+    if (active.element.hasPointerCapture?.(active.pointerId)) active.element.releasePointerCapture(active.pointerId);
+    if (restore) programRef.current?.onScrub?.(active.originalMs, "cancel");
+  }
   useEffect(() => {
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") cancelSliderScrub(); };
+    const blur = () => cancelSliderScrub();
+    window.addEventListener("keydown", escape); window.addEventListener("blur", blur);
+    return () => { window.removeEventListener("keydown", escape); window.removeEventListener("blur", blur); cancelSliderScrub(false); };
+  }, []);
+  useEffect(() => {
+    if (busy) cancelSliderScrub(false);
     if (busy) { videoRef.current?.pause(); programRef.current?.onPlaybackIntent(false); }
   }, [busy, url]);
 
@@ -139,7 +161,7 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
     let active = true;
     void video.play().catch(() => { if (active && activePreviewUrl.current === url) fail("MANUAL_VIDEO_UNSUPPORTED"); });
     return () => { active = false; };
-  }, [program?.resume, ready, seeking, busy, url]);
+  }, [program?.resume, ready, seeking, busy, url, seek.sequence]);
 
   useEffect(() => {
     if (!playing || !ready || !clip) return;
@@ -264,15 +286,27 @@ export function ManualVideoPreview({ backend, source, sourceLabel, snapshotId, c
         <button type="button" className="secondary-button" disabled={!ready || seeking || busy || programFrame === 0} onClick={() => program.onSeek(framesToMilliseconds(Math.max(0, programFrame! - 1)))}>{t("preview.previousFrame")}</button>
         <button type="button" className="secondary-button" disabled={!ready || seeking || busy || programFrame === floorMsToFrames(program.durationMs)} onClick={() => program.onSeek(framesToMilliseconds(Math.min(floorMsToFrames(program.durationMs), programFrame! + 1)))}>{t("preview.nextFrame")}</button>
       </>}
-      <input type="range" aria-label={t(program ? "sequence.seek" : clip ? "preview.clipSeek" : "preview.sourceSeek")} min={program ? 0 : startMs} max={program ? timing ? floorMsToFrames(program.durationMs) : program.durationMs : Math.max(startMs + 1, endMs)} step="1" value={program ? timing ? programFrame : programMs : Math.min(endMs, Math.max(startMs, currentMs))} disabled={!ready || busy} onChange={(event) => {
-        if (program) { program.onSeek(timing ? framesToMilliseconds(Number(event.target.value)) : Number(event.target.value)); return; }
+      <input type="range" aria-label={t(program ? "sequence.seek" : clip ? "preview.clipSeek" : "preview.sourceSeek")} min={program ? 0 : startMs} max={program ? timing ? floorMsToFrames(program.durationMs) : program.durationMs : Math.max(startMs + 1, endMs)} step="1" value={program ? timing ? programFrame : programMs : Math.min(endMs, Math.max(startMs, currentMs))} disabled={!ready || busy}
+      onPointerDown={event => {
+        if (event.button !== 0 || !ready || busy || !program?.onScrub || sliderScrub.current) return;
+        sliderScrub.current = { pointerId: event.pointerId, originalMs: programMs, element: event.currentTarget };
+        event.currentTarget.setPointerCapture?.(event.pointerId); program.onScrub(programMs, "start");
+      }}
+      onPointerUp={event => {
+        if (sliderScrub.current?.pointerId !== event.pointerId || !program?.onScrub) return;
+        const value = timing ? framesToMilliseconds(Number(event.currentTarget.value)) : Number(event.currentTarget.value);
+        cancelSliderScrub(false); program.onScrub(value, "end");
+      }} onPointerCancel={() => cancelSliderScrub()} onLostPointerCapture={() => cancelSliderScrub()}
+      onChange={(event) => {
+        if (program?.onScrub && sliderScrub.current) { program.onScrub(timing ? framesToMilliseconds(Number(event.target.value)) : Number(event.target.value), "move"); return; }
+        if (program) { program.onSeek(timing ? framesToMilliseconds(Number(event.target.value)) : Number(event.target.value), program.resume); return; }
         const video = videoRef.current; if (!video) return;
         setSeeking(true); video.currentTime = Math.min(mediaEndMs, Number(event.target.value) - startMs) / 1000;
       }} />
       <time data-testid="preview-timecode">{timing && program ? t("sequence.framePosition", { frame: programFrame!, time: formatFrames(programFrame!) }) : t(program ? "sequence.position" : "preview.sourcePosition", { time: formatMilliseconds(program ? programMs : currentMs) })} / {timing && program ? formatFrames(floorMsToFrames(program.durationMs)) : formatMilliseconds(program ? program.durationMs : endMs)}</time>
     </div>
     {preview?.proxy && <p className="manual-preview-hint">{t("preview.proxyHint")}</p>}
-    {clip && <div className="manual-preview-timing">
+    {clip && !sequencePreview && <div className="manual-preview-timing">
       <time data-testid="preview-clip-timecode">{t("preview.clipElapsed", { time: formatMilliseconds(currentMs - startMs), duration: formatMilliseconds(endMs - startMs) })}</time>
       <output>{t("preview.clipBounds", { start: timing ? formatFrames(timing.sourceStartFrame) : formatMilliseconds(startMs), end: timing ? formatFrames(timing.sourceEndFrame) : formatMilliseconds(endMs) })}{timing && " @ 30 fps"}</output>
     </div>}

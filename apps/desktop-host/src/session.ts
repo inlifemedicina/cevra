@@ -25,7 +25,7 @@ import type {
   MediaExecutionIntentRepository
 } from "@cevra/application";
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
-import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
+import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview, SourceThumbnail, SourceThumbnailRequest } from "@cevra/application";
 import type { ManualVideoSequenceEdit } from "@cevra/application";
 import { validateManualExportPreparationRequest, type ManualExportPreparationRequest, type ManualExportPreparation } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
@@ -58,6 +58,7 @@ import {
 import type { CapabilityState, DesktopHostState } from "./protocol.js";
 import { readDesignatedFa02Pair } from "./fa02-review-admission.js";
 import { readLocalVideoPreview } from "./local-video-preview.js";
+import { SourceThumbnailService } from "./source-thumbnail.js";
 import { DerivedVideoPreview, resolvePreviewRange, supportsOriginalProxy } from "./derived-video-preview.js";
 import { NativeManualExportDestination } from "./manual-export-destination.js";
 import { guardManualExportEngine } from "./manual-export-resources.js";
@@ -88,6 +89,7 @@ export interface DesktopSessionServices {
   manualExport?: Pick<ManualSequenceExportApplicationService, "execute">;
   manualExportCapability?: CapabilityState;
   manualExportSettle?: () => Promise<void>;
+  sourceThumbnail?: Pick<SourceThumbnailService, "prepare" | "close">;
   derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare"> & Partial<Pick<DerivedVideoPreview, "close">>;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
@@ -102,6 +104,8 @@ export class DesktopSession {
   private activeMutationTask: Promise<unknown> | null = null;
   private previewTask: Promise<LocalVideoPreview> | null = null;
   private previewOperationId: string | null = null;
+  private previewPreparationTail: Promise<unknown> = Promise.resolve();
+  private readonly thumbnailOperationIds = new Set<string>();
   private legacyPreviewSequence = 0;
   private readonly legacyPreviewOperationIds = new Set<string>();
   private exportPreparationTask: Promise<ManualExportPreparation> | null = null;
@@ -369,7 +373,8 @@ export class DesktopSession {
   }
 
   private async retireManualPreviews(): Promise<void> {
-    const previous = this.previewTask;
+    const previous = this.previewPreparationTail;
+    for (const id of this.thumbnailOperationIds) this.cancel(id);
     if (this.previewOperationId) this.cancel(this.previewOperationId);
     const legacy = [...this.activeTasks.entries()].filter(([id]) => this.legacyPreviewOperationIds.has(id));
     for (const [id] of legacy) this.cancel(id);
@@ -409,28 +414,29 @@ export class DesktopSession {
     if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     const stable = structuredClone(request);
-    if (Object.keys(stable).some((key) => !["sourceId", "expectedSnapshotId", "clipId", "operationId"].includes(key))
+    if (Object.keys(stable).some((key) => !["sourceId", "expectedSnapshotId", "clipId", "operationId", "sequence"].includes(key))
+      || (stable.sequence !== undefined && (stable.sequence !== true || stable.clipId !== undefined || !stable.operationId))
       || (stable.clipId !== undefined && (!stable.clipId || !stable.operationId))
       || (stable.operationId !== undefined && (typeof stable.operationId !== "string" || !stable.operationId))) throw safeError("MANUAL_VIDEO_INVALID_REQUEST");
     if (stable.operationId !== undefined) {
       if (this.operations.has(stable.operationId!)) throw safeError("OPERATION_DUPLICATE");
-      const resolve = () => stable.clipId !== undefined ? resolvePreviewRange(this.services.history, stable)
+      const resolve = () => (stable.clipId !== undefined || stable.sequence) ? resolvePreviewRange(this.services.history, stable)
         : { source: resolveManualVideo(this.services.history.current, stable) };
       resolve();
-      if (stable.clipId !== undefined && !this.services.derivedVideoPreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+      if ((stable.clipId !== undefined || stable.sequence) && !this.services.derivedVideoPreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
       // Only the latest preview prepares bytes. Cancellation is scoped to this
       // read-only operation; ingest/transcription keep their own controllers.
-      const previous = this.previewTask;
+      const previous = this.previewPreparationTail;
       if (this.previewOperationId) this.cancel(this.previewOperationId);
       const task = this.runOperation(stable.operationId!, async (signal) => {
         await previous?.catch(() => undefined);
         if (signal.aborted) throw safeError("OPERATION_CANCELLED");
         const journal = this.services.history.journalIdentity;
-        const sequence = stable.clipId !== undefined && this.services.history.current.timeline.clips.length > 1;
+        const sequence = stable.sequence || stable.clipId !== undefined && this.services.history.current.timeline.clips.length > 1;
         if (sequence && !this.services.manualSequencePreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
         const plan = sequence ? await this.services.manualSequencePreview!.prepare({ version: 1, expectedSnapshotId: stable.expectedSnapshotId }, signal) : undefined;
         const { source } = resolve();
-        const preview = this.services.derivedVideoPreview && (stable.clipId !== undefined || supportsOriginalProxy(source))
+        const preview = this.services.derivedVideoPreview && (stable.clipId !== undefined || stable.sequence || supportsOriginalProxy(source))
           ? await this.services.derivedVideoPreview.prepare(stable, signal)
           : await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
         if (signal.aborted) throw safeError("OPERATION_CANCELLED");
@@ -442,6 +448,7 @@ export class DesktopSession {
         resolve();
         return preview;
       });
+      this.previewPreparationTail = task.catch(() => undefined);
       this.previewTask = task;
       this.previewOperationId = stable.operationId!;
       try { return await task; } finally {
@@ -459,6 +466,29 @@ export class DesktopSession {
         return preview;
       });
     } finally { this.legacyPreviewOperationIds.delete(legacyId); }
+  }
+
+  async thumbnailLocalVideo(request: SourceThumbnailRequest): Promise<SourceThumbnail> {
+    if (this.closing) throw safeError("OPERATION_CANCELLED");
+    if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
+    if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+    if (!this.services.sourceThumbnail) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
+    const stable = structuredClone(request);
+    if (Object.keys(stable).some(key => !["sourceId", "expectedSnapshotId", "operationId"].includes(key))
+      || !stable.operationId || typeof stable.operationId !== "string") throw safeError("MANUAL_VIDEO_INVALID_REQUEST");
+    resolveManualVideo(this.services.history.current, stable);
+    if (this.operations.has(stable.operationId)) throw safeError("OPERATION_DUPLICATE");
+    const previous = this.previewPreparationTail;
+    this.thumbnailOperationIds.add(stable.operationId);
+    const task = this.runOperation(stable.operationId, async signal => {
+      await previous.catch(() => undefined); signal.throwIfAborted();
+      if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+      const frame = await this.services.sourceThumbnail!.prepare(stable, signal);
+      if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
+      signal.throwIfAborted(); return frame;
+    });
+    this.previewPreparationTail = task.catch(() => undefined);
+    try { return await task; } finally { this.thumbnailOperationIds.delete(stable.operationId); }
   }
 
   async createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopHostState; clipId: string }> {
@@ -518,6 +548,7 @@ export class DesktopSession {
   async close(): Promise<void> {
     this.closing = true;
     this.services.derivedVideoPreview?.close?.();
+    this.services.sourceThumbnail?.close();
     for (const controller of this.operations.values()) controller.abort();
     await Promise.allSettled([
       ...this.activeTasks.values(),
@@ -527,6 +558,7 @@ export class DesktopSession {
       await this.services.close?.();
     } finally {
       this.services.derivedVideoPreview?.close?.();
+      this.services.sourceThumbnail?.close();
       await this.services.persistence?.close();
     }
   }
@@ -628,7 +660,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       transcriptionCapability: transcription.capability,
       persistence: opened.persistence,
       ...(media?.resolvedAudioPlan ? { resolvedAudioPlan: media.resolvedAudioPlan } : {}),
-      ...(media?.engine && media.settle ? { derivedVideoPreview: new DerivedVideoPreview({ history, engine: media.engine, settle: media.settle,
+      ...(media?.engine && media.settle ? { sourceThumbnail: new SourceThumbnailService({ history, engine: media.engine, settle: media.settle }), derivedVideoPreview: new DerivedVideoPreview({ history, engine: media.engine, settle: media.settle,
         runtimeIdentity: () => createHash("sha256").update(readFileSync(resolve(configuredMediaRuntime.paths!.root, "manifest.json"))).digest("hex") }) } : {}),
       close: async () => {
         await media?.close?.();
