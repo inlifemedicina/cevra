@@ -922,6 +922,47 @@ PASS. Tauri platform resource resolution passed in the canonical
 No GUI opening or full READY follows from a headless Host result. Existing resource
 ceilings, broader source and Owner/native gates remain open.
 
+## Compact-export package refresh and inherited backend evidence — 2026-10-06
+
+The reviewed local UI correction was authorized for the existing Draft #87 and
+an updated isolated package. The new app is `CEVRA Vids G1 Review fb34610.app` in
+`/private/tmp/vids-g1-compact-export-fb34610`, built offline from functional source
+`fb346106d5a70daed85a8401c8c79a7c7449453c` / tree
+`a6b19c5f15a44e9d959fafeef4a6373dc7e81bc9`. UI157/typecheck and the independent
+source review remain bound to the identical reviewed code blobs. The new frontend
+build contains the export counter; the native build embeds it. Both builds, actual
+Tauri resource resolution, top-level/deep strict signatures and the gated launcher
+`--check-only` passed without opening a window.
+
+Fresh inventory differs from the old app only in `Contents/Info.plist` and the
+native executable. New app tree:
+`bfd6a26e3a672cec69c0a32050ef32b8f876f86a6c172f3412a3b9cb0b8d056b`;
+native SHA-256:
+`629bca14a984d33f776c91b0f323a583fca8925f5892b307d542d70ef9052f3f`.
+Host, Node, sealed Media/Python, worker bindings and every other packaged entry
+retain the baseline bytes. Git objects for Host, Rust, engines, packages and
+dependency pins also match `22e3c431`; the previous 29-response packaged-Host
+export/checkpoint/reopen proof is inherited backend evidence, not a fresh render
+or UI acceptance. No local native media render was repeated.
+
+The sole future entrypoint is `launch-fb34610.command`; the previously delivered
+`launch-22e3c43.command` forwards to it, including `--check-only`. Original launcher
+bytes are archived outside the repo; old app/receipts remain historical and intact.
+The [single grouped script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+now targets the corrected package. A documentation-only completion commit may
+follow the functional build: the final source-binding receipt records both heads
+and proves identical execution components. Independent package review is APPROVE.
+At this pre-publication checkpoint, final source binding and remote exact-head CI
+are PENDING; their terminal results will be recorded in Draft #87 and the new
+package's consolidated receipt. Prior `22e3c431` CI is historical, not a claim for
+the new remote head.
+
+Strict 512-MiB/2-GiB instantaneous resource guarantees stay BLOCKED; no weaker
+contract was accepted. AppHandle/WebView/picker and grouped human/perceptual G1
+acceptance remain NOT_RUN/BLOCKED as applicable. Director impact is a compatible
+presentation correction; typed operations, IR and History retain their boundaries.
+Progress 55%, F-A02 1/1; no Take/device/AI/merge action or release promotion.
+
 ## Final grouped-script review and bounded UI correction — 2026-10-06
 
 The frozen `22e3c431` package/launcher received a final read-only review against

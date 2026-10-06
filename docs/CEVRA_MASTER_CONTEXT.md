@@ -2850,6 +2850,23 @@ credential is used. Node-only signing does not prove whole-bundle/Host acceptanc
 do not declare GUI READY based on headless tests. Fresh exact-head package/Host/review/CI
 receipts accompany the Draft; actual GUI/Owner and strict resource gates stay open.
 
+**Corrected compact-export package — 2026-10-06:** the reviewed source fix was
+authorized for Draft #87 and isolated packaging. Functional build `fb346106`
+(tree `a6b19c5f15a44e9d959fafeef4a6373dc7e81bc9`) now exists as
+`/private/tmp/vids-g1-compact-export-fb34610/package/CEVRA Vids G1 Review fb34610.app`.
+Offline frontend/native builds, actual resource resolution, strict/deep signatures,
+full inventory and launcher check-only passed. Only Info.plist and the native
+executable differ from the previous app; Host/Node/Media and dependencies are
+identical, so backend export/recovery proof is inherited without another local
+render. The new launcher is the future entrypoint; the old command redirects to it
+with original bytes archived. The single human script targets the corrected app.
+Independent package review is APPROVE. At this pre-publication checkpoint, final
+documentation-only source binding and exact remote CI are PENDING; terminal results
+will be recorded in Draft #87 and its new consolidated receipt. Old22 CI stays
+historical. [Scoped record](CEVRA_MANUAL_SEQUENCE_G1.md#compact-export-package-refresh-and-inherited-backend-evidence--2026-10-06).
+Strict resource contract unchanged/BLOCKED, human GUI/picker/perception pending.
+Director compatible, 55%, F-A02 1/1; no Take/device/AI/merge/release action.
+
 **Final grouped-script review — 2026-10-06:** the frozen `22e3c431` package/launcher
 had no identity defect in the read-only check. Its final build/signature/packaged
 Host export/recovery PASS remains separate from unexecuted GUI/picker/Owner proof.

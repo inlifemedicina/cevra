@@ -108,6 +108,17 @@ declared ad-hoc signed Node copy passed strict verification/version while the
 original pin, official manifests and sealed Media/Python remain unchanged.
 Whole-bundle/Host verification is separate. Exact-head package/Host/review/CI
 receipts accompany the Draft; no GUI/Owner or hard-cap PASS follows.
+Corrected compact-export package `fb346106` is now built offline in the isolated
+`vids-g1-compact-export-fb34610` root. Frontend/native builds, resource resolution,
+strict/deep signatures, inventory and launcher check-only passed; only Info.plist
+and native executable changed. Host/Node/Media/dependency identity supports inherited
+backend export/recovery proof without another local render. New launcher and the
+redirected previous command target the corrected app; the single human script was
+updated. Package review is APPROVE; at this pre-publication checkpoint final source
+binding/remote CI are PENDING and will be recorded with Draft #87 and its receipt.
+Strict resources remain BLOCKED and human GUI/picker/perception
+pending; Director compatible, 55%, F-A02 1/1, no Take/device/AI/merge/release.
+[Scoped record](CEVRA_MANUAL_SEQUENCE_G1.md#compact-export-package-refresh-and-inherited-backend-evidence--2026-10-06).
 Final grouped-script review found no frozen-package/launcher identity defect;
 build/signature/packaged-Host export/recovery PASS remains separate from unexecuted
 GUI/picker/Owner. The single acceptance script now defines technical labels,

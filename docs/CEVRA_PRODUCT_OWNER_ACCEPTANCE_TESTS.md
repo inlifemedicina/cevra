@@ -227,7 +227,7 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 Roteiro único para a futura rodada coordenada; **não abrir agora** nem interromper
 o teste Take existente. G1 é o bloco de montagem manual com prévia e exportação;
 os IDs de teste abaixo servem ao registro da equipe, não são botões do aplicativo.
-A equipe fornece o launcher da build isolada `22e3c431` e os dois vídeos sintéticos
+A equipe fornece o launcher da build isolada corrigida `fb34610` e os dois vídeos sintéticos
 do manifesto. Abrir somente essa variante quando a rodada estiver coordenada.
 Ela deve começar no projeto descartável vazio. Se aparecer outro projeto,
 **parar e informar a equipe**, sem apagar, substituir ou importar projeto pessoal.
@@ -306,9 +306,9 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    têm voz: percepção de fala/lábios continua `BLOCKED` nesta variante.
 5. **X-T3/T5/T7 — exportação limitada às fixtures:** executar somente na rodada
    limitada coordenada, com o plano restaurado e a capacidade confirmada pela equipe.
-   No pacote congelado `22e3c43`, no modo compacto, selecionar **Controles antes de
-   Exportar** para manter estado/cancelamento acessíveis; no modo aberto, usar o
-   painel contextual já visível. Em **Exportar sequência**, clicar
+   No pacote corrigido `fb34610`, no modo compacto com **Diretor** selecionado,
+   clicar **Exportar** no topo deve revelar **Controles**, progresso e cancelamento.
+   No modo aberto, usar o painel contextual já visível. Em **Exportar sequência**, clicar
    **Exportar MP4…**; o botão **Exportar** no topo usa a mesma operação.
    Escolher nome novo, como `montagem-g1-01.mp4`, na pasta descartável fornecida.
    **Esperado:** **Export salvo:** com o nome escolhido; MP4 abre com a ordem A/B/A/A
@@ -336,7 +336,15 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    qualidade/voz/lip-sync ou G1 completo. Não pedir ao Owner provocar excesso de
    RAM/disco. O contrato de recursos permanece intacto até decisão explícita.
 
-Preparação nativa atual de 2026-10-06: o pacote isolado `22e3c431` passou build,
+Pacote atual para a futura rodada: `CEVRA Vids G1 Review fb34610.app`, launcher
+`/private/tmp/vids-g1-compact-export-fb34610/launch-fb34610.command`. Build offline,
+assinatura estrita/profunda, resolução de recursos, inventário e `--check-only`
+passaram; a correção de visibilidade está incorporada. A entrada anterior foi
+redirecionada ao novo launcher, com seus bytes originais arquivados. Host, Node,
+Media e dependências permaneceram iguais: a prova de exportação descrita abaixo
+é herdada, sem render local repetido. Isso não executa janela/seletor/aceite humano.
+
+Prova nativa herdada de 2026-10-06: o pacote isolado `22e3c431` passou build,
 assinatura estrita/profunda e IPC do Host empacotado com uma exportação sintética,
 checkpoint/falha/reabertura/Undo/Redo. A janela, AppHandle/WebView e seletor nativo
 continuam **NÃO EXECUTADOS**. A/B são H264/SDR/BT709/1080p/AAC48k estéreo; o plano
@@ -355,13 +363,14 @@ pins/manifests e Media/Python preservados. O pacote final `22e3c431` passou
 separadamente na verificação completa e no Host; os primeiros recibos falhos
 continuam históricos. Compilação/headless não promovem os itens humanos acima.
 
-Revisão final noturna: o pacote congelado continua com a necessidade de selecionar
+Histórico da primeira revisão, antes do novo pacote: o pacote congelado precisava selecionar
 Controles antes do export no compacto. A fonte recebeu uma correção independente:
 Exportar no topo revela Controles sem perder instrução do Diretor ou projeto.
 Duas regressões PT/EN falharam antes da correção; UI157 e typecheck passaram depois.
 A correção de fonte não está no aplicativo congelado e requer novo empacotamento
 antes de ser apresentada como comportamento daquela build. Nenhum render/CI,
-janela, projeto humano ou merge foi executado nesta revisão.
+janela, projeto humano ou merge foi executado naquela revisão. O pacote corrigido
+acima sucede esse checkpoint e não promove os gates estritos ou humanos.
 
 Estado deste roteiro: **NÃO EXECUTADO / preparação nativa agrupada**. Não promove G1,
 G5/G6, native/owner, progresso ou F-A02. A política temporal está aprovada;
