@@ -922,6 +922,42 @@ PASS. Tauri platform resource resolution passed in the canonical
 No GUI opening or full READY follows from a headless Host result. Existing resource
 ceilings, broader source and Owner/native gates remain open.
 
+## Final grouped-script review and bounded UI correction — 2026-10-06
+
+The frozen `22e3c431` package/launcher received a final read-only review against
+the grouped Owner script. No package/launcher identity defect was found. The
+script had concrete delivery gaps: unexplained R2/R4/frame notation, English
+operation names instead of real PT-BR labels, no restored reference after edits,
+an ambiguous promise of cursor persistence and human steps with no UI route.
+The [single grouped script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+now defines terms, gives actual actions/expected/failure per stage, supplies the
+four A/B ranges, explains automatic checkpoint and distinguishes History from
+the visual playhead. Human legacy import, injected save failure and full resource
+acceptance stay BLOCKED. Current build/strict-signature/packaged-Host evidence is
+reconciled separately from still-unexecuted AppHandle/WebView/picker/perception.
+The outer package README points to that same catalog and retains a pre-review
+copy outside the repository; no second acceptance catalog was created.
+
+A concrete independent UI defect was found: in compact mode with Director active,
+the toolbar could start export while Controls hid feedback/Cancel. App now sends
+the existing export-request counter to the existing sidebar, which selects Controls
+without focus, remount, a second operation or canonical edit. Two PT/EN App workflow
+regressions failed before at inaccessible Cancel; the three affected test files
+passed 31/31 after the fix, and the full UI suite passed 157/157 with typecheck.
+The tests prove one operation/cancel plus retained project/archive, selection and
+Director draft; they do not prove native geometry, picker or media. Independent
+source review approved the bounded change. No native render/resource proof was
+repeated and no CI/merge was requested.
+
+This source correction is not in the frozen app: its source/runtime/receipt
+bindings remain `22e3c431`/sealed R4. The human instructions therefore require
+selecting Controls before export in compact mode in that package. A newly built package is required
+before claiming the corrected toolbar behavior in the app; none was created during
+this final review. Resource policy was untouched. Director impact is a compatible
+presentation correction with typed execution/IR/History intact; the separate
+resource-guarantee choice below still needs Owner decision. Progress 55%, F-A02
+exhausted 1/1, Draft #86/#87 unmerged, no human session/device/AI action.
+
 ## Resource-ceiling feasibility and pending decision — 2026-10-06
 
 Read-only source and primary-documentation review against

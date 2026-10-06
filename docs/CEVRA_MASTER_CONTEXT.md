@@ -2850,6 +2850,22 @@ credential is used. Node-only signing does not prove whole-bundle/Host acceptanc
 do not declare GUI READY based on headless tests. Fresh exact-head package/Host/review/CI
 receipts accompany the Draft; actual GUI/Owner and strict resource gates stay open.
 
+**Final grouped-script review — 2026-10-06:** the frozen `22e3c431` package/launcher
+had no identity defect in the read-only check. Its final build/signature/packaged
+Host export/recovery PASS remains separate from unexecuted GUI/picker/Owner proof.
+The [single script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+now uses actual buttons, defines R2/R4/CFR30/IN/OUT/timecode, restores the four
+reference clips after edits and explains automatic save. It removes the visual
+cursor-persistence promise and marks unavailable human legacy/save-failure/full
+resource variants BLOCKED. An independent compact-export UI defect was fixed in
+source: the toolbar reveals Controls rather than hiding feedback/Cancel behind
+Director. Two PT/EN regressions failed before; UI157/typecheck and independent
+review passed after. The fix is not in the frozen app, whose instructions say
+select Controls before export in compact mode; new packaging is required before claiming the
+corrected behavior there. [Scoped record](CEVRA_MANUAL_SEQUENCE_G1.md#final-grouped-script-review-and-bounded-ui-correction--2026-10-06).
+No native render, CI, GUI, human media/session, AI or merge action occurred. Director
+impact compatible presentation fix; resources unchanged, 55% and F-A02 1/1.
+
 **Resource-ceiling feasibility — 2026-10-06:** source/official-document review of
 `22e3c43142cbdd28d8d600e658cc65864629bab2` found no proved in-scope mechanism for
 instantaneous aggregate 512-MiB physical renderer memory and 2-GiB owned logical/

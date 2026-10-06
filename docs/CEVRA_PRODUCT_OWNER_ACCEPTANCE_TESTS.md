@@ -224,50 +224,125 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 
 ### Single grouped G1 script
 
-Roteiro único preparado para uma build futura coordenada e identificada por
-SHA/runtime. Usar somente projeto descartável e duas fixtures locais admitidas,
-com hashes registrados; preservar o projeto humano e a rodada Take existentes.
-Não instalar/abrir agora nem repetir aceites históricos. Registrar por ID e
-variante os resultados técnicos e o julgamento perceptual separado.
+Roteiro único para a futura rodada coordenada; **não abrir agora** nem interromper
+o teste Take existente. G1 é o bloco de montagem manual com prévia e exportação;
+os IDs de teste abaixo servem ao registro da equipe, não são botões do aplicativo.
+A equipe fornece o launcher da build isolada `22e3c431` e os dois vídeos sintéticos
+do manifesto. Abrir somente essa variante quando a rodada estiver coordenada.
+Ela deve começar no projeto descartável vazio. Se aparecer outro projeto,
+**parar e informar a equipe**, sem apagar, substituir ou importar projeto pessoal.
 
-1. **I4-T1, X-T1/T7:** abrir a build coordenada sem IA; alternar PT/EN e coluna
-   aberta/compacta. Conferir timeline, seleção e acesso aos controles por scroll.
-2. **D1-T1, X-T5:** importar as duas fixtures admitidas; marcar quatro trechos,
-   incluindo repetição de uma fonte e um trecho da segunda. Conferir conteúdo,
-   ordem, numeração e hashes dos originais.
-3. **D14-T2, X-T1/T2:** percorrer append/insert/duplicate/split/trim/reorder/remove
-   em uma montagem contínua. Undo/Redo deve desfazer/refazer uma ação por vez;
-   salvar/reabrir preserva sequência, cursor e fontes.
-4. **X-T6/T9, I8-T3/T6:** ouvir/ver Sequência, buscar nas junções e no OUT, repetir
-   explicitamente e voltar a Original para novas marcas. Registrar continuidade,
-   voz/imagem, conteúdo e tempo percebido; a junção pode aguardar preparação.
-   Nenhum resultado fake substitui esse julgamento nativo/perceptual.
-5. **X-T3/T5/T7:** conferir o alinhamento visível CFR30; para projeto legado,
-   revisar deltas e confirmar a conversão explícita, com Undo/reabertura. Em
-   “Exportar sequência”, escolher destino novo; cancelar no seletor e no render,
-   e tentar uma saída existente. Conferir o resultado real e estado/erro honesto:
-   um export confirmado gera uma única entrada e checkpoint; falha de save não
-   rerenderiza. Publicação incerta preserva arquivos e pede conferir o destino.
-   Nenhum original, arquivo anterior ou substituição alheia pode ser apagado.
-6. **I17-T8/T9, X-T2/T4:** usar uma falha de save preparada pela equipe técnica,
-   Retry e novo Close; conferir preservação do projeto/Undo/Redo/reabertura.
-   Timeout/retirement desconhecido mantém o projeto aberto; não forçar descarte.
-7. **D8-T2, I19-T1, X-T3/T5/T6/T9:** export final e oráculos de ordem/IN/OUT/
-   duração/áudio/cor/qualidade/recursos ficam **BLOCKED** até os gates de
-   pipeline/runtime/envelope e limites necessários à rodada serem concluídos. Depois,
-   executar essa variante na mesma rodada agrupada; não alegar PASS antecipado.
+Termos usados nesta rodada:
 
-Preparação nativa de 2026-10-06: pacote macOS arm64 isolado em construção/verificação,
-sem abrir a janela e com diretório/identificador próprios. Duas fixtures sintéticas
-H264/SDR/BT709/1080p/AAC48k estéreo, A em 24 fps e B em 30000/1001, possuem hashes
-registrados no manifesto do pacote. O plano de referência A[15,60), B[30,75),
-A[15,60), A[120,150) soma 165 frames CFR30, 5,5 s e 264000 amostras por canal.
-Flashes/beeps permitem observar ordem/sync; não substituem julgamento de voz/lip.
-O scan antes de publicação bloqueia excesso agregado persistente; a supervisão
-RAM/disco continua amostrada, sem teto instantâneo provado. O item 7 mantém esse
-gate explicitamente aberto; o pacote não declara READY para G1 completo ou projeto
-real arbitrário. Os receipts técnicos de build/Host/runtime e comandos de abertura
-posterior acompanham a mesma variante, sem duplicar este catálogo.
+| Termo | O que significa e o que fazer |
+| --- | --- |
+| Fixture A/B | Vídeos de teste fornecidos pela equipe: `Fonte-A-CFR24-8s.mp4` tem faixa vermelha; `Fonte-B-NTSC-6s.mp4` tem faixa azul. Não é necessário criar vídeos ou usar mídia pessoal. |
+| `fixtures-r2`, runtime R4, métricas R2 | São três rótulos técnicos diferentes: `fixtures-r2` identifica o segundo lote de vídeos válidos; R4 identifica a montagem selada do runtime do pacote; R2 nas medições identifica uma prova anterior. Nenhum deles é um botão ou etapa a executar. Não renomear pastas nem trocar runtime. |
+| CFR30 / frames | A timeline usa 30 quadros por segundo; o primeiro quadro tem número 0. Os originais A/B têm outra cadência, e continuam intactos. Digitar números inteiros nos campos **IN (frames)** e **OUT (frames)**. |
+| IN / OUT | IN inclui o primeiro quadro; OUT indica o primeiro quadro excluído. IN 15 / OUT 60 produz 45 quadros, de 0,5 s até antes de 2 s da fonte. |
+| Tempo `00:05:15` | A indicação em frames é **minutos:segundos:quadros**; isso significa 5 segundos mais 15 quadros, portanto 5,5 s. Não significa 5 minutos e 15 segundos. |
+| Cursor | Linha que indica a posição de reprodução na montagem. Para dividir, selecionar o clip e clicar na régua dentro dele. A posição visual do cursor não é prometida após fechar/reabrir. |
+| Salvo / Tentar salvar | O projeto é salvo automaticamente após alterações. Esperar **Salvo** ou **Sessão recuperada · salva** no topo. **Tentar salvar** é recuperação de falha, quando aparece; não existe comando Salvar/Abrir projeto disponível nesta variante. |
+
+**Plano de referência:** em **Controles da montagem**, junto à timeline, escolher
+**Fonte**, preencher IN/OUT e clicar **Adicionar trecho ao final** para cada linha.
+Importar A antes de B permite identificar Vídeo 1=A e Vídeo 2=B no projeto vazio;
+o nome de arquivo em detalhes confirma a correspondência. Hashes são conferidos
+pela equipe técnica, não estão expostos como controle humano na UI.
+
+| Ordem | Fonte | IN (frames) | OUT (frames) | Duração |
+| --- | --- | ---: | ---: | --- |
+| 1 | A vermelha | 15 | 60 | 45 quadros / 1,5 s |
+| 2 | B azul | 30 | 75 | 45 quadros / 1,5 s |
+| 3 | A vermelha, repetição exata do primeiro trecho | 15 | 60 | 45 quadros / 1,5 s |
+| 4 | A vermelha, outro trecho | 120 | 150 | 30 quadros / 1 s |
+
+O esperado dessa montagem é **quatro clips, 165 quadros / 5,5 s**, sem espaços.
+As junções estão em 1,5 s, 3 s e 4,5 s. Experimentos de edição mudam esse esperado:
+restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exportação.
+
+1. **I4-T1, X-T1/T7 — abertura e acesso:** abrir somente o launcher fornecido,
+   sem IA. No topo, **EN** muda para inglês e **PT** volta ao português. Alternar
+   **Modo compacto / Modo aberto**; no compacto, selecionar **Controles** para o
+   painel de edição e **Diretor** para sua aba. Usar scroll quando necessário.
+   **Esperado:** projeto vazio próprio, timeline e controles alcançáveis; alternar
+   idioma/coluna não edita o projeto. **Falha:** build errada, outro projeto, controle
+   anunciado inacessível ou erro de abertura. Parar nessa etapa e registrar a tela.
+2. **D1-T1, X-T5 — fontes e montagem:** em **Mídia**, clicar **Importar** e escolher
+   A, depois importar B. Montar as quatro linhas do plano acima.
+   **Esperado:** A/B identificáveis e clips na ordem A, B, A, A, total de 5,5 s.
+   **Falha:** importação recusada inesperadamente, trecho/conteúdo errado ou alteração
+   automática não pedida. Se a função estiver indisponível na build, registrar
+   `BLOCKED` com a mensagem, sem recorrer a mídia ou configuração pessoal.
+3. **D14-T2, X-T1/T2 — edição reversível:** selecionar um clip na timeline antes
+   de usar os botões abaixo. Após cada experiência, **Desfazer**, **Refazer** e
+   **Desfazer** novamente devem devolver a montagem de referência.
+
+   | Ação disponível | Como experimentar | Resultado esperado antes de desfazer |
+   | --- | --- | --- |
+   | Duplicar selecionado | Selecionar o primeiro clip e clicar no botão. | Cinco clips; trecho duplicado igual ao selecionado. |
+   | Inserir antes do selecionado | Selecionar o primeiro clip; Fonte B, IN 30, OUT 75; clicar no botão. | Cinco clips; o novo B precede o primeiro A. |
+   | Dividir no cursor | Selecionar o primeiro clip; clicar na régua dentro dele; clicar no botão habilitado. | Cinco clips; duas partes cobrem o trecho anterior e a duração total não muda. No limite do clip o botão deve ficar desabilitado. |
+   | Ajustar trecho selecionado | Selecionar o primeiro clip; confirmar Fonte A; mudar OUT de 60 para 59 e clicar no botão. | Mesmo número de clips e montagem um quadro menor; Desfazer restaura OUT 60. |
+   | Mover para antes / Mover para depois | Selecionar um clip que tenha vizinho na direção escolhida e clicar. | Ordem troca com o vizinho, sem espaço ou perda de conteúdo. |
+   | Remover selecionado | Selecionar o B e clicar. | Três clips, total 4 s; Desfazer restaura B e 5,5 s. |
+
+   **Esperado:** uma ação por Desfazer/Refazer, fontes e numeração preservadas.
+   Com as quatro linhas restauradas, aguardar **Salvo**, fechar normalmente a janela
+   isolada e reabrir pelo mesmo launcher. Conferir sequência/fontes e histórico
+   disponível; não exigir a antiga posição visual do cursor.
+   **Falha:** conteúdo perdido, duas ações desfeitas juntas ou estado salvo diferente.
+   Em **Salvando…**, **Alterações não salvas** ou fechamento pendente, manter aberto
+   e informar a equipe; não forçar encerramento nem substituir o projeto.
+4. **X-T6/T9, I8-T3/T6 — prévia:** selecionar **Sequência** e **Reproduzir**, ouvir
+   os beeps e observar a ordem vermelha/azul/vermelha/vermelha. Clicar na régua perto
+   das três junções; **Home/End** na régua levam ao início/fim, e ←/→ avançam um
+   quadro. Marcar **Repetir sequência** para uma volta e desmarcar para parar no
+   fim. Voltar a **Original**, selecionar uma fonte e experimentar **Marcar IN/OUT**
+   sem acrescentar outro clip; depois retornar à montagem de referência.
+   **Esperado:** conteúdo e cortes corretos; pode haver espera pela preparação na
+   junção. **Registrar separadamente:** pausas, sincronismo percebido, tela preta ou quadro
+   fora do trecho. Testes simulados não aprovam esse comportamento nativo. Estas fixtures não
+   têm voz: percepção de fala/lábios continua `BLOCKED` nesta variante.
+5. **X-T3/T5/T7 — exportação limitada às fixtures:** executar somente na rodada
+   limitada coordenada, com o plano restaurado e a capacidade confirmada pela equipe.
+   No pacote congelado `22e3c43`, no modo compacto, selecionar **Controles antes de
+   Exportar** para manter estado/cancelamento acessíveis; no modo aberto, usar o
+   painel contextual já visível. Em **Exportar sequência**, clicar
+   **Exportar MP4…**; o botão **Exportar** no topo usa a mesma operação.
+   Escolher nome novo, como `montagem-g1-01.mp4`, na pasta descartável fornecida.
+   **Esperado:** **Export salvo:** com o nome escolhido; MP4 abre com a ordem A/B/A/A
+   e duração 5,5 s. A equipe confirma quadros/amostras/cor/hashes, sem pedir ffprobe
+   ou comandos ao Owner. Cancelar no seletor não inicia render; **Cancelar export**
+   solicita parar e exige aguardar. Se a publicação confirmou antes do cancelamento,
+   o resultado pode ser **Export salvo**, nunca cancelamento falso. Tentar o nome
+   já existente deve recusá-lo e preservar o arquivo.
+   **Falha:** saída errada, arquivo anterior modificado ou sucesso falso. Publicação
+   incerta pede conferir o destino e preserva o arquivo; não repetir automaticamente.
+   Cancelamento durante render pode terminar rápido demais nestas fixtures: registrar
+   `NÃO EXECUTADO` para essa variante, sem iniciar um teste de carga maior. A conversão
+   legada deste ID está **BLOCKED**: não há importador de projeto na UI Normal;
+   não tentar abrir o arquivo técnico nem converter o projeto novo, já em CFR30.
+6. **I17-T8/T9, X-T2/T4 — falha de salvamento:** **BLOCKED na rodada humana atual**.
+   O Host descartável já teve falha/recuperação técnica, mas não há injeção pronta
+   dessa falha na UI. Não alterar permissões, encher disco ou forçar fechamento para
+   fabricá-la. Quando houver variante preparada, a equipe remove a causa e orienta
+   **Tentar salvar**, aguardar **Salvo** e fechar normalmente; não repetir export.
+   **Falha esperada a detectar nessa futura variante:** perda de estado/histórico ou
+   repetição do render. Aposentadoria/fechamento incerto mantém o projeto aberto.
+7. **D8-T2, I19-T1, X-T3/T5/T6/T9 — aceite completo:** **BLOCKED** pelos limites
+   instantâneos não provados e variantes nativas/perceptuais ainda pendentes.
+   A revisão limitada do item 5 não aprova export geral, projetos arbitrários,
+   qualidade/voz/lip-sync ou G1 completo. Não pedir ao Owner provocar excesso de
+   RAM/disco. O contrato de recursos permanece intacto até decisão explícita.
+
+Preparação nativa atual de 2026-10-06: o pacote isolado `22e3c431` passou build,
+assinatura estrita/profunda e IPC do Host empacotado com uma exportação sintética,
+checkpoint/falha/reabertura/Undo/Redo. A janela, AppHandle/WebView e seletor nativo
+continuam **NÃO EXECUTADOS**. A/B são H264/SDR/BT709/1080p/AAC48k estéreo; o plano
+tem 264000 amostras por canal, conferidas pela equipe. Supervisão RAM/disco é
+amostrada; a admissão antes de publicação não prova teto instantâneo. Recibos e
+comandos do pacote acompanham a variante, sem criar outro catálogo de aceite.
 
 O primeiro smoke do Host empacotado parou antes de ingest/render/export por
 capability indisponível: o parser de filtros rejeitava as duas colunas reais do
@@ -276,9 +351,17 @@ health/capabilities reais PASS. O binário Node pinado mantém seus bytes oficia
 mas falha na verificação estrita da assinatura também antes do bundle; o primeiro
 pacote fica BLOCKED por assinatura. Uma cópia separada assinada localmente ad hoc
 passou no probe estrito/version, com hash pós assinatura declarado e original,
-pins/manifests e Media/Python preservados. Isso não prova o novo bundle/Host.
-Compilação/headless não promovem os itens humanos acima; preservar receipts
-falhos e aguardar pacote/verificação próprios.
+pins/manifests e Media/Python preservados. O pacote final `22e3c431` passou
+separadamente na verificação completa e no Host; os primeiros recibos falhos
+continuam históricos. Compilação/headless não promovem os itens humanos acima.
+
+Revisão final noturna: o pacote congelado continua com a necessidade de selecionar
+Controles antes do export no compacto. A fonte recebeu uma correção independente:
+Exportar no topo revela Controles sem perder instrução do Diretor ou projeto.
+Duas regressões PT/EN falharam antes da correção; UI157 e typecheck passaram depois.
+A correção de fonte não está no aplicativo congelado e requer novo empacotamento
+antes de ser apresentada como comportamento daquela build. Nenhum render/CI,
+janela, projeto humano ou merge foi executado nesta revisão.
 
 Estado deste roteiro: **NÃO EXECUTADO / preparação nativa agrupada**. Não promove G1,
 G5/G6, native/owner, progresso ou F-A02. A política temporal está aprovada;

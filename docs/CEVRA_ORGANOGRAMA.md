@@ -108,6 +108,16 @@ declared ad-hoc signed Node copy passed strict verification/version while the
 original pin, official manifests and sealed Media/Python remain unchanged.
 Whole-bundle/Host verification is separate. Exact-head package/Host/review/CI
 receipts accompany the Draft; no GUI/Owner or hard-cap PASS follows.
+Final grouped-script review found no frozen-package/launcher identity defect;
+build/signature/packaged-Host export/recovery PASS remains separate from unexecuted
+GUI/picker/Owner. The single acceptance script now defines technical labels,
+actual actions/expected/failure, reference restoration and automatic save;
+unavailable legacy/save-failure/full resource variants stay BLOCKED. A bounded
+source fix reveals Controls when toolbar export starts, preserving Director/project
+state; PT/EN regressions, UI157/typecheck and review passed. It is not in the frozen
+`22e3c431` app; select Controls before export in compact mode there. No repackage/render/CI/GUI/AI
+or merge. [Scoped record](CEVRA_MANUAL_SEQUENCE_G1.md#final-grouped-script-review-and-bounded-ui-correction--2026-10-06).
+Director impact compatible presentation correction, progress 55%, F-A02 1/1.
 The subsequent read-only resource-feasibility finding against `22e3c431` leaves
 the strict gate BLOCKED. Reservation/child file-size limits can contain logical
 writes, while allocated blocks and aggregate physical/framework RAM remain

@@ -285,6 +285,39 @@ for (const committedFailure of [false, true]) {
   });
 }
 
+it.each(["pt-BR", "en-US"] as const)("%s reveals compact export feedback and cancellation from the toolbar without changing the project or Director draft", async locale => {
+  const backend = new SequenceBackend();
+  await backend.service.edit({ version: 2, expectedSnapshotId: backend.history.current.history.headSnapshotId!, type: "append", sourceId: "s0", sourceStartFrame: 15, sourceEndFrame: 60 });
+  const read = backend.loadState.bind(backend);
+  backend.loadState = async () => ({ ...await read(), status: "local-saved", capabilities: { ...(await read()).capabilities, "project.export": { available: true, reason: "available" } } });
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const exportSequence = vi.fn(async (_request: unknown) => { await gate; return { outcome: "cancelled" as const }; });
+  const cancel = vi.fn(async (operationId: string) => { release(); return { operationId, cancelled: true }; });
+  Object.assign(backend, { exportManualSequence: exportSequence, cancelOperation: cancel });
+  const { container } = await mount(backend);
+  const draft = screen.getByLabelText("Instrução para o Diretor CEVRA") as HTMLTextAreaElement;
+  fireEvent.change(draft, { target: { value: "Manter esta instrução sem executar IA" } });
+  if (locale === "en-US") fireEvent.click(screen.getByRole("button", { name: "Trocar idioma" }));
+  const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
+  fireEvent.click(screen.getByRole("button", { name: t("sidebar.compact") }));
+  expect(screen.getByRole("tab", { name: t("sidebar.directorTab") }).getAttribute("aria-selected")).toBe("true");
+  const before = backend.history.toArchive();
+  const selection = container.querySelector('[data-testid="app-shell"]')!.getAttribute("data-selected-project-item-id");
+  fireEvent.click(screen.getByRole("button", { name: t("action.export") }));
+  const cancelButton = await screen.findByRole("button", { name: t("export.cancel") });
+  expect(screen.getByRole("tab", { name: t("sidebar.controlsTab") }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByText(t("export.running"))).toBeTruthy();
+  fireEvent.click(cancelButton);
+  await screen.findByText(t("export.cancelled"));
+  expect(exportSequence).toHaveBeenCalledTimes(1);
+  expect(cancel).toHaveBeenCalledExactlyOnceWith((exportSequence.mock.calls[0][0] as { operationId: string }).operationId);
+  expect(backend.history.toArchive()).toEqual(before);
+  expect(container.querySelector('[data-testid="app-shell"]')!.getAttribute("data-selected-project-item-id")).toBe(selection);
+  fireEvent.click(screen.getByRole("tab", { name: t("sidebar.directorTab") }));
+  expect(draft.value).toBe("Manter esta instrução sem executar IA");
+});
+
 it("keeps a larger legacy source duration intact while bounding disposable frame inputs", async () => {
   const backend = new SequenceBackend();
   backend.history.commit({ type: "source.add", source: { ...originals[0]!, id: "large-clock", uri: "/tmp/offline-large-clock.mp4", durationMs: Number.MAX_SAFE_INTEGER } });
