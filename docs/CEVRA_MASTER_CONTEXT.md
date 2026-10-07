@@ -2691,6 +2691,18 @@ native perception, picker, minimum-layout and human close/reopen are pending.
 Director impact compatible on the same typed commands/IR/History, no provider
 execution; progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain recorded.
 
+The independent #90 review then required one P2 focus correction: leaving dirty
+IN/OUT for Append/Insert or another button sent an implicit trim and disabled the
+intended button before click. Code `3e4397d64a80fdc1687f0e42d10106a7c3f5f741`
+preserves the explicit action at the visible snapshot, with no preceding queued
+trim. Append/Insert use the range draft; other controls keep canonical selection
+semantics. Normal valid blur, Enter dedup and Escape cancellation remain covered.
+Real focused-input/user.click regressions were red for seven cases at the former
+head; the corrected source passes UI194/194, i18n2/2 and build offline, including
+null-relatedTarget pointer intent with no mutation until click. Exact new-head
+CI/re-review are required; earlier 10/10 CI applies to `8bd9463`, not this delta.
+The incremental-cache proposal remains unapproved and unimplemented.
+
 **Earlier follow-up — 2026-10-07:** coordination supplied independent APPROVE
 for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program
 preparation measured 2.153 s for four clips/5.5 s and 6.853–6.879 s for 12 unique

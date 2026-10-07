@@ -7,6 +7,19 @@
 Build Desktop e regressões Desktop **183/183**, i18n **2/2**, PASS offline.
 CI do novo head e revisão proporcional serão registrados no Draft/receipt;
 os 11/11 jobs de `2382dae` e o bundle anterior não validam automaticamente este delta.
+
+**Correção da revisão P2:** a revisão de #90 encontrou OUT30→29 seguido de
+Adicionar: blur enviava trim e desabilitava o botão antes do click. O delta de
+código `3e4397d64a80fdc1687f0e42d10106a7c3f5f741` dá prioridade à ação do botão:
+Adicionar/Inserir usam o draft; demais ações usam a seleção canônica. Não enfileira
+um trim anterior nem usa um snapshot posterior presumido. Blur para fora das
+ações ainda confirma range válido; Enter+blur permanece deduplicado e Esc restaura.
+Foco/relatedTarget e intenção pointer cobrem também o botão que não recebe foco
+do mouse, sem executar comandos no pointerdown. UI **194/194**, i18n **2/2** e build
+PASS; 11 regressões novas usam campo realmente focado e `user.click`, incluindo
+os sete botões de montagem, Undo, Enter/blur/Esc, invalidez e relatedTarget nulo.
+Sete regressões falharam no head anterior e o log foi preservado. Revisão exata
+e CI do novo head continuam requeridos; simulação DOM não é PASS WKWebView.
 A espera de 6,85–8,05 s após editar **não atende ao pedido do Owner** e não é
 critério de aceite. Nenhum protótipo abaixo altera o app ou o projeto humano.
 

@@ -1392,6 +1392,13 @@ and resize cancellation/keyboard limits. This source delta needs proportional
 review and exact-head CI; the signed `2382dae` package remains a separate prior
 artifact. No human app/project was replaced or operated.
 
+The #90 review's P2 blur/button failure is corrected at code
+`3e4397d64a80fdc1687f0e42d10106a7c3f5f741`: an explicit button action takes
+priority over implicit trim, retaining the visible snapshot. Append/Insert use
+the range draft; other actions use canonical selection. UI194/194, i18n2/2 and
+build PASS include real focus/user.click, Enter/blur/Esc and null-relatedTarget
+regressions; exact-head CI/re-review remain required.
+
 The Owner's requested edit fluency is not met by 6.85–8.05-s new-program waits.
 Two external proofs use the existing renderer and verify decoded-frame hashes,
 complete decoded PCM, grids/endpoints and original hashes. The immutable-memory

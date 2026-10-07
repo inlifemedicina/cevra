@@ -202,6 +202,11 @@ The proposed 32-MiB/64-entry worker-local segment LRU is **not approved or
 implemented in production**; neither the 6.85–8.05-s current wait nor prototype
 times are acceptance. No live app/project/media or Take session was operated.
 
+Independent #90 review required a P2 correction: range blur consumed the next
+button action. Code `3e4397d64a80fdc1687f0e42d10106a7c3f5f741` preserves the
+explicit action/snapshot; build, UI194/194 and i18n2/2 pass with real-focus/click
+regressions. Exact new-head review/CI are required, with no cache implementation.
+
 ```text
 CEVRA VIDS
 │

@@ -252,6 +252,12 @@ de 6,85–8,05 s não atende ao pedido; a prova incremental no worker não mede 
 completa do app nem aprova o cache de produção. Picker, percepção/áudio nativos,
 layout mínimo da ajuda e persistência humana continuam NÃO EXECUTADOS nesta etapa.
 
+Na correção P2 da revisão #90, escolher um botão dá prioridade à sua ação:
+Adicionar/Inserir usam o range digitado, sem trim anterior; demais ações usam a
+seleção canônica. O mesmo checklist agrupado cobre esse fluxo, sem rodada nova
+por botão. Build/UI194/i18n2 PASS offline, código `3e4397d64a80fdc1687f0e42d10106a7c3f5f741`;
+revisão e CI deste novo delta precisam de registro próprio.
+
 A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
 os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
 estava concluída no handoff histórico; a rodada teve os relatos parciais acima. Abrir somente esse aplicativo,
