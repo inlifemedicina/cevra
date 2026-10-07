@@ -10,7 +10,7 @@
   "audio.unavailable": "O mixer de áudio ainda não está disponível. O áudio original é preservado na edição e exportação.",
   "media.thumbnailRetry": "Tentar miniatura novamente",
   "sequence.removeSelection": "Remover seleção",
-  "sequence.rangeAutoCommit": "Enter ou sair do campo sem escolher um botão aplica IN/OUT válido ao selecionado; Esc cancela. O botão escolhido tem prioridade. Uma ação de Desfazer.",
+  "sequence.rangeAutoCommit": "Enter ou sair do campo aplica IN/OUT válido ao selecionado; Esc cancela. A próxima ação aguarda a confirmação. Cada alteração tem seu próprio Desfazer.",
   "sequence.rangeDraft": "IN/OUT define o próximo trecho; use Adicionar ou Inserir para criá-lo.",
   "keyboard.title": "Atalhos de teclado",
   "keyboard.space": "Espaço",

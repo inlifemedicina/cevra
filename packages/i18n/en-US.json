@@ -10,7 +10,7 @@
   "audio.unavailable": "The audio mixer is not available yet. Original audio is preserved during editing and export.",
   "media.thumbnailRetry": "Retry thumbnail",
   "sequence.removeSelection": "Remove selection",
-  "sequence.rangeAutoCommit": "Enter or leaving the field without choosing a button applies valid IN/OUT to the selected clip; Esc cancels. The chosen button takes priority. One Undo action.",
+  "sequence.rangeAutoCommit": "Enter or leaving the field applies valid IN/OUT to the selected clip; Esc cancels. The next action waits for confirmation. Each change has its own Undo.",
   "sequence.rangeDraft": "IN/OUT defines the next excerpt; use Append or Insert to create it.",
   "keyboard.title": "Keyboard shortcuts",
   "keyboard.space": "Space",
