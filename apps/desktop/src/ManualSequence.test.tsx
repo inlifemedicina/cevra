@@ -305,6 +305,83 @@ it("a new frame action adopts CFR30 atomically and keyboard edits step whole fra
   expect(backend.history.current.timeline).toEqual(before);
 });
 
+async function legacyConformFixture() {
+  const backend = new SequenceBackend();
+  await backend.service.edit({ version: 1, expectedSnapshotId: backend.history.current.history.headSnapshotId!, type: "append", sourceId: "s0", sourceStartMs: 0, sourceEndMs: 1000 });
+  const view = await mount(backend); const user = userEvent.setup();
+  const clipId = clips(backend)[0]!.id;
+  const item = view.container.querySelector<HTMLElement>(`[data-clip-id="${clipId}"]`)!;
+  await user.click(item.querySelector<HTMLElement>(".timeline-item") ?? item);
+  expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(clipId);
+  const review = () => within(screen.getByRole("region", { name: "Revise cada corte antes de converter" }));
+  return { ...view, user, clipId, review };
+}
+
+it.each(["click", "Enter", "Space"] as const)("legacy reviewed OUT30 → dirty OUT0.900 → confirm/%s never rebinds the old proposal after trim", async activation => {
+  const f = await legacyConformFixture(); const before = f.backend.history.current;
+  await f.user.click(f.review().getByRole("button", { name: "Revisar conversão para 30 fps" }));
+  expect((await f.review().findByLabelText("OUT (frames)") as HTMLInputElement).value).toBe("30");
+  const oldSnapshot = f.backend.history.current.history.headSnapshotId;
+  const input = controls().getByLabelText("OUT (segundos)");
+  await f.user.click(input); await f.user.clear(input); await f.user.type(input, "0.900");
+  let release!: () => void; f.backend.beforeEdit = () => new Promise(resolve => { release = resolve; });
+  const confirm = f.review().getByRole("button", { name: "Confirmar cortes em frames revisados" });
+  if (activation === "click") await f.user.click(confirm);
+  else { await act(async () => confirm.focus()); await f.user.keyboard(activation === "Enter" ? "{Enter}" : " "); }
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
+  await act(async () => release());
+  await waitFor(() => expect(clips(f.backend)[0]!.sourceEndMs).toBe(900));
+  expect(f.backend.history.current.timeline.timingPolicy).toBe("legacy-milliseconds");
+  expect(f.backend.history.current.history.headSnapshotId).not.toBe(oldSnapshot);
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
+  expect(f.review().queryByRole("button", { name: "Confirmar cortes em frames revisados" })).toBeNull();
+  f.backend.beforeEdit = async () => {};
+  await f.user.click(f.review().getByRole("button", { name: "Revisar conversão para 30 fps" }));
+  expect((await f.review().findByLabelText("OUT (frames)") as HTMLInputElement).value).toBe("27");
+  const confirmedSnapshot = f.backend.history.current.history.headSnapshotId;
+  await f.user.click(f.review().getByRole("button", { name: "Confirmar cortes em frames revisados" }));
+  await waitFor(() => expect(f.backend.history.current.timeline.timingPolicy).toBe("cfr30"));
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim", "conform"]);
+  expect(f.backend.requests[1]).toMatchObject({ expectedSnapshotId: confirmedSnapshot, clips: [{ clipId: f.clipId, sourceStartFrame: 0, sourceEndFrame: 27 }] });
+  expect(clips(f.backend)[0]!.sourceEndMs).toBe(900);
+  await f.user.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(f.backend.history.current.timeline.timingPolicy).toBe("legacy-milliseconds"));
+  expect(clips(f.backend)[0]!.sourceEndMs).toBe(900);
+  await f.user.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(f.backend.history.current).toEqual(before));
+});
+
+it("reading a legacy proposal waits for pending range settlement and reads the actual confirmed snapshot", async () => {
+  const f = await legacyConformFixture(); const read = vi.spyOn(f.backend, "previewManualSequenceConform");
+  const input = controls().getByLabelText("OUT (segundos)");
+  await f.user.click(input); await f.user.clear(input); await f.user.type(input, "0.900");
+  let release!: () => void; f.backend.beforeEdit = () => new Promise(resolve => { release = resolve; });
+  await f.user.click(f.review().getByRole("button", { name: "Revisar conversão para 30 fps" }));
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]); expect(read).not.toHaveBeenCalled();
+  await act(async () => release());
+  await waitFor(() => expect(read).toHaveBeenCalledExactlyOnceWith({ version: 1, expectedSnapshotId: f.backend.history.current.history.headSnapshotId }));
+  expect((await f.review().findByLabelText("OUT (frames)") as HTMLInputElement).value).toBe("27");
+  expect(f.backend.history.current.timeline.timingPolicy).toBe("legacy-milliseconds");
+});
+
+it("a late legacy proposal response cannot replace a newer review after the canonical range changes", async () => {
+  const f = await legacyConformFixture(); const read = f.backend.previewManualSequenceConform.bind(f.backend);
+  let deliver!: (value: Awaited<ReturnType<typeof read>>) => void;
+  const oldSnapshot = f.backend.history.current.history.headSnapshotId!;
+  const oldProposal = await read({ version: 1, expectedSnapshotId: oldSnapshot });
+  vi.spyOn(f.backend, "previewManualSequenceConform").mockImplementationOnce(() => new Promise(resolve => { deliver = resolve; }));
+  await f.user.click(f.review().getByRole("button", { name: "Revisar conversão para 30 fps" }));
+  const input = controls().getByLabelText("OUT (segundos)");
+  await f.user.click(input); await f.user.clear(input); await f.user.type(input, "0.900");
+  await f.user.tab();
+  await waitFor(() => expect(clips(f.backend)[0]!.sourceEndMs).toBe(900));
+  await f.user.click(f.review().getByRole("button", { name: "Revisar conversão para 30 fps" }));
+  expect((await f.review().findByLabelText("OUT (frames)") as HTMLInputElement).value).toBe("27");
+  await act(async () => deliver(oldProposal));
+  expect((f.review().getByLabelText("OUT (frames)") as HTMLInputElement).value).toBe("27");
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
+});
+
 for (const committedFailure of [false, true]) {
   it(`App retains a late ${committedFailure ? "committed failure and checkpoint" : "export receipt"} across the new export history head without replay`, async () => {
     const backend = new SequenceBackend();

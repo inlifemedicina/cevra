@@ -459,6 +459,15 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
   function editSequenceAfterRange(request: ManualVideoSequenceEdit) {
     const visibleSnapshot = canonicalProject.current?.history.headSnapshotId;
+    if (request.type === "conform") return afterRangeDraft(current => {
+      // Reviewed conversion values belong immutably to their proposal snapshot.
+      // A preceding trim invalidates that review; never rebind its payload.
+      if (request.expectedSnapshotId !== current.history.headSnapshotId) {
+        const cause = { code: "MANUAL_SEQUENCE_STALE" };
+        handleRuntimeError(cause); throw cause;
+      }
+      return editManualSequence(request);
+    });
     return afterRangeDraft(current => editManualSequence({ ...request,
       // Rebind only a request captured at the visible head before this settlement.
       // An already stale gesture keeps its token for normal backend rejection.
@@ -550,7 +559,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} sidebarCompact={sidebarCompact} exportAvailable={exportAvailable && !manualActionBusy} status={backendState.status} retryAvailable={Boolean(backendState.checkpoint) && (backendState.status === "persistence-error" || backendState.status === "local-unsaved")} retryBusy={manualActionBusy} canUndo={backendState.canUndo && !manualActionBusy} canRedo={backendState.canRedo && !manualActionBusy} t={t} onWorkspaceChange={value => { void afterRangeDraft(() => setWorkspace(value)).catch(() => {}); }} onLocaleChange={value => requestAction(() => setLocale(value))} onMediaToggle={() => requestAction(() => setMediaOpen(value => !value))} onSidebarToggle={() => requestAction(() => setSidebarCompact(value => !value))} onUndo={() => { void afterRangeDraft(() => changeHistory("undo")).catch(() => {}); }} onRedo={() => { void afterRangeDraft(() => changeHistory("redo")).catch(() => {}); }} onRetryCheckpoint={() => requestAction(retryCheckpoint)} onExport={() => { void afterRangeDraft(() => setExportRequest(value => value + 1)).catch(() => {}); }} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={id => requestAction(() => { setActiveTool(id); if (id === "media") setMediaOpen(true); })} />
-        {mediaOpen && <MediaPanel backend={!backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? backend : undefined} snapshotId={project.history.headSnapshotId ?? undefined} thumbnailBusy={mutationBusy} actionBusy={manualActionBusy} onAction={action => afterRangeDraft(() => action())} sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !manualActionBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => requestAction(importMedia)} />}
+        {mediaOpen && <MediaPanel backend={!backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? backend : undefined} snapshotId={project.history.headSnapshotId ?? undefined} thumbnailBusy={mutationBusy} actionBusy={manualActionBusy} onAction={action => afterRangeDraft(action)} sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !manualActionBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => requestAction(importMedia)} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
             {realPreview ? sequenceClips && (sequenceClips.length > 1 || project.timeline.timingPolicy === "cfr30" && sequenceClips.length > 0)
@@ -561,8 +570,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
           {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
         </div>
       </div>
-      <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} controlsRequest={exportRequest} t={t} onAction={action => afterRangeDraft(() => action())} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
-        directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || manualActionBusy} error={editorialError} t={t} onAction={action => afterRangeDraft(() => action())} onRefresh={() => requestAction(refreshEditorial)} onRevise={request => afterRangeDraft(() => reviseEditorial(request))} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
+      <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} controlsRequest={exportRequest} t={t} onAction={action => afterRangeDraft(action)} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
+        directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || manualActionBusy} error={editorialError} t={t} onAction={action => afterRangeDraft(action)} onRefresh={() => requestAction(refreshEditorial)} onRevise={request => afterRangeDraft(() => reviseEditorial(request))} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
         contextualPanel={<Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t}
           exportPreparation={exportClips && exportClips.length > 0 && <ManualExportPreparationPanel key={project.project.id} backend={backend} snapshotId={project.history.headSnapshotId!} locale={locale} busy={editingBusy} actionBusy={manualActionBusy && !exportBusy} onConfirmAction={confirmActionSnapshot} available={exportAvailable} exportRequest={exportRequest} t={t} onBusyChange={value => { manualMutationInFlight.current = value; setExportBusy(value); }} onExported={result => applyBackendState(result.state, undefined, true)} onReconciled={(state, code) => handleRuntimeError({ code, reconciledState: state }, true)} />} />} />
       <Timeline backend={backend} presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} selectedClipIds={selectedTimelineClipIds} onSelectClips={(ids, primary) => {
@@ -570,7 +579,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
           if (primary && primary !== selectedProjectItemId) selectSettledProjectItem(current, primary, ids);
           else { selectionEpoch.current++; setSelectedTimelineClipIds(ids); setSelectedProjectItemId(primary); }
         }, true).catch(() => {});
-      }} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} onResizeCancel={event => { if (event.pointerId === timelineResize.current?.id) endTimelineResize(true); }} onResizeKey={timelineResizeKey} height={timelineHeight} trimAvailable={realPreview} trimBusy={manualActionBusy} onTrim={trimManualClip} sequenceClips={sequenceClips} onSequenceEdit={editSequenceAfterRange} onCommitRange={commitRange} rangeDraft={rangeDraft} onRangeAction={action => afterRangeDraft(() => action())} />
+      }} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} onResizeCancel={event => { if (event.pointerId === timelineResize.current?.id) endTimelineResize(true); }} onResizeKey={timelineResizeKey} height={timelineHeight} trimAvailable={realPreview} trimBusy={manualActionBusy} onTrim={trimManualClip} sequenceClips={sequenceClips} onSequenceEdit={editSequenceAfterRange} onCommitRange={commitRange} rangeDraft={rangeDraft} onRangeAction={action => afterRangeDraft(action)} />
     </main>
   );
 }

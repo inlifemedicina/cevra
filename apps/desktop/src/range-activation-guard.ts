@@ -1,4 +1,5 @@
 import { useEffect, useRef, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
+import type { ProjectIR } from "@cevra/project-ir";
 
 type Activation = { epoch: number; target: Element; cancelled: boolean; pointerId?: number };
 function actionTarget(target: EventTarget | null): Element | null {
@@ -89,4 +90,4 @@ export function useRangeActivationGuard() {
 }
 
 /** Shared UI callback protocol; it never owns Project IR or backend execution. */
-export type RangeActionGate = (action: () => void | Promise<void>) => Promise<void>;
+export type RangeActionGate = (action: (current: Readonly<ProjectIR>) => void | Promise<void>) => Promise<void>;

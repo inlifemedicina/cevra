@@ -150,7 +150,7 @@ export function ManualSequenceControls({ project, clips, presentations, selected
       }}>{t(chosen.length > 1 ? "sequence.removeSelection" : "sequence.remove")}</button>
       {!selected && <span>{t("sequence.selectClip")}</span>}
     </div>
-    {!grid && <ManualSequenceConformReview backend={backend} project={project} busy={disabled} t={t} onEdit={onEdit} />}
+    {!grid && <ManualSequenceConformReview backend={backend} project={project} busy={disabled} t={t} onEdit={onEdit} onAction={onAction} />}
   </section>;
 }
 
