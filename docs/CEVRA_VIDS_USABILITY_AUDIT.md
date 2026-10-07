@@ -8,6 +8,40 @@ Build Desktop e regressões Desktop **183/183**, i18n **2/2**, PASS offline.
 CI do novo head e revisão proporcional serão registrados no Draft/receipt;
 os 11/11 jobs de `2382dae` e o bundle anterior não validam automaticamente este delta.
 
+## P2 da conversão legada — proposta vinculada ao snapshot revisado
+
+Revisão independente de `900da2a` confirmou os dois P2 anteriores resolvidos,
+mas encontrou conformação legada com payload revisado rebindado após trim:
+proposta OUT1,000s→30frames; digitar OUT0,900s e confirmar enviava trim900ms,
+depois os antigos30frames com o novo snapshot. Isso podia restaurar1s sem revisão.
+Código `f530b1d1b3db86e10f52f85259d8d6d335f35ebb` fixa esse vínculo: `conform`
+conserva o snapshot da proposta e o App rejeita o comando capturado antes do
+backend se o settlement mudou o head. Não atualiza o token de um payload revisado.
+O trim900ms permanece canônico; é obrigatório ler a proposta nova27frames antes
+de confirmar. Uma confirmação posterior válida gera seu próprio Undo, separado
+do trim. Não há conversão nem replay automático após invalidar a revisão.
+
+A leitura também passa pelo mesmo gate, recebendo o IR realmente confirmado.
+A proposta, os drafts de frames e a confirmação só aparecem no snapshot ao qual
+pertencem, sem depender de um efeito posterior para apagar a UI. Respostas
+assíncronas pertencem a uma geração/leitura imutável; uma leitura nova/cancelamento
+aposenta a resposta antiga. O resultado pode chegar antes de React renderizar
+o novo IR, mas nunca autoriza display/confirmação em head diferente. Leitura
+assíncrona não prende a edição manual; mudar o head retira a proposta anterior.
+Cancelar revisão usa o gate e não executa conversão.
+
+Desktop **236/236**, build, i18n **2/2** e diff check PASS offline. Cinco novos
+casos App/backend/Application/History: confirmação click/Enter/Space com trim
+pendente; leitura aguarda trim e pede o head retornado; resposta antiga chegando
+depois da nova proposta. Caracterização válida em900da2a: **4 RED/1 já PASS**.
+Os três casos de confirmação provam ausência de conform no backend, preservação
+de900ms, nova proposta27frames, conversão no snapshot revisado e dois Undo exatos.
+O caso legado existente mantém conversão/collapsed-range/reopen sem perda.
+CI de900da2a terminou10/10 PASS, monorepo1.476/UI231, mas não cobre este delta.
+**Novo-head CI e revisão independente PENDENTES no checkpoint de publicação.**
+#90 Draft/#89 preservado, sem cache/GUI/merge/IA. Director compatível no mesmo
+IR/History; progresso55%, F-A021/1, G1 integral não aceito e checklist único mantidos.
+
 **Histórico — primeira correção P2, SUPERSEDED pela reavaliação abaixo:** a revisão de #90 encontrou OUT30→29 seguido de
 Adicionar: blur enviava trim e desabilitava o botão antes do click. O delta de
 código `3e4397d64a80fdc1687f0e42d10106a7c3f5f741` dá prioridade à ação do botão:
@@ -81,6 +115,7 @@ de mídia mantêm seus guards; não se enfileiram closures de decoder obsoleto.
 | --- | --- |
 | IN/OUT: Enter, blur, Esc | Uma Promise de settlement por owner; falha conserva valor/owner, Esc cancela. Sem comando em press ou mero foco. |
 | Append/Insert/Duplicate/Split/Remove/Reorder, botões e atalhos | `editSequenceAfterRange`; mesma transição, atual IR/head retornado e um Undo por mutação typed. |
+| Conversão legada: ler, revisar frames, confirmar, cancelar | Leitura usa gate + IR confirmado. Proposta/drafts/confirm ficam vinculados ao snapshot revisado; `conform` nunca recebe token posterior. Trim que muda head invalida a confirmação capturada antes do backend e exige nova leitura/revisão. Geração e identidade aposentam resposta assíncrona stale. |
 | Criação a partir do Original | Append também passa por `editSequenceAfterRange`; readiness e range admitido do preview continuam obrigatórios. |
 | Seleção de fonte/clip/caption/graphic, grupo, Select All/Clear, teclado | `afterRangeDraft` antes de substituir seleção/owner. Seleção durante uma ação já enviada continua permitida quando não espera o draft. |
 | Fonte no controle de range | `onRangeAction` confirma o owner antigo antes de trocar os campos para outra fonte. |

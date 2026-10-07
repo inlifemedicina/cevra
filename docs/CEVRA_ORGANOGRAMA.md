@@ -234,6 +234,16 @@ Firstf70c874 CI had PR Monorepo PASS and one push UI failure in the old temporar
 editorial test. Synchronize that test with editable/completed UI and verify saved
 title; no production change. Preserve failure; fresh head CI/re-review required.
 
+Latest review at900da2a resolved the two prior P2, then found a stale reviewed
+legacy conform payload rebound after trim. Code
+`f530b1d1b3db86e10f52f85259d8d6d335f35ebb` keeps proposal snapshot immutable,
+rejects captured conform if settlement changes head, and routes reading through
+the confirmed-IR gate. New review required after trim; async generations and
+snapshot binding retire stale replies/UI. UI236, build/i18n2/diff PASS; five new
+cases (4RED/1alreadyPASS). Historical900da2a CI10/10 does not cover new delta;
+CI/exact re-review pending at publication. [Full contract/inventory](CEVRA_VIDS_USABILITY_AUDIT.md#p2-da-conversão-legada--proposta-vinculada-ao-snapshot-revisado).
+Draft/no cache/GUI/merge/IA; Director compatible; same55%/F-A021/1/G1/checklist.
+
 ```text
 CEVRA VIDS
 │

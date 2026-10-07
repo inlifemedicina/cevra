@@ -2764,6 +2764,21 @@ editorial review test. That test now waits for editable fields and completed UI
 busy, and additionally proves the saved title. Production code unchanged;
 failure log preserved, fresh head needs its own CI/re-review.
 
+**Current legacy-conversion P2 — 2026-10-07:** independent900da2a review resolved
+the two prior P2 but found that a reviewed conform payload could be rebound to a
+new snapshot after range settlement (review30frames, trim900ms, old conform30).
+Code `f530b1d1b3db86e10f52f85259d8d6d335f35ebb` keeps the proposal snapshot
+immutable and rejects the captured conform before backend dispatch when trim
+changes head. Reading waits for settlement and uses the confirmed IR; display,
+frame drafts and confirmation require the proposal's exact snapshot. New read/
+cancel generations retire stale asynchronous replies. User must review27frames
+after trim900ms, then explicitly confirm; trim and conform retain separate Undo.
+Desktop236/236, build/i18n2/diff PASS; five new integration cases, valid baseline
+characterization4RED/1alreadyPASS. [Canonical repro, contract and routing](CEVRA_VIDS_USABILITY_AUDIT.md#p2-da-conversão-legada--proposta-vinculada-ao-snapshot-revisado).
+Historical900da2a CI10/10 (monorepo1,476/UI231) does not cover this delta; new-head
+CI/re-review PENDING at publication. Draft only, no cache/GUI/merge/provider;
+Director compatible, progress55%, F-A021/1/full G1 unaccepted/checklist unchanged.
+
 **Earlier follow-up — 2026-10-07:** coordination supplied independent APPROVE
 for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program
 preparation measured 2.153 s for four clips/5.5 s and 6.853–6.879 s for 12 unique

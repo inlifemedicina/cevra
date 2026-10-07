@@ -1431,6 +1431,18 @@ failed. Wait for fields enabled and UI busy settled, retaining native-command
 checks and adding saved-title proof; production unchanged. Failure preserved;
 new head CI/re-review remain mandatory.
 
+Latest900da2a review resolved the two previous P2 and identified reviewed legacy
+conform30frames rebound after trim900ms. Code
+`f530b1d1b3db86e10f52f85259d8d6d335f35ebb` conserves the proposal's snapshot;
+App rejects that captured conform before backend after head changes. Reading
+waits for the confirmed IR; review drafts/display/confirmation keep immutable
+binding, and a new read/cancel retires old asynchronous replies. Read27frames
+after trim900ms, explicitly confirm, and retain separate trim/conform Undo.
+UI236/build/i18n2/diff PASS, five new cases, valid baseline4RED/1alreadyPASS.
+900da2a CI10/10 historical; new-head CI/review pending at publication. Existing
+grouped catalog only; no cache/GUI/merge/provider or native acceptance inference.
+[Complete conversion contract/routing](CEVRA_VIDS_USABILITY_AUDIT.md#p2-da-conversão-legada--proposta-vinculada-ao-snapshot-revisado).
+
 The Owner's requested edit fluency is not met by 6.85–8.05-s new-program waits.
 Two external proofs use the existing renderer and verify decoded-frame hashes,
 complete decoded PCM, grids/endpoints and original hashes. The immutable-memory

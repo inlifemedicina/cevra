@@ -280,6 +280,16 @@ temporário falho no push. O teste aguarda campos habilitados/busy concluído e
 confere título guardado, sem mudança de produção. Falha preservada; CI e revisão
 do próximo head continuam obrigatórios, sem nova rodada humana.
 
+A revisão900da2a resolveu os dois P2 anteriores e encontrou conversão legada
+reusando proposta30frames após trim900ms. Código
+`f530b1d1b3db86e10f52f85259d8d6d335f35ebb`: proposta conserva snapshot original;
+trim que muda head impede o conform capturado antes do backend, exigindo reler/
+revisar27frames e confirmar explicitamente. Leitura aguarda range confirmado;
+resposta antiga não substitui revisão nova. Trim e conform têm Undo separados.
+UI236/build/i18n2/diff PASS, cinco casos novos (4RED/1jáPASS); novo CI/revisão
+pendentes na publicação, CI900da2a histórico. Incorporar ao mesmo grupo/catálogo,
+sem IDs/rodada novos e sem inferir aceite nativo. [Registro único](CEVRA_VIDS_USABILITY_AUDIT.md#p2-da-conversão-legada--proposta-vinculada-ao-snapshot-revisado).
+
 A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
 os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
 estava concluída no handoff histórico; a rodada teve os relatos parciais acima. Abrir somente esse aplicativo,
