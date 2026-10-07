@@ -420,8 +420,9 @@ class ManualSequenceTests(unittest.TestCase):
 
     def test_extract_frame_closed_dimension_schema_and_native_filter(self) -> None:
         base = {"input": "/preview.mp4", "output": "/frame.png", "at": 0}
-        worker._validate_tool_arguments("cevra-extract-frame", {**base, "max_dimension": 720})
-        for value in (0, 719, 721, True, "720"):
+        for maximum in (160, 720):
+            worker._validate_tool_arguments("cevra-extract-frame", {**base, "max_dimension": maximum})
+        for value in (0, 159, 161, 719, 721, True, "720"):
             with self.assertRaises(ValueError):
                 worker._validate_tool_arguments("cevra-extract-frame", {**base, "max_dimension": value})
 
@@ -429,6 +430,7 @@ class ManualSequenceTests(unittest.TestCase):
     def test_extract_frame_measures_bounded_png_and_removes_only_owned_failed_output(self) -> None:
         class FrameCommon(Common):
             width = 720
+            height = 404
             foreign = False
             command = None
             @staticmethod
@@ -442,21 +444,24 @@ class ManualSequenceTests(unittest.TestCase):
                 if self.foreign:
                     replacement = Path(path).with_suffix(".foreign")
                     replacement.write_bytes(b"foreign png"); replacement.replace(path)
-                return {"file": path, "video": {"codec": "png", "width": self.width, "height": 404}}
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory) / "frame.png"; common = FrameCommon()
-            args = {"input": "/preview.mp4", "output": str(output), "at": 0, "max_dimension": 720}
-            tools._run_extract_frame(common, args)
-            self.assertIn("min(720,iw)", common.command[common.command.index("-vf") + 1])
-            self.assertEqual(output.read_bytes(), b"owned png")
-            output.unlink(); common.width = 721
-            with self.assertRaisesRegex(RuntimeError, "dimension postcondition"):
+                return {"file": path, "video": {"codec": "png", "width": self.width, "height": self.height}}
+        for maximum, height in ((160, 90), (720, 404)):
+            with self.subTest(maximum=maximum), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "frame.png"; common = FrameCommon()
+                common.width, common.height = maximum, height
+                args = {"input": "/preview.mp4", "output": str(output), "at": 0, "max_dimension": maximum}
                 tools._run_extract_frame(common, args)
-            self.assertFalse(output.exists())
-            common.foreign = True
-            with self.assertRaisesRegex(RuntimeError, "identity changed"):
-                tools._run_extract_frame(common, args)
-            self.assertEqual(output.read_bytes(), b"foreign png")
+                self.assertIn(f"min({maximum},iw)", common.command[common.command.index("-vf") + 1])
+                self.assertIn(f"min({maximum},ih)", common.command[common.command.index("-vf") + 1])
+                self.assertEqual(output.read_bytes(), b"owned png")
+                output.unlink(); common.width = maximum + 1
+                with self.assertRaisesRegex(RuntimeError, "dimension postcondition"):
+                    tools._run_extract_frame(common, args)
+                self.assertFalse(output.exists())
+                common.foreign = True
+                with self.assertRaisesRegex(RuntimeError, "identity changed"):
+                    tools._run_extract_frame(common, args)
+                self.assertEqual(output.read_bytes(), b"foreign png")
 
     def _pipeline(self, directory: str, *, failure: str | None = None, preview: bool = False):
         from contextlib import ExitStack

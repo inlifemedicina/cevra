@@ -309,6 +309,27 @@ async function continuousMontagePreview(fixture, expectedIds, ranges, sources, o
     assert.deepEqual(fixture.history.toArchive(), before); assert.deepEqual(readdirSync(temporaryRoot), []);
     measurements.push({ name: "source-thumbnail", width: packet.width, height: packet.height, bytes: Buffer.from(packet.base64, "base64").length, sourceSha256Preserved: true, beforePlay: true });
   } finally { thumbnail.close(); }
+  for (const [width, height] of [[1920, 1080], [1080, 1920]]) {
+    const uri = path.join(root, `source-card-${width}x${height}.mp4`);
+    run(["-y", "-f", "lavfi", "-i", `testsrc2=s=${width}x${height}:r=30:d=0.4`,
+      "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=0.4",
+      "-map", "0:v:0", "-map", "1:a:0", "-c:v", "h264_videotoolbox", "-b:v", "4000000", "-c:a", "aac", uri]);
+    const large = await projectFor([uri], `source-card-${width}x${height}`), originalHash = sha(uri);
+    const before = large.history.toArchive(), executions = large.executions.toArchive();
+    const cards = new SourceThumbnailService({ history: large.history, engine: countedEngine, settle: () => transport.settle(), temporaryRoot });
+    try {
+      const request = { sourceId: "source-0", expectedSnapshotId: large.history.current.history.headSnapshotId, operationId: `card-${width}x${height}` };
+      const count = executionCount, packet = await cards.prepare(request, new AbortController().signal);
+      assert.deepEqual([packet.width, packet.height], width > height ? [160, 90] : [90, 160]);
+      assert.equal(executionCount, count + 1);
+      assert.deepEqual(await cards.prepare({ ...request, operationId: `${request.operationId}-cache` }, new AbortController().signal), packet);
+      assert.equal(executionCount, count + 1);
+      assert.equal(sha(uri), originalHash); assert.deepEqual(large.history.toArchive(), before); assert.deepEqual(large.executions.toArchive(), executions);
+      assert.deepEqual(readdirSync(temporaryRoot), []);
+      measurements.push({ name: "source-thumbnail-large", sourceWidth: width, sourceHeight: height, width: packet.width, height: packet.height,
+        bytes: Buffer.from(packet.base64, "base64").length, sourceSha256Preserved: true, beforePlay: true, cachedWithoutReplay: true });
+    } finally { cards.close(); }
+  }
 }
 
 function destination(output) {

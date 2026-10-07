@@ -332,7 +332,7 @@ def _run_extract_frame(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
         "-map", "0:v:0", "-frames:v", "1",
     ]
     if maximum is not None:
-        cmd += ["-vf", "scale=w='min(720,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease"]
+        cmd += ["-vf", f"scale=w='min({maximum},iw)':h='min({maximum},ih)':force_original_aspect_ratio=decrease"]
     cmd += ["-c:v", "png", output]
     common.run(cmd)
     publication = _publication_evidence(Path(output))
@@ -340,7 +340,7 @@ def _run_extract_frame(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
         result = _file_result(common, output, {"publication": publication} if publication else None)
         if maximum is not None:
             video = result["structuredContent"]["probe"].get("video", {})
-            if not isinstance(video.get("width"), int) or not isinstance(video.get("height"), int) or not 1 <= min(video["width"], video["height"]) <= max(video["width"], video["height"]) <= 720:
+            if not isinstance(video.get("width"), int) or not isinstance(video.get("height"), int) or not 1 <= min(video["width"], video["height"]) <= max(video["width"], video["height"]) <= maximum:
                 raise RuntimeError("extract-frame bounded PNG dimension postcondition failed")
         return result
     except BaseException:

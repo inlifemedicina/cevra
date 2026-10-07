@@ -1321,6 +1321,56 @@ Director impact compatible typed editing/ephemeral derivative extension, with
 no new engine/provider/dependency/approval authority; progress55%, F-A021/1 and
 full G1 remain unchanged.
 
+### Representative preparation and large-card correction — 2026-10-07
+
+Independent APPROVE for `abf862f2ea5c92a695de9409b2a5558fc22fc400` was received
+through coordination, with identity/diff and seven artifacts reported checked.
+This is an unsigned handoff, not a fabricated signed or GitHub review receipt.
+That exact head passed all 11 jobs across [push CI](https://github.com/inlifemedicina/cevra/actions/runs/37549088428),
+[PR CI](https://github.com/inlifemedicina/cevra/actions/runs/37549176625) and
+[macOS release runtime](https://github.com/inlifemedicina/cevra/actions/runs/37549176705).
+
+On darwin-arm64, two newly generated moving Full HD sources (8-s CFR24 and 6-s
+NTSC, 9663222/7773991 bytes) were measured through the production DesktopSession
+and sealed runtime. The four-clip 165-frame/5.5-s montage took 2153 ms on the first
+preparation; a one-frame trim and reorder took 1444/1442 ms. Cache/Undo/rename
+snapshot cases took 22–24 ms with no engine call. Twelve unique occurrences over
+60 s took 6853 ms; a one-frame trim took 6879 ms, cache/Undo 26–28 ms. A superseded
+request plus new preparation took 8246 ms; a focused repeat measured old operation
+retirement at 15 ms and subsequent new delivery at 8047 ms. These are Host/render
+delivery measurements, not native decoder-ready timing, a latency SLA or human
+acceptance. The waits near eight seconds are an explicit remaining editing cost.
+
+A new montage key prepares the entire program; trim/order/removal changes it.
+Selection, program seek and crossing cuts reuse one already-loaded video. Cache
+keys include canonical occurrences, original descriptors and runtime identity;
+hits still freshly validate originals. Undo can reuse a retained version, but four
+entries/32 MiB, eviction and restart limit this reuse. New requests cancel and
+wait for the previous owned job's retirement; no stale response was admitted.
+This removes per-join preparation, while full-program edit latency remains a
+product limitation requiring explicit evaluation before acceptance.
+
+The isolated `abf862f` arm64 bundle passed strict/deep signatures and worker/source
+binding without a window. Its merged plist contains pt-BR/en-US and pt-BR fallback;
+Foundation selected **en-US** as preferred localization in this environment. Both
+native save routes carry `CEVRA.mp4` and the MP4 filter. Neither the macOS language
+nor app preferences were changed; native picker appearance/language remains
+unexecuted. Metadata support does not promise a Portuguese native dialog.
+
+The packaged-Host check then exposed a real card defect: despite admitting the
+closed 160-pixel profile, FFmpeg scaling and its postcondition still used 720.
+Small 160×90 source fixtures had concealed it; a Full HD source yielded 720×405
+and the Host correctly rejected it. The follow-up now uses the admitted maximum
+in both filter and postcondition, retaining the 720-pixel preview profile. Python
+regressions cover both profiles and owned-output cleanup; real release-runtime
+regressions add landscape/portrait Full HD card admission/cache/hash/history.
+Media Python137 and the sealed release-runtime regression passed, including
+1920×1080→160×90 and 1080×1920→90×160 cards, cache reuse, original hashes and
+unchanged History. The failed bundle receipt is retained. This narrow delta requires proportional
+independent review and its own published-head CI; the earlier APPROVE does not
+approve the delta. No new app/human round, IN/OUT semantics or resource budget is
+changed. Director impact compatible; progress55%, F-A021/1, full G1 unaccepted.
+
 ## Product and Director boundaries
 
 Creator=Lite; Studio=Full; Vids=Desktop. I19's technical label “Creator Skill

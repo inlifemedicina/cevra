@@ -161,6 +161,18 @@ real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,
 Vids=Desktop; Lite/Full share core and Full visual output does not require Vids.
 
+**Current gate — 2026-10-07:** `abf862f` received independent APPROVE through
+coordination and passed exact-head CI11/11. Representative Full HD preparation
+measured 2.153 s for 5.5 s/four clips, 6.853–6.879 s for 60 s/12 unique clips and
+22–28 ms for cache/Undo. Program cache misses still prepare the full montage;
+edit waits near eight seconds remain a limitation, despite no per-cut render.
+Isolated bundle metadata/signatures passed without a window; Foundation preferred
+en-US here. A packaged Full HD card exposed the 160-profile/720-filter mismatch,
+now corrected with bounded profile/large-source regressions. That narrow delta
+requires proportional independent review and its own CI. See the
+[scoped record](CEVRA_MANUAL_SEQUENCE_G1.md#representative-preparation-and-large-card-correction--2026-10-07).
+No human round/app replacement, IN/OUT change or G1/progress55%/F-A021/1 promotion.
+
 **Current usability work — 2026-10-06:** the coordinated Owner round subsequently
 confirmed opening/import, implemented editing buttons and correct A/B/A/A export
 in the isolated variant, and reported preview waits at joins, absent thumbnails

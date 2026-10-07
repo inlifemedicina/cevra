@@ -2658,6 +2658,20 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
+**Current follow-up — 2026-10-07:** coordination supplied independent APPROVE
+for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program
+preparation measured 2.153 s for four clips/5.5 s and 6.853–6.879 s for 12 unique
+clips/60 s; cache/Undo took 22–28 ms. A new montage cache miss still renders the
+whole program, with a focused cancellation/new-delivery case near eight seconds.
+There is no per-cut preparation on the loaded CFR30 program, but editing latency
+is an explicit remaining limitation. The isolated bundle's localization/MP4
+metadata passed; Foundation preferred en-US here and no picker was opened or Mac
+language changed. Packaged Full HD card validation found a retained 720-pixel
+filter behind the 160-pixel request. A narrow filter/postcondition correction and
+large-source regressions follow; this delta needs proportional independent review
+and its own CI before readiness. [Measured record and scope](CEVRA_MANUAL_SEQUENCE_G1.md#representative-preparation-and-large-card-correction--2026-10-07).
+IN/OUT, live app/project/export, progress55% and F-A021/1 remain preserved.
+
 **Active usability follow-up — 2026-10-06:** the Owner's coordinated G1 round
 reported opening/import, the implemented editing buttons and A/B/A/A export as
 working within that variant. In-app preview paused at joins; source cards lacked
