@@ -129,11 +129,15 @@ it("reviews through the existing native commands while temporary-session canonic
   const user = userEvent.setup(); render(<App backend={backend} />);
   await screen.findByText("Revisão temporária · não guardada");
   const titles = await screen.findAllByLabelText("Título do bloco");
+  await waitFor(() => expect((titles[0] as HTMLInputElement).disabled).toBe(false));
   expect((screen.getByRole("button", { name: "Refazer" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.change(titles[0], { target: { value: "Revisão na sessão temporária" } });
   await user.click(screen.getByRole("button", { name: "Guardar títulos e notas na sessão" }));
   await waitFor(() => expect(calls).toContain("desktop_revise_editorial_draft"));
+  await waitFor(() => expect((screen.getByRole("button", { name: "Atualizar" }) as HTMLButtonElement).disabled).toBe(false));
+  const revised = await source.loadEditorialDraft();
+  expect(revised.status === "current" && revised.draft.blocks[0].title).toBe("Revisão na sessão temporária");
   await user.click(screen.getByRole("button", { name: "Trocar idioma" }));
   expect(screen.getByText("Temporary review · not saved")).toBeTruthy();
   expect((await source.loadEditorialDraft()).status).toBe("current");
