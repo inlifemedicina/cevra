@@ -1,6 +1,6 @@
 import type { ManualVideoSequenceEdit } from "@cevra/application";
 import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import type { SourcePresentation } from "../source-presentation";
 import type { Translate } from "../ui-model";
 import type { DesktopBackend } from "../backend/desktop-backend";
@@ -40,12 +40,43 @@ export function ManualSequenceControls({ project, clips, presentations, selected
   const submitted = useRef<string | null>(null);
   const skipBlur = useRef(false);
   const composing = useRef(false);
+  const container = useRef<HTMLElement>(null);
+  const pointerAction = useRef<HTMLButtonElement | null>(null);
   const rangeHintId = useId();
   const source = sources.find(item => item.id === sourceId);
   useEffect(() => {
     setSourceId(initialSource?.id ?? "");
     setStart(initialStart()); setEnd(initialEnd());
   }, [selectedId, selected?.sourceStartMs, selected?.sourceEndMs, initialSource?.id, initialSource?.durationMs, grid]);
+
+  function actionButton(target: EventTarget | null): HTMLButtonElement | null {
+    const button = target instanceof Element ? target.closest("button") : null;
+    const scope = container.current?.closest(".app-shell") ?? container.current;
+    return button instanceof HTMLButtonElement && scope?.contains(button) && !button.matches(":disabled")
+      && button.getAttribute("aria-disabled") !== "true" ? button : null;
+  }
+  useEffect(() => {
+    // WKWebView may blur a field without putting mouse focus on the button.
+    // Remember pointer intent until release, but perform mutations only on click.
+    const press = (event: PointerEvent) => {
+      pointerAction.current = null;
+      const active = document.activeElement;
+      if (event.button === 0 && active instanceof HTMLInputElement && active.hasAttribute("data-manual-range") && container.current?.contains(active)) {
+        pointerAction.current = actionButton(event.target);
+      }
+    };
+    const release = () => { pointerAction.current = null; };
+    window.addEventListener("pointerdown", press, true);
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("pointercancel", release, true);
+    window.addEventListener("blur", release);
+    return () => {
+      release(); window.removeEventListener("pointerdown", press, true);
+      window.removeEventListener("pointerup", release, true);
+      window.removeEventListener("pointercancel", release, true);
+      window.removeEventListener("blur", release);
+    };
+  }, []);
 
   const begin = grid ? frameInput(start) : milliseconds(start), finish = grid ? frameInput(end) : milliseconds(end);
   const maximum = source ? grid ? maximumSourceFrame(source.durationMs!) : source.durationMs! : 0;
@@ -81,6 +112,12 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     }
   }
   function confirmDraft() { if (!skipBlur.current && !composing.current) range("trim"); }
+  function draftBlur(event: FocusEvent<HTMLInputElement>) {
+    // The chosen action owns the transition: never commit an implicit trim that
+    // disables its button or changes the snapshot before its click is delivered.
+    if (actionButton(event.relatedTarget) || actionButton(pointerAction.current)) return;
+    confirmDraft();
+  }
   function draftKey(event: KeyboardEvent<HTMLInputElement>) {
     if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229 || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
     if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); confirmDraft(); }
@@ -95,7 +132,7 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     if (!chosen.length || next < 0 || next >= clips.length) return;
     void edit({ type: "reorder", clipIds: reorderedTimeline(clips.map(clip => clip.id), chosen, clips[next]!.id, delta > 0) });
   }
-  return <section className="manual-sequence-controls" aria-label={t("sequence.controls")}>
+  return <section ref={container} className="manual-sequence-controls" aria-label={t("sequence.controls")}>
     <p>{t(grid ? "sequence.frameGrid" : "sequence.legacyTiming")}</p>
     <fieldset disabled={disabled}>
       <legend>{t("sequence.sourceRange")}</legend>
@@ -103,8 +140,8 @@ export function ManualSequenceControls({ project, clips, presentations, selected
         const next = sources.find(item => item.id === event.target.value);
         setSourceId(next?.id ?? ""); setStart("0"); setEnd(String(grid ? maximumSourceFrame(next?.durationMs ?? 0) : (next?.durationMs ?? 0) / 1000));
       }}>{sources.map(item => <option key={item.id} value={item.id}>{presentations.get(item.id)?.label ?? item.displayName}</option>)}</select></label>
-      <label>{t(grid ? "sequence.inFrames" : "sequence.inSeconds")}<input type="number" step={grid ? "1" : "0.001"} min="0" value={start} aria-invalid={!valid} aria-describedby={rangeHintId} onChange={event => { skipBlur.current = false; setStart(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
-      <label>{t(grid ? "sequence.outFrames" : "sequence.outSeconds")}<input type="number" step={grid ? "1" : "0.001"} min="0" max={grid ? maximum : maximum / 1000} value={end} aria-invalid={!valid} aria-describedby={rangeHintId} onChange={event => { skipBlur.current = false; setEnd(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
+      <label>{t(grid ? "sequence.inFrames" : "sequence.inSeconds")}<input data-manual-range type="number" step={grid ? "1" : "0.001"} min="0" value={start} aria-invalid={!valid} aria-describedby={rangeHintId} onFocus={() => { pointerAction.current = null; }} onChange={event => { skipBlur.current = false; setStart(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={draftBlur} /></label>
+      <label>{t(grid ? "sequence.outFrames" : "sequence.outSeconds")}<input data-manual-range type="number" step={grid ? "1" : "0.001"} min="0" max={grid ? maximum : maximum / 1000} value={end} aria-invalid={!valid} aria-describedby={rangeHintId} onFocus={() => { pointerAction.current = null; }} onChange={event => { skipBlur.current = false; setEnd(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={draftBlur} /></label>
       <button type="button" className="secondary-button" disabled={!valid} onClick={() => range("append")}>{t("sequence.append")}</button>
       <button type="button" className="secondary-button" disabled={!valid || !selected} onClick={() => range("insert")}>{t("sequence.insert")}</button>
       <button type="button" className="secondary-button" disabled={!valid || !selected || sourceId !== selected.sourceId || sourceStartMs === selected.sourceStartMs && sourceEndMs === selected.sourceEndMs} onClick={() => range("trim")}>{t("sequence.trim")}</button>

@@ -1,6 +1,7 @@
 import { ManualVideoSequenceApplicationService, type ManualVideoSequenceEdit, type SourceContentIdentityPort } from "@cevra/application";
 import { createEmptyProject, ProjectHistory, framesToMilliseconds, type SourceAsset } from "@cevra/project-ir";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { ManualVideoPreview } from "./components/ManualVideoPreview";
@@ -460,6 +461,93 @@ it("Enter plus blur during a pending trim neither duplicates the command nor pre
   fireEvent.keyDown(input, { key: "Enter" });
   await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(29));
   expect(f.backend.requests).toHaveLength(2);
+});
+
+it.each([
+  ["sequence.append", "append"], ["sequence.insert", "insert"], ["sequence.trim", "trim"],
+  ["sequence.duplicate", "duplicate"], ["sequence.split", "split"],
+  ["sequence.later", "reorder"], ["sequence.remove", "remove"]
+] as const)("focused range → real click %s publishes that action once at the visible snapshot", async (label, type) => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
+  if (type === "split") fireEvent.keyDown(f.timeline, { key: "ArrowRight" });
+  const before = f.backend.history.current;
+  const input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  expect(document.activeElement).toBe(input);
+  let release!: () => void; f.backend.beforeEdit = () => new Promise(resolve => { release = resolve; });
+  await user.click(controls().getByRole("button", { name: translate("pt-BR", label) }));
+  expect(f.backend.requests).toHaveLength(1);
+  const request = f.backend.requests[0]!;
+  expect(request.type).toBe(type); expect(request.expectedSnapshotId).toBe(before.history.headSnapshotId);
+  if (request.type === "append" || request.type === "insert" || request.type === "trim") {
+    expect(request).toMatchObject({ version: 2, sourceStartFrame: 0, sourceEndFrame: 29 });
+  }
+  await act(async () => release());
+  await waitFor(() => expect(f.backend.history.current.history.revision).toBe(before.history.revision + 1));
+  if (["append", "insert", "duplicate", "reorder"].includes(type)) {
+    expect(clips(f.backend).find(c => c.id === f.ids[0])!.frameTiming!.sourceEndFrame).toBe(30);
+  }
+  await user.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(f.backend.history.current).toEqual(before));
+  expect(f.backend.requests).toHaveLength(1);
+});
+
+it("real Enter then focus loss serializes one trim; Escape followed by a real action uses restored bounds", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
+  let input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  let release!: () => void; f.backend.beforeEdit = () => new Promise(resolve => { release = resolve; });
+  await user.keyboard("{Enter}"); await user.click(f.timeline);
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
+  await act(async () => release());
+  await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(29));
+  f.backend.beforeEdit = async () => {};
+  await user.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(30));
+  input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29"); await user.keyboard("{Escape}");
+  await user.click(f.timeline); expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
+  await user.click(input); await user.click(controls().getByRole("button", { name: translate("pt-BR", "sequence.append") }));
+  await waitFor(() => expect(clips(f.backend)).toHaveLength(5));
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim", "append"]);
+  expect(f.backend.requests[1]).toMatchObject({ version: 2, sourceStartFrame: 0, sourceEndFrame: 30 });
+});
+
+it("a real history-button click after a dirty focused range keeps the explicit Undo intent", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
+  const before = f.backend.history.current;
+  const input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  await user.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(clips(f.backend)).toHaveLength(3));
+  expect(f.backend.requests).toHaveLength(0);
+  await user.click(screen.getByRole("button", { name: "Refazer" }));
+  await waitFor(() => expect(f.backend.history.current).toEqual(before));
+});
+
+it("real click keeps its action when the browser blurs the field without focusing the button", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
+  const before = f.backend.history.current;
+  const input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  const button = controls().getByRole("button", { name: translate("pt-BR", "sequence.append") });
+  button.addEventListener("mousedown", event => { event.preventDefault(); input.blur(); }, { once: true });
+  await user.click(button);
+  await waitFor(() => expect(clips(f.backend)).toHaveLength(5));
+  expect(f.backend.requests).toHaveLength(1);
+  expect(f.backend.requests[0]).toMatchObject({ type: "append", expectedSnapshotId: before.history.headSnapshotId, sourceStartFrame: 0, sourceEndFrame: 29 });
+});
+
+it("real focus loss still commits a valid range and rejects invalid bounds outside button actions", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
+  const input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input);
+  await user.click(screen.getByLabelText(translate("pt-BR", "director.inputLabel")));
+  expect(f.backend.requests).toHaveLength(0);
+  await user.click(input); await user.type(input, "29");
+  await user.click(screen.getByLabelText(translate("pt-BR", "director.inputLabel")));
+  await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(29));
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
 });
 
 it("native shortcuts duplicate once and history shortcuts respect fields, modals, IME and browser ownership", async () => {
