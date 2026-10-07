@@ -207,7 +207,7 @@ button action. Code `3e4397d64a80fdc1687f0e42d10106a7c3f5f741` preserves the
 explicit action/snapshot; build, UI194/194 and i18n2/2 pass with real-focus/click
 regressions. Exact new-head review/CI are required, with no cache implementation.
 
-Current #90 P2 re-evaluation: code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
+Settlement foundation of #90 P2 re-evaluation: code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
 replaces generic blur suppression with explicit draft settlement before the next
 App intent. Enter/blur shares one trim; selection changes only after confirmation;
 duplicate/append/insert follows the returned snapshot and preserves OUT29. Two
@@ -217,6 +217,18 @@ i18n2/2, build PASS with 13 new App/backend regressions (nine initially RED).
 **New-head CI and exact independent review PENDING**; #90 Draft, #89 preserved.
 Director compatible, no provider/native-user-app/Take operation. Cache remains
 unapproved/unimplemented; progress55%, F-A021/1 and full G1 unaccepted remain.
+
+Current #90 follow-up closes the two P2 observed at57511e1 with code
+`63c89c026e4a18b216c69e0dbc2871d632239163`: one activation epoch consumes failed
+press/key/drag through release/click/Drop, requiring a new explicit retry; all
+action entry points share settlement, including Import/Cmd+I and Inspector export
+with actual confirmed snapshot. [Complete routing inventory](CEVRA_VIDS_USABILITY_AUDIT.md#inventário-completo-de-entradas-e-limites)
+distinguishes safe navigation/actions from decoder/lifecycle/layout guards.
+UI231/231, i18n2/2, build/diff PASS; 24 new regressions. Historical57511e1 CI
+finished10/10 PASS after alignment infrastructure retry (monorepo1,452/UI207).
+New-head CI and exact independent review PENDING. Draft only; no cache/provider/
+native GUI/device/Take/merge. Director compatible, progress55%, F-A021/1 and
+full G1 unaccepted unchanged; reuse the same grouped acceptance catalog.
 
 ```text
 CEVRA VIDS

@@ -263,6 +263,18 @@ falha/retry e ativação pointer/Enter/Space/Cmd+D integram a mesma regressão.
 Build/UI207/i18n2 PASS offline; novo CI e revisão independente exata PENDENTES.
 Sem nova rodada por botão e sem inferir PASS nativo/humano do DOM.
 
+O fechamento dos dois P2 de57511e1, código
+`63c89c026e4a18b216c69e0dbc2871d632239163`, permanece neste mesmo checklist:
+press → falha de trim → release/click/Drop não repete comando nem ação; um gesto
+novo permite retry. Importar/Cmd+I, exportar/Inspector/Cmd+E, painéis, seleção,
+fonte e modo/repetição usam confirmação comum; export recebe o snapshot confirmado.
+Mídia/decoder e geometria antiga mantêm bloqueio/invalidação seguros. UI231,
+build/i18n2/diff PASS offline com 24 casos novos. CI de57511e1 terminou10/10 PASS
+(histórico); CI e revisão independente do novo head PENDENTES. Não adicionar
+IDs/rodadas por campo ou botão; não inferir PASS WKWebView/picker/humano. O
+[inventário técnico único](CEVRA_VIDS_USABILITY_AUDIT.md#inventário-completo-de-entradas-e-limites)
+registra os caminhos e limites, sem alterar a aprovação de cache nem executar IA.
+
 A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
 os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
 estava concluída no handoff histórico; a rodada teve os relatos parciais acima. Abrir somente esse aplicativo,

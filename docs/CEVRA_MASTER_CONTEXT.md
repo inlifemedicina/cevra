@@ -2709,7 +2709,7 @@ focus/click and await enabled Undo while retaining exact restoration/count check
 Build/UI194 pass again; no further production change. Failed CI logs are preserved
 and fresh exact-head CI remains mandatory, rather than relabeling the failed runs.
 
-**Current P2 re-evaluation correction — 2026-10-07:** review of `5f9266c`
+**P2 settlement foundation — 2026-10-07, completed by the follow-up below:** review of `5f9266c`
 confirmed that generic button priority discarded a dirty range on selection or
 duplicate, and Tab focus was mistaken for activation. Code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
 supersedes that approach with an explicit draft state (clean/editing/committing/
@@ -2736,6 +2736,28 @@ no native GUI/user media/Take/device/provider operation. Cache still unapproved 
 unimplemented. [Canonical evidence/contract](CEVRA_VIDS_USABILITY_AUDIT.md).
 Director compatible; progress55%, F-A02 exhausted1/1, full G1 unaccepted and the
 single grouped acceptance catalog remain unchanged.
+
+**Current P2 follow-up — 2026-10-07:** independent review still found two P2 at
+`57511e1`: failure between press and release could retry trim + duplicate in the
+same gesture, and Import bypassed settlement and lost its click to blur busy.
+Code `63c89c026e4a18b216c69e0dbc2871d632239163` adds one App activation-epoch guard
+and completes the shared range-action routing, including Import button/Cmd+I,
+export TopBar/Cmd+E/Inspector, panels/selection/accelerators, source chooser,
+editorial callbacks and preview mode/repeat. Failed pointer/key/drag consumes its
+release/click/Drop; only a new explicit gesture retries. Press records intent,
+never executes a command. Export uses the confirmed canonical snapshot and keeps
+publication/receipt no-replay semantics. Preview intentions survive the existing
+snapshot remount; actual decoder/readiness/busy and stale geometry guards remain.
+[Full entry-point inventory and evidence](CEVRA_VIDS_USABILITY_AUDIT.md#fechamento-dos-dois-p2-restantes--2026-10-07).
+Desktop UI231/231, build, i18n2/2 and diff check PASS offline, 24 new regression
+cases. Initial 12-case characterization was ten RED/two already PASS. `57511e1`
+CI is now terminal10/10 PASS (monorepo1,452/UI207); alignment's initial pip-download
+timeout was preserved and a single-job retry requested only after terminal, with
+five successful jobs observed in attempt2. **New-head CI and exact independent
+re-review PENDING**; prior green does not approve this code. #90 Draft/#89 preserved.
+No cache implementation/approval, merge, native app/package/media/Take/device or
+real provider operation. Director compatible with the same typed IR/History;
+progress55%, F-A021/1, full G1 unaccepted and one grouped checklist unchanged.
 
 **Earlier follow-up — 2026-10-07:** coordination supplied independent APPROVE
 for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program

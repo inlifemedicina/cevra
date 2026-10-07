@@ -1399,7 +1399,7 @@ the range draft; other actions use canonical selection. UI194/194, i18n2/2 and
 build PASS include real focus/user.click, Enter/blur/Esc and null-relatedTarget
 regressions; exact-head CI/re-review remain required.
 
-Current P2 re-evaluation at code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
+P2 settlement foundation at code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
 restores the approved Enter/blur confirmation contract through explicit draft
 settlement and a captured following App intent. Selecting another clip commits
 the previous range before replacing its fields; Duplicate/Append/Insert confirms
@@ -1411,6 +1411,20 @@ Desktop build PASS include 13 new integration regressions; nine were RED before
 implementation at5f9266c. New-head CI/re-review PENDING; #90 Draft, #89/package
 preserved. No native/user-app/Take operation or acceptance inference. Reuse the
 same grouped I4-T1/X-T1/T7/X-T6 checklist; no new round per field or button.
+
+Current follow-up code `63c89c026e4a18b216c69e0dbc2871d632239163` addresses the
+two remaining review P2 at57511e1. A failed range consumes any pointer/key/drag
+already in progress through release/click/Drop; retry requires a new gesture.
+Import button/Cmd+I and all action entries now share settlement; TopBar/Cmd+E/
+Inspector export uses the confirmed snapshot, retaining receipt/publication
+no-replay. Mode/repeat survives snapshot remount; actual decoder/media busy and
+stale drag/trim geometry still retire unsafe operations. Full routing inventory
+is in [the canonical audit](CEVRA_VIDS_USABILITY_AUDIT.md#inventário-completo-de-entradas-e-limites).
+Offline UI231/231, i18n2/2, build/diff PASS include 24 new cases; first12 were
+ten RED/two already PASS. Historical575 CI ended10/10 PASS, monorepo1,452/UI207,
+after alignment's pip-download failure and terminal retry. New-head CI/re-review
+PENDING; #90 remains Draft. Same grouped acceptance, no new human round, cache,
+provider, native GUI/device/Take operation or merge; no acceptance promotion.
 
 The Owner's requested edit fluency is not met by 6.85–8.05-s new-program waits.
 Two external proofs use the existing renderer and verify decoded-frame hashes,

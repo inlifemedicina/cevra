@@ -21,7 +21,7 @@ os sete botões de montagem, Undo, Enter/blur/Esc, invalidez e relatedTarget nul
 Sete regressões falharam no head anterior e o log foi preservado. Revisão exata
 e CI do novo head continuam requeridos; simulação DOM não é PASS WKWebView.
 
-**Correção atual da reavaliação P2 — código `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`:**
+**Fundação do settlement — código `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`, complementada pelo fechamento abaixo:**
 a reavaliação de `5f9266c` confirmou que a prioridade genérica de botões perdia
 OUT29 ao selecionar/duplicar e confundia Tab/foco com ativação. Essa solução está
 **SUPERSEDED**. O estado explícito do draft é clean → editing → committing →
@@ -50,12 +50,76 @@ duplicate, Cmd+D nativo, Tab em Adicionar sem ativação seguido de edição no 
 pointer abandonado e falha/retry. Nove caracterizações foram RED no head `5f9266c`
 antes da implementação; o log permanece externo ao repo. As regressões anteriores
 foram atualizadas para preservar os dois estados/Undo, não para suprimir o trim.
-**CI do novo head e revisão independente exata PENDENTES**; os 10/10 e 1.439 testes
+Nesse checkpoint, CI e revisão independente exata estavam PENDENTES; os 10/10 e 1.439 testes
 do head `5f9266c` são históricos. DOM/offline não certifica WKWebView, percepção
 nativa, picker, layout mínimo ou persistência humana. #90 segue Draft; #89/app
 humano/Take preservados. Cache não aprovado/não implementado; sem chamada real IA.
 Director compatível na mesma fronteira typed IR/History, progresso55%, F-A021/1 e
 G1 integral não aceito permanecem. Reutilizar o mesmo checklist I4-T1/X-T1/T7/X-T6.
+
+## Fechamento dos dois P2 restantes — 2026-10-07
+
+Código `63c89c026e4a18b216c69e0dbc2871d632239163`. A revisão de `57511e1`
+encontrou duas lacunas concretas: press em Duplicar → blur/trim → HOST_TIMEOUT
+antes de release permitia retry e duplicate no mesmo gesto; Importar ainda
+contornava o settlement e era desabilitado antes do click. O protocolo de draft
+permanece; a correção completa o roteamento comum no App e registra a época da
+ativação em capture. Falhar um range consome o pointer/tecla/drag já iniciado.
+Release, click e Drop desse gesto não repetem trim nem ação. Um novo press/tecla
+é retry explícito. Registrar press nunca executa comando; Tab/foco não ativa.
+
+Importar usa a mesma espera por confirmação, por botão e Cmd+I. Exportar pelo
+TopBar/Cmd+E/Inspector recebe o snapshot realmente confirmado antes de chamar
+o picker/backend. Cancellation, receipt e publicação já journaled continuam sem
+replay. Intenção de modo Original/Montagem e repetição pertence ao App, para
+sobreviver ao remount existente por snapshot. Campos do range e trabalho real
+de mídia mantêm seus guards; não se enfileiram closures de decoder obsoleto.
+
+### Inventário completo de entradas e limites
+
+| Entrada | Roteamento e limite verificado |
+| --- | --- |
+| IN/OUT: Enter, blur, Esc | Uma Promise de settlement por owner; falha conserva valor/owner, Esc cancela. Sem comando em press ou mero foco. |
+| Append/Insert/Duplicate/Split/Remove/Reorder, botões e atalhos | `editSequenceAfterRange`; mesma transição, atual IR/head retornado e um Undo por mutação typed. |
+| Criação a partir do Original | Append também passa por `editSequenceAfterRange`; readiness e range admitido do preview continuam obrigatórios. |
+| Seleção de fonte/clip/caption/graphic, grupo, Select All/Clear, teclado | `afterRangeDraft` antes de substituir seleção/owner. Seleção durante uma ação já enviada continua permitida quando não espera o draft. |
+| Fonte no controle de range | `onRangeAction` confirma o owner antigo antes de trocar os campos para outra fonte. |
+| Importar: botão e Cmd+I | `requestAction(importMedia)`; primeira intenção continua disponível enquanto o blur confirma; capability e busy de importação continuam obrigatórios. |
+| Exportar: TopBar/Cmd+E e Escolher destino no Inspector | Transição comum e `confirmActionSnapshot`; export usa head confirmado. Operação começa somente após confirmação; cleanup distingue snapshot da operação. |
+| Undo/Redo: botão e aceleradores | Mesma transição antes de History. Undo após blur primeiro desfaz trim; não presume snapshot futuro. |
+| Tentar salvar | Mesma transição; checkpoint/token lidos do estado canônico confirmado, sem retry de token capturado antigo. |
+| Editorial: atualizar, salvar notas, mover bloco, selecionar fonte, descartar notas | Refresh/revise/source e discard compartilham o gate. Revisão editorial mantém sua validação de revision; texto digitado permanece draft local. |
+| Transcrição | Capability + transição comum antes de iniciar; cancelar operação permanece imediato. Nenhum provedor foi executado nesta correção. |
+| Workspace, ToolRail, mídia/sidebar, idioma; tabs/modo interno do sidebar | Mesma transição por click/teclado antes de navegação que pode substituir a superfície. |
+| Filtros de mídia e retry de thumbnail | Gate comum; busca digitada é UI local. Thumbnail continua vinculado ao snapshot/busy reais. |
+| Original/Montagem e repetição | Gate comum e intenção no App após confirmação; novo snapshot invalida a mídia antiga antes de aplicá-la. |
+| Drag/drop e trim por alça | Comandos typed e guard de ativação. Falha durante drag consome Drop; mudança canônica continua aposentando geometria/snapshot capturados. Não se reaproveita drag antigo após trim confirmado. |
+| Play/Pause, frames, marcar IN/OUT, slider/scrub, retry do decoder | Continuam vinculados à mídia admitida, busy/readiness e lifecycle. Um decoder anterior nunca é usado como confirmação do novo snapshot. Não há fila de comandos de transporte capturados antes da invalidação. |
+| Zoom/Fit/régua, resize de timeline/sidebar, scroll; texto/preset do Director | Estado local/gesto de layout, sem mutação do IR. Guards existentes de cancelamento/geometria permanecem; editar texto/preset não executa Director. |
+| Ajuda/disclosures, browser/sistema, campos, IME/VoiceOver | Divulgação/foco local e proteções existentes de atalhos; sem execução por Tab, composição ou acelerador do browser. Compatibilidade nativa ainda requer a regressão agrupada. |
+
+UI **231/231**, i18n **2/2**, Desktop build e diff check PASS offline. São **24
+casos novos** sobre UI207: nove press/fail/release (com retry por gesto novo),
+12 caminhos de sucesso/click/atalhos, Space/failure/release, troca de fonte e
+Drop após falha. Na primeira caracterização de 12 casos, dez foram RED e dois
+já PASS; esse log permanece externo, sem declarar os 24 inicialmente RED.
+Fixtures App/backend/Application/History usam picker/export fake cancelado,
+sem GUI ou provider. Dois testes antigos de export agora aguardam busy/Undo pela
+UI real; preservam as mesmas provas de receipt/publicação/restauração sem replay.
+O caso de range inválido cancela com Esc antes de trocar fonte.
+
+CI exato de `57511e185f990849071b3491f34e49d00954d0e5` terminou **10/10 PASS**:
+[push](https://github.com/inlifemedicina/cevra/actions/runs/37560690054) e
+[PR, attempt2](https://github.com/inlifemedicina/cevra/actions/runs/37560694033).
+O attempt1 de alignment falhou em download pip antes dos testes. Pediu-se somente
+retry do job `112597029416` após terminal; o GitHub apresentou cinco jobs no
+attempt2, todos PASS. Monorepo daquele head: **1.452/1.452**, UI207. Receipt terminal
+externo SHA256 `eda2ce887a09aed0330de2d397fc886fedc5a38ac470b99250b2ae9a8e5cb37a`.
+Esses gates são históricos: **novo head ainda requer CI e revisão independente**.
+#90 segue Draft e #89 permanece `2382dae`. Sem cache, merge, pacote/GUI nativo,
+mídia humana, Take, Xcode/iPhone ou chamada real IA. Director compatível no mesmo
+IR/History; progresso55%, F-A021/1, G1 integral não aceito e o único checklist
+I4-T1/X-T1/T7/X-T6 permanecem. DOM/offline não comprova aceite WKWebView/humano.
 
 O primeiro CI do delta `ba90d4d` encontrou uma corrida nos testes antigos Enter/blur:
 eles liam o History interno antes de a UI liberar Undo e clicavam o botão ainda
