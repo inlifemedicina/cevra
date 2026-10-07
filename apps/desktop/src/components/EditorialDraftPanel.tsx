@@ -1,5 +1,5 @@
 import type { EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest } from "@cevra/application";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { Translate } from "../ui-model";
 import type { SourcePresentation } from "../source-presentation";
 
@@ -9,18 +9,23 @@ export function EditorialDraftPanel({ state, presentations, busy, error, t, onRe
   onRefresh(): void; onRevise(request: ReviseEditorialDraftRequest): Promise<void>;
   onSourceSelect(sourceId: string): void;
 }) {
+  const retained = useRef<EditorialDraftV1 | null>(null);
+  if (state?.status === "current") retained.current = state.draft;
+  else if (state?.status === "empty" && !error) retained.current = null;
+  const draft = state?.status === "current" ? state.draft : state?.status === "stale" ? retained.current : null;
   return <section className="editorial-review" aria-labelledby="editorial-review-title">
     <div className="editorial-heading"><h3 id="editorial-review-title">{t("editorialReview.title")}</h3><button type="button" className="text-button" onClick={onRefresh} disabled={busy}>{t("editorialReview.refresh")}</button></div>
     {error && <p role="alert">{t("editorialReview.error")}</p>}
-    {!state && <p role="status">{t("editorialReview.loading")}</p>}
+    {!state && !error && <p role="status">{t("editorialReview.loading")}</p>}
     {state?.status === "empty" && <p>{t("editorialReview.empty")}</p>}
     {state?.status === "stale" && <p role="status">{t("editorialDraft.error.stale")}</p>}
-    {state?.status === "current" && <DraftContents key={JSON.stringify([state.draft.id, state.draft.analysis.executionId, state.draft.analysis.contextId, state.draft.analysis.binding.projectId])} draft={state.draft} presentations={presentations} busy={busy} t={t} onRevise={onRevise} onSourceSelect={onSourceSelect} />}
+    {draft && <DraftContents key={JSON.stringify([draft.id, draft.analysis.executionId, draft.analysis.contextId, draft.analysis.binding.projectId])} draft={draft} presentations={presentations} busy={busy || error || state?.status !== "current"} t={t} onRevise={onRevise} onSourceSelect={onSourceSelect} />}
   </section>;
 }
 
 function DraftContents({ draft, presentations, busy, t, onRevise, onSourceSelect }: { draft: EditorialDraftV1; presentations: ReadonlyMap<string, SourcePresentation>; busy: boolean; t: Translate; onRevise(request: ReviseEditorialDraftRequest): Promise<void>; onSourceSelect(sourceId: string): void }) {
   const [edits, setEdits] = useState(() => draft.blocks.map(({ id, title, userNote }) => ({ blockId: id, title, userNote })));
+  const hintId = useId();
   useEffect(() => { setEdits(draft.blocks.map(({ id, title, userNote }) => ({ blockId: id, title, userNote }))); }, [draft.id, draft.revision]);
   const valid = edits.every(edit => edit.title.trim().length > 0 && edit.title.length <= 200 && edit.userNote.length <= 2000);
   const changed = edits.some(edit => { const original = draft.blocks.find(block => block.id === edit.blockId)!; return original.title !== edit.title || original.userNote !== edit.userNote; });
@@ -41,10 +46,10 @@ function DraftContents({ draft, presentations, busy, t, onRevise, onSourceSelect
         function update(field: "title" | "userNote", value: string) { setEdits(current => current.map(item => item.blockId === block.id ? { ...item, [field]: value } : item)); }
         return <li key={block.id} data-block-id={block.id} className="editorial-card">
           <div className="editorial-block-heading"><strong className="editorial-block-number">{t("editorialReview.block", { number: index + 1 })}</strong>{draft.caveatObservationIds.includes(block.observationId) && <strong className="editorial-caveat">{t("editorialDraft.block.caveat")}</strong>}</div>
-          <label>{t("editorialReview.blockTitle")}<input value={edit.title} maxLength={200} disabled={busy} onChange={event => update("title", event.target.value)} /></label>
+          <label>{t("editorialReview.blockTitle")}<input aria-label={t("editorialReview.titleForBlock", { number: index + 1 })} aria-invalid={!edit.title.trim() || edit.title.length > 200} aria-describedby={hintId} value={edit.title} maxLength={200} disabled={busy} onChange={event => update("title", event.target.value)} /></label>
           <p className="editorial-section-label">{t("editorialReview.originalAnalysis")}</p>
           <p className="editorial-statement">{observation.statement}</p>
-          <label>{t("editorialReview.userNote")}<textarea rows={2} value={edit.userNote} maxLength={2000} disabled={busy} onChange={event => update("userNote", event.target.value)} /></label>
+          <label>{t("editorialReview.userNote")}<textarea aria-label={t("editorialReview.noteForBlock", { number: index + 1 })} aria-invalid={edit.userNote.length > 2000} aria-describedby={hintId} rows={2} value={edit.userNote} maxLength={2000} disabled={busy} onChange={event => update("userNote", event.target.value)} /></label>
           <details><summary>{t("editorialReview.sourcesAndReason")}</summary><p>{observation.justification}</p><p>{t("editorialReview.uncertainty")}: {t(`editorialReview.uncertainty.${observation.uncertainty}`)}</p>
             {block.evidenceReferences.map(ref => {
               const evidence = draft.evidence.find(item => item.reference === ref)!;
@@ -63,7 +68,8 @@ function DraftContents({ draft, presentations, busy, t, onRevise, onSourceSelect
         </li>;
       })}
     </ol>
-    <p className="editorial-editing-hint" role="status">{editingHint}</p>
+    <p id={hintId} className="editorial-editing-hint" role="status">{editingHint}</p>
+    {changed && <p role="status">{t("editorialReview.reorderSavesNotes")}</p>}
     <button type="button" className="secondary-button" disabled={busy || !valid || !changed} title={busy || !valid || !changed ? editingHint : undefined} onClick={() => void onRevise({ expectedRevision: draft.revision, blockEdits: edits })}>{t("editorialReview.saveNotes")}</button>
     <button type="button" className="text-button" disabled={busy || !changed} title={busy || !changed ? editingHint : undefined} onClick={() => setEdits(draft.blocks.map(({ id, title, userNote }) => ({ blockId: id, title, userNote })))}>{t("editorialReview.discardNotes")}</button>
     <details className="editorial-limitations"><summary>{t("editorialReview.assessment")}</summary>

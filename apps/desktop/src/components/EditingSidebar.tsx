@@ -1,3 +1,4 @@
+import { gestureEscape, timelineShortcutBlocked } from "../timeline-interactions";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode, type UIEvent } from "react";
 import type { Translate } from "../ui-model";
 
@@ -63,7 +64,7 @@ export function EditingSidebar({ compact, width, editorialVisible, directorPanel
     const cancel = () => stopGesture();
     const escape = (event: globalThis.KeyboardEvent) => {
       const current = gesture.current;
-      if (event.key !== "Escape" || !current) return;
+      if (!gestureEscape(event) || !current) return;
       onWidthChange(current.width);
       setEditorialShare(current.share);
       stopGesture();
@@ -135,6 +136,7 @@ export function EditingSidebar({ compact, width, editorialVisible, directorPanel
     else setHeight(current.height + event.clientY - current.start, current.usableHeight);
   }
   function key(event: KeyboardEvent<HTMLButtonElement>, kind: Gesture["kind"]) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || timelineShortcutBlocked(event.nativeEvent)) return;
     if (compact) return;
     const keys = kind === "width" ? ["ArrowLeft", "ArrowRight", "Home", "End"] : ["ArrowUp", "ArrowDown", "Home", "End"];
     if (!keys.includes(event.key)) return;
@@ -151,6 +153,7 @@ export function EditingSidebar({ compact, width, editorialVisible, directorPanel
     onModeToggle();
   }
   function tabKey(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || timelineShortcutBlocked(event.nativeEvent)) return;
     if (!editorialVisible || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     const next = event.key === "Home" ? "director" : event.key === "End" ? "controls" : activeTab === "director" ? "controls" : "director";

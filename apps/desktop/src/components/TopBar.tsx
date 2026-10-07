@@ -1,5 +1,8 @@
 import type { CevraLocale } from "@cevra/i18n";
 import { Icon } from "./Icon";
+import { shortcutProps } from "../keyboard-shortcuts";
+import { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
+import { timelineShortcutBlocked } from "../timeline-interactions";
 import { workspaces, workspaceKeys, type Translate, type Workspace } from "../ui-model";
 
 interface TopBarProps {
@@ -27,6 +30,7 @@ interface TopBarProps {
 
 export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOpen, exportAvailable, status, retryAvailable, retryBusy, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onSidebarToggle, onMediaToggle, onUndo, onRedo, onRetryCheckpoint, onExport }: TopBarProps) {
   function handleWorkspaceKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || timelineShortcutBlocked(event.nativeEvent)) return;
     const currentIndex = workspaces.indexOf(workspace);
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
@@ -43,7 +47,7 @@ export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOp
       <div className="brand-block">
         <span className="brand-mark" aria-hidden="true">C</span>
         <strong>{t("app.vidsName")}</strong>
-        <button className="project-menu" type="button" disabled title={t("status.unavailableDetail")} aria-label={t("top.projectMenu")}>
+        <button className="project-menu" type="button" disabled title={t("status.notImplemented")} aria-label={t("top.projectMenu")}>
           <span>{projectName}</span><Icon name="chevron" size={14} />
         </button>
       </div>
@@ -67,15 +71,16 @@ export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOp
       <div className="top-actions">
         <button type="button" className={mediaOpen ? "icon-button toggled" : "icon-button"} onClick={onMediaToggle} aria-label={t("top.mediaPanel")} title={t("top.mediaPanel")}><Icon name="panel" /></button>
         <button type="button" data-sidebar-toggle className={sidebarCompact ? "icon-button toggled sidebar-toggle" : "icon-button sidebar-toggle"} onClick={onSidebarToggle} aria-label={t(sidebarCompact ? "sidebar.activateOpen" : "sidebar.activateCompact")} title={t(sidebarCompact ? "sidebar.activateOpen" : "sidebar.activateCompact")} aria-pressed={sidebarCompact} aria-controls="editing-sidebar"><Icon name="inspect" /></button>
-        <button type="button" className="icon-button" disabled={!canUndo} onClick={onUndo} aria-label={t("action.undo")} title={canUndo ? t("action.undo") : t("history.undoUnavailable")}><Icon name="undo" /></button>
-        <button type="button" className="icon-button" disabled={!canRedo} onClick={onRedo} aria-label={t("action.redo")} title={canRedo ? t("action.redo") : t("history.redoUnavailable")}><Icon name="redo" /></button>
+        <button {...shortcutProps("undo", t)} type="button" className="icon-button" disabled={!canUndo} onClick={onUndo} aria-label={t("action.undo")} title={retryBusy ? t("status.busy") : canUndo ? shortcutProps("undo", t).title : t("history.undoUnavailable")}><Icon name="undo" /></button>
+        <button {...shortcutProps("redo", t)} type="button" className="icon-button" disabled={!canRedo} onClick={onRedo} aria-label={t("action.redo")} title={retryBusy ? t("status.busy") : canRedo ? shortcutProps("redo", t).title : t("history.redoUnavailable")}><Icon name="redo" /></button>
         <span role="status" className={`save-status ${status === "demo-not-persisted" ? "demo-status" : status === "host-unavailable" || status === "persistence-error" ? "failed-status" : "local-status"}`}><i aria-hidden="true" />{t(statusKey(status))}</span>
         {retryAvailable && <button type="button" className="save-retry-button" disabled={retryBusy} onClick={onRetryCheckpoint}>{t("top.retrySave")}</button>}
         <button className="locale-button" type="button" onClick={() => onLocaleChange(locale === "pt-BR" ? "en-US" : "pt-BR")} aria-label={t("top.switchLanguage")} title={t("top.switchLanguage")}>
           {locale === "pt-BR" ? "EN" : "PT"}
         </button>
-        <button type="button" className="export-button" disabled={!exportAvailable} onClick={onExport} title={exportAvailable ? undefined : t("status.unavailableDetail")}>{t("action.export")}</button>
-        <button type="button" className="icon-button settings-action" disabled aria-label={t("top.settings")} title={t("status.unavailableDetail")}><Icon name="settings" /></button>
+        <button {...shortcutProps("export", t)} type="button" className="export-button" disabled={!exportAvailable} onClick={onExport} title={retryBusy ? t("status.busy") : exportAvailable ? shortcutProps("export", t).title : t("export.unavailable")}>{t("action.export")}</button>
+        <KeyboardShortcutHelp t={t} />
+        <button type="button" className="icon-button settings-action" disabled aria-label={t("top.settings")} title={t("status.notImplemented")}><Icon name="settings" /></button>
       </div>
     </header>
   );

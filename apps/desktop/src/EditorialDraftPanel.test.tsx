@@ -2,7 +2,7 @@ import { presentSources } from "./source-presentation";
 import { translate } from "@cevra/i18n";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { App } from "./App";
 import { EditorialFixtureBackend } from "./backend/editorial-fixture-backend";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
@@ -52,9 +52,10 @@ it("saves title/note only and displays stale state after canonical redo", async 
   await waitFor(() => expect((screen.getByRole("button", { name: "Atualizar" }) as HTMLButtonElement).disabled).toBe(false));
   await user.click(screen.getByRole("button", { name: "Refazer" }));
   await screen.findByText(translate("pt-BR", "editorialDraft.error.stale"));
-  expect(screen.queryAllByLabelText("Título do bloco")).toHaveLength(0);
+  expect(screen.queryAllByLabelText("Título do bloco")).toHaveLength(5);
+  expect((screen.getAllByLabelText("Título do bloco")[0] as HTMLInputElement).disabled).toBe(true);
   await user.click(screen.getByRole("button", { name: "Atualizar" }));
-  expect(screen.queryAllByLabelText("Título do bloco")).toHaveLength(0);
+  expect(screen.queryAllByLabelText("Título do bloco")).toHaveLength(5);
 });
 
 it("keeps the same draft and editable content when switching the interface to English", async () => {
@@ -137,4 +138,35 @@ it("reviews through the existing native commands while temporary-session canonic
   expect(screen.getByText("Temporary review · not saved")).toBeTruthy();
   expect((await source.loadEditorialDraft()).status).toBe("current");
   expect(calls.every(command => ["desktop_get_state", "desktop_get_editorial_draft", "desktop_revise_editorial_draft"].includes(command))).toBe(true);
+});
+it.each(["refresh", "revise"])("transient %s failure retains pending text, avoids false stale, and retry preserves the draft", async failingAction => {
+  const backend = new EditorialFixtureBackend();
+  render(<App backend={backend} />);
+  const titles = await screen.findAllByLabelText("Título do bloco");
+  await waitFor(() => expect((titles[0] as HTMLInputElement).disabled).toBe(false));
+  const before = backend.history.toArchive();
+  fireEvent.change(titles[0], { target: { value: "Texto ainda não guardado" } });
+  const note = screen.getAllByLabelText("Sua nota")[0]!;
+  fireEvent.change(note, { target: { value: "Minha anotação pendente." } });
+  const method = failingAction === "refresh" ? "loadEditorialDraft" : "reviseEditorialDraft";
+  vi.spyOn(backend, method).mockRejectedValueOnce({ code: "HOST_TIMEOUT" });
+  fireEvent.click(screen.getByRole("button", { name: failingAction === "refresh" ? "Atualizar" : "Guardar títulos e notas na sessão" }));
+  await screen.findByText(translate("pt-BR", "editorialReview.error"));
+  expect((screen.getAllByLabelText("Título do bloco")[0] as HTMLInputElement).value).toBe("Texto ainda não guardado");
+  expect((screen.getAllByLabelText("Sua nota")[0] as HTMLTextAreaElement).value).toBe("Minha anotação pendente.");
+  expect(screen.queryByText(translate("pt-BR", "editorialDraft.error.stale"))).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Atualizar" }));
+  await waitFor(() => expect((screen.getAllByLabelText("Título do bloco")[0] as HTMLInputElement).disabled).toBe(false));
+  expect((screen.getAllByLabelText("Título do bloco")[0] as HTMLInputElement).value).toBe("Texto ainda não guardado");
+  expect(backend.history.toArchive()).toEqual(before);
+});
+
+it("editorial labels identify block and limits, expose invalid fields, and disclose reorder saving drafts", async () => {
+  render(<App backend={new EditorialFixtureBackend()} />);
+  const title = await screen.findByRole("textbox", { name: "Título do bloco 2 (até 200 caracteres)" });
+  expect(screen.getByRole("textbox", { name: "Sua nota no bloco 2 (até 2.000 caracteres)" })).toBeTruthy();
+  fireEvent.change(title, { target: { value: " " } });
+  expect(title.getAttribute("aria-invalid")).toBe("true");
+  expect(document.getElementById(title.getAttribute("aria-describedby")!)?.textContent).toBeTruthy();
+  expect(screen.getByText("Reordenar também guarda os títulos e notas pendentes na sessão.")).toBeTruthy();
 });

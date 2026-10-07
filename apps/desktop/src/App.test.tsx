@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { translate, translationKeys } from "@cevra/i18n";
 import { createEmptyProject, createSourceTranscript, sourceNumberingForSources, ProjectHistory, validateProjectIR, type ProjectIR } from "@cevra/project-ir";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
 import type { DesktopBackend, DesktopBackendState, ImportMediaResult } from "./backend/desktop-backend";
@@ -268,7 +268,7 @@ describe("CEVRA Vids desktop shell", () => {
     expect(screen.getByRole("button", { name: "Desfazer" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Refazer" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Tela cheia" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Redimensionar linha do tempo verticalmente" })).toBeTruthy();
+    expect(screen.getByRole("separator", { name: "Redimensionar linha do tempo verticalmente" })).toBeTruthy();
   });
 
   it("switches visible chrome to EN-US with feature parity", async () => {
@@ -663,4 +663,71 @@ it("rejects missing or colliding host numbering before using it for source label
     const backend = new TauriDesktopBackend(async () => ({ project, sourceNumbering, canUndo: false, canRedo: false, status: { hostAvailable: true, persistence: "local-saved" }, capabilities: { mediaImport: { available: false, reason: "runtime-not-configured" }, transcription: { available: false, reason: "runtime-not-configured" } } }) as never);
     await expect(backend.loadState()).rejects.toThrow(/source numbering|Source numbering/i);
   }
+});
+it("native import/history shortcuts use guarded real actions even with library closed, while browser and text keys remain owned", async () => {
+  const backend = new FunctionalDesktopBackend(), picker = vi.spyOn(backend, "pickAndImportMedia");
+  render(<App backend={backend} />);
+  const shell = await screen.findByTestId("app-shell");
+  fireEvent.keyDown(shell, { key: "i", metaKey: true }); expect(picker).not.toHaveBeenCalled();
+  vi.stubGlobal("__TAURI_INTERNALS__", {});
+  try {
+    fireEvent.click(screen.getByRole("button", { name: translate("pt-BR", "top.mediaPanel") }));
+    fireEvent.keyDown(shell, { key: "i", metaKey: true });
+    await waitFor(() => expect(backend.history.current.sources).toHaveLength(1));
+    expect(picker).toHaveBeenCalledTimes(1);
+    const field = screen.getByRole("textbox", { name: translate("pt-BR", "director.inputLabel") });
+    fireEvent.keyDown(field, { key: "z", metaKey: true });
+    expect(backend.history.current.sources).toHaveLength(1);
+    fireEvent.keyDown(shell, { key: "z", metaKey: true });
+    await waitFor(() => expect(backend.history.current.sources).toHaveLength(0));
+  } finally { vi.unstubAllGlobals(); }
+});
+
+it("production media never creates composition cards or fabricated audio mixer levels", async () => {
+  const backend = new FunctionalDesktopBackend(); await backend.pickAndImportMedia();
+  const { container } = render(<App backend={backend} />); await screen.findByTestId("app-shell");
+  fireEvent.click(screen.getByRole("tab", { name: "Composição" }));
+  expect(await screen.findByText(translate("pt-BR", "composition.unavailable"))).toBeTruthy();
+  expect(container.querySelectorAll(".composition-card")).toHaveLength(0);
+  fireEvent.click(within(screen.getByRole("tablist", { name: translate("pt-BR", "workspace.navigation") })).getByRole("tab", { name: "Áudio" }));
+  expect(await screen.findByText(translate("pt-BR", "audio.unavailable"))).toBeTruthy();
+  expect(container.querySelectorAll(".audio-channel, .meter")).toHaveLength(0);
+  expect((screen.getByRole("button", { name: translate("pt-BR", "nav.effects") }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("tab", { name: "Transcrição" }));
+  expect((screen.getByRole("textbox", { name: translate("pt-BR", "transcription.search") }) as HTMLInputElement).disabled).toBe(true);
+  expect((screen.getByRole("checkbox", { name: translate("pt-BR", "transcription.followPlayhead") }) as HTMLInputElement).disabled).toBe(true);
+});
+
+it("inspector reads canonical opacity and reports unknown transform/font/audio properties honestly", async () => {
+  const project = createDemoProject();
+  const clip = project.timeline.clips[0]!; clip.opacity = 0.37;
+  const props = { project, presentations: presentSources(project.sources, sourceNumberingForSources(project.sources), (key, parameters) => translate("pt-BR", key, parameters)), workspace: "edit" as const, t: (key: Parameters<typeof translate>[1]) => translate("pt-BR", key) };
+  render(<Inspector {...props} selectedProjectItemId={clip.id} />);
+  expect((screen.getByLabelText(translate("pt-BR", "inspector.opacity")) as HTMLInputElement).value).toBe("37%");
+  expect((screen.getByLabelText(translate("pt-BR", "inspector.position")) as HTMLInputElement).value).toBe("Indisponível");
+});
+
+it("timeline height supports bounded keyboard edits, matching pointer retirement and cancellation, with no history mutation", async () => {
+  const backend = new FunctionalDesktopBackend(), before = backend.history.toArchive();
+  render(<App backend={backend} />); const shell = await screen.findByTestId("app-shell");
+  const handle = screen.getByRole("separator", { name: translate("pt-BR", "timeline.resize") });
+  const height = () => shell.style.getPropertyValue("--timeline-height");
+  fireEvent.keyDown(handle, { key: "End" }); expect(height()).toBe("420px");
+  fireEvent.keyDown(handle, { key: "ArrowDown", shiftKey: true }); expect(height()).toBe("372px");
+  fireEvent.keyDown(handle, { key: "Home", ctrlKey: true, altKey: true }); expect(height()).toBe("372px");
+  const pointer = (target: Element | Window, type: string, id: number, y = 100) => {
+    const event = new MouseEvent(type, { bubbles: true, button: 0, clientY: y });
+    Object.defineProperty(event, "pointerId", { value: id }); fireEvent(target, event);
+  };
+  pointer(handle, "pointerdown", 1); pointer(window, "pointermove", 2, 0); expect(height()).toBe("372px");
+  pointer(window, "pointermove", 1, 0); expect(height()).toBe("420px");
+  fireEvent.keyDown(window, { key: "Escape", isComposing: true, keyCode: 229 }); expect(height()).toBe("420px");
+  fireEvent.keyDown(window, { key: "Escape", ctrlKey: true, altKey: true }); expect(height()).toBe("420px");
+  fireEvent.keyDown(window, { key: "Escape" }); expect(height()).toBe("372px");
+  pointer(handle, "pointerdown", 3); pointer(window, "pointermove", 3, 500); expect(height()).toBe("220px");
+  fireEvent(window, new Event("blur")); expect(height()).toBe("372px");
+  pointer(handle, "pointerdown", 4); pointer(window, "pointermove", 4, 500); pointer(window, "pointerup", 4, 500);
+  expect(height()).toBe("220px");
+  pointer(window, "pointermove", 4, 0); expect(height()).toBe("220px");
+  expect(backend.history.toArchive()).toEqual(before);
 });

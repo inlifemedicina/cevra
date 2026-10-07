@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 function controls() { return within(screen.getByRole("region", { name: "Controles da montagem" })); }
 function range(start: string, end: string) {
@@ -369,8 +369,16 @@ it.each(["pt-BR", "en-US"] as const)("%s reveals compact export feedback and can
   expect(screen.getByRole("tab", { name: t("sidebar.directorTab") }).getAttribute("aria-selected")).toBe("true");
   const before = backend.history.toArchive();
   const selection = container.querySelector('[data-testid="app-shell"]')!.getAttribute("data-selected-project-item-id");
-  fireEvent.click(screen.getByRole("button", { name: t("action.export") }));
+  if (locale === "pt-BR") {
+    const shell = screen.getByTestId("app-shell");
+    fireEvent.keyDown(shell, { key: "e", metaKey: true }); expect(exportSequence).not.toHaveBeenCalled();
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
+    fireEvent.keyDown(draft, { key: "e", metaKey: true }); expect(exportSequence).not.toHaveBeenCalled();
+    fireEvent.keyDown(shell, { key: "e", metaKey: true });
+  } else fireEvent.click(screen.getByRole("button", { name: t("action.export") }));
   const cancelButton = await screen.findByRole("button", { name: t("export.cancel") });
+  fireEvent.keyDown(screen.getByTestId("app-shell"), { key: "e", metaKey: true });
+  expect(exportSequence).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("tab", { name: t("sidebar.controlsTab") }).getAttribute("aria-selected")).toBe("true");
   expect(screen.getByText(t("export.running"))).toBeTruthy();
   fireEvent.click(cancelButton);
@@ -406,4 +414,93 @@ it("pointer playhead dragging uses the fixed ruler geometry and Escape restores 
   pointer("pointerup",400);expect(ruler.getAttribute("aria-valuenow")).toBe("1");
   pointer("pointerdown",200);pointer("pointermove",350);pointer("pointerup",400);expect(ruler.getAttribute("aria-valuenow")).toBe("90");
   expect(f.backend.history.toArchive()).toEqual(before);expect(f.backend.requests).toHaveLength(0);
+});
+it.each(["Enter", "blur"])("valid IN/OUT %s commits once, remains atomic and preserves text Undo", async trigger => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const before = f.backend.history.current;
+  const input = controls().getByLabelText("OUT (frames)");
+  fireEvent.change(input, { target: { value: "29" } });
+  if (trigger === "Enter") fireEvent.keyDown(input, { key: "Enter" }); else fireEvent.blur(input);
+  fireEvent.blur(input); fireEvent.keyDown(input, { key: "Enter", repeat: true });
+  await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(29));
+  expect(f.backend.requests).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(f.backend.history.current).toEqual(before));
+});
+
+it("Escape restores numerical drafts and invalid, IME or other-source drafts create no mutation", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!);
+  let input = controls().getByLabelText("OUT (frames)");
+  fireEvent.change(input, { target: { value: "29" } });
+  fireEvent.compositionStart(input); fireEvent.blur(input);
+  expect(f.backend.requests).toHaveLength(0);
+  fireEvent.compositionEnd(input);
+  fireEvent.keyDown(input, { key: "Enter", isComposing: true, keyCode: 229 });
+  fireEvent.keyDown(input, { key: "Escape" }); fireEvent.blur(input);
+  expect((input as HTMLInputElement).value).toBe("30");
+  fireEvent.change(input, { target: { value: "" } }); fireEvent.blur(input); fireEvent.keyDown(input, { key: "Enter" });
+  expect(input.getAttribute("aria-invalid")).toBe("true");
+  expect(input.getAttribute("aria-describedby")).toBeTruthy();
+  fireEvent.change(controls().getByRole("combobox", { name: "Fonte" }), { target: { value: "s1" } });
+  input = controls().getByLabelText("OUT (frames)");
+  fireEvent.change(input, { target: { value: "31" } }); fireEvent.blur(input);
+  expect(f.backend.requests).toHaveLength(0);
+});
+
+it("Enter plus blur during a pending trim neither duplicates the command nor prevents a failed retry", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!);
+  let reject!: (error: unknown) => void;
+  f.backend.beforeEdit = () => new Promise((_, r) => { reject = r; });
+  const input = controls().getByLabelText("OUT (frames)");
+  fireEvent.change(input, { target: { value: "29" } });
+  fireEvent.keyDown(input, { key: "Enter" }); fireEvent.blur(input);
+  expect(f.backend.requests).toHaveLength(1);
+  await act(async () => reject({ code: "HOST_TIMEOUT" }));
+  await waitFor(() => expect(input.matches(":disabled")).toBe(false));
+  f.backend.beforeEdit = async () => {};
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(29));
+  expect(f.backend.requests).toHaveLength(2);
+});
+
+it("native shortcuts duplicate once and history shortcuts respect fields, modals, IME and browser ownership", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!);
+  fireEvent.keyDown(f.timeline, { key: "d", metaKey: true });
+  expect(f.backend.requests).toHaveLength(0); // Browser keeps its bookmark shortcut.
+  vi.stubGlobal("__TAURI_INTERNALS__", {});
+  const consumed = new KeyboardEvent("keydown", { key: "d", metaKey: true, bubbles: true, cancelable: true });
+  consumed.preventDefault(); fireEvent(f.timeline, consumed);
+  const editable = document.createElement("div"); editable.setAttribute("contenteditable", "true"); f.timeline.append(editable);
+  fireEvent.keyDown(editable, { key: "d", metaKey: true }); editable.remove();
+  expect(f.backend.requests).toHaveLength(0);
+  fireEvent.keyDown(f.timeline, { key: "d", metaKey: true });
+  fireEvent.keyDown(f.timeline, { key: "d", metaKey: true, repeat: true });
+  await waitFor(() => expect(clips(f.backend)).toHaveLength(5));
+  expect(f.backend.requests).toHaveLength(1);
+  const revision = f.backend.history.current.history.revision;
+  for (const key of ["z", "a", "d", "b"]) fireEvent.keyDown(controls().getByLabelText("IN (frames)"), { key, metaKey: true });
+  fireEvent.keyDown(f.timeline, { key: "z", metaKey: true, isComposing: true });
+  fireEvent.keyDown(f.timeline, { key: "ArrowDown", ctrlKey: true, altKey: true });
+  expect(f.backend.history.current.history.revision).toBe(revision);
+  const modal = document.createElement("dialog"); modal.open = true; document.body.append(modal);
+  fireEvent.keyDown(f.timeline, { key: "z", metaKey: true }); modal.remove();
+  expect(clips(f.backend)).toHaveLength(5);
+  fireEvent.keyDown(f.timeline, { key: "z", metaKey: true });
+  await waitFor(() => expect(clips(f.backend)).toHaveLength(4));
+  fireEvent.keyDown(f.timeline, { key: "z", metaKey: true, shiftKey: true });
+  await waitFor(() => expect(clips(f.backend)).toHaveLength(5));
+});
+
+it("keyboard group movement matches canonical group drag, with one Undo, and clear-selection is contextual", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); f.click(f.ids[2]!, { metaKey: true });
+  const before = f.backend.history.current;
+  fireEvent.keyDown(f.timeline, { key: "ArrowDown", altKey: true });
+  await waitFor(() => expect(clips(f.backend).map(c => c.id)).toEqual([f.ids[1], f.ids[3], f.ids[0], f.ids[2]]));
+  expect(f.backend.requests).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(f.backend.history.current).toEqual(before));
+  fireEvent.keyDown(f.timeline, { key: "a", metaKey: true, shiftKey: true });
+  expect(f.container.querySelectorAll('[data-clip-id] [aria-pressed="true"], [data-clip-id][aria-pressed="true"]')).toHaveLength(0);
+  fireEvent.keyDown(f.timeline, { key: "a", metaKey: true, shiftKey: true });
+  expect(screen.queryByTestId("timeline-selected-duration")).toBeNull();
+  expect(f.backend.requests).toHaveLength(1);
 });

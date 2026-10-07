@@ -16,12 +16,12 @@ export function ToolRail({ selected, t, onSelect }: { selected: string; t: Trans
   return (
     <nav className="tool-rail" aria-label={t("nav.primary")}>
       {tools.map(([id, icon, key]) => (
-        <button key={id} type="button" className={selected === id ? "rail-button active" : "rail-button"} onClick={() => onSelect(id)} title={t(key as TranslationKey)} aria-label={t(key as TranslationKey)}>
+        <button key={id} type="button" disabled={id !== "media"} className={selected === id ? "rail-button active" : "rail-button"} onClick={() => onSelect(id)} title={id === "media" ? t(key as TranslationKey) : t("status.notImplemented")} aria-label={t(key as TranslationKey)}>
           <Icon name={icon} />
           <span>{t(key as TranslationKey)}</span>
         </button>
       ))}
-      <button type="button" className="rail-button rail-settings" disabled title={t("status.unavailableDetail")} aria-label={t("nav.settings")}>
+      <button type="button" className="rail-button rail-settings" disabled title={t("status.notImplemented")} aria-label={t("nav.settings")}>
         <Icon name="settings" /><span>{t("nav.settings")}</span>
       </button>
     </nav>

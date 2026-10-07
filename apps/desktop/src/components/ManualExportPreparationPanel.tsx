@@ -96,6 +96,7 @@ export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy
     <p>{t(available && backend.exportManualSequence ? "export.profile" : "export.unavailable")}</p>
     <button type="button" disabled={busy || pending || !available || !backend.exportManualSequence} onClick={() => void exportSequence()}>{t("export.choose")}</button>
     {pending && <button type="button" disabled={status === "cancelling"} onClick={cancel}>{t("export.cancel")}</button>}
+    {(status === "exporting" || status === "cancelling") && <progress aria-label={t("export.running")} />}
     <div role="status" aria-live="polite">
       {status === "exporting" && t("export.running")}
       {status === "cancelling" && t("export.prepareCancelling")}

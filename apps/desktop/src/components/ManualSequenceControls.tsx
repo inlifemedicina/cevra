@@ -1,17 +1,20 @@
 import type { ManualVideoSequenceEdit } from "@cevra/application";
 import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { SourcePresentation } from "../source-presentation";
 import type { Translate } from "../ui-model";
 import type { DesktopBackend } from "../backend/desktop-backend";
 import { maximumSourceFrame, floorMsToFrames, frameInput, framesToMilliseconds, isCfr30Frame } from "../frame-timing";
 import { ManualSequenceConformReview } from "./ManualSequenceConformReview";
+import { shortcutProps } from "../keyboard-shortcuts";
+import { reorderedTimeline } from "../timeline-interactions";
 
 interface Props {
   project: Readonly<ProjectIR>;
   clips: readonly TimelineClip[];
   presentations: ReadonlyMap<string, SourcePresentation>;
   selectedId: string | null;
+  selectedClipIds?: readonly string[];
   playheadMs: number;
   busy: boolean;
   t: Translate;
@@ -22,7 +25,7 @@ type Unbound<T> = T extends unknown ? Omit<T, "version" | "expectedSnapshotId"> 
 type Intent = Unbound<ManualVideoSequenceEdit>;
 
 /** Inputs are disposable drafts; only the typed backend publishes the timeline. */
-export function ManualSequenceControls({ project, clips, presentations, selectedId, playheadMs, busy, t, onEdit, backend }: Props) {
+export function ManualSequenceControls({ project, clips, presentations, selectedId, selectedClipIds, playheadMs, busy, t, onEdit, backend }: Props) {
   const grid = project.timeline.timingPolicy === "cfr30" || clips.length === 0;
   const selected = clips.find(clip => clip.id === selectedId);
   const sources = manualSequenceSources(project);
@@ -33,6 +36,11 @@ export function ManualSequenceControls({ project, clips, presentations, selected
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(initialEnd);
   const [pending, setPending] = useState(false);
+  const inFlight = useRef(false);
+  const submitted = useRef<string | null>(null);
+  const skipBlur = useRef(false);
+  const composing = useRef(false);
+  const rangeHintId = useId();
   const source = sources.find(item => item.id === sourceId);
   useEffect(() => {
     setSourceId(initialSource?.id ?? "");
@@ -45,30 +53,47 @@ export function ManualSequenceControls({ project, clips, presentations, selected
   const sourceStartMs = grid && begin !== null ? framesToMilliseconds(begin) : begin;
   const sourceEndMs = grid && finish !== null ? framesToMilliseconds(finish) : finish;
   const disabled = busy || pending;
-  const selectedIndex = selected ? clips.findIndex(clip => clip.id === selected.id) : -1;
+  const chosen = clips.filter(clip => (selectedClipIds ?? (selected ? [selected.id] : [])).includes(clip.id)).map(clip => clip.id);
+  const firstChosen = clips.findIndex(clip => clip.id === chosen[0]);
+  const lastChosen = clips.findIndex(clip => clip.id === chosen.at(-1));
   const splitFrame = grid && Number.isFinite(playheadMs) && playheadMs >= 0 ? floorMsToFrames(playheadMs) : null;
   const canSplit = Boolean(selected && (grid ? splitFrame !== null && selected.frameTiming && splitFrame > selected.frameTiming.timelineStartFrame && splitFrame < selected.frameTiming.timelineEndFrame
     : Number.isSafeInteger(playheadMs) && playheadMs > selected.timelineStartMs && playheadMs < selected.timelineEndMs));
   async function edit(intent: Intent) {
-    if (disabled) return;
+    if (disabled || inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
     try { await onEdit({ ...intent, version: grid ? 2 : 1, expectedSnapshotId: project.history.headSnapshotId! } as ManualVideoSequenceEdit); }
-    catch { /* App reconciles canonical state and displays the operation error. */ }
-    finally { setPending(false); }
+    catch { submitted.current = null; /* App reconciles canonical state and displays the operation error. */ }
+    finally { inFlight.current = false; setPending(false); }
   }
   function range(type: "append" | "insert" | "trim") {
     if (!valid) return;
     const bounds = grid ? { sourceStartFrame: begin!, sourceEndFrame: finish! } : { sourceStartMs: sourceStartMs!, sourceEndMs: sourceEndMs! };
     if (type === "append") void edit({ type, sourceId, ...bounds });
     else if (type === "insert" && selected) void edit({ type, sourceId, beforeClipId: selected.id, ...bounds });
-    else if (type === "trim" && selected && sourceId === selected.sourceId) void edit({ type, clipId: selected.id, ...bounds });
+    else if (type === "trim" && selected && sourceId === selected.sourceId) {
+      if (disabled || inFlight.current || sourceStartMs === selected.sourceStartMs && sourceEndMs === selected.sourceEndMs) return;
+      const key = JSON.stringify([project.history.headSnapshotId, selected.id, sourceId, begin, finish]);
+      if (submitted.current === key) return;
+      submitted.current = key;
+      void edit({ type, clipId: selected.id, ...bounds });
+    }
+  }
+  function confirmDraft() { if (!skipBlur.current && !composing.current) range("trim"); }
+  function draftKey(event: KeyboardEvent<HTMLInputElement>) {
+    if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229 || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); confirmDraft(); }
+    if (event.key === "Escape") {
+      event.preventDefault(); event.stopPropagation(); skipBlur.current = true;
+      setStart(String(grid ? selected?.sourceId === sourceId ? selected.frameTiming?.sourceStartFrame ?? 0 : 0 : selected?.sourceId === sourceId ? selected.sourceStartMs / 1000 : 0));
+      setEnd(String(grid ? selected?.sourceId === sourceId ? selected.frameTiming?.sourceEndFrame ?? maximum : maximum : selected?.sourceId === sourceId ? selected.sourceEndMs / 1000 : maximum / 1000));
+    }
   }
   function move(delta: -1 | 1) {
-    const next = selectedIndex + delta;
-    if (!selected || next < 0 || next >= clips.length) return;
-    const ids = clips.map(clip => clip.id);
-    [ids[selectedIndex], ids[next]] = [ids[next]!, ids[selectedIndex]!];
-    void edit({ type: "reorder", clipIds: ids });
+    const next = (delta < 0 ? firstChosen : lastChosen) + delta;
+    if (!chosen.length || next < 0 || next >= clips.length) return;
+    void edit({ type: "reorder", clipIds: reorderedTimeline(clips.map(clip => clip.id), chosen, clips[next]!.id, delta > 0) });
   }
   return <section className="manual-sequence-controls" aria-label={t("sequence.controls")}>
     <p>{t(grid ? "sequence.frameGrid" : "sequence.legacyTiming")}</p>
@@ -78,19 +103,22 @@ export function ManualSequenceControls({ project, clips, presentations, selected
         const next = sources.find(item => item.id === event.target.value);
         setSourceId(next?.id ?? ""); setStart("0"); setEnd(String(grid ? maximumSourceFrame(next?.durationMs ?? 0) : (next?.durationMs ?? 0) / 1000));
       }}>{sources.map(item => <option key={item.id} value={item.id}>{presentations.get(item.id)?.label ?? item.displayName}</option>)}</select></label>
-      <label>{t(grid ? "sequence.inFrames" : "sequence.inSeconds")}<input type="number" step={grid ? "1" : "0.001"} min="0" value={start} onChange={event => setStart(event.target.value)} /></label>
-      <label>{t(grid ? "sequence.outFrames" : "sequence.outSeconds")}<input type="number" step={grid ? "1" : "0.001"} min="0" max={grid ? maximum : maximum / 1000} value={end} onChange={event => setEnd(event.target.value)} /></label>
+      <label>{t(grid ? "sequence.inFrames" : "sequence.inSeconds")}<input type="number" step={grid ? "1" : "0.001"} min="0" value={start} aria-invalid={!valid} aria-describedby={rangeHintId} onChange={event => { skipBlur.current = false; setStart(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
+      <label>{t(grid ? "sequence.outFrames" : "sequence.outSeconds")}<input type="number" step={grid ? "1" : "0.001"} min="0" max={grid ? maximum : maximum / 1000} value={end} aria-invalid={!valid} aria-describedby={rangeHintId} onChange={event => { skipBlur.current = false; setEnd(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
       <button type="button" className="secondary-button" disabled={!valid} onClick={() => range("append")}>{t("sequence.append")}</button>
       <button type="button" className="secondary-button" disabled={!valid || !selected} onClick={() => range("insert")}>{t("sequence.insert")}</button>
       <button type="button" className="secondary-button" disabled={!valid || !selected || sourceId !== selected.sourceId || sourceStartMs === selected.sourceStartMs && sourceEndMs === selected.sourceEndMs} onClick={() => range("trim")}>{t("sequence.trim")}</button>
-      {!valid && <span role="status">{t("preview.rangeInvalid")}</span>}
+      <span id={rangeHintId} role="status">{t(!valid ? "preview.rangeInvalid" : selected?.sourceId === sourceId ? "sequence.rangeAutoCommit" : "sequence.rangeDraft")}</span>
     </fieldset>
     <div className="manual-sequence-actions">
-      <button type="button" className="secondary-button" disabled={disabled || !selected} onClick={() => { if (selected) void edit({ type: "duplicate", clipId: selected.id }); }}>{t("sequence.duplicate")}</button>
-      <button type="button" className="secondary-button" disabled={disabled || !canSplit} onClick={() => { if (selected) void edit(grid ? { type: "split", clipId: selected.id, timelineAtFrame: splitFrame! } : { type: "split", clipId: selected.id, timelineAtMs: playheadMs }); }}>{t("sequence.split")}</button>
-      <button type="button" className="secondary-button" disabled={disabled || selectedIndex <= 0} onClick={() => move(-1)}>{t("sequence.earlier")}</button>
-      <button type="button" className="secondary-button" disabled={disabled || selectedIndex < 0 || selectedIndex >= clips.length - 1} onClick={() => move(1)}>{t("sequence.later")}</button>
-      <button type="button" className="secondary-button" disabled={disabled || !selected} onClick={() => { if (selected) void edit({ type: "remove", clipId: selected.id }); }}>{t("sequence.remove")}</button>
+      <button {...shortcutProps("duplicate", t)} type="button" className="secondary-button" disabled={disabled || !selected} onClick={() => { if (selected) void edit({ type: "duplicate", clipId: selected.id }); }}>{t("sequence.duplicate")}</button>
+      <button {...shortcutProps("split", t)} type="button" className="secondary-button" disabled={disabled || !canSplit} onClick={() => { if (selected) void edit(grid ? { type: "split", clipId: selected.id, timelineAtFrame: splitFrame! } : { type: "split", clipId: selected.id, timelineAtMs: playheadMs }); }}>{t("sequence.split")}</button>
+      <button {...shortcutProps("earlier", t)} type="button" className="secondary-button" disabled={disabled || firstChosen <= 0} onClick={() => move(-1)}>{t("sequence.earlier")}</button>
+      <button {...shortcutProps("later", t)} type="button" className="secondary-button" disabled={disabled || lastChosen < 0 || lastChosen >= clips.length - 1} onClick={() => move(1)}>{t("sequence.later")}</button>
+      <button {...shortcutProps("remove", t)} type="button" className="secondary-button" disabled={disabled || !chosen.length} onClick={() => {
+        if (chosen.length > 1) void edit({ type: "remove-many", clipIds: chosen });
+        else if (selected) void edit({ type: "remove", clipId: selected.id });
+      }}>{t(chosen.length > 1 ? "sequence.removeSelection" : "sequence.remove")}</button>
       {!selected && <span>{t("sequence.selectClip")}</span>}
     </div>
     {!grid && <ManualSequenceConformReview backend={backend} project={project} busy={disabled} t={t} onEdit={onEdit} />}

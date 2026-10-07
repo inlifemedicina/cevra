@@ -31,5 +31,15 @@ export function timelineShortcutBlocked(event: { target: EventTarget | null; isC
   if (target?.closest('input, textarea, select, [role="textbox"]') || target instanceof HTMLElement && target.isContentEditable) return true;
   const editable = target?.closest("[contenteditable]");
   if (editable && editable.getAttribute("contenteditable") !== "false") return true;
+  return modalOpen();
+}
+
+function modalOpen(): boolean {
   return Boolean(document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]:not([aria-hidden="true"]), [role="alertdialog"][aria-modal="true"]:not([aria-hidden="true"])'));
+}
+
+/** Escape may cancel a captured gesture; composing text and dialogs own theirs. */
+export function gestureEscape(event: Pick<globalThis.KeyboardEvent, "key" | "defaultPrevented" | "repeat" | "isComposing" | "keyCode" | "metaKey" | "ctrlKey" | "altKey">): boolean {
+  return event.key === "Escape" && !event.defaultPrevented && !event.repeat && !event.isComposing && event.keyCode !== 229
+    && !event.metaKey && !event.ctrlKey && !event.altKey && !modalOpen();
 }

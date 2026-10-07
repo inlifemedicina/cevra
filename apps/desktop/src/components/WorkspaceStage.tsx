@@ -42,9 +42,9 @@ function TranscriptionWorkspace({ project, presentations, activeSourceId, playhe
   return (
     <div className="specialized-workspace transcript-workspace" data-testid="workspace-transcription">
       <section className="dominant-list-panel">
-        <div className="specialized-heading"><div><span className="eyebrow">{t("workspace.transcription")}</span><h2>{t("transcription.title")}</h2><p>{t("transcription.description")}</p></div><div className="transcription-actions">{source && transcriptionCapability.available && <button type="button" className="import-button" disabled={transcriptionOperationId !== null || transcriptionBlocked} onClick={onTranscribe}>{t(transcriptionOperationId ? "transcription.busy" : sourceTranscript ? "transcription.retranscribe" : "transcription.transcribe")}</button>}{transcriptionOperationId && <button type="button" className="secondary-button" onClick={onCancelTranscription}>{t("transcription.cancel")}</button>}<label className="follow-toggle"><input type="checkbox" defaultChecked />{t("transcription.followPlayhead")}</label></div></div>
+        <div className="specialized-heading"><div><span className="eyebrow">{t("workspace.transcription")}</span><h2>{t("transcription.title")}</h2><p>{t("transcription.description")}</p></div><div className="transcription-actions">{source && transcriptionCapability.available && <button type="button" className="import-button" disabled={transcriptionOperationId !== null || transcriptionBlocked} onClick={onTranscribe}>{t(transcriptionOperationId ? "transcription.busy" : sourceTranscript ? "transcription.retranscribe" : "transcription.transcribe")}</button>}{transcriptionOperationId && <button type="button" className="secondary-button" onClick={onCancelTranscription}>{t("transcription.cancel")}</button>}<label className="follow-toggle"><input type="checkbox" disabled title={t("status.notImplemented")} checked={false} readOnly />{t("transcription.followPlayhead")}</label></div></div>
         {source && !transcriptionCapability.available && <p className="unavailable-note" role="status"><span aria-hidden="true">●</span>{t(capabilityReasonKey(transcriptionCapability.reason))}</p>}
-        <div className="search-field wide"><span aria-hidden="true">⌕</span><input aria-label={t("transcription.search")} placeholder={t("transcription.search")} /></div>
+        <div className="search-field wide"><span aria-hidden="true">⌕</span><input disabled title={t("status.notImplemented")} aria-label={t("transcription.search")} placeholder={t("transcription.search")} /></div>
         <div className="transcript-segments">
           {transcript?.segments.map((segment) => {
             const active = playheadMs >= segment.startMs && playheadMs <= segment.endMs;
@@ -62,12 +62,12 @@ function TranscriptionWorkspace({ project, presentations, activeSourceId, playhe
 
 function CompositionWorkspace({ project, playheadMs, playing, previewInteractive, t, onPlayingChange }: WorkspaceStageProps) {
   const [focusedCardId, setFocusedCardId] = useState<string | null>(null);
-  const showPresentationFixtures = previewInteractive || project.sources.length > 0;
+  const showPresentationFixtures = previewInteractive;
   return (
     <div className="specialized-workspace composition-workspace" data-testid="workspace-composition">
       <section className="asset-browser">
         <div className="specialized-heading"><div><span className="eyebrow">{t("workspace.composition")}</span><h2>{t("composition.title")}</h2><p>{t("composition.description")}</p></div></div>
-        {!showPresentationFixtures && <p className="workspace-empty-state" role="status">{t("composition.empty")}</p>}
+        {!showPresentationFixtures && <p className="workspace-empty-state" role="status">{t(project.sources.length ? "composition.unavailable" : "composition.empty")}</p>}
         {showPresentationFixtures && <div className="asset-groups">
           {(["composition.overlays", "composition.broll", "composition.graphics"] as const).map((key, groupIndex) => <div key={key}><h3>{t(key)}</h3><div className="composition-grid">{[0, 1, 2].map((item) => { const id = `composition-${groupIndex}-${item}`; return <button key={id} type="button" className={focusedCardId === id ? "composition-card selected" : "composition-card"} onClick={() => setFocusedCardId(id)}><span aria-hidden="true">{groupIndex === 0 ? "◇" : groupIndex === 1 ? "▧" : "Aa"}</span><small>{t(key)} {item + 1}</small></button>; })}</div></div>)}
         </div>}
@@ -95,12 +95,12 @@ const waveHeights = [12, 24, 18, 32, 14, 28, 38, 22, 16, 34, 26, 40, 20, 30, 13,
 function AudioWorkspace({ project, playheadMs, playing, previewInteractive, t, onPlayingChange }: WorkspaceStageProps) {
   const [focusedChannelId, setFocusedChannelId] = useState<string | null>(null);
   const channels = [["track-a1", "audio.voice", "-1.0 dB"], ["track-a2", "audio.music", "-12.0 dB"], ["track-a3", "audio.sfx", "-6.0 dB"]] as const;
-  const showPresentationFixtures = previewInteractive || project.sources.length > 0;
+  const showPresentationFixtures = previewInteractive;
   return (
     <div className="specialized-workspace audio-workspace" data-testid="workspace-audio">
       <section className="audio-mixer">
         <div className="specialized-heading"><div><span className="eyebrow">{t("workspace.audio")}</span><h2>{t("audio.title")}</h2><p>{t("audio.description")}</p></div></div>
-        {!showPresentationFixtures && <p className="workspace-empty-state" role="status">{t("audio.empty")}</p>}
+        {!showPresentationFixtures && <p className="workspace-empty-state" role="status">{t(project.sources.length ? "audio.unavailable" : "audio.empty")}</p>}
         {showPresentationFixtures && <div className="audio-channels">{channels.map(([id, key, level], channelIndex) => <button type="button" key={id} className={focusedChannelId === id ? "audio-channel selected" : "audio-channel"} onClick={() => setFocusedChannelId(id)}><span className="channel-head"><strong>{t(key)}</strong><em>{level}</em></span><span className="large-wave" aria-label={t("audio.waveform")}>{waveHeights.map((height, index) => <i key={index} style={{ height: Math.max(5, height - channelIndex * 5) }} />)}</span><span className="channel-controls"><small>{t("audio.gain")}</small><b>−</b><span className="meter"><i style={{ width: `${78 - channelIndex * 17}%` }} /></span><b>＋</b><small>{t("audio.pan")}: 0</small></span></button>)}</div>}
       </section>
       <Preview compact empty={project.sources.length === 0} interactive={previewInteractive} playing={playing} playheadMs={playheadMs} durationMs={project.timeline.durationMs} t={t} onPlayingChange={onPlayingChange} />
