@@ -8,9 +8,10 @@ type Exported = Extract<ManualSequenceExportResult, { outcome: "exported" }>;
 type Status = "idle" | "exporting" | "cancelling" | "cancelled" | "exported" | "error";
 
 /** A closed native Save picker and one Host operation own publication/history. */
-export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy, available = false, exportRequest = 0, t, onBusyChange, onExported, onReconciled }: {
+export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy, actionBusy = busy, onConfirmAction, available = false, exportRequest = 0, t, onBusyChange, onExported, onReconciled }: {
   backend: DesktopBackend; snapshotId: string; locale: CevraLocale; busy: boolean; available?: boolean; t: Translate;
   exportRequest?: number;
+  actionBusy?: boolean; onConfirmAction?(): Promise<string | null>;
   onBusyChange?(value: boolean): void; onExported?(result: Exported): void; onReconciled?(state: DesktopBackendState, code: string): void;
 }) {
   const [status, setStatus] = useState<Status>("idle");
@@ -20,6 +21,8 @@ export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy
   const [pending, setPending] = useState(false);
   const alive = useRef(true);
   const active = useRef<string | null>(null);
+  const activeSnapshot = useRef<string | null>(null);
+  const starting = useRef(false);
   const current = useRef({ busy, snapshotId });
   const observedRequest = useRef(exportRequest);
   current.current = { busy, snapshotId };
@@ -30,7 +33,7 @@ export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy
     void exportSequence();
   }, [exportRequest]);
   useEffect(() => () => {
-    if (active.current) void backend.cancelOperation(active.current).catch(() => undefined);
+    if (active.current && (!alive.current || activeSnapshot.current === snapshotId)) void backend.cancelOperation(active.current).catch(() => undefined);
   }, [backend, snapshotId]);
   useEffect(() => {
     if (busy && active.current) {
@@ -40,12 +43,21 @@ export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy
   }, [backend, busy]);
 
   async function exportSequence() {
-    if (busy || active.current || !available || !backend.exportManualSequence) return;
+    if (actionBusy || active.current || starting.current || !available || !backend.exportManualSequence) return;
+    let confirmedSnapshot: string | null = snapshotId;
+    if (onConfirmAction) {
+      starting.current = true;
+      try { confirmedSnapshot = await onConfirmAction(); }
+      catch { return; }
+      finally { starting.current = false; }
+    }
+    if (!confirmedSnapshot || !alive.current || active.current) return;
     const operationId = `manual-export-${crypto.randomUUID()}`;
     active.current = operationId;
+    activeSnapshot.current = confirmedSnapshot;
     setPending(true); onBusyChange?.(true); setStatus("exporting"); setDestination(""); setErrorCode(""); setResourceCause(null);
     try {
-      const result = await backend.exportManualSequence({ version: 1, expectedSnapshotId: snapshotId, operationId, locale });
+      const result = await backend.exportManualSequence({ version: 1, expectedSnapshotId: confirmedSnapshot, operationId, locale });
       if (!alive.current) return;
       if (result.outcome === "cancelled") { setStatus("cancelled"); return; }
       if (typeof result.executionId !== "string" || !result.executionId || typeof result.exportId !== "string" || !result.exportId
@@ -53,12 +65,12 @@ export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy
       // Confirmed publication stays canonical even if Cancel crossed its reply.
       // Never replay the renderer or hide a journaled export as cancelled.
       setDestination(result.destinationLabel); setStatus("exported");
-      if (current.current.snapshotId === snapshotId) onExported?.(result);
+      if (current.current.snapshotId === confirmedSnapshot) onExported?.(result);
     } catch (cause) {
       const error = cause as { code?: unknown; causeCode?: unknown; reconciledState?: DesktopBackendState } | null;
       const code = error && typeof error.code === "string" ? error.code : "HOST_OPERATION_FAILED";
       if (!alive.current) return;
-      if (error?.reconciledState && current.current.snapshotId === snapshotId) onReconciled?.(error.reconciledState, code);
+      if (error?.reconciledState && current.current.snapshotId === confirmedSnapshot) onReconciled?.(error.reconciledState, code);
       if (code === "OPERATION_CANCELLED") setStatus("cancelled");
       else {
         setResourceCause((code === "MANUAL_EXPORT_PUBLICATION_UNVERIFIED" || code === "MANUAL_EXPORT_CLEANUP_FAILED") && isManualExportResourceCauseCode(error?.causeCode) ? error.causeCode : null);
@@ -94,7 +106,7 @@ export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy
   return <section className="manual-export-preparation" aria-label={t("export.title")}>
     <h3>{t("export.title")}</h3>
     <p>{t(available && backend.exportManualSequence ? "export.profile" : "export.unavailable")}</p>
-    <button type="button" disabled={busy || pending || !available || !backend.exportManualSequence} onClick={() => void exportSequence()}>{t("export.choose")}</button>
+    <button type="button" disabled={actionBusy || pending || !available || !backend.exportManualSequence} onClick={() => void exportSequence()}>{t("export.choose")}</button>
     {pending && <button type="button" disabled={status === "cancelling"} onClick={cancel}>{t("export.cancel")}</button>}
     {(status === "exporting" || status === "cancelling") && <progress aria-label={t("export.running")} />}
     <div role="status" aria-live="polite">

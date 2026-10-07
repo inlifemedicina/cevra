@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as Reac
 import type { ManualVideoSequenceEdit, TrimManualVideoClipRequest } from "@cevra/application";
 import { ManualSequenceControls, type ManualRangeDraftController } from "./ManualSequenceControls";
 import type { RefObject } from "react";
+import type { RangeActionGate } from "../range-activation-guard";
 import { supportsManualClipPreview } from "./ManualVideoPreview";
 import { formatMilliseconds, formatTime, type Translate } from "../ui-model";
 import { Icon } from "./Icon";
@@ -51,6 +52,7 @@ interface TimelineProps {
   onSequenceEdit?(request: ManualVideoSequenceEdit): Promise<void>;
   onCommitRange?(request: ManualVideoSequenceEdit): Promise<void>;
   rangeDraft?: RefObject<ManualRangeDraftController | null>;
+  onRangeAction?: RangeActionGate;
   onSelect(id: string): void;
   onPlayheadChange(milliseconds: number, phase?: TimelineSeekPhase): void;
   onZoomChange(value: number): void;
@@ -65,7 +67,7 @@ type TimelineVisual =
   | { id: string; kind: "caption"; startMs: number; endMs: number; label: string; caption: CaptionCue }
   | { id: string; kind: "graphic"; startMs: number; endMs: number; label: string; graphic: GraphicItem };
 
-export function Timeline({ project, presentations, selectedId, selectedClipIds, onSelectClips, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, onResizeCancel, onResizeKey, height = 292, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit, onCommitRange, rangeDraft, backend }: TimelineProps) {
+export function Timeline({ project, presentations, selectedId, selectedClipIds, onSelectClips, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, onResizeCancel, onResizeKey, height = 292, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit, onCommitRange, rangeDraft, onRangeAction, backend }: TimelineProps) {
   const selectedIds = selectedClipIds ?? (selectedId && project.timeline.clips.some(clip => clip.id === selectedId) ? [selectedId] : []);
   const orderedIds = sequenceClips?.map(clip => clip.id) ?? [];
   const anchor = useRef<string | null>(selectedId);
@@ -210,7 +212,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
           <button {...shortcutProps("clear-selection", t)} type="button" disabled={!selectedIds.length} onClick={() => onSelectClips([], null)}>{t("keyboard.clearSelection")}</button>
         </>}
       </div>
-      {sequenceClips && onSequenceEdit && onCommitRange && rangeDraft && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedIds.length === 1 ? selectedIds[0]! : null} selectedClipIds={selectedIds} playheadMs={playheadMs} busy={editingDisabled} t={t} onEdit={onSequenceEdit} onCommitRange={onCommitRange} rangeDraft={rangeDraft} />}
+      {sequenceClips && onSequenceEdit && onCommitRange && rangeDraft && onRangeAction && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedIds.length === 1 ? selectedIds[0]! : null} selectedClipIds={selectedIds} playheadMs={playheadMs} busy={editingDisabled} t={t} onEdit={onSequenceEdit} onCommitRange={onCommitRange} rangeDraft={rangeDraft} onAction={onRangeAction} />}
       <div className="timeline-table">
         <div className="timeline-corner"><span className="timecode">{grid ? formatFrames(floorMsToFrames(playheadMs)) : trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs)}</span></div>
         <div

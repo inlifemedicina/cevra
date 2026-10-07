@@ -328,8 +328,8 @@ for (const committedFailure of [false, true]) {
     const entries = backend.history.entries.length;
     const exportButton = screen.getByRole("button", { name: translate("pt-BR", "action.export") });
     await waitFor(() => expect(exportButton.matches(":disabled")).toBe(false));
-    fireEvent.click(exportButton);
-    expect(screen.getByRole("button", { name: "Desfazer" }).matches(":disabled")).toBe(true);
+    await userEvent.setup().click(exportButton);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Desfazer" }).matches(":disabled")).toBe(true));
     fireEvent.click(screen.getByRole("button", { name: translate("pt-BR", "export.cancel") }));
     fireEvent.click(screen.getByRole("tab", { name: translate("pt-BR", "workspace.composition") }));
     expect(screen.getByRole("button", { name: translate("pt-BR", "export.cancel") }).matches(":disabled")).toBe(true);
@@ -446,6 +446,7 @@ it("Escape restores numerical drafts and invalid, IME or other-source drafts cre
   fireEvent.change(input, { target: { value: "" } }); fireEvent.blur(input); fireEvent.keyDown(input, { key: "Enter" });
   expect(input.getAttribute("aria-invalid")).toBe("true");
   expect(input.getAttribute("aria-describedby")).toBeTruthy();
+  fireEvent.keyDown(input, { key: "Escape" });
   fireEvent.change(controls().getByRole("combobox", { name: "Fonte" }), { target: { value: "s1" } });
   input = controls().getByLabelText("OUT (frames)");
   fireEvent.change(input, { target: { value: "31" } }); fireEvent.blur(input);
@@ -682,6 +683,158 @@ it("failed range settlement retains the draft and blocks a following duplicate u
   await waitFor(() => expect(clips(f.backend)).toHaveLength(5));
   expect(f.backend.requests.map(r => r.type)).toEqual(["trim", "trim", "duplicate"]);
   expect(clips(f.backend).filter(c => c.sourceStartMs === 0 && c.frameTiming!.sourceEndFrame === 29)).toHaveLength(2);
+});
+
+function enableOfflineActions(backend: SequenceBackend) {
+  const load = backend.loadState.bind(backend);
+  backend.loadState = async () => {
+    const state = await load();
+    return { ...state, capabilities: { ...state.capabilities,
+      "media.import": { available: true, reason: "available" }, "project.export": { available: true, reason: "available" } } };
+  };
+  const picker = vi.fn(async () => ({ outcome: "cancelled" as const }));
+  const exporter = vi.fn(async (_request: { expectedSnapshotId: string }) => ({ outcome: "cancelled" as const }));
+  backend.pickAndImportMedia = picker;
+  Object.assign(backend, { exportManualSequence: exporter });
+  return { picker, exporter };
+}
+
+it.each(["duplicate", "selection", "import", "export", "inspector-export", "panel", "original-mode", "repeat", "filter"] as const)("press → failed trim → release consumes the same %s gesture; only a new gesture may retry", async kind => {
+  const backend = new SequenceBackend(); const io = enableOfflineActions(backend);
+  for (const [sourceId, sourceEndFrame] of [["s0", 30], ["s1", 60]] as const) await backend.service.edit({ version: 2, type: "append", expectedSnapshotId: backend.history.current.history.headSnapshotId!, sourceId, sourceStartFrame: 0, sourceEndFrame });
+  const f = await mount(backend); const user = userEvent.setup();
+  const ids = clips(backend).map(c => c.id);
+  await user.click(f.container.querySelector<HTMLElement>(`[data-clip-id="${ids[0]}"]`)!);
+  const before = backend.history.current;
+  const input = controls().getByLabelText("OUT (frames)") as HTMLInputElement;
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  backend.beforeEdit = async () => { if (backend.requests.length === 1) throw { code: "HOST_TIMEOUT" }; };
+  const target = kind === "duplicate" ? controls().getByRole("button", { name: translate("pt-BR", "sequence.duplicate") })
+    : kind === "selection" ? f.container.querySelector<HTMLElement>(`[data-clip-id="${ids[1]}"]`)!
+    : kind === "repeat" ? screen.getByRole("checkbox", { name: translate("pt-BR", "sequence.repeat") })
+    : kind === "filter" ? within(screen.getByRole("complementary", { name: translate("pt-BR", "media.title") })).getByRole("tab", { name: translate("pt-BR", "media.filter.audio") })
+    : screen.getByRole("button", { name: translate("pt-BR", kind === "import" ? "media.import" : kind === "export" ? "action.export" : kind === "inspector-export" ? "export.choose" : kind === "original-mode" ? "preview.originalMode" : "top.mediaPanel") });
+  await user.pointer({ target, keys: "[MouseLeft>]" });
+  await waitFor(() => expect(input.matches(":disabled")).toBe(false));
+  expect(backend.requests.map(r => r.type)).toEqual(["trim"]);
+  await user.pointer({ target, keys: "[/MouseLeft]" });
+  expect(backend.requests.map(r => r.type)).toEqual(["trim"]);
+  expect(backend.history.current).toEqual(before);
+  expect(input.value).toBe("29"); expect(io.picker).not.toHaveBeenCalled(); expect(io.exporter).not.toHaveBeenCalled();
+  expect(screen.getByTestId("app-shell").classList.contains("media-open")).toBe(true);
+  expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(ids[0]);
+  if (kind === "repeat") expect((target as HTMLInputElement).checked).toBe(false);
+  if (kind === "original-mode") expect(target.getAttribute("aria-pressed")).toBe("false");
+  if (kind === "filter") expect(target.getAttribute("aria-selected")).toBe("false");
+  await user.click(target);
+  await waitFor(() => expect(clips(backend)[0]!.frameTiming!.sourceEndFrame).toBe(29));
+  expect(backend.requests.filter(r => r.type === "trim")).toHaveLength(2);
+  if (kind === "duplicate") await waitFor(() => expect(clips(backend)).toHaveLength(3));
+  if (kind === "selection") await waitFor(() => expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(ids[1]));
+  if (kind === "import") await waitFor(() => expect(io.picker).toHaveBeenCalledTimes(1));
+  if (kind === "export" || kind === "inspector-export") await waitFor(() => expect(io.exporter).toHaveBeenCalledTimes(1));
+  if (kind === "panel") await waitFor(() => expect(screen.getByTestId("app-shell").classList.contains("media-closed")).toBe(true));
+  if (kind === "repeat") await waitFor(() => expect((screen.getByRole("checkbox", { name: translate("pt-BR", "sequence.repeat") }) as HTMLInputElement).checked).toBe(true));
+  if (kind === "original-mode") await waitFor(() => expect(screen.getByRole("button", { name: translate("pt-BR", "preview.originalMode") }).getAttribute("aria-pressed")).toBe("true"));
+  if (kind === "filter") await waitFor(() => expect(target.getAttribute("aria-selected")).toBe("true"));
+});
+
+it.each(["import", "export", "inspector-export", "Cmd+I", "Cmd+E", "Cmd+Z", "media-panel", "sidebar-panel", "original-mode", "repeat", "filter", "workspace"] as const)("focused range → %s waits for the confirmed snapshot and preserves the activation", async kind => {
+  const f = await gestureFixture(); const io = enableOfflineActions(f.backend);
+  // Publish capabilities through the same App load path, then mount a fresh App.
+  f.unmount(); await mount(f.backend);
+  const user = userEvent.setup();
+  await user.click(screen.getAllByRole("button", { name: /Vídeo 1.*s0.mp4/ })[1]!);
+  const before = f.backend.history.current;
+  const input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  let release!: () => void; f.backend.beforeEdit = () => new Promise(resolve => { release = resolve; });
+  if (kind.startsWith("Cmd")) {
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
+    await act(async () => screen.getByTestId("app-shell").focus());
+    // The shell is not focusable; move focus to the existing timeline first.
+    await act(async () => document.querySelector<HTMLElement>(".timeline")!.focus());
+    await user.keyboard(kind === "Cmd+I" ? "{Meta>}i{/Meta}" : kind === "Cmd+Z" ? "{Meta>}z{/Meta}" : "{Meta>}e{/Meta}");
+  } else if (kind === "repeat") await user.click(screen.getByRole("checkbox", { name: translate("pt-BR", "sequence.repeat") }));
+  else if (kind === "filter") await user.click(within(screen.getByRole("complementary", { name: translate("pt-BR", "media.title") })).getByRole("tab", { name: translate("pt-BR", "media.filter.audio") }));
+  else if (kind === "workspace") await user.click(screen.getByRole("tab", { name: translate("pt-BR", "workspace.composition") }));
+  else {
+    const label = kind === "import" ? "media.import" : kind === "export" ? "action.export" : kind === "inspector-export" ? "export.choose" : kind === "media-panel" ? "top.mediaPanel" : kind === "original-mode" ? "preview.originalMode" : "sidebar.activateCompact";
+    await user.click(screen.getByRole("button", { name: translate("pt-BR", label) }));
+  }
+  expect(io.picker).not.toHaveBeenCalled(); expect(io.exporter).not.toHaveBeenCalled();
+  if (kind === "media-panel") expect(screen.getByTestId("app-shell").classList.contains("media-open")).toBe(true);
+  if (kind === "sidebar-panel") expect(screen.getByTestId("app-shell").classList.contains("sidebar-open")).toBe(true);
+  await act(async () => release());
+  await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(kind === "Cmd+Z" ? 30 : 29));
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
+  if (kind === "Cmd+Z") expect(f.backend.history.current).toEqual(before);
+  else expect(f.backend.history.current.history.headSnapshotId).not.toBe(before.history.headSnapshotId);
+  if (kind === "import" || kind === "Cmd+I") await waitFor(() => expect(io.picker).toHaveBeenCalledTimes(1));
+  if (["export", "inspector-export", "Cmd+E"].includes(kind)) {
+    await waitFor(() => expect(io.exporter).toHaveBeenCalledTimes(1));
+    expect(io.exporter.mock.calls[0]![0].expectedSnapshotId).toBe(f.backend.history.current.history.headSnapshotId);
+  }
+  if (kind === "media-panel") await waitFor(() => expect(screen.getByTestId("app-shell").classList.contains("media-closed")).toBe(true));
+  if (kind === "sidebar-panel") await waitFor(() => expect(screen.getByTestId("app-shell").classList.contains("sidebar-compact")).toBe(true));
+  if (kind === "original-mode") await waitFor(() => expect(screen.getByRole("button", { name: translate("pt-BR", "preview.originalMode") }).getAttribute("aria-pressed")).toBe("true"));
+  if (kind === "repeat") await waitFor(() => expect((screen.getByRole("checkbox", { name: translate("pt-BR", "sequence.repeat") }) as HTMLInputElement).checked).toBe(true));
+  if (kind === "filter") await waitFor(() => expect(within(screen.getByRole("complementary", { name: translate("pt-BR", "media.title") })).getByRole("tab", { name: translate("pt-BR", "media.filter.audio") }).getAttribute("aria-selected")).toBe("true"));
+  if (kind === "workspace") await waitFor(() => expect(screen.getByTestId("app-shell").classList.contains("workspace-composition")).toBe(true));
+});
+
+it("Space press → failure → key release consumes the keyboard gesture and a later Enter explicitly retries", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
+  const input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  let reject!: (error: unknown) => void;
+  f.backend.beforeEdit = async () => { if (f.backend.requests.length === 1) await new Promise<void>((_resolve, r) => { reject = r; }); };
+  const duplicate = controls().getByRole("button", { name: translate("pt-BR", "sequence.duplicate") });
+  for (let i = 0; i < 8 && document.activeElement !== duplicate; i++) await user.tab();
+  expect(document.activeElement).toBe(duplicate);
+  await user.keyboard("[Space>]");
+  await act(async () => reject({ code: "HOST_TIMEOUT" }));
+  await user.keyboard("[/Space]");
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]); expect(clips(f.backend)).toHaveLength(4);
+  await user.keyboard("{Enter}");
+  await waitFor(() => expect(clips(f.backend)).toHaveLength(5));
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim", "trim", "duplicate"]);
+});
+
+it("source selector settles the old owner before switching to another source range", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
+  const input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  let release!: () => void; f.backend.beforeEdit = () => new Promise(resolve => { release = resolve; });
+  await user.selectOptions(controls().getByRole("combobox", { name: "Fonte" }), "s1");
+  expect((input as HTMLInputElement).value).toBe("29");
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
+  await act(async () => release());
+  await waitFor(() => expect((controls().getByRole("combobox", { name: "Fonte" }) as HTMLSelectElement).value).toBe("s1"));
+  expect((controls().getByLabelText("OUT (frames)") as HTMLInputElement).value).toBe("180");
+  expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(29);
+});
+
+it("a range failure during an existing drag consumes Drop without retrying trim or replaying reorder", async () => {
+  const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
+  const input = controls().getByLabelText("OUT (frames)");
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  let reject!: (error: unknown) => void;
+  f.backend.beforeEdit = () => new Promise<void>((_resolve, r) => { reject = r; });
+  await user.pointer({ target: f.item(f.ids[0]!), keys: "[MouseLeft>]" });
+  const transfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
+  fireEvent.dragStart(f.item(f.ids[0]!), { dataTransfer: transfer });
+  await act(async () => reject({ code: "HOST_TIMEOUT" }));
+  const target = f.item(f.ids[3]!);
+  vi.spyOn(target, "getBoundingClientRect").mockReturnValue({ left: 0, width: 100 } as DOMRect);
+  const event = new MouseEvent("drop", { bubbles: true, cancelable: true, clientX: 90 });
+  Object.defineProperty(event, "dataTransfer", { value: transfer }); fireEvent(target, event);
+  fireEvent.dragEnd(f.item(f.ids[0]!));
+  await user.pointer({ target: f.timeline, keys: "[/MouseLeft]" });
+  expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
+  expect(clips(f.backend).map(c => c.id)).toEqual(f.ids);
+  expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(30);
+  expect((input as HTMLInputElement).value).toBe("29");
 });
 
 it("native shortcuts duplicate once and history shortcuts respect fields, modals, IME and browser ownership", async () => {

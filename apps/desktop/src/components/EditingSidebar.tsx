@@ -1,6 +1,7 @@
 import { gestureEscape, timelineShortcutBlocked } from "../timeline-interactions";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode, type UIEvent } from "react";
 import type { Translate } from "../ui-model";
+import type { RangeActionGate } from "../range-activation-guard";
 
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 480;
@@ -10,10 +11,11 @@ const MIN_CONTEXT_HEIGHT = 180;
 
 type Gesture = { kind: "width" | "split"; pointerId: number; start: number; width: number; height: number; share: number; usableHeight: number; target: HTMLButtonElement };
 
-export function EditingSidebar({ compact, width, editorialVisible, directorPanel, contextualPanel, controlsRequest = 0, t, onWidthChange, onModeToggle }: {
+export function EditingSidebar({ compact, width, editorialVisible, directorPanel, contextualPanel, controlsRequest = 0, t, onWidthChange, onModeToggle, onAction }: {
   compact: boolean; width: number; editorialVisible: boolean; directorPanel: ReactNode; contextualPanel: ReactNode;
   controlsRequest?: number;
   t: Translate; onWidthChange(width: number): void; onModeToggle(): void;
+  onAction?: RangeActionGate;
 }) {
   const body = useRef<HTMLDivElement>(null);
   const container = useRef<HTMLElement>(null);
@@ -149,16 +151,15 @@ export function EditingSidebar({ compact, width, editorialVisible, directorPanel
     } else setHeight(event.key === "Home" ? minEditorial : event.key === "End" ? maxEditorial : editorialHeight + (event.key === "ArrowDown" ? step : -step));
   }
   function toggleMode() {
-    stopGesture();
-    onModeToggle();
+    action(() => { stopGesture(); onModeToggle(); });
   }
+  function action(callback: () => void) { if (onAction) void onAction(callback).catch(() => {}); else callback(); }
   function tabKey(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || timelineShortcutBlocked(event.nativeEvent)) return;
     if (!editorialVisible || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
     const next = event.key === "Home" ? "director" : event.key === "End" ? "controls" : activeTab === "director" ? "controls" : "director";
-    setTab(next);
-    document.getElementById(`sidebar-tab-${next}`)?.focus();
+    action(() => { setTab(next); document.getElementById(`sidebar-tab-${next}`)?.focus(); });
   }
   const splitStyle = { "--editorial-height": `${editorialHeight}px` } as CSSProperties;
   return <aside id="editing-sidebar" className={`editing-sidebar${compact ? " compact" : ""}`} aria-label={t("sidebar.title")} ref={container} onScrollCapture={rememberScroll}>
@@ -166,7 +167,7 @@ export function EditingSidebar({ compact, width, editorialVisible, directorPanel
       onPointerDown={event => start(event, "width")} onPointerMove={move} onPointerUp={stopGesture} onPointerCancel={stopGesture} onLostPointerCapture={stopGesture} onKeyDown={event => key(event, "width")}><span /></button>
     <header className="editing-sidebar-heading"><strong>{t(compact ? "sidebar.compact" : "sidebar.expanded")}</strong><button type="button" className="secondary-button" onClick={toggleMode}>{t(compact ? "sidebar.expanded" : "sidebar.compact")}</button></header>
     <div className="sidebar-tabs" hidden={!compact} role="tablist" aria-label={t("sidebar.tabs")}>
-      {(["director", "controls"] as const).map(item => <button key={item} id={`sidebar-tab-${item}`} type="button" role="tab" disabled={item === "director" && !editorialVisible} aria-selected={activeTab === item} tabIndex={activeTab === item ? 0 : -1} aria-controls={`sidebar-${item === "director" ? "editorial" : "context"}`} onClick={() => setTab(item)} onKeyDown={tabKey}>{t(item === "director" ? "sidebar.directorTab" : "sidebar.controlsTab")}</button>)}
+      {(["director", "controls"] as const).map(item => <button key={item} id={`sidebar-tab-${item}`} type="button" role="tab" disabled={item === "director" && !editorialVisible} aria-selected={activeTab === item} tabIndex={activeTab === item ? 0 : -1} aria-controls={`sidebar-${item === "director" ? "editorial" : "context"}`} onClick={() => action(() => setTab(item))} onKeyDown={tabKey}>{t(item === "director" ? "sidebar.directorTab" : "sidebar.controlsTab")}</button>)}
     </div>
     <div ref={body} className={`editing-sidebar-body${editorialVisible ? "" : " context-only"}`} style={splitStyle}>
       <div id="sidebar-editorial" className="sidebar-editorial" role={compact ? "tabpanel" : undefined} aria-labelledby={compact ? "sidebar-tab-director" : undefined} hidden={!directorVisible}>{directorPanel}</div>

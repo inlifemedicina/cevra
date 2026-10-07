@@ -8,6 +8,7 @@ import { maximumSourceFrame, floorMsToFrames, frameInput, framesToMilliseconds, 
 import { ManualSequenceConformReview } from "./ManualSequenceConformReview";
 import { shortcutProps } from "../keyboard-shortcuts";
 import { reorderedTimeline } from "../timeline-interactions";
+import type { RangeActionGate } from "../range-activation-guard";
 
 interface Props {
   project: Readonly<ProjectIR>;
@@ -21,6 +22,7 @@ interface Props {
   onEdit(request: ManualVideoSequenceEdit): Promise<void>;
   onCommitRange(request: ManualVideoSequenceEdit): Promise<void>;
   rangeDraft: RefObject<ManualRangeDraftController | null>;
+  onAction: RangeActionGate;
   backend?: DesktopBackend;
 }
 /** One draft settlement is shared by blur, Enter and the next App transition. */
@@ -31,7 +33,7 @@ type Unbound<T> = T extends unknown ? Omit<T, "version" | "expectedSnapshotId"> 
 type Intent = Unbound<ManualVideoSequenceEdit>;
 
 /** Inputs are disposable drafts; only the typed backend publishes the timeline. */
-export function ManualSequenceControls({ project, clips, presentations, selectedId, selectedClipIds, playheadMs, busy, t, onEdit, onCommitRange, rangeDraft, backend }: Props) {
+export function ManualSequenceControls({ project, clips, presentations, selectedId, selectedClipIds, playheadMs, busy, t, onEdit, onCommitRange, rangeDraft, onAction, backend }: Props) {
   const grid = project.timeline.timingPolicy === "cfr30" || clips.length === 0;
   const selected = clips.find(clip => clip.id === selectedId);
   const sources = manualSequenceSources(project);
@@ -123,9 +125,12 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     <p>{t(grid ? "sequence.frameGrid" : "sequence.legacyTiming")}</p>
     <fieldset>
       <legend>{t("sequence.sourceRange")}</legend>
-      <label>{t("sequence.source")}<select disabled={fieldsDisabled} aria-label={t("sequence.source")} value={sourceId} onChange={event => {
+      <label>{t("sequence.source")}<select disabled={disabled} aria-label={t("sequence.source")} value={sourceId} onChange={event => {
         const next = sources.find(item => item.id === event.target.value);
-        setSourceId(next?.id ?? ""); setStart("0"); setEnd(String(grid ? maximumSourceFrame(next?.durationMs ?? 0) : (next?.durationMs ?? 0) / 1000));
+        void onAction(() => {
+          skipBlur.current = false; setDraftPhase("editing");
+          setSourceId(next?.id ?? ""); setStart("0"); setEnd(String(grid ? maximumSourceFrame(next?.durationMs ?? 0) : (next?.durationMs ?? 0) / 1000));
+        }).catch(() => {});
       }}>{sources.map(item => <option key={item.id} value={item.id}>{presentations.get(item.id)?.label ?? item.displayName}</option>)}</select></label>
       <label>{t(grid ? "sequence.inFrames" : "sequence.inSeconds")}<input disabled={fieldsDisabled} data-manual-range type="number" step={grid ? "1" : "0.001"} min="0" value={start} aria-invalid={!valid} aria-describedby={rangeHintId} onChange={event => { skipBlur.current = false; setDraftPhase("editing"); setStart(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
       <label>{t(grid ? "sequence.outFrames" : "sequence.outSeconds")}<input disabled={fieldsDisabled} data-manual-range type="number" step={grid ? "1" : "0.001"} min="0" max={grid ? maximum : maximum / 1000} value={end} aria-invalid={!valid} aria-describedby={rangeHintId} onChange={event => { skipBlur.current = false; setDraftPhase("editing"); setEnd(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>

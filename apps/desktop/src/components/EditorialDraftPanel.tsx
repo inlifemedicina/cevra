@@ -2,12 +2,14 @@ import type { EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest
 import { useEffect, useId, useRef, useState } from "react";
 import type { Translate } from "../ui-model";
 import type { SourcePresentation } from "../source-presentation";
+import type { RangeActionGate } from "../range-activation-guard";
 
-export function EditorialDraftPanel({ state, presentations, busy, error, t, onRefresh, onRevise, onSourceSelect }: {
+export function EditorialDraftPanel({ state, presentations, busy, error, t, onRefresh, onRevise, onSourceSelect, onAction }: {
   state: EditorialDraftState | null; busy: boolean; error: boolean; t: Translate;
   presentations: ReadonlyMap<string, SourcePresentation>;
   onRefresh(): void; onRevise(request: ReviseEditorialDraftRequest): Promise<void>;
   onSourceSelect(sourceId: string): void;
+  onAction?: RangeActionGate;
 }) {
   const retained = useRef<EditorialDraftV1 | null>(null);
   if (state?.status === "current") retained.current = state.draft;
@@ -19,17 +21,21 @@ export function EditorialDraftPanel({ state, presentations, busy, error, t, onRe
     {!state && !error && <p role="status">{t("editorialReview.loading")}</p>}
     {state?.status === "empty" && <p>{t("editorialReview.empty")}</p>}
     {state?.status === "stale" && <p role="status">{t("editorialDraft.error.stale")}</p>}
-    {draft && <DraftContents key={JSON.stringify([draft.id, draft.analysis.executionId, draft.analysis.contextId, draft.analysis.binding.projectId])} draft={draft} presentations={presentations} busy={busy || error || state?.status !== "current"} t={t} onRevise={onRevise} onSourceSelect={onSourceSelect} />}
+    {draft && <DraftContents key={JSON.stringify([draft.id, draft.analysis.executionId, draft.analysis.contextId, draft.analysis.binding.projectId])} draft={draft} presentations={presentations} busy={busy || error || state?.status !== "current"} t={t} onRevise={onRevise} onSourceSelect={onSourceSelect} onAction={onAction} />}
   </section>;
 }
 
-function DraftContents({ draft, presentations, busy, t, onRevise, onSourceSelect }: { draft: EditorialDraftV1; presentations: ReadonlyMap<string, SourcePresentation>; busy: boolean; t: Translate; onRevise(request: ReviseEditorialDraftRequest): Promise<void>; onSourceSelect(sourceId: string): void }) {
+function DraftContents({ draft, presentations, busy, t, onRevise, onSourceSelect, onAction }: { draft: EditorialDraftV1; presentations: ReadonlyMap<string, SourcePresentation>; busy: boolean; t: Translate; onRevise(request: ReviseEditorialDraftRequest): Promise<void>; onSourceSelect(sourceId: string): void; onAction?: RangeActionGate }) {
   const [edits, setEdits] = useState(() => draft.blocks.map(({ id, title, userNote }) => ({ blockId: id, title, userNote })));
   const hintId = useId();
   useEffect(() => { setEdits(draft.blocks.map(({ id, title, userNote }) => ({ blockId: id, title, userNote }))); }, [draft.id, draft.revision]);
   const valid = edits.every(edit => edit.title.trim().length > 0 && edit.title.length <= 200 && edit.userNote.length <= 2000);
   const changed = edits.some(edit => { const original = draft.blocks.find(block => block.id === edit.blockId)!; return original.title !== edit.title || original.userNote !== edit.userNote; });
   const editingHint = busy ? t("editorialReview.updating") : !valid ? t("editorialReview.titleRequired") : changed ? t("editorialReview.pendingNotes") : t("editorialReview.noPendingNotes");
+  function discard() {
+    const action = () => setEdits(draft.blocks.map(({ id, title, userNote }) => ({ blockId: id, title, userNote })));
+    if (onAction) void onAction(action).catch(() => {}); else action();
+  }
   async function move(index: number, delta: number) {
     const order = draft.blocks.map(block => block.id);
     [order[index], order[index + delta]] = [order[index + delta], order[index]];
@@ -71,7 +77,7 @@ function DraftContents({ draft, presentations, busy, t, onRevise, onSourceSelect
     <p id={hintId} className="editorial-editing-hint" role="status">{editingHint}</p>
     {changed && <p role="status">{t("editorialReview.reorderSavesNotes")}</p>}
     <button type="button" className="secondary-button" disabled={busy || !valid || !changed} title={busy || !valid || !changed ? editingHint : undefined} onClick={() => void onRevise({ expectedRevision: draft.revision, blockEdits: edits })}>{t("editorialReview.saveNotes")}</button>
-    <button type="button" className="text-button" disabled={busy || !changed} title={busy || !changed ? editingHint : undefined} onClick={() => setEdits(draft.blocks.map(({ id, title, userNote }) => ({ blockId: id, title, userNote })))}>{t("editorialReview.discardNotes")}</button>
+    <button type="button" className="text-button" disabled={busy || !changed} title={busy || !changed ? editingHint : undefined} onClick={discard}>{t("editorialReview.discardNotes")}</button>
     <details className="editorial-limitations"><summary>{t("editorialReview.assessment")}</summary>
       {draft.analysisReview.notes.map((note, i) => <p key={i}>{note}</p>)}
       {draft.analysisReview.priorChecks.map(check => <p key={check.id}><strong>{check.id}: {t(`editorialReview.support.${check.outcome}`)}</strong> — {check.detail}</p>)}
