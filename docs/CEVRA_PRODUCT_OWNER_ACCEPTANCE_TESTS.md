@@ -238,6 +238,20 @@ revisão independente e próxima rodada agrupada aguardam coordenação. O rotei
 abaixo continua referência do pacote congelado, sem afirmar que o novo código
 foi instalado. Nenhum novo teste humano é solicitado nesta etapa.
 
+**Decisão e automação — 07/10/2026:** Enter ou blur confirma IN/OUT válido do
+trecho selecionado, Esc cancela, um Undo desfaz e Enter+blur não duplica o commit
+(Owner 00:22:58 UTC). Adicionar/Inserir e conversão de timing continuam explícitos.
+O [inventário completo de campos/atalhos e proposta de latência](CEVRA_VIDS_USABILITY_AUDIT.md)
+reúne achados P1/P2 e correções na branch separada
+`feat/vids-usability-keyboard-audit`, código `10a66830e56a31e17a22ed6ad10efc7f5814f9fe`:
+build, UI183/183 e i18n2/2 PASS offline; revisão exata/CI ainda requeridos.
+Na futura rodada única, reutilizar I4-T1, X-T1/T7 e variante X-T6 para campos e
+foco/atalhos/grupo, rascunho/erro/retry, prévia após editar, export e fechar/reabrir.
+Não criar aceite humano por campo nem repetir os casos já aceitos. A espera atual
+de 6,85–8,05 s não atende ao pedido; a prova incremental no worker não mede entrega
+completa do app nem aprova o cache de produção. Picker, percepção/áudio nativos,
+layout mínimo da ajuda e persistência humana continuam NÃO EXECUTADOS nesta etapa.
+
 A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
 os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
 estava concluída no handoff histórico; a rodada teve os relatos parciais acima. Abrir somente esse aplicativo,

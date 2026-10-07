@@ -2658,7 +2658,40 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-**Current follow-up — 2026-10-07:** coordination supplied independent APPROVE
+**Approved UI decision and completed investigation — 2026-10-07:** the Owner
+approved Enter/blur confirmation of valid selected-clip IN/OUT at 00:22:58 UTC,
+Escape cancellation, one Undo and no duplicate Enter-plus-blur commit. This
+supersedes the earlier Apply-only pending decision; append/insert and legacy
+timing-policy conversion still have explicit confirmation. Approved existing
+function shortcuts and a complete field/surface audit are prepared separately
+on `feat/vids-usability-keyboard-audit`, based on `2382dae` / Draft #89. Code
+checkpoint `10a66830e56a31e17a22ed6ad10efc7f5814f9fe` passed Desktop build,
+Desktop183/183 and i18n2/2 offline. The central catalogue uses guarded existing
+handlers, preserves text/IME/modal/system ownership and keeps browser shortcuts.
+The independent audit's P1 transient editorial-text loss and fabricated
+production composition/audio fixtures are corrected; P2 property/availability,
+tabs/labels/thumbnail retry and timeline resize gaps are covered. Exact-head CI
+and proportional independent review remain required; no new human package is
+installed/opened or claimed accepted.
+
+The measured 6.85–8.05-s whole-program edit wait does not meet the Owner request.
+Two external synthetic-worker proofs reuse validated segments and preserve all
+decoded video-frame hashes and PCM bytes versus uncached references. A bounded
+in-memory proof measured reorder1.249s, one-frame trim1.753s and delete1.016s,
+versus uncached reorder6.755s/trim6.629s; it excludes Host/IPC/PNG/UI and does not
+prove instantaneous response, production RSS admission or perceptual acceptance.
+The concrete proposal is a worker-local 32-MiB/64-entry LRU of immutable segment
+bytes/grid receipts, with full-program/fresh-origin validation and existing
+resource reservations, in a separate technical delta. **Proposal approval is
+pending; no production cache/pipeline change is implemented.** Alternatives,
+costs, risks, estimates, proof hashes and the 33-row field inventory are in the
+[canonical audit/proposal](CEVRA_VIDS_USABILITY_AUDIT.md). Issue #88 and the
+existing grouped I4-T1/X-T1/T7/X-T6 acceptance record remain authoritative;
+native perception, picker, minimum-layout and human close/reopen are pending.
+Director impact compatible on the same typed commands/IR/History, no provider
+execution; progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain recorded.
+
+**Earlier follow-up — 2026-10-07:** coordination supplied independent APPROVE
 for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program
 preparation measured 2.153 s for four clips/5.5 s and 6.853–6.879 s for 12 unique
 clips/60 s; cache/Undo took 22–28 ms. A new montage cache miss still renders the
@@ -2682,8 +2715,9 @@ Branch `feat/vids-timeline-usability-preview-continuity`, based on Draft #87 hea
 `a6c099a5e37c669ed881443dd52b5aab7e2ce7d2`, now has offline-tested timeline
 interaction, atomic group removal, one continuous CFR30 program preview and
 automatic identity-bound thumbnails. See the [scoped technical record](CEVRA_MANUAL_SEQUENCE_G1.md#human-findings-and-usability-follow-up--2026-10-06).
-Seek follows the approved play/pause/drag/cancel policy; IN/OUT keeps explicit
-Apply-button confirmation pending the Owner's separate decision. Native bundle
+Seek follows the approved play/pause/drag/cancel policy. At this earlier
+checkpoint IN/OUT retained Apply; the 2026-10-07 decision above supersedes that
+pending state for selected-clip trim. Native bundle
 localization metadata is prepared, but the resulting picker language is untested.
 Independent review of this new diff and a coordinated future human round remain
 pending. The open app/project/export and earlier package receipts stay preserved;
