@@ -417,14 +417,17 @@ it("pointer playhead dragging uses the fixed ruler geometry and Escape restores 
   expect(f.backend.history.toArchive()).toEqual(before);expect(f.backend.requests).toHaveLength(0);
 });
 it.each(["Enter", "blur"])("valid IN/OUT %s commits once, remains atomic and preserves text Undo", async trigger => {
-  const f = await gestureFixture(); f.click(f.ids[0]!); const before = f.backend.history.current;
+  const f = await gestureFixture(); f.click(f.ids[0]!); const before = f.backend.history.current; const user = userEvent.setup();
   const input = controls().getByLabelText("OUT (frames)");
-  fireEvent.change(input, { target: { value: "29" } });
-  if (trigger === "Enter") fireEvent.keyDown(input, { key: "Enter" }); else fireEvent.blur(input);
-  fireEvent.blur(input); fireEvent.keyDown(input, { key: "Enter", repeat: true });
+  await user.click(input); await user.clear(input); await user.type(input, "29");
+  if (trigger === "Enter") await user.keyboard("{Enter}");
+  else await user.click(screen.getByLabelText(translate("pt-BR", "director.inputLabel")));
+  await user.click(f.timeline); fireEvent.keyDown(input, { key: "Enter", repeat: true });
   await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(29));
   expect(f.backend.requests).toHaveLength(1);
-  fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
+  const undo = screen.getByRole("button", { name: "Desfazer" });
+  await waitFor(() => expect(undo.matches(":disabled")).toBe(false));
+  await user.click(undo);
   await waitFor(() => expect(f.backend.history.current).toEqual(before));
 });
 

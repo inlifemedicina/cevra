@@ -20,6 +20,12 @@ PASS; 11 regressões novas usam campo realmente focado e `user.click`, incluindo
 os sete botões de montagem, Undo, Enter/blur/Esc, invalidez e relatedTarget nulo.
 Sete regressões falharam no head anterior e o log foi preservado. Revisão exata
 e CI do novo head continuam requeridos; simulação DOM não é PASS WKWebView.
+
+O primeiro CI do delta `ba90d4d` encontrou uma corrida nos testes antigos Enter/blur:
+eles liam o History interno antes de a UI liberar Undo e clicavam o botão ainda
+desabilitado. Os dois testes agora usam foco/click reais e aguardam Undo habilitado,
+mantendo a comparação completa de restauração e a contagem de um único comando.
+Build/UI194 PASS novamente; não houve mudança adicional no código de produção.
 A espera de 6,85–8,05 s após editar **não atende ao pedido do Owner** e não é
 critério de aceite. Nenhum protótipo abaixo altera o app ou o projeto humano.
 

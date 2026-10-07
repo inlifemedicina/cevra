@@ -2703,6 +2703,12 @@ null-relatedTarget pointer intent with no mutation until click. Exact new-head
 CI/re-review are required; earlier 10/10 CI applies to `8bd9463`, not this delta.
 The incremental-cache proposal remains unapproved and unimplemented.
 
+The first `ba90d4d` CI exposed a legacy Enter/blur Undo-test synchronization race:
+History changed before the UI released its pending guard. Both tests now use real
+focus/click and await enabled Undo while retaining exact restoration/count checks.
+Build/UI194 pass again; no further production change. Failed CI logs are preserved
+and fresh exact-head CI remains mandatory, rather than relabeling the failed runs.
+
 **Earlier follow-up — 2026-10-07:** coordination supplied independent APPROVE
 for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program
 preparation measured 2.153 s for four clips/5.5 s and 6.853–6.879 s for 12 unique
