@@ -2759,6 +2759,11 @@ No cache implementation/approval, merge, native app/package/media/Take/device or
 real provider operation. Director compatible with the same typed IR/History;
 progress55%, F-A021/1, full G1 unaccepted and one grouped checklist unchanged.
 
+First CI atf70c874: PR Monorepo/UI231 PASS, push failed the existing temporary
+editorial review test. That test now waits for editable fields and completed UI
+busy, and additionally proves the saved title. Production code unchanged;
+failure log preserved, fresh head needs its own CI/re-review.
+
 **Earlier follow-up — 2026-10-07:** coordination supplied independent APPROVE
 for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program
 preparation measured 2.153 s for four clips/5.5 s and 6.853–6.879 s for 12 unique

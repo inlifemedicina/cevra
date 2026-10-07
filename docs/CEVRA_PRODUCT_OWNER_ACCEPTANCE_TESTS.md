@@ -275,6 +275,11 @@ IDs/rodadas por campo ou botão; não inferir PASS WKWebView/picker/humano. O
 [inventário técnico único](CEVRA_VIDS_USABILITY_AUDIT.md#inventário-completo-de-entradas-e-limites)
 registra os caminhos e limites, sem alterar a aprovação de cache nem executar IA.
 
+O primeiro CI em f70c874 teve Monorepo/UI231 PASS no PR e um teste editorial
+temporário falho no push. O teste aguarda campos habilitados/busy concluído e
+confere título guardado, sem mudança de produção. Falha preservada; CI e revisão
+do próximo head continuam obrigatórios, sem nova rodada humana.
+
 A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
 os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
 estava concluída no handoff histórico; a rodada teve os relatos parciais acima. Abrir somente esse aplicativo,

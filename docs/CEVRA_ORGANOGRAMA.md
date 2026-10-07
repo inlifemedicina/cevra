@@ -230,6 +230,10 @@ New-head CI and exact independent review PENDING. Draft only; no cache/provider/
 native GUI/device/Take/merge. Director compatible, progress55%, F-A021/1 and
 full G1 unaccepted unchanged; reuse the same grouped acceptance catalog.
 
+Firstf70c874 CI had PR Monorepo PASS and one push UI failure in the old temporary
+editorial test. Synchronize that test with editable/completed UI and verify saved
+title; no production change. Preserve failure; fresh head CI/re-review required.
+
 ```text
 CEVRA VIDS
 │

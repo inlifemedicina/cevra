@@ -108,6 +108,13 @@ sem GUI ou provider. Dois testes antigos de export agora aguardam busy/Undo pela
 UI real; preservam as mesmas provas de receipt/publicação/restauração sem replay.
 O caso de range inválido cancela com Esc antes de trocar fonte.
 
+O primeiro CI desse delta em `f70c874` passou Monorepo no PR, UI231, mas o push
+falhou no teste antigo de revisão editorial temporária: encontrava o campo sem
+esperar edição habilitada e verificava chamada antes da UI concluir busy. O teste
+agora aguarda ambos os estados da UI e verifica também o título efetivamente
+guardado. Não muda código de produção nem expectativa de comando/boundary;
+o log falho permanece preservado e o próximo head exige CI próprio.
+
 CI exato de `57511e185f990849071b3491f34e49d00954d0e5` terminou **10/10 PASS**:
 [push](https://github.com/inlifemedicina/cevra/actions/runs/37560690054) e
 [PR, attempt2](https://github.com/inlifemedicina/cevra/actions/runs/37560694033).

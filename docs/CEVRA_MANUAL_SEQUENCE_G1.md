@@ -1426,6 +1426,11 @@ after alignment's pip-download failure and terminal retry. New-head CI/re-review
 PENDING; #90 remains Draft. Same grouped acceptance, no new human round, cache,
 provider, native GUI/device/Take operation or merge; no acceptance promotion.
 
+Firstf70c874 CI: PR Monorepo/UI231 passed; push's old temporary-editorial test
+failed. Wait for fields enabled and UI busy settled, retaining native-command
+checks and adding saved-title proof; production unchanged. Failure preserved;
+new head CI/re-review remain mandatory.
+
 The Owner's requested edit fluency is not met by 6.85–8.05-s new-program waits.
 Two external proofs use the existing renderer and verify decoded-frame hashes,
 complete decoded PCM, grids/endpoints and original hashes. The immutable-memory
