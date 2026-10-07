@@ -20,6 +20,7 @@ from typing import Any
 import cevra_bounded_preview as inspection
 import cevra_job_control as jobs
 from cevra_streaming_process import reduce_lines
+from cevra_preview_segments import CACHE as preview_segments, encode as encode_segment_identity
 
 CFR30_SOURCE_SAMPLER = "fps=30:start_time=0:round=near:eof_action=pass"
 SAMPLING_POLICY = "source-pts-fps30-near-v1"
@@ -261,6 +262,22 @@ class _LogicalBudget:
         self.settle(path)
         return result
 
+    def restore_segment(self, path: Path, payload: bytes) -> None:
+        # The complete immutable payload is charged before opening a writer.
+        self.reserve(path, len(payload))
+        self.producers += 1
+        view = memoryview(payload)
+        with path.open("xb") as handle:
+            for offset in range(0, len(payload), 65536):
+                jobs.check_cancelled()
+                chunk = view[offset:offset + 65536]
+                self.check_write(path, offset, len(chunk))
+                if handle.write(chunk) != len(chunk):
+                    raise RuntimeError("preview segment restoration was incomplete")
+        self.settle(path)
+        if inspection._hash_stable(path, path.lstat(), inspection.MAX_BYTES) != hashlib.sha256(payload).hexdigest():
+            raise RuntimeError("preview restored segment hash mismatch")
+
     def evidence(self) -> dict:
         return {"version": 1, "enforcement": "reserved-logical-space", "budgetBytes": self.maximum,
                 "peakReservedBytes": self.peak_reserved, "producerCount": self.producers,
@@ -455,7 +472,27 @@ def _video_filter(start: int, end: int, width: int, height: int) -> str:
     return f"{CFR30_SOURCE_SAMPLER},trim=start_frame={start}:end_frame={end},setpts=N/(30*TB),scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1"
 
 
-def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict:
+def _segment_runtime_identity(common: Any) -> dict:
+    from runtime_integrity import CRITICAL_WORKER_FILES
+    paths = {name: Path(common.require_tool(name)) for name in ("ffmpeg", "ffprobe")}
+    paths.update({name: Path(__file__).parent / Path(name).name for name in CRITICAL_WORKER_FILES})
+    root = os.environ.get("CEVRA_MEDIA_RUNTIME_ROOT")
+    if root and (Path(root) / "manifest.json").is_file():
+        paths["manifest"] = Path(root) / "manifest.json"
+    return {name: {"sha256": inspection._hash_stable(path, path.lstat(), 512 * 1024 * 1024), "sizeBytes": path.lstat().st_size}
+            for name, path in paths.items()}
+
+
+def _segment_key(item: dict, video: dict, stream_index: int, encoder_args: list[str], runtime_identity: dict) -> bytes:
+    return encode_segment_identity({"version": 1, "sourceContent": item["source_content"], "sourceVideo": video,
+        "videoStreamIndex": stream_index, "audioSelection": item["audio_selection"],
+        "inFrame": item["source_start_frame"], "outFrame": item["source_end_frame"],
+        "sampler": CFR30_SOURCE_SAMPLER, "samplingPolicy": SAMPLING_POLICY, "grid": [30, 1],
+        "profile": "manual-cfr30-preview-v1", "width": 720, "height": 404, "pixelFormat": "yuv420p",
+        "encoderArgs": encoder_args, "frameFilterVersion": 1, "runtime": runtime_identity})
+
+
+def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_segments: bool = False) -> dict:
     import cevra_native_tools as tools
     items, total = validate(args, preview)
     output = tools._absolute_new_mux_output(args["output"])
@@ -473,7 +510,13 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
     sources, metadata, segments, original_stamps, receipts = {}, {}, {}, {}, []
     accounting = root / "published-account.mp4"
     publication = None
+    cache_transaction = preview_segments.transaction() if preview and retain_segments else None
+    runtime_identity = None
+    cache_misses = []
+    cache_success = False
     try:
+        if cache_transaction:
+            runtime_identity = _segment_runtime_identity(common)
         budget = _LogicalBudget(root, root_stamp, OWNED_BYTES)
         source_targets = {}
         # Admit all mandatory copies and the conservative stereo PCM allowance
@@ -534,8 +577,24 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
                 profile[profile.index("-b:v") + 1] = str(bitrate)
                 if preview:
                     profile += ["-maxrate", "700k", "-bufsize", "1400k"]
-                budget.run_native(common, common.ffmpeg_base(overwrite=False) + ["-threads", "2", "-filter_threads", "2", "-copyts", "-i", str(sealed), "-map", f"0:{receipts[int(source_id[1:])]['videoStreamIndex']}", "-an", "-vf", _video_filter(start, end, width, height), *profile, *_colour_args(metadata[source_id]["video"]), "-bf", "0", "-fps_mode", "passthrough", "-video_track_timescale", "30000", "-metadata:s:v:0", "rotate=0", str(segment)])
-                _video_clock(common, segment, end - start, width, height)
+                stream_index = receipts[int(source_id[1:])]["videoStreamIndex"]
+                encoder_args = [*profile, *_colour_args(metadata[source_id]["video"]), "-bf", "0", "-fps_mode", "passthrough", "-video_track_timescale", "30000", "-metadata:s:v:0", "rotate=0"]
+                cache_key = _segment_key(item, metadata[source_id]["video"], stream_index, encoder_args, runtime_identity) if cache_transaction else None
+                grid = {"version": 1, "frames": end - start, "width": width, "height": height,
+                        "codec": "h264", "pixelFormat": "yuv420p", "frameRate": [30, 1], "durationFrames": end - start}
+                payload = cache_transaction.get(cache_key, grid) if cache_transaction else None
+                if payload is not None:
+                    budget.restore_segment(segment, payload)
+                    del payload
+                else:
+                    budget.run_native(common, common.ffmpeg_base(overwrite=False) + ["-threads", "2", "-filter_threads", "2", "-copyts", "-i", str(sealed), "-map", f"0:{stream_index}", "-an", "-vf", _video_filter(start, end, width, height), *encoder_args, str(segment)])
+                    segment_stamp = segment.lstat()
+                    segment_digest = inspection._hash_stable(segment, segment_stamp, inspection.MAX_BYTES) if cache_transaction and segment_stamp.st_size <= inspection.MAX_BYTES else None
+                    _video_clock(common, segment, end - start, width, height)
+                    if segment_digest is not None:
+                        if inspection._hash_stable(segment, segment_stamp, inspection.MAX_BYTES) != segment_digest:
+                            raise RuntimeError("preview segment changed during grid validation")
+                        cache_misses.append((cache_key, segment, grid, segment_digest))
                 segments[key] = segment
             occurrences.append(segments[key])
         graph_path = directory / "sequence.ffgraph"; owned_files.append(graph_path)
@@ -570,6 +629,8 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
                 expected = next(r["sha256"] for r in receipts if r["inputUri"] == originals[int(source_id[1:])].as_posix())
                 if inspection._hash_stable(sealed, sealed.lstat(), SOURCE_BYTES) != expected:
                     raise RuntimeError("manual sealed original changed during render")
+            if cache_transaction and _segment_runtime_identity(common) != runtime_identity:
+                raise RuntimeError("preview segment runtime changed during render")
             candidate_stream = next(s for s in _streams(common, candidate) if s.get("codec_type") == "video")
             for key in COLOUR_KEYS[:-1]:
                 expected = metadata["s0"]["video"].get(key)
@@ -605,6 +666,13 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
             "logicalBudget": budget.evidence()}
         result["structuredContent"]["manualSequence"] = evidence
         result["content"] = [{"type": "text", "text": json.dumps(result["structuredContent"])}]
+        if cache_transaction:
+            # Read only admitted derivatives, with no extra originals or PCM.
+            # Pending objects share the retention ceiling with committed ones.
+            for cache_key, segment, grid, segment_digest in cache_misses:
+                cache_transaction.stage(cache_key, segment, grid, expected_digest=segment_digest)
+            jobs.check_cancelled()
+            cache_success = True
         return result
     except BaseException as execution_error:
         if publication is not None or accounting.exists():
@@ -613,8 +681,12 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
     finally:
         errors = []
         # A replaced root cannot confer cleanup authority over its new contents.
-        _root_current(root, root_stamp)
-        _root_current(directory, directory_stamp)
+        try:
+            _root_current(root, root_stamp)
+            _root_current(directory, directory_stamp)
+        except BaseException:
+            if cache_transaction: cache_transaction.abort()
+            raise
         # Never path-unlink a public manual destination after publication.
         # Its retained private accounting link permits conservative recovery;
         # only normal successful Host settlement removes that issued workspace.
@@ -628,6 +700,16 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False) -> dict
         except OSError as error:
             errors.append(str(error))
         if errors:
+            if cache_transaction: cache_transaction.abort()
             # A failure to remove private inputs/intermediates prevents admission.
             preservation = "; public destination and accounting link retained for recovery" if publication is not None or accounting.exists() else ""
             raise RuntimeError("manual owned artifact cleanup incomplete: " + "; ".join(errors) + preservation)
+        if cache_transaction:
+            if cache_success:
+                try:
+                    cache_transaction.commit()
+                except BaseException:
+                    cache_transaction.abort()
+                    raise
+            else:
+                cache_transaction.abort()

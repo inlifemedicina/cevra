@@ -11,7 +11,8 @@ import cevra_job_control as job_control
 import cevra_media_worker as media_worker
 
 
-def controlled_tool(name, arguments):
+def controlled_tool(name, arguments, *, retain_preview_segments=False):
+    assert retain_preview_segments is False
     if name != "desktop-host-containment-test":
         raise RuntimeError("unexpected controlled test tool")
     child = job_control.popen([sys.executable, "-c", "import time; time.sleep(60)"])

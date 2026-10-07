@@ -48,6 +48,41 @@ for line in sys.stdin:
     request = json.loads(line)
     if request["method"] == "ping":
         reply(request, {"activeJobId": active, "jobThreadActive": active is not None})
+    elif request["method"] == "fixture/cache-marker":
+        reply(request, {"ownedPreviewCache": request["params"].get("ownedPreviewCache")})
+    elif request["method"] == "fixture/cache-pressure":
+        # Real production cache objects under the real native RSS observer.
+        # Bytes are a synthetic pressure fixture, not admitted/decoded media.
+        assert request["params"].get("ownedPreviewCache") is True
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "worker"))
+        from cevra_preview_segments import SegmentCache, encode
+        cache = SegmentCache()
+        root = pathlib.Path(request["params"]["root"])
+        payload = root / "synthetic-pressure.bin"
+        payload.write_bytes(b"p" * (8 * 1024 * 1024 - 4096))
+        transaction = cache.transaction()
+        for index in range(4):
+            transaction.stage(encode({"segment": index}), payload, {"syntheticPressure": True})
+        transaction.commit()
+        full = cache.state()
+        time.sleep(0.25)  # Complete a native RSS sample at the byte ceiling.
+        for index in range(4, 8):
+            transaction = cache.transaction()
+            transaction.stage(encode({"segment": index}), payload, {"syntheticPressure": True})
+            transaction.commit()
+        evicted = cache.state()
+        time.sleep(0.25)
+        payload.write_bytes(b"small")
+        cache.clear()
+        for index in range(65):
+            transaction = cache.transaction()
+            transaction.stage(encode({"segment": index}), payload, {"syntheticPressure": True})
+            transaction.commit()
+        entry_pressure = cache.state()
+        payload.unlink()
+        time.sleep(0.25)  # Ensure at least one complete native sample at retention.
+        reply(request, {"full": full, "evicted": evicted, "entryPressure": entry_pressure,
+                        "admittedMedia": False})
     elif request["method"] == "tools/call":
         active = request["params"]["jobId"]
         threading.Thread(target=job, args=(request,), daemon=True).start()

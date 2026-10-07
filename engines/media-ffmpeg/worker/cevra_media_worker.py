@@ -84,6 +84,7 @@ if RELEASE_MODE:
 
 from cevra_native_tools import AUDIO_CODECS as DELIVERY_AUDIO_CODECS
 from cevra_native_tools import CUSTOM_TOOLS, DELIVERY_MATRIX, VIDEO_CODECS as DELIVERY_VIDEO_CODECS, call_custom_tool
+from cevra_preview_segments import CACHE as preview_segments
 import cevra_job_control as job_control
 from runtime_profile import adapt_required_capabilities, candidates, configured_profile, ensure_functional_profile, invalidate_cache as invalidate_profile_cache
 
@@ -673,7 +674,7 @@ def _attach_effective_profile(result: Dict[str, Any], name: str, arguments: Dict
     return result
 
 
-def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+def _call_tool_in_process(name: str, arguments: Dict[str, Any], *, retain_preview_segments: bool = False) -> Dict[str, Any]:
     if name not in ALLOWED_TOOLS:
         return {"isError": True, "content": [{"type": "text", "text": f"tool {name} is not allowed by CEVRA"}]}
     try:
@@ -682,7 +683,7 @@ def _call_tool_in_process(name: str, arguments: Dict[str, Any]) -> Dict[str, Any
         return {"isError": True, "content": [{"type": "text", "text": str(exc)}]}
     if name != "cevra-measure-audio":
         _ensure_profile()
-    custom = call_custom_tool(name, arguments or {}, VENDOR_ROOT)
+    custom = call_custom_tool(name, arguments or {}, VENDOR_ROOT, retain_preview_segments=retain_preview_segments)
     if custom is not None:
         return _attach_effective_profile(custom, name, arguments)
 
@@ -964,6 +965,10 @@ def _now_iso() -> str:
 
 
 def handle(method: str, params: Dict[str, Any]) -> Any:
+    if method == "cevra/preview-cache-state":
+        return preview_segments.state()
+    if method not in ("initialize", "ping") and (params.get("ownedPreviewCache") is not True or method == "cevra/configure"):
+        preview_segments.clear()
     if method == "initialize":
         return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "cevra-media-worker", "version": WORKER_VERSION}}
     if method == "ping":
@@ -999,17 +1004,19 @@ def _write_response(response: Dict[str, Any]) -> None:
         _CONTROL_STDOUT.flush()
 
 
-def _job_response(request_id: Any, job_id: str, name: str, arguments: Dict[str, Any]) -> None:
+def _job_response(request_id: Any, job_id: str, name: str, arguments: Dict[str, Any], retain_preview_segments: bool = False) -> None:
     global _JOB_THREAD
     response: Dict[str, Any]
     try:
-        result = _call_tool_in_process(name, arguments)
+        result = _call_tool_in_process(name, arguments, retain_preview_segments=retain_preview_segments)
         cancelled = job_control.finish_job(job_id)
         if cancelled:
+            preview_segments.clear()
             response = {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32800, "message": f"media job {job_id} was cancelled"}}
         else:
             response = {"jsonrpc": "2.0", "id": request_id, "result": result}
     except BaseException as exc:
+        preview_segments.clear()
         cancelled = job_control.finish_job(job_id)
         code = -32800 if cancelled else -32000
         message = f"media job {job_id} was cancelled" if cancelled else str(exc)
@@ -1037,8 +1044,11 @@ def _start_job(request_id: Any, params: Dict[str, Any]) -> Optional[Dict[str, An
     _validate_tool_arguments(name, arguments)
     if _JOB_THREAD is not None or job_control.active_job_id() is not None:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32001, "message": "media worker is busy"}}
+    guarded = params.get("ownedPreviewCache") is True
+    if not guarded or name not in ("cevra-render-manual-video-preview", "cevra-extract-frame"):
+        preview_segments.clear()
     job_control.begin_job(job_id)
-    thread = threading.Thread(target=_job_response, args=(request_id, job_id, name, arguments), name=f"cevra-media-job-{job_id}")
+    thread = threading.Thread(target=_job_response, args=(request_id, job_id, name, arguments, guarded and name == "cevra-render-manual-video-preview"), name=f"cevra-media-job-{job_id}")
     _JOB_THREAD = thread
     try:
         thread.start()
@@ -1117,8 +1127,10 @@ def main() -> int:
                     job_id = params.get("jobId")
                     if not isinstance(job_id, str) or not job_id:
                         raise ValueError("jobId must be a non-empty string")
+                    preview_segments.clear()
                     response = {"jsonrpc": "2.0", "id": req["id"], "result": {"cancelled": job_control.cancel(job_id), "jobId": job_id}}
                 elif method == "cevra/shutdown":
+                    preview_segments.clear()
                     active = job_control.active_job_id()
                     if active:
                         job_control.cancel(active)
@@ -1146,6 +1158,7 @@ def main() -> int:
         inspected = sys.modules.get("cevra_bounded_preview")
         if inspected is not None:
             inspected._clear_inspections()
+        preview_segments.clear()
     return 0
 
 

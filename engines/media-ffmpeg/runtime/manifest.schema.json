@@ -39,7 +39,7 @@
       "properties": {
         "root": { "const": "worker" }, "entrypoint": { "const": "worker/cevra_media_worker.py" },
         "treeSha256": { "$ref": "#/$defs/hash" },
-        "files": { "type": "array", "minItems": 9, "maxItems": 9, "items": { "$ref": "#/$defs/file" } }
+        "files": { "type": "array", "minItems": 10, "maxItems": 10, "items": { "$ref": "#/$defs/file" } }
       }
     },
     "upstream": {

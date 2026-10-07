@@ -15,8 +15,35 @@ function transport(t) {
   const worker = new ProcessMediaWorkerTransport({ mode: "development", pythonExecutable: python, workerScript, shutdownTimeoutMs: 3000, controlTimeoutMs: 2000, renderLivenessIntervalMs: 100 });
   t.after(() => worker.stop()); return worker;
 }
+test("preview cache marker is issued only by a live captured lease and caller input cannot enable it", async t => {
+  const root = await directory(t), worker = transport(t);
+  assert.equal((await worker.request("fixture/cache-marker", { ownedPreviewCache: true })).ownedPreviewCache, false);
+  const observe = async () => ({ rendererRssBytes: 32 * 1024 ** 2 + 100, ownedLogicalBytes: 1, ownedAllocatedBytes: 1, processIds: [worker.workerPid] });
+  const guarded = await worker.withOwnedRenderBudget({ ...limits, ownedDirectory: root, observe },
+    () => worker.request("fixture/cache-marker", { ownedPreviewCache: false }));
+  assert.equal(guarded.result.ownedPreviewCache, true);
+  assert.equal(guarded.resourceEvidence.memoryBudgetBytes, 512 * 1024 ** 2);
+  assert.equal((await worker.request("fixture/cache-marker", { ownedPreviewCache: true })).ownedPreviewCache, false);
+});
 async function waitFile(path) { const deadline = Date.now() + 5000; while (true) { try { return await readFile(path, "utf8"); } catch { if (Date.now() > deadline) throw Error("Owned fixture did not become ready."); await new Promise(resolve => setTimeout(resolve, 20)); } } }
 async function waitDead(pid) { const deadline = Date.now() + 3000; while (true) { try { process.kill(pid, 0); } catch { return; } if (Date.now() > deadline) throw Error("Owned fixture did not retire."); await new Promise(resolve => setTimeout(resolve, 20)); } }
+
+test("full production segment objects share the native 512 MiB RSS scope and byte/entry eviction bounds", { skip: process.platform === "win32" }, async t => {
+  const root = await directory(t), worker = transport(t);
+  const guarded = await worker.withOwnedRenderBudget({ ...limits, ownedDirectory: root },
+    () => worker.request("fixture/cache-pressure", { root }));
+  const { full, evicted, entryPressure } = guarded.result;
+  assert.equal(guarded.result.admittedMedia, false);
+  assert.equal(full.entries, 4); assert.equal(full.pendingEntries, 0);
+  assert.ok(full.retainedBytes > 31 * 1024 ** 2 && full.retainedBytes <= 32 * 1024 ** 2);
+  assert.equal(evicted.entries, 4); assert.equal(evicted.evictions, 4);
+  assert.ok(evicted.retainedBytes <= 32 * 1024 ** 2);
+  assert.equal(entryPressure.entries, 64); assert.equal(entryPressure.evictions, 5);
+  assert.equal(guarded.resourceEvidence.memoryBudgetBytes, limits.rendererRssLimitBytes);
+  assert.ok(guarded.resourceEvidence.peakRendererRssBytes >= full.retainedBytes);
+  assert.ok(guarded.resourceEvidence.peakRendererRssBytes <= limits.rendererRssLimitBytes);
+  t.diagnostic(JSON.stringify({ scope: "synthetic byte pressure with production cache objects; not decoded media", full, evicted, entryPressure, resourceEvidence: guarded.resourceEvidence }));
+});
 
 test("watchdog observes aggregate RSS, fails closed on observation loss and binds one directory identity", async t => {
   const root = await directory(t); const failures = [];
