@@ -137,4 +137,3 @@ The measured improvement does not establish immediate updates or subjective
 acceptance. Progress stays **55%**; **F-A02 exhausted 1/1** and full G1 unaccepted
 remain. No merge, human app/session/device operation, AI call or issue #88 body
 publication is included.
-
