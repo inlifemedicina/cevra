@@ -8,7 +8,7 @@ Build Desktop e regressões Desktop **183/183**, i18n **2/2**, PASS offline.
 CI do novo head e revisão proporcional serão registrados no Draft/receipt;
 os 11/11 jobs de `2382dae` e o bundle anterior não validam automaticamente este delta.
 
-**Correção da revisão P2:** a revisão de #90 encontrou OUT30→29 seguido de
+**Histórico — primeira correção P2, SUPERSEDED pela reavaliação abaixo:** a revisão de #90 encontrou OUT30→29 seguido de
 Adicionar: blur enviava trim e desabilitava o botão antes do click. O delta de
 código `3e4397d64a80fdc1687f0e42d10106a7c3f5f741` dá prioridade à ação do botão:
 Adicionar/Inserir usam o draft; demais ações usam a seleção canônica. Não enfileira
@@ -20,6 +20,42 @@ PASS; 11 regressões novas usam campo realmente focado e `user.click`, incluindo
 os sete botões de montagem, Undo, Enter/blur/Esc, invalidez e relatedTarget nulo.
 Sete regressões falharam no head anterior e o log foi preservado. Revisão exata
 e CI do novo head continuam requeridos; simulação DOM não é PASS WKWebView.
+
+**Correção atual da reavaliação P2 — código `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`:**
+a reavaliação de `5f9266c` confirmou que a prioridade genérica de botões perdia
+OUT29 ao selecionar/duplicar e confundia Tab/foco com ativação. Essa solução está
+**SUPERSEDED**. O estado explícito do draft é clean → editing → committing →
+clean/failed, vinculado ao selecionado. Enter e todo blur válido compartilham a
+mesma Promise de trim; não há exceção por relatedTarget ou intenção pointer.
+A transição no App captura a ação seguinte e aguarda confirmação real do backend.
+Só então troca seleção ou envia duplicate/append/insert/reorder/split/remove no
+snapshot devolvido. Não presume um head futuro nem reexecuta uma ação após falha.
+Durante settlement, o valor/owner permanece visível e os botões de ação continuam
+recebendo a primeira ativação; após capturá-la, a transação bloqueia repetição.
+Falha mantém o draft e cancela a intenção seguinte; um novo gesto é retry explícito.
+
+OUT30→29 + selecionar outro clip confirma o antigo antes de mostrar OUT60;
+Duplicar confirma trim e duplica OUT29; Adicionar/Inserir confirmam o trim e criam
+o range digitado. **São dois comandos/Undo quando há trim + ação**: o primeiro
+Undo retira a ação, o segundo restaura OUT30. Undo logo após sair do campo desfaz
+o trim confirmado antes de atingir History mais antigo. Esc continua cancelando
+o draft; marcar ranges de Original/outra fonte continua usando criação explícita.
+Não houve escolha nova de produto: a correção restabelece o contrato aprovado
+Enter/blur confirma, Esc cancela, preservando a ação seguinte e o valor.
+
+Build Desktop, **UI207/207**, i18n **2/2**, diff check PASS offline. **13 novas
+regressões App/backend/Application/ProjectHistory** incluem seleção por pointer e
+teclado, duplicate/append/insert por click/Enter/Space, Enter pendente seguido de
+duplicate, Cmd+D nativo, Tab em Adicionar sem ativação seguido de edição no Director,
+pointer abandonado e falha/retry. Nove caracterizações foram RED no head `5f9266c`
+antes da implementação; o log permanece externo ao repo. As regressões anteriores
+foram atualizadas para preservar os dois estados/Undo, não para suprimir o trim.
+**CI do novo head e revisão independente exata PENDENTES**; os 10/10 e 1.439 testes
+do head `5f9266c` são históricos. DOM/offline não certifica WKWebView, percepção
+nativa, picker, layout mínimo ou persistência humana. #90 segue Draft; #89/app
+humano/Take preservados. Cache não aprovado/não implementado; sem chamada real IA.
+Director compatível na mesma fronteira typed IR/History, progresso55%, F-A021/1 e
+G1 integral não aceito permanecem. Reutilizar o mesmo checklist I4-T1/X-T1/T7/X-T6.
 
 O primeiro CI do delta `ba90d4d` encontrou uma corrida nos testes antigos Enter/blur:
 eles liam o History interno antes de a UI liberar Undo e clicavam o botão ainda

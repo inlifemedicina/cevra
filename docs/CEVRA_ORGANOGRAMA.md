@@ -202,10 +202,21 @@ The proposed 32-MiB/64-entry worker-local segment LRU is **not approved or
 implemented in production**; neither the 6.85–8.05-s current wait nor prototype
 times are acceptance. No live app/project/media or Take session was operated.
 
-Independent #90 review required a P2 correction: range blur consumed the next
+Historical / SUPERSEDED approach — independent #90 review required a P2 correction: range blur consumed the next
 button action. Code `3e4397d64a80fdc1687f0e42d10106a7c3f5f741` preserves the
 explicit action/snapshot; build, UI194/194 and i18n2/2 pass with real-focus/click
 regressions. Exact new-head review/CI are required, with no cache implementation.
+
+Current #90 P2 re-evaluation: code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
+replaces generic blur suppression with explicit draft settlement before the next
+App intent. Enter/blur shares one trim; selection changes only after confirmation;
+duplicate/append/insert follows the returned snapshot and preserves OUT29. Two
+mutations have two recoverable Undo entries. Focus-only Tab never activates a
+button; failure retains the draft and stops the following action. UI207/207,
+i18n2/2, build PASS with 13 new App/backend regressions (nine initially RED).
+**New-head CI and exact independent review PENDING**; #90 Draft, #89 preserved.
+Director compatible, no provider/native-user-app/Take operation. Cache remains
+unapproved/unimplemented; progress55%, F-A021/1 and full G1 unaccepted remain.
 
 ```text
 CEVRA VIDS

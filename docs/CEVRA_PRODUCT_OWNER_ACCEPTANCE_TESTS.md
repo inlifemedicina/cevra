@@ -252,11 +252,16 @@ de 6,85–8,05 s não atende ao pedido; a prova incremental no worker não mede 
 completa do app nem aprova o cache de produção. Picker, percepção/áudio nativos,
 layout mínimo da ajuda e persistência humana continuam NÃO EXECUTADOS nesta etapa.
 
-Na correção P2 da revisão #90, escolher um botão dá prioridade à sua ação:
-Adicionar/Inserir usam o range digitado, sem trim anterior; demais ações usam a
-seleção canônica. O mesmo checklist agrupado cobre esse fluxo, sem rodada nova
-por botão. Build/UI194/i18n2 PASS offline, código `3e4397d64a80fdc1687f0e42d10106a7c3f5f741`;
-revisão e CI deste novo delta precisam de registro próprio.
+A reavaliação P2 de `5f9266c` substitui a prioridade genérica de botões (histórico
+`3e4397d`) pelo settlement explícito, código `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`.
+No mesmo checklist agrupado: OUT30→29 + seleção confirma o clip antigo antes de
+mostrar OUT60; Duplicar confirma trim e copia OUT29; Adicionar/Inserir confirma
+trim e cria o range digitado. Há dois comandos recuperáveis quando ocorrem trim
++ ação: um Undo retira a ação, outro restaura OUT30. Tab em Adicionar sem ativar
+confirma o trim; clicar/editar no Director não cria clip. Enter/blur dedup, Esc,
+falha/retry e ativação pointer/Enter/Space/Cmd+D integram a mesma regressão.
+Build/UI207/i18n2 PASS offline; novo CI e revisão independente exata PENDENTES.
+Sem nova rodada por botão e sem inferir PASS nativo/humano do DOM.
 
 A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
 os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica

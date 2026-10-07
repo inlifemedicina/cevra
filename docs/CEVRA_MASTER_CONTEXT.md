@@ -2691,7 +2691,7 @@ native perception, picker, minimum-layout and human close/reopen are pending.
 Director impact compatible on the same typed commands/IR/History, no provider
 execution; progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain recorded.
 
-The independent #90 review then required one P2 focus correction: leaving dirty
+Historical / SUPERSEDED approach — the independent #90 review then required one P2 focus correction: leaving dirty
 IN/OUT for Append/Insert or another button sent an implicit trim and disabled the
 intended button before click. Code `3e4397d64a80fdc1687f0e42d10106a7c3f5f741`
 preserves the explicit action at the visible snapshot, with no preceding queued
@@ -2708,6 +2708,34 @@ History changed before the UI released its pending guard. Both tests now use rea
 focus/click and await enabled Undo while retaining exact restoration/count checks.
 Build/UI194 pass again; no further production change. Failed CI logs are preserved
 and fresh exact-head CI remains mandatory, rather than relabeling the failed runs.
+
+**Current P2 re-evaluation correction — 2026-10-07:** review of `5f9266c`
+confirmed that generic button priority discarded a dirty range on selection or
+duplicate, and Tab focus was mistaken for activation. Code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
+supersedes that approach with an explicit draft state (clean/editing/committing/
+failed) and one settlement Promise shared by Enter, every valid blur and the App's
+next captured intent. The old owner/value stays visible until settlement succeeds;
+selection/duplicate/append/insert proceeds only against the actual returned IR/head.
+Failure retains the draft and stops the next action; no automatic replay. Focus and
+pointer press are not activation. A pending trim leaves action buttons available
+for the first captured intent, then normal guards block repeated mutation. The
+established ability to select Original while a submitted action completes remains.
+
+OUT30→29 then Duplicate produces trim + duplicate OUT29; Append/Insert produce trim
++ creation with that range; selection confirms the old clip before showing OUT60.
+Each typed mutation has its own Journal/Undo: action Undo preserves the trim, a
+second Undo restores OUT30. Undo after blur first reverses the confirmed trim.
+Esc cancels; Original/other-source ranges keep explicit creation. This restores the
+approved Enter/blur contract without a new product decision or IR/engine change.
+Desktop build/UI207/207, i18n2/2, diff check PASS. Thirteen new full App/backend/
+Application/History regressions cover pointer, focus-only Tab, Enter/Space/Cmd+D,
+selection, next actions, failure/retry and exact restoration; nine were RED at the
+prior head before implementation. **Exact new-head CI and re-review PENDING**;
+5f9266c's 10/10 CI is historical. Draft #90 only, #89 and native packages preserved;
+no native GUI/user media/Take/device/provider operation. Cache still unapproved and
+unimplemented. [Canonical evidence/contract](CEVRA_VIDS_USABILITY_AUDIT.md).
+Director compatible; progress55%, F-A02 exhausted1/1, full G1 unaccepted and the
+single grouped acceptance catalog remain unchanged.
 
 **Earlier follow-up — 2026-10-07:** coordination supplied independent APPROVE
 for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program

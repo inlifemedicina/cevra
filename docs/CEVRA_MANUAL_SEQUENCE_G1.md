@@ -1392,12 +1392,25 @@ and resize cancellation/keyboard limits. This source delta needs proportional
 review and exact-head CI; the signed `2382dae` package remains a separate prior
 artifact. No human app/project was replaced or operated.
 
-The #90 review's P2 blur/button failure is corrected at code
+Historical / SUPERSEDED first correction — the #90 review's P2 blur/button failure was addressed at code
 `3e4397d64a80fdc1687f0e42d10106a7c3f5f741`: an explicit button action takes
 priority over implicit trim, retaining the visible snapshot. Append/Insert use
 the range draft; other actions use canonical selection. UI194/194, i18n2/2 and
 build PASS include real focus/user.click, Enter/blur/Esc and null-relatedTarget
 regressions; exact-head CI/re-review remain required.
+
+Current P2 re-evaluation at code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
+restores the approved Enter/blur confirmation contract through explicit draft
+settlement and a captured following App intent. Selecting another clip commits
+the previous range before replacing its fields; Duplicate/Append/Insert confirms
+trim then operates at the actual backend head with OUT29. Trim and the next edit
+have separate recoverable Undo entries. Focus-only Tab is never activation;
+failed settlement retains the draft and stops the next intent; Esc cancels.
+Original/other-source range creation remains explicit. UI207/207, i18n2/2 and
+Desktop build PASS include 13 new integration regressions; nine were RED before
+implementation at5f9266c. New-head CI/re-review PENDING; #90 Draft, #89/package
+preserved. No native/user-app/Take operation or acceptance inference. Reuse the
+same grouped I4-T1/X-T1/T7/X-T6 checklist; no new round per field or button.
 
 The Owner's requested edit fluency is not met by 6.85–8.05-s new-program waits.
 Two external proofs use the existing renderer and verify decoded-frame hashes,
