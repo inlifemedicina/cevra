@@ -6,6 +6,8 @@
   "permissions": [
     "allow-desktop-edit-manual-video-sequence",
     "allow-desktop-get-close-state",
+    "allow-desktop-get-media-drop-state",
+    "allow-desktop-import-dropped-media",
     "allow-desktop-retry-checkpoint",
     "allow-desktop-get-state",
     "allow-desktop-pick-and-ingest-media",

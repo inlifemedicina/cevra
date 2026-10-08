@@ -11,7 +11,7 @@ import type {
   DesktopCapabilityReason,
   DesktopOperationError,
   ManualSequenceExportResult,
-  ImportMediaResult
+  ImportMediaResult, NativeMediaDropState, DroppedMediaResult, DroppedMediaItem
 } from "./desktop-backend";
 
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -92,14 +92,24 @@ export class TauriDesktopBackend implements DesktopBackend {
   async pickAndImportMedia(locale: "pt-BR" | "en-US"): Promise<ImportMediaResult> {
     const response = await this.call<
       | { outcome: "cancelled" }
-      | { outcome: "imported"; result: { state: HostState; importedSourceId: string } }
+      | { outcome: "imported"; result: { state: HostState; importedSourceId: string; reused?: boolean } }
     >("desktop_pick_and_ingest_media", { args: { locale } });
     if (response.outcome === "cancelled") return response;
     return {
       outcome: "imported",
       state: fromHostState(response.result.state),
-      importedSourceId: response.result.importedSourceId
+      importedSourceId: response.result.importedSourceId,
+      reused: response.result.reused
     };
+  }
+
+  async getNativeMediaDropState(): Promise<NativeMediaDropState> {
+    return this.call("desktop_get_media_drop_state");
+  }
+
+  async importDroppedMedia(receiptId: string, locale: "pt-BR" | "en-US"): Promise<DroppedMediaResult> {
+    const result = await this.call<{ state: HostState; results: DroppedMediaItem[] }>("desktop_import_dropped_media", { args: { receiptId, locale } });
+    return { state: fromHostState(result.state), results: result.results };
   }
 
   async transcribeSource(sourceId: string, operationId: string, locale: "pt-BR" | "en-US"): Promise<DesktopBackendState> {

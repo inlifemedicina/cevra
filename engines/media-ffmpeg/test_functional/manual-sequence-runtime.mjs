@@ -444,6 +444,29 @@ try {
     assert.equal(source.sampleRate, 44_100); assert.equal(source.channelLayout, "stereo"); assert.equal(source.sourceAudioFirstSample, 1323);
     assert.equal(source.audioStreamCount, 1); assert.equal(source.videoStreamIndex, 0); assert.equal(source.audioStreamIndex, 1);
   }
+  // Presentation-only copy provenance must survive the real preview/export boundary.
+  const copyFixture = await projectFor(sources, "manual-frame-copy");
+  for (const [index, sourceStartFrame, sourceEndFrame] of ranges) await copyFixture.sequence.edit({version:2,type:"append",
+    expectedSnapshotId:copyFixture.history.current.history.headSnapshotId,sourceId:`source-${index}`,sourceStartFrame,sourceEndFrame});
+  const copyBefore = copyFixture.history.current, copyEntries = copyFixture.history.entries.length;
+  const copyOriginals = [...copyBefore.timeline.clips].sort((a,b)=>a.timelineStartMs-b.timelineStartMs);
+  await copyFixture.sequence.edit({version:2,type:"duplicate-many",expectedSnapshotId:copyBefore.history.headSnapshotId,
+    clipIds:[copyOriginals.at(-1).id,copyOriginals[0].id]});
+  const copied = copyFixture.history.current;
+  assert.equal(copyFixture.history.entries.length,copyEntries+1);
+  assert.deepEqual(copied.timeline.clips.slice(-2).map(clip=>clip.extensions["cevra.manualClipCopy.v1"].originalClipId),[copyOriginals[0].id,copyOriginals.at(-1).id]);
+  copyFixture.history.undo();assert.deepEqual(copyFixture.history.current,copyBefore);
+  copyFixture.history.redo();assert.deepEqual(copyFixture.history.current,copied);
+  const copyPlan = await new ManualSequencePreviewApplicationService({history:copyFixture.history,identity:artifacts}).prepare({version:1,expectedSnapshotId:copied.history.headSnapshotId});
+  assert.equal(copyPlan.durationMs,copied.timeline.durationMs);
+  const copyExpected = [...expectedIds,...oracles[ranges[0][0]].interval(ranges[0][1],ranges[0][2]),
+    ...oracles[ranges.at(-1)[0]].interval(ranges.at(-1)[1],ranges.at(-1)[2])];
+  const copiedFinal = await finalExport(copyFixture,"final-multi-copy-provenance",copyExpected);
+  assert.equal(copiedFinal.receipt.itemCount,7);
+  assert.equal(copiedFinal.receipt.uniqueSegmentCount,4);
+  copyFixture.history.undo(); // export.add only
+  copyFixture.history.undo();assert.deepEqual(copyFixture.history.current,copyBefore); // whole copied block
+  copyFixture.history.redo();assert.deepEqual(copyFixture.history.current,copied);
   const pulseMeasurements = []; let cursor = 0;
   for (const [sourceIndex, start, end] of ranges) {
     const sourceIn = sourceIndex === 1 ? framesToMilliseconds(1000) : 500;

@@ -297,6 +297,8 @@ pub enum ManualVideoSequenceAction {
     Append { source_id: String, source_start_ms: u64, source_end_ms: u64 },
     Insert { before_clip_id: String, source_id: String, source_start_ms: u64, source_end_ms: u64 },
     Duplicate { clip_id: String },
+    #[serde(rename = "duplicate-many")]
+    DuplicateMany { clip_ids: Vec<String> },
     Remove { clip_id: String },
     #[serde(rename = "remove-many")]
     RemoveMany { clip_ids: Vec<String> },
@@ -319,6 +321,8 @@ pub enum ManualVideoSequenceFrameAction {
     Append { source_id: String, source_start_frame: u64, source_end_frame: u64 },
     Insert { before_clip_id: String, source_id: String, source_start_frame: u64, source_end_frame: u64 },
     Duplicate { clip_id: String },
+    #[serde(rename = "duplicate-many")]
+    DuplicateMany { clip_ids: Vec<String> },
     Remove { clip_id: String },
     #[serde(rename = "remove-many")]
     RemoveMany { clip_ids: Vec<String> },
@@ -449,22 +453,28 @@ pub async fn desktop_pick_and_ingest_media(
         .dialog()
         .file()
         .set_title("CEVRA Vids")
-        .add_filter(
-            "Media",
-            &[
-                "mp4", "mov", "mkv", "m4v", "webm", "wav", "m4a", "mp3", "aac", "flac", "ogg",
-            ],
-        )
+        .add_filter("Media", SUPPORTED_MEDIA_EXTENSIONS)
         .blocking_pick_file();
     let Some(picked) = picked else {
         return Ok(json!({ "outcome": "cancelled" }));
     };
-    let path = picked.into_path().map_err(|_| {
-        DesktopCommandError::new(
-            "PICKER_INVALID_SELECTION",
-            "The selected media path is invalid.",
-        )
-    })?;
+    let path = picked.into_path().map_err(|_| DesktopCommandError::new("PICKER_INVALID_SELECTION", "The selected media path is invalid."))?;
+    ingest_native_path(&app, &supervisor, &path, &args.locale).await
+}
+
+const SUPPORTED_MEDIA_EXTENSIONS: &[&str] = &["mp4", "mov", "mkv", "m4v", "webm", "wav", "m4a", "mp3", "aac", "flac", "ogg"];
+fn validate_media_path(path: &Path) -> Result<(), DesktopCommandError> {
+    if !path.is_absolute() || path.to_str().is_none() {
+        return Err(DesktopCommandError::new("PICKER_INVALID_SELECTION", "The selected media path is invalid."));
+    }
+    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase();
+    if !SUPPORTED_MEDIA_EXTENSIONS.contains(&extension.as_str()) {
+        return Err(DesktopCommandError::new("LOCAL_SOURCE_UNSUPPORTED_MEDIA", "This media format is not supported by the current importer."));
+    }
+    Ok(())
+}
+async fn ingest_native_path(app: &AppHandle, supervisor: &Arc<DesktopHostSupervisor>, path: &Path, locale: &str) -> Result<Value, DesktopCommandError> {
+    validate_media_path(path)?;
     if !path.is_absolute() {
         return Err(DesktopCommandError::new(
             "PICKER_INVALID_SELECTION",
@@ -480,7 +490,7 @@ pub async fn desktop_pick_and_ingest_media(
             )
         })?
         .to_owned();
-    let display_name = file_name(&path)?;
+    let display_name = file_name(path)?;
     let operation_id = format!(
         "native-import-{}",
         OPERATION_SEQUENCE.fetch_add(1, Ordering::Relaxed)
@@ -492,7 +502,7 @@ pub async fn desktop_pick_and_ingest_media(
                 "uri": path_text,
                 "displayName": display_name,
                 "operationId": operation_id,
-                "locale": args.locale,
+                "locale": locale,
             }),
             &operation_id,
         )
@@ -502,6 +512,42 @@ pub async fn desktop_pick_and_ingest_media(
         Err(error) => return Err(recover_mutation(&app, &supervisor, error).await),
     };
     Ok(json!({ "outcome": "imported", "result": result }))
+}
+
+#[tauri::command]
+pub fn desktop_get_media_drop_state(registry: State<'_, Arc<crate::media_drop::MediaDropRegistry>>) -> Result<crate::media_drop::MediaDropState, DesktopCommandError> {
+    registry.state()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MediaDropArgs { receipt_id: String, locale: String }
+
+#[tauri::command]
+pub async fn desktop_import_dropped_media(
+    app: AppHandle, supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    registry: State<'_, Arc<crate::media_drop::MediaDropRegistry>>, args: MediaDropArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_locale(&args.locale)?; validate_id(&args.receipt_id, "receiptId")?;
+    supervisor.ensure_started(&app).await?;
+    let paths = registry.consume(&args.receipt_id)?;
+    let mut results = Vec::with_capacity(paths.len());
+    for path in paths {
+        match ingest_native_path(&app, &supervisor, &path, &args.locale).await {
+            Ok(value) => results.push(json!({ "outcome": if value["result"]["reused"] == true { "reused" } else { "imported" },
+                "sourceId": value["result"]["importedSourceId"] })),
+            Err(error) if ["PICKER_INVALID_SELECTION", "LOCAL_SOURCE_INVALID_REQUEST", "LOCAL_SOURCE_UNSUPPORTED_MEDIA",
+                "LOCAL_SOURCE_KIND_MISMATCH", "LOCAL_SOURCE_PROBE_FAILED", "LOCAL_SOURCE_IDENTITY_UNAVAILABLE",
+                "LOCAL_SOURCE_OFFLINE", "LOCAL_SOURCE_CONTENT_CHANGED"].contains(&error.code.as_str()) =>
+                results.push(json!({ "outcome": "failed", "errorCode": error.code })),
+            Err(error) => return Err(error),
+        }
+    }
+    let state = match supervisor.request_control("project.snapshot", json!({})).await {
+        Ok(state) => state,
+        Err(error) => return Err(recover_mutation(&app, &supervisor, error).await),
+    };
+    Ok(json!({ "state": state, "results": results }))
 }
 
 #[tauri::command]
@@ -686,6 +732,20 @@ mod video_boundary_tests {
         }
     }
     #[test]
+    fn file_drop_admission_never_accepts_webview_paths_and_keeps_existing_format_boundary() {
+        let valid = json!({"receiptId":"native-media-drop-1","locale":"pt-BR"});
+        assert!(serde_json::from_value::<MediaDropArgs>(valid.clone()).is_ok());
+        for field in ["path", "paths", "uri", "files", "commands", "outputUri"] {
+            let mut injected = valid.clone(); injected[field] = json!("/tmp/caller-chosen.mp4");
+            assert!(serde_json::from_value::<MediaDropArgs>(injected).is_err());
+        }
+        assert!(validate_media_path(Path::new("/tmp/native source.MP4")).is_ok());
+        assert!(validate_media_path(Path::new("/tmp/native source.wav")).is_ok());
+        assert_eq!(validate_media_path(Path::new("relative.mp4")).unwrap_err().code, "PICKER_INVALID_SELECTION");
+        assert_eq!(validate_media_path(Path::new("/tmp/native source.txt")).unwrap_err().code, "LOCAL_SOURCE_UNSUPPORTED_MEDIA");
+    }
+
+    #[test]
     fn manual_sequence_boundary_accepts_only_closed_intents_and_safe_bindings() {
         for action in [
             json!({"type":"append","sourceId":"source","sourceStartMs":0,"sourceEndMs":700}),
@@ -693,6 +753,7 @@ mod video_boundary_tests {
             json!({"type":"duplicate","clipId":"clip"}),
             json!({"type":"remove","clipId":"clip"}),
             json!({"type":"remove-many","clipIds":["clip","other"]}),
+            json!({"type":"duplicate-many","clipIds":["clip","other"]}),
             json!({"type":"trim","clipId":"clip","sourceStartMs":0,"sourceEndMs":700}),
             json!({"type":"split","clipId":"clip","timelineAtMs":350}),
             json!({"type":"reorder","clipIds":["clip","other"]}),
@@ -728,6 +789,7 @@ mod video_boundary_tests {
             json!({"type":"split","clipId":"clip","timelineAtFrame":2}),
             json!({"type":"duplicate","clipId":"clip"}), json!({"type":"remove","clipId":"clip"}),
             json!({"type":"remove-many","clipIds":["clip","other"]}),
+            json!({"type":"duplicate-many","clipIds":["clip","other"]}),
             json!({"type":"reorder","clipIds":["clip","other"]}),
             json!({"type":"conform","clips":[{"clipId":"clip","sourceStartFrame":1,"sourceEndFrame":3}]}),
         ] {

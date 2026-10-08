@@ -105,6 +105,34 @@ export class LocalSourceIngestService {
     this.idGenerator = options.idGenerator ?? defaultId;
   }
 
+  /** Reuse only the same registered locator after fresh content verification. No journal/save/probe replay. */
+  async reuseRegistered(request: Pick<LocalSourceIngestRequest, "uri" | "locale">, signal?: AbortSignal): Promise<SourceAsset | undefined> {
+    const before = this.history.current;
+    const locale = request.locale ?? before.project.defaultLocale;
+    const input = typeof request.uri === "string" ? localSourceProbeInput(request.uri) : undefined;
+    if (!input) throw new LocalSourceIngestError("LOCAL_SOURCE_INVALID_REQUEST", locale, "repeated-ingest");
+    const source = before.sources.find(item => localSourceProbeInput(item.uri) === input);
+    if (!source) return undefined;
+    const expected = source.technicalDescriptor?.content;
+    const digest = expected?.sha256 ?? source.checksum;
+    if (!this.identity || !digest) throw new LocalSourceIngestError("LOCAL_SOURCE_IDENTITY_UNAVAILABLE", locale, "repeated-ingest");
+    const journal = this.history.journalIdentity;
+    try {
+      const captured = await this.identity.captureSource(source.uri, signal);
+      const verified = await this.identity.identifySource(source.uri, captured, signal);
+      if (verified.content.sha256 !== digest || expected && verified.content.sizeBytes !== expected.sizeBytes
+        || await this.identity.checkSource(source.uri, verified.stamp, signal) !== "match") {
+        throw new LocalSourceIngestError("LOCAL_SOURCE_CONTENT_CHANGED", locale, "repeated-ingest");
+      }
+    } catch (cause) {
+      if (cause instanceof LocalSourceIngestError) throw cause;
+      throw mapIdentityError(cause, locale, "repeated-ingest");
+    }
+    if (signal?.aborted) throw new MediaApplicationError("MEDIA_OPERATION_CANCELLED", locale, "repeated-ingest");
+    if (this.history.journalIdentity !== journal) throw new LocalSourceIngestError("LOCAL_SOURCE_PROJECT_CONFLICT", locale, "repeated-ingest");
+    return clone(source);
+  }
+
   async ingest(request: LocalSourceIngestRequest, signal?: AbortSignal): Promise<LocalSourceIngestResult> {
     let stableRequest: LocalSourceIngestRequest;
     try {

@@ -2,6 +2,8 @@
 pub const APPLICATION_COMMANDS: &[&str] = &[
     "desktop_edit_manual_video_sequence",
     "desktop_get_close_state",
+    "desktop_get_media_drop_state",
+    "desktop_import_dropped_media",
     "desktop_retry_checkpoint",
     "desktop_get_state",
     "desktop_pick_and_ingest_media",

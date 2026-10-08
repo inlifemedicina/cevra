@@ -67,7 +67,7 @@
   "nav.primary": "Editor tools",
   "action.undo": "Undo",
   "action.redo": "Redo",
-  "action.export": "Export",
+  "action.export": "Export MP4",
   "action.search": "Search",
   "action.review": "Review",
   "action.apply": "Apply",
@@ -482,5 +482,17 @@
   "timeline.selectedDuration": "Selection ({count}): {duration}",
   "timeline.selectAll": "Select all clips",
   "media.thumbnailLoading": "Preparing thumbnail…",
-  "media.thumbnailUnavailable": "Thumbnail unavailable"
+  "media.thumbnailUnavailable": "Thumbnail unavailable",
+  "sequence.duplicateSelection": "Duplicate selection",
+  "clipPresentation.copy": "Copy {number}",
+  "clipPresentation.occurrence": "Clip {number}",
+  "clipPresentation.source": "Source · {name}",
+  "media.dropHint": "Drop files to import",
+  "media.dropInvalid": "The drop expired or contains invalid paths. Drop the files again.",
+  "media.alreadyImported": "This original is already in the project.",
+  "media.dropFinished": "Imported: {imported} · Already present: {reused} · Failed: {failed}",
+  "timeline.dropBefore": "Insert before {name}",
+  "timeline.dropEnd": "Insert at the end",
+  "timeline.cursor": "Cursor {time} · frame {frame}",
+  "timeline.cursorTime": "Cursor {time}"
 }

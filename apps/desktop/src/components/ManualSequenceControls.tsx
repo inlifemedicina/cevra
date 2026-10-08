@@ -1,4 +1,4 @@
-import type { ManualVideoSequenceEdit } from "@cevra/application";
+import { supportsManualClipExtensions, type ManualVideoSequenceEdit } from "@cevra/application";
 import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
 import { useEffect, useLayoutEffect, useId, useRef, useState, type RefObject, type KeyboardEvent } from "react";
 import type { SourcePresentation } from "../source-presentation";
@@ -140,7 +140,10 @@ export function ManualSequenceControls({ project, clips, presentations, selected
       <span id={rangeHintId} role="status">{t(!valid ? "preview.rangeInvalid" : selected?.sourceId === sourceId ? "sequence.rangeAutoCommit" : "sequence.rangeDraft")}</span>
     </fieldset>
     <div className="manual-sequence-actions">
-      <button {...shortcutProps("duplicate", t)} type="button" className="secondary-button" disabled={disabled || !selected} onClick={() => { if (selected) void edit({ type: "duplicate", clipId: selected.id }); }}>{t("sequence.duplicate")}</button>
+      <button {...shortcutProps("duplicate", t)} type="button" className="secondary-button" disabled={disabled || !chosen.length} onClick={() => {
+        if (chosen.length > 1) void edit({ type: "duplicate-many", clipIds: chosen });
+        else if (chosen[0]) void edit({ type: "duplicate", clipId: chosen[0] });
+      }}>{t(chosen.length > 1 ? "sequence.duplicateSelection" : "sequence.duplicate")}</button>
       <button {...shortcutProps("split", t)} type="button" className="secondary-button" disabled={disabled || !canSplit} onClick={() => { if (selected) void edit(grid ? { type: "split", clipId: selected.id, timelineAtFrame: splitFrame! } : { type: "split", clipId: selected.id, timelineAtMs: playheadMs }); }}>{t("sequence.split")}</button>
       <button {...shortcutProps("earlier", t)} type="button" className="secondary-button" disabled={disabled || firstChosen <= 0} onClick={() => move(-1)}>{t("sequence.earlier")}</button>
       <button {...shortcutProps("later", t)} type="button" className="secondary-button" disabled={disabled || lastChosen < 0 || lastChosen >= clips.length - 1} onClick={() => move(1)}>{t("sequence.later")}</button>
@@ -148,7 +151,7 @@ export function ManualSequenceControls({ project, clips, presentations, selected
         if (chosen.length > 1) void edit({ type: "remove-many", clipIds: chosen });
         else if (selected) void edit({ type: "remove", clipId: selected.id });
       }}>{t(chosen.length > 1 ? "sequence.removeSelection" : "sequence.remove")}</button>
-      {!selected && <span>{t("sequence.selectClip")}</span>}
+      {!chosen.length && <span>{t("sequence.selectClip")}</span>}
     </div>
     {!grid && <ManualSequenceConformReview backend={backend} project={project} busy={disabled} t={t} onEdit={onEdit} onAction={onAction} />}
   </section>;
@@ -187,7 +190,7 @@ export function manualSequenceClips(project: Readonly<ProjectIR>): TimelineClip[
   const grid = project.timeline.timingPolicy === "cfr30";
   for (const clip of clips) {
     const source = sources.get(clip.sourceId);
-    if (!source || clip.trackId !== track!.id || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || Object.keys(clip.extensions ?? {}).length
+    if (!source || clip.trackId !== track!.id || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || !supportsManualClipExtensions(clip)
       || ![clip.timelineStartMs, clip.timelineEndMs, clip.sourceStartMs, clip.sourceEndMs].every(grid ? Number.isFinite : Number.isSafeInteger)
       || clip.timelineStartMs !== end || clip.sourceStartMs < 0 || clip.sourceStartMs >= clip.sourceEndMs || clip.sourceEndMs > source.durationMs!) return undefined;
     if (grid) {

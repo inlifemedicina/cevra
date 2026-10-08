@@ -208,7 +208,7 @@ describe("CEVRA Vids desktop shell", () => {
   it("binds a selected B-roll clip to its source and shows the no-transcript state", async () => {
     const user = await renderApplication();
     const timeline = screen.getByLabelText("Linha do tempo");
-    await user.click(within(timeline).getByRole("button", { name: "Vídeo 2 · B-roll_Detalhes.mp4" }));
+    await user.click(within(timeline).getByRole("button", { name: /Trecho \d+ · Fonte · Vídeo 2 · B-roll_Detalhes.mp4/ }));
     const shell = screen.getByTestId("app-shell");
     expect(shell.dataset.selectedProjectItemId).toBe("clip-broll-1");
     expect(shell.dataset.activeSourceId).toBe("source-broll");
@@ -276,7 +276,7 @@ describe("CEVRA Vids desktop shell", () => {
     await user.click(screen.getByRole("button", { name: "Trocar idioma" }));
     expect(screen.getByRole("tab", { name: "Edit" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Transcription" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Export MP4" })).toBeTruthy();
     expect(document.documentElement.lang).toBe("en-US");
   });
 
@@ -299,7 +299,7 @@ describe("CEVRA Vids desktop shell", () => {
   it("makes every deferred production action explicit and unavailable", async () => {
     await renderApplication();
     expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Exportar" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Exportar MP4" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("A importação real de arquivos não está conectada nesta versão de apresentação.")).toBeTruthy();
   });
 
@@ -675,6 +675,7 @@ it("native import/history shortcuts use guarded real actions even with library c
     fireEvent.keyDown(shell, { key: "i", metaKey: true });
     await waitFor(() => expect(backend.history.current.sources).toHaveLength(1));
     expect(picker).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Desfazer" }).matches(":disabled")).toBe(false));
     const field = screen.getByRole("textbox", { name: translate("pt-BR", "director.inputLabel") });
     fireEvent.keyDown(field, { key: "z", metaKey: true });
     expect(backend.history.current.sources).toHaveLength(1);

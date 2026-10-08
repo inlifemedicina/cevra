@@ -602,3 +602,34 @@ test("reports a typed commit failure and keeps the previous project revision", a
   assert.equal(history.current.history.revision, revisionBefore);
   assert.equal(history.current.sources.length, 0);
 });
+
+function registeredRepeat(identity=verifiedIdentity('/tmp/repeated.mov')) {
+  const f=fixture(async()=>{throw Error('a registered original must not re-probe');},identity);
+  f.history.commit({type:'source.add',source:{id:'existing',kind:'video',uri:'/tmp/repeated.mov',displayName:'Repeated',checksum:'c'.repeat(64),durationMs:1000,
+    technicalDescriptor:{version:1,basis:'ingest',content:{sha256:'c'.repeat(64),sizeBytes:4096},method:{profile:'cevra.source-technical.v1',engineId:'test',engineVersion:'1',engineApiVersion:1}}}});
+  return {...f,identity};
+}
+test('registered path and equivalent file URL reuse verified source without journal, probe or numbering changes',async()=>{
+  const f=registeredRepeat(),before=f.history.toArchive(),numbering=f.history.sourceNumbering;
+  const source=await f.service.reuseRegistered({uri:'file:///tmp/repeated.mov',locale:'en-US'});
+  assert.equal(source.id,'existing');source.displayName='detached';
+  assert.deepEqual(f.history.toArchive(),before);assert.deepEqual(f.history.sourceNumbering,numbering);assert.equal(f.media.calls.length,0);
+  assert.equal(await f.service.reuseRegistered({uri:'/tmp/a-different-original.mov'}),undefined);
+});
+test('repeat verification rejects changed bytes, missing files and aborted work without publication',async()=>{
+  for(const failure of ['changed','offline','abort']) {
+    const f=registeredRepeat(),before=f.history.toArchive(),abort=new AbortController();
+    if(failure==='changed') f.identity.checkSource=async()=> 'changed';
+    if(failure==='offline') f.identity.captureSource=async()=>{throw {code:'SOURCE_IDENTITY_OFFLINE'};};
+    if(failure==='abort') abort.abort();
+    await assert.rejects(f.service.reuseRegistered({uri:'/tmp/repeated.mov'},abort.signal));
+    assert.deepEqual(f.history.toArchive(),before);assert.equal(f.media.calls.length,0);
+  }
+});
+test('repeat verification detects intervening history even if Undo restores the same snapshot',async()=>{
+ const f=registeredRepeat(),before=f.history.current;
+ const identify=f.identity.identifySource.bind(f.identity);
+ f.identity.identifySource=async(...args)=>{const value=await identify(...args);f.history.commit({type:'project.rename',name:'intervening'});f.history.undo();return value;};
+ await assert.rejects(f.service.reuseRegistered({uri:'/tmp/repeated.mov'}),{code:'LOCAL_SOURCE_PROJECT_CONFLICT'});
+ assert.deepEqual(f.history.current,before);assert.equal(f.media.calls.length,0);
+});

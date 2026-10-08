@@ -94,9 +94,20 @@ async function gestureFixture() {
   return { ...view, item, click, ids: clips(backend).map(clip => clip.id), timeline: view.container.querySelector<HTMLElement>(".timeline")! };
 }
 
+function dragGeometry(f: Awaited<ReturnType<typeof gestureFixture>>) {
+  const lane = f.item(f.ids[0]!).closest(".track-lane")!;
+  vi.spyOn(lane, "getBoundingClientRect").mockReturnValue({ left: 0, right: 800, width: 800, top: 0, bottom: 40, height: 40 } as DOMRect);
+  vi.spyOn(lane.querySelector(".timeline-width")!, "getBoundingClientRect").mockReturnValue({left:0,right:800,width:800} as DOMRect);
+  for (let index = 0; index < f.ids.length; index++) vi.spyOn(f.item(f.ids[index]!), "getBoundingClientRect").mockReturnValue({ left: index * 100, right: (index + 1) * 100, width: 100, top: 0, bottom: 40, height: 40 } as DOMRect);
+}
+function dragPointer(element: HTMLElement, type: string, x: number, y = 20) {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y });
+  Object.defineProperty(event, "pointerId", { value: 71 }); fireEvent(element, event);
+}
+
 it("clip selection retains timeline scale and exposes exact total and selected durations", async () => {
   const f = await gestureFixture();
-  const positions = () => [...f.container.querySelectorAll<HTMLElement>("[data-clip-id]")].map(item => item.style.cssText);
+  const positions = () => [...f.container.querySelectorAll<HTMLElement>("[data-clip-id]")].map(item => [item.style.left,item.style.width]);
   f.click(f.ids[0]!); const first = positions();
   f.click(f.ids[3]!); expect(positions()).toEqual(first);
   expect(screen.getByTestId("timeline-total-duration").textContent).toContain("5 s · 150 quadros");
@@ -130,12 +141,12 @@ it("Cmd+A and Delete remove a montage in one Undo while typing, composition and 
 it("dragging an already selected group preserves its members and publishes one reorder", async () => {
   const f = await gestureFixture(), before = f.backend.history.current;
   f.click(f.ids[0]!); f.click(f.ids[2]!, { metaKey: true });
-  const transfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
-  fireEvent.dragStart(f.item(f.ids[0]!), { dataTransfer: transfer });
+  dragGeometry(f); const root = f.item(f.ids[0]!);
+  dragPointer(root, "pointerdown", 50); dragPointer(root, "pointermove", 450);
   expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (2)");
-  const target = f.item(f.ids[3]!);
-  vi.spyOn(target, "getBoundingClientRect").mockReturnValue({ left: 0, width: 100 } as DOMRect);
-  const drop = new MouseEvent("drop", { bubbles: true, clientX: 90 }); Object.defineProperty(drop, "dataTransfer", { value: transfer }); fireEvent(target, drop);
+  expect(f.backend.requests).toHaveLength(0);
+  expect(screen.getByText("Inserir no final", { selector: "output" })).toBeTruthy();
+  dragPointer(root, "pointerup", 450);
   await waitFor(() => expect(clips(f.backend).map(clip => clip.id)).toEqual([f.ids[1], f.ids[3], f.ids[0], f.ids[2]]));
   expect(f.backend.requests).toHaveLength(1);
   expect(f.backend.requests[0].type).toBe("reorder");
@@ -488,11 +499,11 @@ it("pointer playhead dragging uses the fixed ruler geometry and Escape restores 
   vi.spyOn(ruler.querySelector(".timeline-width")!,"getBoundingClientRect").mockReturnValue({left:100,width:500} as DOMRect);
   function pointer(type:string,x:number) {const event=new MouseEvent(type,{bubbles:true,button:0,clientX:x});Object.defineProperty(event,"pointerId",{value:7});fireEvent(ruler,event);}
   const before=f.backend.history.toArchive();fireEvent.keyDown(ruler,{key:"Home"});fireEvent.keyDown(ruler,{key:"ArrowRight"});expect(ruler.getAttribute("aria-valuenow")).toBe("1");
-  pointer("pointerdown",200);expect(ruler.getAttribute("aria-valuenow")).toBe("30");
-  pointer("pointermove",350);expect(ruler.getAttribute("aria-valuenow")).toBe("75");
+  pointer("pointerdown",200);expect(ruler.getAttribute("aria-valuenow")).toBe("48");
+  pointer("pointermove",350);expect(ruler.getAttribute("aria-valuenow")).toBe("120");
   fireEvent.keyDown(window,{key:"Escape"});expect(ruler.getAttribute("aria-valuenow")).toBe("1");
   pointer("pointerup",400);expect(ruler.getAttribute("aria-valuenow")).toBe("1");
-  pointer("pointerdown",200);pointer("pointermove",350);pointer("pointerup",400);expect(ruler.getAttribute("aria-valuenow")).toBe("90");
+  pointer("pointerdown",200);pointer("pointermove",350);pointer("pointerup",400);expect(ruler.getAttribute("aria-valuenow")).toBe("144");
   expect(f.backend.history.toArchive()).toEqual(before);expect(f.backend.requests).toHaveLength(0);
 });
 it.each(["Enter", "blur"])("valid IN/OUT %s commits once, remains atomic and preserves text Undo", async trigger => {
@@ -725,7 +736,7 @@ it("keyboard selection settles the old clip's range before displaying the newly 
   const f = await gestureFixture(); f.click(f.ids[0]!); const user = userEvent.setup();
   const input = controls().getByLabelText("OUT (frames)");
   await user.click(input); await user.clear(input); await user.type(input, "29");
-  await act(async () => f.item(f.ids[3]!).focus());
+  await act(async () => f.item(f.ids[3]!).querySelector<HTMLButtonElement>(".timeline-trim-select")!.focus());
   await user.keyboard("{Enter}");
   await waitFor(() => expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(f.ids[3]));
   expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
@@ -899,14 +910,10 @@ it("a range failure during an existing drag consumes Drop without retrying trim 
   let reject!: (error: unknown) => void;
   f.backend.beforeEdit = () => new Promise<void>((_resolve, r) => { reject = r; });
   await user.pointer({ target: f.item(f.ids[0]!), keys: "[MouseLeft>]" });
-  const transfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
-  fireEvent.dragStart(f.item(f.ids[0]!), { dataTransfer: transfer });
   await act(async () => reject({ code: "HOST_TIMEOUT" }));
-  const target = f.item(f.ids[3]!);
-  vi.spyOn(target, "getBoundingClientRect").mockReturnValue({ left: 0, width: 100 } as DOMRect);
-  const event = new MouseEvent("drop", { bubbles: true, cancelable: true, clientX: 90 });
-  Object.defineProperty(event, "dataTransfer", { value: transfer }); fireEvent(target, event);
-  fireEvent.dragEnd(f.item(f.ids[0]!));
+  dragGeometry(f);
+  dragPointer(f.item(f.ids[0]!), "pointermove", 450);
+  dragPointer(f.item(f.ids[0]!), "pointerup", 450);
   await user.pointer({ target: f.timeline, keys: "[/MouseLeft]" });
   expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
   expect(clips(f.backend).map(c => c.id)).toEqual(f.ids);
@@ -938,6 +945,7 @@ it("native shortcuts duplicate once and history shortcuts respect fields, modals
   expect(clips(f.backend)).toHaveLength(5);
   fireEvent.keyDown(f.timeline, { key: "z", metaKey: true });
   await waitFor(() => expect(clips(f.backend)).toHaveLength(4));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Refazer" }).matches(":disabled")).toBe(false));
   fireEvent.keyDown(f.timeline, { key: "z", metaKey: true, shiftKey: true });
   await waitFor(() => expect(clips(f.backend)).toHaveLength(5));
 });
@@ -955,4 +963,134 @@ it("keyboard group movement matches canonical group drag, with one Undo, and cle
   fireEvent.keyDown(f.timeline, { key: "a", metaKey: true, shiftKey: true });
   expect(screen.queryByTestId("timeline-selected-duration")).toBeNull();
   expect(f.backend.requests).toHaveLength(1);
+});
+
+it("an unselected clip reorders from one captured gesture with a visible destination and one Undo", async()=>{
+ const f=await gestureFixture(), before=f.backend.history.current;f.click(f.ids[1]!);dragGeometry(f);
+ const root=f.item(f.ids[0]!);dragPointer(root,"pointerdown",50);dragPointer(root,"pointermove",450);
+ expect(f.item(f.ids[0]!)).toBe(root);expect(f.backend.requests).toHaveLength(0);
+ expect(screen.getByText("Inserir no final",{selector:"output"})).toBeTruthy();
+ dragPointer(root,"pointerup",450);
+ await waitFor(()=>expect(clips(f.backend).map(c=>c.id)).toEqual([f.ids[1],f.ids[2],f.ids[3],f.ids[0]]));
+ expect(f.backend.requests.map(r=>r.type)).toEqual(["reorder"]);
+ await waitFor(()=>expect(screen.getByRole("button",{name:"Desfazer"}).matches(":disabled")).toBe(false));
+ fireEvent.click(screen.getByRole("button",{name:"Desfazer"}));await waitFor(()=>expect(f.backend.history.current).toEqual(before));
+});
+for(const cancel of ["Escape","blur","pointercancel","outside"] as const) it(`cancelled ${cancel} drag leaves history intact and a fresh keyboard selection works`,async()=>{
+ const f=await gestureFixture(),before=f.backend.history.toArchive();f.click(f.ids[1]!);dragGeometry(f);
+ const root=f.item(f.ids[0]!);dragPointer(root,"pointerdown",50);dragPointer(root,"pointermove",450);
+ if(cancel==="Escape") fireEvent.keyDown(window,{key:"Escape"});
+ else if(cancel==="blur") fireEvent(window,new Event("blur"));
+ else dragPointer(root,cancel==="outside"?"pointerup":"pointercancel",450,100);
+ dragPointer(root,"pointerup",450);expect(f.backend.history.toArchive()).toEqual(before);expect(f.backend.requests).toHaveLength(0);
+ const button=root.querySelector<HTMLButtonElement>(".timeline-trim-select")!;button.focus();await userEvent.setup().keyboard("{Enter}");
+ await waitFor(()=>expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(f.ids[0]));
+});
+it("multiple duplication uses canonical selection order, selects the entire copied block and has one Undo/Redo",async()=>{
+ const f=await gestureFixture();f.click(f.ids[3]!);f.click(f.ids[1]!,{metaKey:true});const before=f.backend.history.current;
+ await action(f.backend,"Duplicar seleção");expect(f.backend.requests[0]).toMatchObject({type:"duplicate-many",clipIds:[f.ids[1],f.ids[3]]});
+ expect(clips(f.backend)).toHaveLength(6);expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (2)");
+ expect(f.container.querySelectorAll('.timeline-trim-select[aria-pressed="true"]')).toHaveLength(2);
+ expect(screen.getByTestId("inspector-selection").textContent).toContain("Cópia 5 · Fonte · Vídeo 1");
+ const after=f.backend.history.current;fireEvent.click(screen.getByRole("button",{name:"Desfazer"}));await waitFor(()=>expect(f.backend.history.current).toEqual(before));
+ await waitFor(()=>expect(screen.getByRole("button",{name:"Refazer"}).matches(":disabled")).toBe(false));
+ fireEvent.click(screen.getByRole("button",{name:"Refazer"}));await waitFor(()=>expect(f.backend.history.current).toEqual(after));
+});
+it("explicit Fit and duration edits keep the chosen pixels/time scale while slack never edits project duration",async()=>{
+ const f=await gestureFixture(),before=f.backend.history.toArchive();fireEvent.click(screen.getByRole("button",{name:/Ajustar linha do tempo/}));
+ expect(f.backend.history.toArchive()).toEqual(before);
+ f.click(f.ids[0]!);const width=parseFloat(f.item(f.ids[0]!).style.width)*parseFloat(f.container.querySelector<HTMLElement>(".timeline-table")!.style.getPropertyValue("--timeline-content-width"))/100;
+ await action(f.backend,"Duplicar selecionado");
+ const next=parseFloat(f.item(f.ids[0]!).style.width)*parseFloat(f.container.querySelector<HTMLElement>(".timeline-table")!.style.getPropertyValue("--timeline-content-width"))/100;
+ expect(next).toBeCloseTo(width);expect(f.backend.history.current.timeline.durationMs).toBe(6000);
+ expect(screen.getByTestId("timeline-cursor").textContent).toMatch(/Cursor .*quadro/);
+});
+
+it.each(["fit", "resize"] as const)("in-flight trim cancels before release when %s changes captured geometry at zoom100", async change => {
+  let measure!: () => void;
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(private readonly callback: () => void) {}
+    observe(element: Element) { if (element.matches(".timeline-table")) measure = this.callback; }
+    disconnect() {}
+  });
+  const f = await gestureFixture(); f.click(f.ids[0]!); dragGeometry(f);
+  fireEvent.change(screen.getByLabelText("Zoom da linha do tempo"), { target: { value: "100" } });
+  const before = f.backend.history.toArchive();
+  const handle = screen.getByRole("slider", { name: "Ajustar OUT do clip" });
+  dragPointer(handle, "pointerdown", 100); dragPointer(handle, "pointermove", 150);
+  expect(Number(handle.getAttribute("aria-valuenow"))).toBeGreaterThan(30);
+  if (change === "fit") fireEvent.click(screen.getByRole("button", { name: /Ajustar linha do tempo/ }));
+  else {
+    Object.defineProperty(f.container.querySelector(".timeline-table")!, "clientWidth", { configurable: true, value: 746 });
+    await act(async () => measure());
+  }
+  expect(handle.getAttribute("aria-valuenow")).toBe("30");
+  dragPointer(handle, "pointerup", 170);
+  expect(f.backend.requests).toHaveLength(0);
+  expect(f.backend.history.toArchive()).toEqual(before);
+  fireEvent.keyDown(handle, { key: "ArrowRight" });
+  await waitFor(() => expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(31));
+  expect(f.backend.requests.map(request => request.type)).toEqual(["trim"]);
+});
+
+it.each(["clip", "source", "same-selection"] as const)("pending pointer reorder preserves a newer %s selection after completion", async selection => {
+  const f = await gestureFixture(); f.click(f.ids[1]!); dragGeometry(f);
+  let release!: () => void;
+  f.backend.beforeEdit = () => new Promise(resolve => { release = resolve; });
+  const root = f.item(f.ids[0]!);
+  dragPointer(root, "pointerdown", 50); dragPointer(root, "pointermove", 450); dragPointer(root, "pointerup", 450);
+  await waitFor(() => expect(f.backend.requests.map(request => request.type)).toEqual(["reorder"]));
+  const selected = selection === "source" ? "s1" : selection === "clip" ? f.ids[2]! : f.ids[1]!;
+  if (selection === "source") fireEvent.click(screen.getByRole("button", { name: /^Vídeo 2 · s1\.mp4$/ }));
+  else f.click(selected);
+  expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(selected);
+  await act(async () => release());
+  await waitFor(() => expect(clips(f.backend).map(clip => clip.id)).toEqual([f.ids[1], f.ids[2], f.ids[3], f.ids[0]]));
+  expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(selected);
+  expect(f.backend.requests).toHaveLength(1);
+});
+
+it("Finder receipts use the import backend once, preserve canonical state and report mixed/repeated inputs",async()=>{
+ const backend=new SequenceBackend(),load=backend.loadState.bind(backend);
+ backend.loadState=async()=>{const state=await load();return {...state,capabilities:{...state.capabilities,"media.import":{available:true,reason:"available"}}};};
+ let drop={sequence:0,hovering:false,receiptId:null as string|null,fileCount:0,errorCode:null as string|null};
+ const importer=vi.fn(async()=>({state:await backend.loadState(),results:[{outcome:"reused" as const,sourceId:"s0"},{outcome:"failed" as const,errorCode:"LOCAL_SOURCE_UNSUPPORTED_MEDIA"}]}));
+ Object.assign(backend,{getNativeMediaDropState:vi.fn(async()=>({...drop})),importDroppedMedia:importer});
+ const f=await mount(backend),before=backend.history.toArchive();
+ drop={...drop,sequence:1,receiptId:"native-media-drop-1",fileCount:2};
+ await screen.findByText("Importados: 0 · Já presentes: 1 · Falhas: 1");
+ expect(importer).toHaveBeenCalledExactlyOnceWith("native-media-drop-1","pt-BR");expect(backend.history.toArchive()).toEqual(before);
+ await act(async()=>{await new Promise(resolve=>setTimeout(resolve,300));});expect(importer).toHaveBeenCalledOnce();
+ drop={...drop,sequence:2,receiptId:null,fileCount:0,errorCode:"LOCAL_SOURCE_INVALID_REQUEST"};
+ await screen.findByText(/O arrasto expirou/);expect(importer).toHaveBeenCalledOnce();f.unmount();
+});
+it("a recovered import applies the durable partial state once and never replays its consumed receipt",async()=>{
+ const backend=new SequenceBackend(),load=backend.loadState.bind(backend);
+ backend.loadState=async()=>{const state=await load();return {...state,capabilities:{...state.capabilities,"media.import":{available:true,reason:"available"}}};};
+ let receipt:string|null=null;
+ const importer=vi.fn(async()=>{throw {code:"HOST_RECOVERED",reconciledState:await backend.loadState()};});
+ Object.assign(backend,{getNativeMediaDropState:async()=>({sequence:receipt?1:0,hovering:false,receiptId:receipt,fileCount:1}),importDroppedMedia:importer});
+ const f=await mount(backend);receipt="native-media-drop-1";
+ await screen.findByText(translate("pt-BR","runtime.sessionRecovered"));
+ await act(async()=>{await new Promise(resolve=>setTimeout(resolve,300));});expect(importer).toHaveBeenCalledOnce();
+ expect(screen.getByTestId("app-shell")).toBeTruthy();f.unmount();
+});
+
+it("short unselected occurrences retain their real width and reorder by canonical time rather than an expanded trim affordance",async()=>{
+ const backend=new SequenceBackend();for(const end of [1,2,5])await backend.service.edit({version:2,type:"append",expectedSnapshotId:backend.history.current.history.headSnapshotId!,sourceId:"s0",sourceStartFrame:0,sourceEndFrame:end});
+ const f=await mount(backend),ids=clips(backend).map(c=>c.id),roots=ids.map(id=>f.container.querySelector<HTMLElement>(`[data-clip-id="${id}"]`)!);
+ expect(roots.every(root=>root.style.minWidth==="0px")).toBe(true);
+ const lane=roots[0].closest(".track-lane")!;vi.spyOn(lane,"getBoundingClientRect").mockReturnValue({left:0,right:800,width:800,top:0,bottom:40,height:40} as DOMRect);
+ vi.spyOn(lane.querySelector(".timeline-width")!,"getBoundingClientRect").mockReturnValue({left:0,right:800,width:800} as DOMRect);
+ // A visually expanded selected affordance must not shift the actual destination.
+ vi.spyOn(roots[2],"getBoundingClientRect").mockReturnValue({left:10,right:400,width:390} as DOMRect);
+ dragPointer(roots[0],"pointerdown",1);dragPointer(roots[0],"pointermove",60);dragPointer(roots[0],"pointerup",60);
+ await waitFor(()=>expect(clips(backend).map(c=>c.id)).toEqual([ids[1],ids[2],ids[0]]));expect(backend.requests).toHaveLength(1);
+});
+for(const cancel of ["zoom","captureloss","snapshot"] as const)it(`internal drag rejects captured geometry after ${cancel}`,async()=>{
+ const f=await gestureFixture();dragGeometry(f);const root=f.item(f.ids[0]!);dragPointer(root,"pointerdown",50);dragPointer(root,"pointermove",450);
+ if(cancel==="zoom")fireEvent.change(screen.getByLabelText("Zoom da linha do tempo"),{target:{value:"180"}});
+ else if(cancel==="captureloss")dragPointer(root,"lostpointercapture",450);
+ else {fireEvent.click(screen.getByRole("button",{name:"Desfazer"}));await waitFor(()=>expect(clips(f.backend)).toHaveLength(3));}
+ const before=f.backend.history.toArchive();dragPointer(root,"pointerup",450);expect(f.backend.history.toArchive()).toEqual(before);expect(f.backend.requests).toHaveLength(0);
 });

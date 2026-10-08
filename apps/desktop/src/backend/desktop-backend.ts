@@ -26,7 +26,17 @@ export interface DesktopBackendState {
 
 export type ImportMediaResult =
   | { readonly outcome: "cancelled" }
-  | { readonly outcome: "imported"; readonly state: DesktopBackendState; readonly importedSourceId: string };
+  | { readonly outcome: "imported"; readonly state: DesktopBackendState; readonly importedSourceId: string; readonly reused?: boolean };
+
+export interface NativeMediaDropState {
+  sequence: number;
+  hovering: boolean;
+  receiptId?: string | null;
+  fileCount: number;
+  errorCode?: string | null;
+}
+export type DroppedMediaItem = { outcome: "imported" | "reused"; sourceId: string } | { outcome: "failed"; errorCode: string };
+export interface DroppedMediaResult { state: DesktopBackendState; results: DroppedMediaItem[] }
 
 export type ManualSequenceExportResult = { readonly outcome: "cancelled" } | {
   readonly outcome: "exported";
@@ -65,6 +75,8 @@ export interface DesktopBackend {
   trimManualVideoClip(request: TrimManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }>;
   editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopBackendState; changedClipIds: string[] }>;
   pickAndImportMedia(locale: "pt-BR" | "en-US"): Promise<ImportMediaResult>;
+  getNativeMediaDropState?(): Promise<NativeMediaDropState>;
+  importDroppedMedia?(receiptId: string, locale: "pt-BR" | "en-US"): Promise<DroppedMediaResult>;
   transcribeSource(sourceId: string, operationId: string, locale: "pt-BR" | "en-US"): Promise<DesktopBackendState>;
   undo(): Promise<DesktopBackendState>;
   redo(): Promise<DesktopBackendState>;

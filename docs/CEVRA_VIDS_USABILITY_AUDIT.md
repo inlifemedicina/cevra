@@ -376,3 +376,99 @@ continuam pendentes; unit/fake não é certificação WKWebView ou APP/OWNER.
 Director: extensão compatível de interação com os mesmos comandos/History/IR,
 sem autoridade de provider/IA ou novo plano editorial. Creator=Lite, Studio=Full,
 Vids=Desktop; progresso 55% e F-A02 esgotado 1/1 permanecem como registrados.
+
+## Consolidated basic editing — 2026-10-08
+
+Pacote aprovado pelo Owner após a rodada agrupada: branch
+`feat/vids-basic-editing-consolidated`, base exata
+`e84424ccb65eb57b15747effe64518b17e6e9cdf` / Draft #91,
+[ADR0036](adr/0036-consolidated-basic-manual-editing.md). Esta decisão substitui
+a exclusão anterior de duplicação em lote no inventário de 07/10 somente para
+a operação aprovada agora; split em lote e renomeação editável continuam fora.
+
+| Área | Implementação e limite |
+| --- | --- |
+| Finder drop / import | Rust captura caminhos nativos absolutos, máximo32 arquivos/120s e consumo único; WebView envia somente receiptId/locale. Query de metadados constante e duas permissões de comandos da aplicação, sem core:event/fs/shell/dialog. Extensões iguais às do picker existente; ingest/checkpoint/recovery compartilhados. Lote misto informa imported/reused/failed, interrompendo mutações restantes em incerteza de storage/session. Snapshot final recupera Host encerrado sem replay. |
+| Importação repetida | Mesmo URI registrado reutilizado somente após verificar identidade/conteúdo atuais. Não aloca fonte, número ou journal/checkpoint. Fonte alterada/offline, abort e conflito de histórico falham sem publicação. Mesmo conteúdo em outro locator conserva a rota anterior de import. |
+| Reorder | Pointer capturado com container estável, foco explícito no botão e destino visível; clip não selecionado funciona no primeiro gesto. Midpoints canônicos, incluindo trechos1/2/5frames, não dependem do retângulo mínimo visual. Commit somente ao soltar; Escape/blur/cancel/captureloss, busy/snapshot/zoom/viewport antigos cancelam. Click pointer após drag não duplica ação nem consome ativação nova pelo teclado. |
+| Duplicação coletiva | Delta fechado V1/V2 duplicate-many valida IDs únicos/existentes, lê ordem canônica e insere bloco após a última seleção. Novos IDs preservam fonte, ranges e propriedades, verificando todas as fontes antes da mutação atômica. Um Undo remove o bloco; archive/reopen/Redo conservam a proveniência. |
+| Rótulos | Numeração estável das fontes continua no Host. Trecho/Cópia descreve posição atual da ocorrência; fonte/filename ficam distintos. A extensão versionada cevra.manualClipCopy.v1 é só proveniência de apresentação; efeito desconhecido/malformado continua fail-closed. Sem registro paralelo ou renomeação. |
+| Régua / escala / cursor | Ticks adaptativos frame-aligned e limitados à área visível. Pixels/tempo manuais conservados ao mudar duração; Ajustar à janela explícito. Slack visual nunca altera IR, prévia ou export. Cursor CFR30 mostra tempo/frame exatos; legado mostra milissegundos sem inventar frames CFR30. |
+| Export / campos / atalhos | Exportar MP4 identifica MP4/H.264/AAC existente. Foco/texto/IME/Escape e Undo/Redo, seleção/grupo, IN/OUT, drag cancelado e eventos de mídia/seek atrasados permanecem protegidos pelos handlers tipados existentes. PT-BR/EN-US têm paridade. |
+
+Gates técnicos locais e falhas preservadas no recibo externo/PR: build final
+PASS; Rust53/53, Python151/11/11 e866 testes Node dos dez demais workspaces PASS,
+incluindo Host185 e domínio325. UI final258/258 PASS com configuração/comando e
+prazos padrão, incluindo cinco regressões da revisão final. O cenário
+explicitamente gated passou separadamente1/1 com cinco payloads reais do Host.
+Na execução conjunta anterior, nove workers da UI atingiram
+timeout de inicialização antes dos testes; essa execução não é declarada PASS.
+UI isolada253 passou antes das últimas correções; UI258 e Desktop build passaram
+após elas. As demais suítes não tiveram mudança posterior. A tabela do Draft/
+receipt registra CI/review terminais, sem promover checks incompletos.
+
+O catálogo Media selado PASS inclui a nova montagem de sete ocorrências após
+duplicate-many, proveniência aceita pelo plano e export dos originais:187frames,
+299200 amostras PCM por canal, Undo/Redo integral. Conferiu cada quadro por oracle
+independente, relógio/endpoint MP4/PCM, originais intactos, CFR24/B-frames,
+NTSC/VFR, um frame/repetição, 44.1kHz/offset/estéreo e60s preview/final.
+Runtime tree SHA256 `fa6eec4820f2399dbca360bb96c9786ea99f163f2625f63bea3c0c33d19cc6f6`,
+manifest SHA256 `f082a22c45ec299125918ddb9c4a7d926039a6c530689551a966a66d6333ebfd`.
+É cópia isolada verificada dos recursos estáticos selados da baseline; o app e
+projeto humano não foram alterados nem usados como fixture.
+
+Host filho real PASS: URI repetido reutilizado sem mutação; arquivo inválido
+recusado sem fonte/checkpoint; source hashes intactos e comparação integral
+decoded-picture/PCM para cold/warm/reorder/trim/removal. Montagem60s/1800frames,
+trim1799 e remoção1499. Entrega JSON/PNG pelo Host mediu cold7,035s,
+warm completo67,5ms, reorder1,940s, trim2,340s e remoção1,732s. Warm usa cache
+completo já existente; não é render incremental. São medições individuais,
+sem SLA de resposta imediata ou prova WKWebView decode/paint. Cache12hits no
+reorder,11hits/1miss no trim e10hits na remoção; cancelamento de job confirmado
+e restart limparam retenção.
+
+Handoff dos cinco payloads reais pelo React/Blob/PNG DOM PASS1/1; reorder167ms,
+trim176ms e remoção132ms nesta execução. Snapshot atual/descartar resposta stale
+passaram, mas Play continuou desabilitado sem decoder. Não prova decode/paint
+WKWebView nem percepção humana ou continuidade/áudio nativos.
+
+O primeiro build não compilou porque o npm privado antigo estava incompleto;
+Node22.23.2 foi restaurado em pasta própria. Python de teste sem stdlib/antigo3.9
+e cache Cargo vazio causaram falhas de fixture antes de validação; pin3.12.14,
+dependências locked e recursos Node próprios restauraram o ambiente. A expectativa
+ACL foi atualizada só para os dois comandos autorizados. Observação RSS impedida
+pelo sandbox passou com execução headless autorizada dos processos próprios.
+O primeiro catálogo de cópias falhou por contar entrada após truncamento legítimo
+de redo; um projeto de fixture separado conserva a asserção de uma entrada.
+Nenhuma dessas falhas é escondida ou promovida a PASS incompleto.
+
+Claude-PoC é inteiramente inerte/mock: duas execuções do comando normal tiveram
+390/391 e SEMANTIC_ANALYSIS_TIMEOUT no intervalo final sub100ms; isolado e serial
+391/391 passaram, mas não resolveram o comando normal. A fixture misturava clock
+controlado na admissão/transport e timer real no serviço de análise. Só a fixture
+foi corrigida: timers positivos seguem o mesmo clock controlado, yields0ms
+continuam reais. Sucesso em29999ms e rejeição TIMEOUT em30000ms verificam o
+deadline original, slot utilizado e timers retirados. Nenhum prazo/produção ou
+asserção original foi relaxado. Focused2/2 e comando normal392/392 PASS; falhas
+anteriores permanecem no recibo. CI deve passar no head final. Nenhum binário
+Claude, conta/modelo/credencial foi acessado.
+
+A revisão independente inicial encontrou seis P1/P2: recovery do snapshot final
+do lote, foco de gesto, ativação de teclado após cancel, mínimo visual de clips,
+custo quadrático de rótulos e frames fictícios em timeline legada. Todos foram
+corrigidos. A revisão final encontrou mais dois P2: trim conservando geometria
+antiga após Fit100/resize e continuação de reorder sobrescrevendo seleção nova.
+Chave completa de geometria cancela trim; a época de seleção existente do App
+protege a continuação, inclusive se o Owner reaplicar a mesma seleção. Quatro
+regressões inicialmente RED e uma fixture de fonte com selector ambíguo foram
+corrigidas; cinco GREEN, UI258 e Desktop build PASS. Revisão final da árvore
+identificada e CI exato ainda precedem o handoff Draft.
+RSS/disk são amostrados, não teto físico instantâneo. Automação não aprova
+picker/drop/paint/percepção nativos ou qualidade subjetiva. O Owner passou
+edição individual, Undo/Redo, miniaturas, reprodução contínua e export português
+na variante anterior; close/reopen e latência medida60s seguem NÃO TESTADOS.
+O [mesmo roteiro agrupado](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+reúne somente o delta futuro, sem nova janela/microtestes neste preparo.
+Director: extensão compatível, autoridade em IR/History e comandos tipados.
+Full G1 unaccepted, progresso55% e F-A02 esgotado1/1 permanecem; sem merge,
+issue88 body, Take/Xcode/iPhone, provider ou chamada real de IA.

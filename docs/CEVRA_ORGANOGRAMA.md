@@ -769,3 +769,29 @@ review remain pending before a new grouped package. Director impact is compatibl
 context, permissions/providers and typed IR/History remain authoritative. No new
 human/device/AI operation, merge or issue88 body publication; progress55%, F-A021/1
 and full G1 unaccepted remain. Reuse the existing single acceptance catalog.
+
+### 2026-10-08 — Approved consolidated basic editing
+
+The Owner's grouped review passed individual edits/shortcuts, removal, IN/OUT,
+Undo/Redo, thumbnails/click preview, continuous sequence playback and Portuguese
+export/file content. Native close/reopen and measured 60-s edit latency remain
+NOT TESTED; full G1 is unaccepted, progress55% and F-A02 exhausted1/1 unchanged.
+
+Approved delta `feat/vids-basic-editing-consolidated`, based on exact `e84424c`
+/ Draft #91, follows [ADR0036](adr/0036-consolidated-basic-manual-editing.md):
+Finder drop via bounded native receipts and existing ingest, reliable captured
+pointer reorder, canonical duplicate-many/one Undo, honest copy/source labels,
+stable manual scale/explicit Fit, adaptive ruler/readable cursor and existing
+MP4/H.264 identification. Only two closed receipt application commands join the
+WebView ACL; no general event/filesystem/shell/plugin access is added. Repeated
+registered URI import verifies current original identity/content before reuse.
+Final export still uses originals; presentation slack/provenance cannot change
+duration, source numbering or media authority.
+
+Domain/history, gesture/focus/shortcut, native ACL, real Host/sealed Media and
+payload-UI gates are recorded in the [existing audit](CEVRA_VIDS_USABILITY_AUDIT.md#consolidated-basic-editing--2026-10-08).
+Final-tree independent review and exact-head CI precede a Draft handoff and the
+same [future grouped script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script).
+Director is compatible with the typed extension; no plan/provider/permission
+authority migrates to UI or worker. No merge, AI/account request, new human
+app/project/window or Take/Xcode/iPhone operation is part of this preparation.

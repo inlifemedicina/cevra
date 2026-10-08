@@ -478,13 +478,13 @@ it("marks from the actual media clock, creates a visible clip and verifies undo/
   await waitFor(() => expect(backend.creates).toHaveLength(1));
   expect(backend.creates[0]).toMatchObject({ sourceId: source.id, sourceStartMs: framesToMilliseconds(38), sourceEndMs: framesToMilliseconds(113) });
   const track = await screen.findByTestId("timeline-track-track-v1");
-  expect(within(track).getByRole("button", { name: "Vídeo 1 · fixture.mp4" })).toBeTruthy();
+  expect(within(track).getByRole("button", { name: "Trecho 1 · Fonte · Vídeo 1 · fixture.mp4" })).toBeTruthy();
   expect(backend.history.current.timeline.durationMs).toBe(2500);
   await waitFor(() => expect((screen.getByRole("button", { name: "Desfazer" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
-  await waitFor(() => expect(within(track).queryByRole("button", { name: "Vídeo 1 · fixture.mp4" })).toBeNull());
+  await waitFor(() => expect(within(track).queryByRole("button", { name: "Trecho 1 · Fonte · Vídeo 1 · fixture.mp4" })).toBeNull());
   fireEvent.click(screen.getByRole("button", { name: "Refazer" }));
-  await waitFor(() => expect(within(track).getByRole("button", { name: "Vídeo 1 · fixture.mp4" })).toBeTruthy());
+  await waitFor(() => expect(within(track).getByRole("button", { name: "Trecho 1 · Fonte · Vídeo 1 · fixture.mp4" })).toBeTruthy());
   expect(backend.history.current.sources[0]).toEqual(source);
   expect(revoke).toHaveBeenCalled();
 });
@@ -619,7 +619,7 @@ it("preexisting speed/muted-track edits fall back explicitly to Original without
   backend.loadState = async () => ({ ...await load(), project: unsupported });
   const { container } = render(<App backend={backend} />);
   await metadata(container);
-  fireEvent.click(within(screen.getByTestId("timeline-track-track-v1")).getByRole("button", { name: "Vídeo 1 · fixture.mp4" }));
+  fireEvent.click(within(screen.getByTestId("timeline-track-track-v1")).getByRole("button", { name: "Trecho 1 · Fonte · Vídeo 1 · fixture.mp4" }));
   await metadata(container);
   expect(screen.getByText(t("preview.unsupportedClip"))).toBeTruthy();
   expect(screen.getByText("Original")).toBeTruthy();
@@ -631,7 +631,7 @@ async function selectedTrimApp(sourceStartMs = 1000, sourceEndMs = 4000) {
   await backend.createManualVideoClip({ sourceId: source.id, expectedSnapshotId: backend.history.current.history.headSnapshotId!, sourceStartMs, sourceEndMs });
   const rendered = render(<App backend={backend} />);
   await metadata(rendered.container);
-  fireEvent.click(within(screen.getByTestId("timeline-track-track-v1")).getByRole("button", { name: "Vídeo 1 · fixture.mp4" }));
+  fireEvent.click(within(screen.getByTestId("timeline-track-track-v1")).getByRole("button", { name: "Trecho 1 · Fonte · Vídeo 1 · fixture.mp4" }));
   await metadata(rendered.container);
   await waitFor(() => expect(screen.getByRole("slider", { name: "Ajustar OUT do clip" }).getAttribute("aria-disabled")).toBe("false"));
   return { backend, ...rendered };

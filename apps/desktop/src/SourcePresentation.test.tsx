@@ -18,8 +18,8 @@ it("keeps source numbers across media search/filter and names non-video sources 
   ];
   const select = vi.fn();
   render(<MediaPanel sources={sources} presentations={presentSources(sources, sourceNumberingForSources(sources), pt)} selectedId={null} workspace="edit" importAvailable={false} importReason="review-session" importBusy={false} t={pt} onSelect={select} onImport={() => {}} />);
-  expect(screen.getByText("Áudio 2")).toBeTruthy();
-  expect(screen.getByText("Imagem 4")).toBeTruthy();
+  expect(screen.getByText("Fonte · Áudio 2")).toBeTruthy();
+  expect(screen.getByText("Fonte · Imagem 4")).toBeTruthy();
   expect(screen.getByText("long-second-name.mov")).toBeTruthy();
   fireEvent.click(screen.getByRole("tab", { name: pt("media.filter.video") }));
   fireEvent.change(screen.getByRole("textbox", { name: pt("media.searchPlaceholder") }), { target: { value: "Vídeo 3" } });
@@ -78,6 +78,6 @@ it("displays host-owned identities after removal, undo, branch replacement and r
   const en = (key: Parameters<typeof translate>[1], parameters?: Record<string, string | number>) => translate("en-US", key, parameters);
   rerender(<MediaPanel sources={reopened.current.sources} presentations={presentSources(reopened.current.sources, reopened.sourceNumbering, en)} {...props} t={en} />);
   fireEvent.change(screen.getByRole("textbox", { name: en("media.searchPlaceholder") }), { target: { value: "" } });
-  expect(screen.getByText("Video 2")).toBeTruthy();
-  expect(screen.getByText("Video 4")).toBeTruthy();
+  expect(screen.getByText("Source · Video 2")).toBeTruthy();
+  expect(screen.getByText("Source · Video 4")).toBeTruthy();
 });

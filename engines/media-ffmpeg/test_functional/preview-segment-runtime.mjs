@@ -177,6 +177,23 @@ try {
     const result = await host.call("media.ingestLocal", { uri: source.uri, displayName: `Synthetic source ${i}`, operationId: `ingest-${i}`, locale: "en-US" });
     sourceIds.push(result.importedSourceId); state = result.state;
   }
+  const importedProject = structuredClone(state.project);
+  const importedNumbering = structuredClone(state.sourceNumbering);
+  const repeated = await host.call("media.ingestLocal", { uri: sources[0].uri,
+    displayName: "Repeated synthetic source", operationId: "repeat-ingest-0", locale: "en-US" });
+  assert.equal(repeated.reused, true);
+  assert.equal(repeated.importedSourceId, sourceIds[0]);
+  assert.deepEqual(repeated.state.project, importedProject, "Repeated import must not publish a journal/checkpoint mutation.");
+  assert.deepEqual(repeated.state.sourceNumbering, importedNumbering);
+  state = repeated.state;
+  const invalidMedia = path.join(root, "invalid-source.txt");
+  writeFileSync(invalidMedia, "Owned invalid media fixture\n");
+  await assert.rejects(host.call("media.ingestLocal", { uri: invalidMedia,
+    displayName: "Invalid source", operationId: "invalid-ingest", locale: "en-US" }),
+    error => typeof error.code === "string");
+  state = await host.call("project.snapshot");
+  assert.deepEqual(state.project, importedProject, "Rejected media cannot add a source or journal/checkpoint mutation.");
+  assert.deepEqual(state.sourceNumbering, importedNumbering);
   async function edit(delta) {
     state = (await host.call("video.editManualSequence", { version: 2,
       expectedSnapshotId: state.project.history.headSnapshotId, ...delta })).state;
@@ -217,6 +234,7 @@ try {
   const uiDeliveries = process.env.CEVRA_PREVIEW_SEGMENT_UI_RECEIPT_OUTPUT || path.join(root, "ui-deliveries.json");
   writeFileSync(uiDeliveries, JSON.stringify(deliveries));
   const receipt = { status: "PASS", root, sourceSha256Preserved: true, providerCalls: 0, nativeWindowLaunched: false,
+    repeatedImportReusedWithoutMutation: true, invalidImportRejectedWithoutMutation: true,
     workerMeasurements, hostMeasurements, uiDeliveries, liveJobCancellationClearedCache: true, workerRestartClearedCache: true,
     runtimeManifestSha256: sha(path.join(runtime, "manifest.json")),
     limitations: ["RSS/disk observations are sampled, not instantaneous physical caps.", "Host receipt includes IPC delivery, not native decode, WKWebView paint or human perceived latency."] };
