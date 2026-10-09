@@ -795,3 +795,23 @@ same [future grouped script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grou
 Director is compatible with the typed extension; no plan/provider/permission
 authority migrates to UI or worker. No merge, AI/account request, new human
 app/project/window or Take/Xcode/iPhone operation is part of this preparation.
+
+### 2026-10-09 — Approved visual B presentation
+
+The Owner selected the inspected original “B · Áreas com tons suaves · Conceito
+visual”; its access blocker is resolved. The separate
+`feat/vids-visual-b-soft-panels` delta starts at `a606db1` / Draft #92 and changes
+only existing-panel presentation: slate-blue Media, violet draft, petrol Director,
+taupe contextual Inspector, neutral Preview/Timeline, rounded borders, gutters
+and readable type. Illustrated functions are not added; existing open/compact
+modes, tabs/resizers, fields, commands and IR/History remain shared.
+
+Actual compiled-UI comparison, Desktop258/258, i18n2/2, build and89 owned
+headless structure/presentation checks PASS. Secondary text on tinted surfaces
+measures6.49–6.81:1; compact inner spacing preserves the draft scroller at the
+native minimum. This is not native paint/perception, full accessibility or Owner
+acceptance. Exact-tree review/CI and the isolated combined package are bound in
+the new Draft/receipt; one future grouped functional+B round retains existing
+IDs. [Scope/evidence](CEVRA_VIDS_USABILITY_AUDIT.md#approved-visual-b-presentation--2026-10-09).
+Director impact compatible presentation only; no IA/provider/device/window
+operation or merge. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.

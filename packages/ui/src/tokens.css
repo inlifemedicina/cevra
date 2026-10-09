@@ -34,6 +34,17 @@
   --cevra-text-lg: 16px;
   --cevra-text-xl: 20px;
   --cevra-shadow-raised: 0 12px 32px rgb(0 0 0 / 32%);
+  --cevra-panel-media: #1c2937;
+  --cevra-panel-media-border: #3b5066;
+  --cevra-panel-draft: #292431;
+  --cevra-panel-draft-border: #51465f;
+  --cevra-panel-director: #1b2c30;
+  --cevra-panel-director-border: #37545a;
+  --cevra-panel-context: #2e2923;
+  --cevra-panel-context-border: #554b3f;
+  --cevra-panel-fg-muted: #a6afbb;
+  --cevra-panel-radius: 12px;
+  --cevra-panel-gap: 8px;
 }
 
 *:focus-visible {

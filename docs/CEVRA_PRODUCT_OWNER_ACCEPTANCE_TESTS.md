@@ -224,6 +224,17 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 
 ### Single grouped G1 script
 
+**Visual B aprovado — 09/10/2026:** a próxima variante agrupa a edição básica
+do Draft #92 com a apresentação B em um único pacote/commit, após review e CI.
+Nos mesmos I4-T1/X-T1/T7/X-T6 abaixo, conferir a leitura dos painéis reais
+(mídia azul ardósia, rascunho violeta, Director petróleo e controles taupe),
+campos/foco/rolagem nos modos aberto e compacto e largura útil da Timeline.
+Preview/Timeline são neutros; controles ilustrativos da referência não são
+funções adicionadas. Não repetir toda a aceitação anterior nem abrir/substituir
+a janela humana durante o preparo. Screenshot/build/UI258/i18n2 e89 checks
+headless são evidência técnica, não APP/OWNER/nativa. O recibo do novo pacote
+fornece a identidade exata para a única futura rodada funcional+visual.
+
 **Rodada e pacote aprovados — 08/10/2026:** o Owner confirmou botões/atalhos de
 edição individual, remoção, IN/OUT, Undo/Redo, miniaturas/click preview, reprodução
 contínua e export/conteúdo em português. Essas observações substituem os relatos

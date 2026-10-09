@@ -2658,6 +2658,35 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
+**Approved visual B presentation — 2026-10-09:** the Owner selected “B · Áreas
+com tons suaves · Conceito visual”. The original1586×992 PNG was inspected and
+confirmed (SHA256
+`93d9a4caf53c56c0038fe0b410389b6f6309abcece62bc904e4020480e18aa38`);
+the reference-access blocker is resolved. A separate
+`feat/vids-visual-b-soft-panels` increment starts at Draft #92 head
+`a606db1b206b507d236ee7dbebf593b68795d344`. Existing Media is slate blue,
+editorial draft violet, Director petrol and contextual Inspector taupe; Preview
+and Timeline remain neutral. Tokens, rounded borders, gutters and typography
+change presentation only. The concept's rename/aspect/pace/style/context-chip
+controls are not implemented. Open/compact modes, tabs, split/width/height
+resizers, actual fields, typed commands, IR/History and engines are preserved.
+
+Compiled actual-UI screenshots precede/follow CSS. Desktop258/258, i18n2/2,
+build and89 owned headless layout/presentation checks PASS across PT/EN, both
+modes, five workspaces and1586×992/1280×800/900×680/900×600. These check outer
+geometry and existing transitions, not native decode/paint or complete product
+accessibility. Secondary text on the four tinted surfaces measures6.49–6.81:1.
+The compact Director's inner spacing is reduced to retain a usable draft scroller
+at the native minimum; no field is hidden. Preview grid width is preserved;
+Timeline loses16px only to its two8px border insets. The
+[existing audit](CEVRA_VIDS_USABILITY_AUDIT.md#approved-visual-b-presentation--2026-10-09)
+records scope and limits. Exact final-tree independent review/CI and new isolated
+combined package identity are recorded in the implementation Draft/receipt.
+One future grouped functional+B round uses the existing acceptance IDs. No app
+is opened/replaced now. Director impact is compatible presentation with no
+new provider/execution authority. No merge/IA/account/device action; progress55%,
+F-A02 exhausted1/1 and full G1 unaccepted remain.
+
 **Approved consolidated basic editing — 2026-10-08:** after the grouped Owner
 review, `feat/vids-basic-editing-consolidated` starts at `e84424c` / Draft #91.
 [ADR 0036](adr/0036-consolidated-basic-manual-editing.md) records Finder drop
