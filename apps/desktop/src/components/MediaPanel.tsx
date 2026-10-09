@@ -19,7 +19,7 @@ const filters = [
   ["image", "media.filter.image"]
 ] as const;
 
-export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, thumbnailBusy = false, actionBusy = thumbnailBusy, onAction, backend, snapshotId, t, onSelect, onImport }: { sources: readonly SourceAsset[]; backend?: DesktopBackend; snapshotId?: string; thumbnailBusy?: boolean; actionBusy?: boolean; onAction?: RangeActionGate; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; t: Translate; onSelect(id: string): void; onImport(): void }) {
+export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, nativeDropHovering = false, thumbnailBusy = false, actionBusy = thumbnailBusy, onAction, backend, snapshotId, t, onSelect, onImport }: { sources: readonly SourceAsset[]; backend?: DesktopBackend; snapshotId?: string; thumbnailBusy?: boolean; actionBusy?: boolean; onAction?: RangeActionGate; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; nativeDropHovering?: boolean; t: Translate; onSelect(id: string): void; onImport(): void }) {
   const thumbnails = useSourceThumbnails(sources, backend, snapshotId, thumbnailBusy || importBusy);
   const [filter, setFilter] = useState<MediaFilter>("all");
   const [query, setQuery] = useState("");
@@ -39,13 +39,14 @@ export function MediaPanel({ sources, presentations, selectedId, workspace, impo
   }), [filter, query, sources, presentations]);
 
   return (
-    <aside className="media-panel" aria-label={t("media.title")}>
+    <aside className={`media-panel${nativeDropHovering ? " media-drop-hovering" : ""}`} aria-label={t("media.title")}>
       <div className="panel-heading">
         <div><span className="eyebrow">{t(workspaceKeys[workspace])}</span><h2>{t("media.title")}</h2></div>
         <button {...shortcutProps("import", t)} type="button" className="import-button" disabled={!importAvailable || importBusy || actionBusy} onClick={onImport} title={importBusy || actionBusy ? t("status.busy") : importAvailable ? shortcutProps("import", t).title : t(capabilityReasonKey(importReason))}>
           <span aria-hidden="true">＋</span>{t(importBusy ? "media.importBusy" : "media.import")}
         </button>
       </div>
+      {nativeDropHovering && <p role="status">{t("media.dropHint")}</p>}
       <div className="search-field">
         <Icon name="search" size={15} />
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("media.searchPlaceholder")} aria-label={t("media.searchPlaceholder")} />
@@ -70,7 +71,7 @@ export function MediaPanel({ sources, presentations, selectedId, workspace, impo
                 {source.kind === "video" && backend?.thumbnailLocalVideo && <small>{t(thumbnails.failed(source) ? "media.thumbnailUnavailable" : "media.thumbnailLoading")}</small>}
               </>}
             </span>
-            <span className="media-card-copy"><strong>{presentations.get(source.id)!.label}</strong><small className="media-source-name">{source.displayName}</small><small>{metadata(source)}</small></span>
+            <span className="media-card-copy"><strong>{t("clipPresentation.source", { name: presentations.get(source.id)!.label })}</strong><small className="media-source-name">{source.displayName}</small><small>{metadata(source)}</small></span>
           </button>
           {thumbnails.failed(source) && backend?.thumbnailLocalVideo && <button type="button" className="text-button" disabled={actionBusy || importBusy} onClick={() => action(() => thumbnails.retry(source))} aria-label={`${t("media.thumbnailRetry")} · ${presentations.get(source.id)!.label}`}>{t("media.thumbnailRetry")}</button>}
           </div>

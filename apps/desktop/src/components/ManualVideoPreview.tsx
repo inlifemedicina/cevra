@@ -1,3 +1,4 @@
+import { supportsManualClipExtensions } from "@cevra/application";
 import type { CreateManualVideoClipRequest, LocalVideoPreview } from "@cevra/application";
 import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -350,7 +351,7 @@ export function supportsManualClipPreview(project: Readonly<ProjectIR>, clip: Ti
   return project.timeline.timingPolicy === "legacy-milliseconds" && !clip.frameTiming && project.timeline.clips.length === 1 && !project.captions.length && !project.graphics.length
     && source?.kind === "video" && Number.isSafeInteger(source.durationMs) && source.durationMs! > 0
     && track?.kind === "video" && !track.hidden && !track.muted
-    && clip.speed === 1 && clip.volume === 1 && clip.opacity === 1 && !clip.extensions
+    && clip.speed === 1 && clip.volume === 1 && clip.opacity === 1 && supportsManualClipExtensions(clip)
     && [clip.sourceStartMs, clip.sourceEndMs, clip.timelineStartMs, clip.timelineEndMs].every(Number.isSafeInteger)
     && clip.sourceStartMs >= 0 && clip.sourceStartMs < clip.sourceEndMs && clip.sourceEndMs <= source.durationMs!
     && clip.timelineStartMs === 0 && clip.timelineEndMs === clip.sourceEndMs - clip.sourceStartMs;

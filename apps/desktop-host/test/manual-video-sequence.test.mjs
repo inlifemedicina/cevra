@@ -97,3 +97,18 @@ test("native close freeze rejects sequence mutation and no-op does not rotate ch
   assert.deepEqual(f.opened.history.toArchive(), before);
   f.session.cancelClose("sequence-close");
 });
+
+test('collective copy persists once, reopens redo with labels/properties and preserves original bytes',async t=>{
+ const f=await setup(t);
+ await f.edit({type:'append',sourceId:'s0',sourceStartMs:0,sourceEndMs:700});
+ await f.edit({type:'append',sourceId:'s1',sourceStartMs:300,sourceEndMs:1000});
+ const before=f.opened.history.current,entries=f.opened.history.entries.length,numbering=f.opened.history.sourceNumbering;
+ const response=await f.edit({type:'duplicate-many',clipIds:['clip-2','clip-1']});assert.equal(response.error,undefined);
+ assert.equal(response.result.state.status.persistence,'local-saved');assert.equal(f.opened.history.entries.length,entries+1);
+ const after=f.opened.history.current;assert.equal(after.timeline.clips.length,4);
+ assert.deepEqual(after.timeline.clips.slice(2).map(c=>c.extensions['cevra.manualClipCopy.v1'].originalClipId),['clip-1','clip-2']);
+ await f.session.undo();assert.deepEqual(f.opened.history.current,before);await f.session.close();
+ const reopened=await DesktopProjectPersistence.open(join(f.root,'store'));t.after(()=>reopened.persistence.close());
+ reopened.history.redo();assert.deepEqual(reopened.history.current,after);assert.deepEqual(reopened.history.sourceNumbering,numbering);
+ for(const source of f.sources)assert.deepEqual(await readFile(source.path),source.bytes);
+});

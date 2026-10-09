@@ -67,7 +67,7 @@
   "nav.primary": "Ferramentas do editor",
   "action.undo": "Desfazer",
   "action.redo": "Refazer",
-  "action.export": "Exportar",
+  "action.export": "Exportar MP4",
   "action.search": "Buscar",
   "action.review": "Revisar",
   "action.apply": "Aplicar",
@@ -482,5 +482,17 @@
   "timeline.selectedDuration": "Seleção ({count}): {duration}",
   "timeline.selectAll": "Selecionar todos os clips",
   "media.thumbnailLoading": "Preparando miniatura…",
-  "media.thumbnailUnavailable": "Miniatura indisponível"
+  "media.thumbnailUnavailable": "Miniatura indisponível",
+  "sequence.duplicateSelection": "Duplicar seleção",
+  "clipPresentation.copy": "Cópia {number}",
+  "clipPresentation.occurrence": "Trecho {number}",
+  "clipPresentation.source": "Fonte · {name}",
+  "media.dropHint": "Solte arquivos para importar",
+  "media.dropInvalid": "O arrasto expirou ou contém caminhos inválidos. Arraste os arquivos novamente.",
+  "media.alreadyImported": "Este original já está no projeto.",
+  "media.dropFinished": "Importados: {imported} · Já presentes: {reused} · Falhas: {failed}",
+  "timeline.dropBefore": "Inserir antes de {name}",
+  "timeline.dropEnd": "Inserir no final",
+  "timeline.cursor": "Cursor {time} · quadro {frame}",
+  "timeline.cursorTime": "Cursor {time}"
 }

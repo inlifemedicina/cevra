@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { workspaceKeys, type Translate, type Workspace } from "../ui-model";
 
 import type { SourcePresentation } from "../source-presentation";
+import { presentClip } from "../clip-presentation";
 
 const videoFields = ["inspector.position", "inspector.scale", "inspector.rotation", "inspector.opacity"] as const;
 
@@ -14,7 +15,7 @@ export function Inspector({ project, presentations, selectedProjectItemId, works
   const caption = project.captions.find((item) => item.id === selectedProjectItemId);
   const graphic = project.graphics.find((item) => item.id === selectedProjectItemId);
   const selectedSource = source ?? clipSource;
-  const selectedName = (selectedSource && presentations.get(selectedSource.id)?.label) ?? caption?.text ?? graphic?.text ?? graphic?.styleToken ?? null;
+  const selectedName = clip ? presentClip(project, clip, presentations, t) : (selectedSource && t("clipPresentation.source", { name: presentations.get(selectedSource.id)?.label ?? selectedSource.id })) ?? caption?.text ?? graphic?.text ?? graphic?.styleToken ?? null;
   const isAudioSelection = source?.kind === "audio" || clipTrack?.kind === "audio";
   return (
     <aside className="inspector" aria-label={t("inspector.title")} data-sidebar-scroll="context">

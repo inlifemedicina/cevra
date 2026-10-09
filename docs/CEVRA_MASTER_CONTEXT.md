@@ -2658,6 +2658,32 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
+**Approved consolidated basic editing — 2026-10-08:** after the grouped Owner
+review, `feat/vids-basic-editing-consolidated` starts at `e84424c` / Draft #91.
+[ADR 0036](adr/0036-consolidated-basic-manual-editing.md) records Finder drop
+through a single-use native receipt and existing ingest, first-gesture reorder,
+canonical multi-selection duplication with one Undo, source/occurrence/copy
+labels, adaptive ruler, stable manual pixels/time, explicit Fit, presentation-only
+trailing space and readable cursor. The existing MP4/H.264 export is identified;
+no new format, editable rename, multitrack, engine/dependency or AI call is added.
+The two added WebView permissions are closed application receipt commands;
+general event/filesystem/shell/plugin access remains absent. Known copy provenance
+is presentation metadata inside existing extensions; unknown effects fail closed.
+Director impact: compatible typed extension, preserving IR/History authority.
+
+The Owner reported passing individual edits/shortcuts, removal, IN/OUT, Undo/Redo,
+thumbnails/click preview, uninterrupted sequence playback and Portuguese export
+content. Native close/reopen and measured 60-s edit latency remain NOT TESTED.
+The [usability audit](CEVRA_VIDS_USABILITY_AUDIT.md#consolidated-basic-editing--2026-10-08)
+records the implementation and technical gates. The same
+[single grouped catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+contains the future delta; no new human window or per-commit microtest is requested.
+Final-tree review and exact-head CI are required before handoff, with terminal
+status on the new Draft/receipt. No merge, human project/device operation or
+issue #88 body publication. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted
+remain unchanged. Earlier preview/keyboard pending entries below are historical
+to their own heads, not evidence that this approved package is unapproved.
+
 **Approved preview segment reuse — 2026-10-07:** following the bounded feasibility
 proposal, the Owner approved integration and confirmed resending the dispatch
 cancelled before execution. A separate `feat/vids-preview-segment-reuse` delta

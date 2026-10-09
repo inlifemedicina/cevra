@@ -224,6 +224,16 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 
 ### Single grouped G1 script
 
+**Rodada e pacote aprovados — 08/10/2026:** o Owner confirmou botões/atalhos de
+edição individual, remoção, IN/OUT, Undo/Redo, miniaturas/click preview, reprodução
+contínua e export/conteúdo em português. Essas observações substituem os relatos
+anteriores de pausas/miniaturas para a variante efetivamente testada. Não aprovam
+o código novo. Fechar/reabrir e latência medida numa montagem60s continuam
+**NÃO TESTADOS**. A preparação consolidada sobre `e84424c` / Draft #91,
+[ADR0036](adr/0036-consolidated-basic-manual-editing.md), tem o delta agrupado
+abaixo; a equipe conclui integração, review e CI antes de fornecer outra variante.
+Não abrir aplicativo novo agora nem repetir checks humanos já aceitos.
+
 **Cache de segmentos aprovado — 07/10/2026:** a extensão separada em RAM sobre
 `278627e` tem [validação técnica local](CEVRA_PREVIEW_SEGMENT_REUSE_V1.md): todos
 os frames/PCM, pressão, cancelamento/restart, Host e entrega à UI. Reorder2.148s,
@@ -410,12 +420,27 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    por variante. Se aparecer falha de recursos, aguardar a operação parar e
    informar a equipe; não reduzir a qualidade nem repetir a exportação sozinho.
 
-Estado deste roteiro: **EXECUÇÃO HUMANA PARCIAL; REGRESSÃO PENDENTE**. O relato
-de abertura/importação, botões de edição, conteúdo e export é limitado à variante
-testada. Pausas/miniaturas/timeline exigem correção e nova revisão; fechar/reabrir,
-variantes ausentes e aceite completo permanecem NÃO EXECUTADO/BLOCKED conforme
-o caso. O próximo pacote não foi instalado e aguarda revisão independente antes
-da rodada agrupada. Este roteiro não promove G1, G5/G6, progresso ou F-A02.
+**Delta único para a futura variante consolidada — 08/10/2026:** incorporar à
+mesma rodada e aos mesmos IDs, quando a equipe entregar o pacote validado.
+Usar somente projeto/fixtures descartáveis fornecidos; cada edição pode ser
+desfeita para restaurar a montagem A/B/A/A antes da próxima observação. Não
+executar uma rodada por campo ou commit nem provocar falhas no projeto pessoal.
+
+| IDs existentes | Observação agrupada na variante nova |
+| --- | --- |
+| D1-T1, X-T5 | Arrastar os vídeos A/B do Finder para o app. Conferir feedback e fontes; repetir A reutiliza a fonte existente. No lote preparado com arquivo inválido, conferir sucessos/falhas sem fonte inválida nem repetição automática. Não abrir arquivos técnicos ou pessoais. |
+| I4-T1, X-T1/T2/T7 | Arrastar um trecho não selecionado num único gesto: destino visível, mudança apenas ao soltar. Escape/cancelamento conserva a ordem; teclado continua funcionando. Selecionar dois trechos, Duplicar/CmdD: cópias na ordem da montagem após a última seleção, IN/OUT preservados, um Undo remove o bloco todo e Redo o restaura. |
+| I4-T1, X-T1/T7 | Conferir rótulos legíveis de fonte, trecho e cópia, inclusive após reorder/Undo. Campo de texto e IME conservam sua edição/Undo; não dispara duplicação ou exclusão ao digitar. Não há renomeação editável neste pacote. |
+| I4-T1, X-T1/T7 | Ajustar zoom, fazer trim/duplicação/remoção e conferir que a escala manual se conserva. Ajustar à janela é explícito. Régua sem sobreposição e cursor legível em minutos:segundos:frames; clicar/seek e reproduzir preservam os intervalos. Espaço vazio após o último trecho não aumenta duração nem export. |
+| X-T3/T5/T7 | Identificação Exportar MP4 e painel MP4/H.264 correspondem ao formato existente. Exportar um nome novo na pasta fornecida com a montagem restaurada; equipe verifica duração/frames/áudio. Só registrar regressões do conteúdo já aceito, sem repetir o aceite anterior como novo PASS. |
+| X-T6, I17-T8/T9 | Na variante60s preparada pela equipe, observar espera após uma edição e entrega da prévia, com método/tempos separados por equipe e Owner; não exigir resposta instantânea. Quando Salvo, fechar normalmente e reabrir para conferir ordem/ranges/Undo/Redo. Não forçar fechamento ou injetar falha; variante sem fixture/capacidade continua BLOCKED/NÃO EXECUTADA. |
+
+Estado deste roteiro: **EXECUÇÃO HUMANA PARCIAL; DELTA CONSOLIDADO PENDENTE**.
+O relato de 08/10 acima é limitado à variante testada. Timeline/drop/duplicação
+coletiva/escala do pacote novo, fechar/reabrir, latência medida e aceite completo
+permanecem NÃO EXECUTADO/BLOCKED conforme o caso. O próximo pacote não foi
+instalado; revisão independente e CI precedem a rodada agrupada. Este roteiro
+não promove G1, G5/G6, progresso ou F-A02.
 
 ### Technical preparation and historical packages
 

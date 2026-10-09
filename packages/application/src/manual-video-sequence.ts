@@ -3,12 +3,15 @@ import { framesToMilliseconds, nearestMsToFrames, frameTimingMilliseconds, isCfr
 import { type SourceContentIdentityPort } from "./source-technical-descriptor.js";
 import { manualVideoError, resolveManualVideo, verifyManualVideoSource } from "./manual-video-clip.js";
 
+import { copyManualClip, supportsManualClipExtensions } from "./manual-clip-presentation.js";
+
 interface Binding { version: 1; expectedSnapshotId: string }
 interface SourceRange { sourceId: string; sourceStartMs: number; sourceEndMs: number }
 export type ManualVideoSequenceEditV1 = Binding & (
   | ({ type: "append" } & SourceRange)
   | ({ type: "insert"; beforeClipId: string } & SourceRange)
   | { type: "duplicate"; clipId: string }
+  | { type: "duplicate-many"; clipIds: readonly string[] }
   | { type: "remove"; clipId: string }
   | { type: "remove-many"; clipIds: readonly string[] }
   | { type: "trim"; clipId: string; sourceStartMs: number; sourceEndMs: number }
@@ -20,6 +23,7 @@ export type ManualVideoSequenceEditV2 = { version: 2; expectedSnapshotId: string
   | { type: "append"; sourceId: string; sourceStartFrame: number; sourceEndFrame: number }
   | { type: "insert"; beforeClipId: string; sourceId: string; sourceStartFrame: number; sourceEndFrame: number }
   | { type: "duplicate"; clipId: string }
+  | { type: "duplicate-many"; clipIds: readonly string[] }
   | { type: "remove"; clipId: string }
   | { type: "remove-many"; clipIds: readonly string[] }
   | { type: "trim"; clipId: string; sourceStartFrame: number; sourceEndFrame: number }
@@ -45,13 +49,13 @@ export interface ManualVideoSequenceConformPreview {
 const fields = {
   append: ["sourceId", "sourceStartMs", "sourceEndMs"],
   insert: ["beforeClipId", "sourceId", "sourceStartMs", "sourceEndMs"],
-  duplicate: ["clipId"], remove: ["clipId"], "remove-many": ["clipIds"],
+  duplicate: ["clipId"], "duplicate-many": ["clipIds"], remove: ["clipId"], "remove-many": ["clipIds"],
   trim: ["clipId", "sourceStartMs", "sourceEndMs"],
   split: ["clipId", "timelineAtMs"], reorder: ["clipIds"]
 } as const;
 const frameFields = {
   append: ["sourceId", "sourceStartFrame", "sourceEndFrame"], insert: ["beforeClipId", "sourceId", "sourceStartFrame", "sourceEndFrame"],
-  duplicate: ["clipId"], remove: ["clipId"], "remove-many": ["clipIds"], trim: ["clipId", "sourceStartFrame", "sourceEndFrame"],
+  duplicate: ["clipId"], "duplicate-many": ["clipIds"], remove: ["clipId"], "remove-many": ["clipIds"], trim: ["clipId", "sourceStartFrame", "sourceEndFrame"],
   split: ["clipId", "timelineAtFrame"], reorder: ["clipIds"], conform: ["clips"]
 } as const;
 const fail = (code: string): never => { throw manualVideoError(`MANUAL_SEQUENCE_${code}`); };
@@ -93,7 +97,7 @@ export function resolveManualVideoSequence(project: Readonly<ProjectIR>, expecte
   const grid = project.timeline.timingPolicy === "cfr30";
   for (const clip of ordered) {
     const source = resolveManualVideo(project, { sourceId: clip.sourceId, expectedSnapshotId });
-    if (clip.trackId !== trackId || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || Object.keys(clip.extensions ?? {}).length
+    if (clip.trackId !== trackId || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || !supportsManualClipExtensions(clip)
       || clip.sourceStartMs < 0 || clip.sourceStartMs >= clip.sourceEndMs || clip.sourceEndMs > source.durationMs) fail("UNSUPPORTED");
     if (grid) {
       const timing = validateClipFrameTiming(clip.frameTiming);
@@ -201,8 +205,17 @@ export class ManualVideoSequenceApplicationService {
         clips.splice(index, 0, clip); verifySources.add(source.id); break;
       }
       case "duplicate": {
-        const index = indexOf(stable.clipId), clip = structuredClone(clips[index]!);
-        clip.id = newId(); clips.splice(index + 1, 0, clip); verifySources.add(clip.sourceId); break;
+        const index = indexOf(stable.clipId), clip = copyManualClip(clips[index]!, newId()); clips.splice(index + 1, 0, clip); verifySources.add(clip.sourceId); break;
+      }
+      case "duplicate-many": {
+        const chosen = new Set(stable.clipIds);
+        if (!chosen.size || chosen.size !== stable.clipIds.length) fail("INVALID_ORDER");
+        for (const id of chosen) indexOf(id);
+        const originals = clips.filter(clip => chosen.has(clip.id));
+        const last = clips.reduce((last, clip, index) => chosen.has(clip.id) ? index : last, -1);
+        const copies = originals.map(clip => { verifySources.add(clip.sourceId); return copyManualClip(clip, newId()); });
+        clips.splice(last + 1, 0, ...copies);
+        break;
       }
       case "remove": {
         const [clip] = clips.splice(indexOf(stable.clipId), 1);
@@ -265,7 +278,7 @@ export class ManualVideoSequenceApplicationService {
     let clips = structuredClone(original);
     const edits: TimelineEditOperation[] = [];
     const changedClipIds: string[] = [];
-    let verifySourceId: string | undefined;
+    const verifySourceIds = new Set<string>();
     const indexOf = (id: string) => { const index = clips.findIndex(clip => clip.id === id); if (index < 0) fail("CLIP_UNKNOWN"); return index; };
     const sourceRange = (sourceId: string, begin: number, end: number) => {
       const source = resolveManualVideo(before, { sourceId, expectedSnapshotId: stable.expectedSnapshotId });
@@ -294,13 +307,23 @@ export class ManualVideoSequenceApplicationService {
         }
         const clip: TimelineClip = { id: newId(), trackId, sourceId: source.id, sourceStartMs: stable.sourceStartMs, sourceEndMs: stable.sourceEndMs,
           timelineStartMs: 0, timelineEndMs: stable.sourceEndMs - stable.sourceStartMs, speed: 1, volume: 1, opacity: 1 };
-        clips.splice(index, 0, clip); changedClipIds.push(clip.id); verifySourceId = source.id;
+        clips.splice(index, 0, clip); changedClipIds.push(clip.id); verifySourceIds.add(source.id);
         break;
       }
       case "duplicate": {
         const index = indexOf(stable.clipId);
-        const clip = { ...clips[index]!, id: newId() };
-        clips.splice(index + 1, 0, clip); changedClipIds.push(clip.id); verifySourceId = clip.sourceId;
+        const clip = copyManualClip(clips[index]!, newId());
+        clips.splice(index + 1, 0, clip); changedClipIds.push(clip.id); verifySourceIds.add(clip.sourceId);
+        break;
+      }
+      case "duplicate-many": {
+        const chosen = new Set(stable.clipIds);
+        if (!chosen.size || chosen.size !== stable.clipIds.length) fail("INVALID_ORDER");
+        for (const id of chosen) indexOf(id);
+        const originals = clips.filter(clip => chosen.has(clip.id));
+        const last = clips.reduce((last, clip, index) => chosen.has(clip.id) ? index : last, -1);
+        const copies = originals.map(clip => { verifySourceIds.add(clip.sourceId); return copyManualClip(clip, newId()); });
+        clips.splice(last + 1, 0, ...copies); changedClipIds.push(...copies.map(clip => clip.id));
         break;
       }
       case "remove": {
@@ -323,7 +346,7 @@ export class ManualVideoSequenceApplicationService {
         const clip = clips[indexOf(stable.clipId)]!;
         sourceRange(clip.sourceId, stable.sourceStartMs, stable.sourceEndMs);
         clip.sourceStartMs = stable.sourceStartMs; clip.sourceEndMs = stable.sourceEndMs;
-        verifySourceId = clip.sourceId;
+        verifySourceIds.add(clip.sourceId);
         break;
       }
       case "split": {
@@ -332,7 +355,7 @@ export class ManualVideoSequenceApplicationService {
         const sourceAtMs = clip.sourceStartMs + (stable.timelineAtMs - clip.timelineStartMs);
         const right = { ...clip, id: newId(), sourceStartMs: sourceAtMs };
         clip.sourceEndMs = sourceAtMs;
-        clips.splice(index + 1, 0, right); verifySourceId = clip.sourceId;
+        clips.splice(index + 1, 0, right); verifySourceIds.add(clip.sourceId);
         break;
       }
       case "reorder": {
@@ -359,7 +382,7 @@ export class ManualVideoSequenceApplicationService {
       if (!changedClipIds.includes(clip.id)) changedClipIds.push(clip.id);
     }
     if (!edits.length) return { project: before, changedClipIds: [] };
-    if (verifySourceId) await verifyManualVideoSource(resolveManualVideo(before, { sourceId: verifySourceId, expectedSnapshotId: stable.expectedSnapshotId }), this.options.identity);
+    for (const sourceId of verifySourceIds) await verifyManualVideoSource(resolveManualVideo(before, { sourceId, expectedSnapshotId: stable.expectedSnapshotId }), this.options.identity);
     if (this.options.history.journalIdentity !== journalIdentity) fail("STALE");
     resolveManualVideoSequence(this.options.history.current, stable.expectedSnapshotId);
     this.options.history.commit({ type: "timeline.edit", version: 1, edits }, { type: "user" });

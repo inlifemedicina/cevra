@@ -1,3 +1,4 @@
+import { supportsManualClipExtensions } from "./manual-clip-presentation.js";
 import { type ProjectHistory, type ProjectIR, type SourceAsset, type TimelineEditOperation, type ClipFrameTimingV1 } from "@cevra/project-ir";
 import { createSourceContentVerificationMemo, SourceTechnicalDescriptorResolver, type SourceContentIdentityPort, type SourceFileOperationalStampV1 } from "./source-technical-descriptor.js";
 
@@ -123,7 +124,7 @@ export class ManualVideoClipApplicationService {
     const track = before.timeline.tracks.find((item) => item.id === clip.trackId);
     if (before.timeline.clips.length !== 1 || before.captions.length || before.graphics.length
       || !track || track.kind !== "video" || track.locked || track.hidden || track.muted
-      || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || Object.keys(clip.extensions ?? {}).length
+      || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || !supportsManualClipExtensions(clip)
       || clip.timelineStartMs !== 0 || clip.timelineEndMs !== clip.sourceEndMs - clip.sourceStartMs
       || clip.sourceStartMs < 0 || clip.sourceEndMs > source.durationMs) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
     if (!Number.isSafeInteger(stable.sourceStartMs) || !Number.isSafeInteger(stable.sourceEndMs)

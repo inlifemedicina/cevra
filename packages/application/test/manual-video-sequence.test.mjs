@@ -326,3 +326,41 @@ test("3000 canonical one-frame occurrences resolve without rounded-ms duration c
   await f.service.edit(f.request({ type: "reorder", clipIds: clips.map(c => c.id) }));
   assert.deepEqual(f.history.toArchive(), archive); assert.equal(f.history.current.timeline.durationMs, 100000);
 });
+
+for (const version of [1, 2]) test(`V${version} collective duplicate preserves canonical order/properties, copies lineage and one recoverable Undo`, async () => {
+  const f = version === 1 ? await fourRanges() : frameSetup();
+  if (version === 2) for (const [sourceId, start, end] of [["s0",0,21],["s0",27,45],["s0",0,21],["s1",9,30]])
+    await f.service.edit(f.request({ type:"append", sourceId, sourceStartFrame:start, sourceEndFrame:end }));
+  const before = f.history.current, numbering = f.history.sourceNumbering, entries = f.history.entries.length;
+  const originals = [before.timeline.clips[1], before.timeline.clips[3]];
+  await f.service.edit(f.request({ type:"duplicate-many", clipIds:originals.map(c=>c.id).reverse() }));
+  const after = f.history.current, ordered = [...after.timeline.clips].sort((a,b)=>a.timelineStartMs-b.timelineStartMs), copies = ordered.slice(4);
+  assert.equal(f.history.entries.length, entries+1);
+  assert.deepEqual(ordered.slice(0,4).map(c=>c.id),before.timeline.clips.map(c=>c.id));
+  for (let i=0;i<copies.length;i++) {
+    const copy=copies[i], original=originals[i];
+    assert.notEqual(copy.id,original.id);
+    for (const key of ["sourceId","sourceStartMs","sourceEndMs","speed","volume","opacity"]) assert.deepEqual(copy[key],original[key]);
+    if(version===2) assert.deepEqual([copy.frameTiming.sourceStartFrame,copy.frameTiming.sourceEndFrame],[original.frameTiming.sourceStartFrame,original.frameTiming.sourceEndFrame]);
+    assert.deepEqual(copy.extensions["cevra.manualClipCopy.v1"],{version:1,originalClipId:original.id});
+  }
+  assert.deepEqual(after.sources,before.sources);assert.deepEqual(f.history.sourceNumbering,numbering);
+  f.history.undo(); assert.deepEqual(f.history.current,before);
+  const reopened=ProjectHistory.fromArchive(f.history.toArchive());reopened.redo();assert.deepEqual(reopened.current,after);
+  f.history.redo();assert.deepEqual(f.history.current,after);
+  await f.service.edit(f.request({type:"duplicate",clipId:copies[0].id})); // known copy metadata remains editable
+});
+
+test("collective duplicate rejects empty/repeated/unknown IDs without publication", async()=>{
+  const f=await fourRanges();const before=f.history.toArchive();
+  for(const clipIds of [[],["clip-1","clip-1"],["clip-1","absent"]]) {
+    await assert.rejects(f.service.edit(f.request({type:"duplicate-many",clipIds})));
+    assert.deepEqual(f.history.toArchive(),before);
+  }
+});
+test("collective duplicate verifies every distinct original before its single publication",async()=>{
+  const f=await fourRanges();const before=f.history.toArchive();
+  f.identity.checkSource=async uri=>uri.includes("s1")?"changed":"match";
+  await assert.rejects(f.service.edit(f.request({type:"duplicate-many",clipIds:["clip-2","clip-4"]})),{code:"MANUAL_VIDEO_SOURCE_CHANGED"});
+  assert.deepEqual(f.history.toArchive(),before);
+});

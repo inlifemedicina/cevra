@@ -75,7 +75,7 @@ function nativeDestinationPath(uri: string): string {
 
 export interface DesktopSessionServices {
   history: ProjectHistory;
-  ingest?: Pick<LocalSourceIngestService, "ingest">;
+  ingest?: Pick<LocalSourceIngestService, "ingest"> & Partial<Pick<LocalSourceIngestService, "reuseRegistered">>;
   sourceTechnicalDescriptor?: Pick<SourceTechnicalDescriptorApplicationService, "adopt">;
   transcription?: Pick<TranscriptionApplicationService, "transcribeSource">;
   mediaCapability: CapabilityState;
@@ -217,9 +217,11 @@ export class DesktopSession {
     this.closeAttempt.committed = true;
   }
 
-  async ingestLocal(params: { uri: string; displayName: string; operationId: string; locale: Locale }): Promise<{ state: DesktopHostState; importedSourceId: string }> {
+  async ingestLocal(params: { uri: string; displayName: string; operationId: string; locale: Locale }): Promise<{ state: DesktopHostState; importedSourceId: string; reused?: boolean }> {
     if (!this.services.mediaCapability.available || !this.services.ingest) throw safeError("MEDIA_UNAVAILABLE");
     return this.runOperation(params.operationId, (signal) => this.runMutation(async () => {
+      const reused = await this.services.ingest!.reuseRegistered?.({ uri: params.uri, locale: params.locale }, signal);
+      if (reused) return { state: this.state(), importedSourceId: reused.id, reused: true };
       const outcome = await this.services.ingest!.ingest({ uri: params.uri, displayName: params.displayName, locale: params.locale }, signal);
       await this.persistMutation();
       return { state: this.state(), importedSourceId: outcome.source.id };

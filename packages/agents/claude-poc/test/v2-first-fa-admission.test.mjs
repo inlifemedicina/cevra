@@ -300,13 +300,39 @@ test('reservation I/O uses remaining deadline; expired commit keeps slot but nev
   assert.equal(fake.calls.length, 0); assert.equal((await inspectInertLedger(root, id)).usedReservations, 1);
 });
 test('last sub-100ms interval remains valid without extending the entry deadline', async t => {
-  const root = await ledger(t), clock = clockFixture(), fake = fakeProcess(root);
+  const root = await ledger(t), clock = clockFixture();
+  bindPositiveTimers(t, clock);
+  const fake = fakeProcess(root, { onContact: () => clock.advance(49) });
   const admission = controller({ ledgerAdapter: { ...ledgerIo, async inspect(...args) {
     const value = await inspectInertLedger(...args); clock.advance(29950); return value;
   } } });
   assert.equal((await admission.runFirstFaWithAdmission(input(root, admission, fake, { clock }))).state, 'OFFLINE_FAKE_PASS');
+  assert.equal(clock.now(), 29999);
   assert.equal(fake.calls.length, 1); assert.equal(clock.pending(), 0);
 });
+test('last sub-100ms interval expires at the entry deadline despite the application minimum', async t => {
+  const root = await ledger(t), clock = clockFixture();
+  bindPositiveTimers(t, clock);
+  const fake = fakeProcess(root, { onContact: () => clock.advance(50) });
+  const admission = controller({ ledgerAdapter: { ...ledgerIo, async inspect(...args) {
+    const value = await inspectInertLedger(...args); clock.advance(29950); return value;
+  } } });
+  await assert.rejects(admission.runFirstFaWithAdmission(input(root, admission, fake, { clock })), code('TIMEOUT'));
+  assert.equal(clock.now(), 30000);
+  assert.equal(fake.calls.length, 1);
+  assert.equal((await inspectInertLedger(root, id)).usedReservations, 1);
+  assert.equal(clock.pending(), 0);
+});
+function bindPositiveTimers(t, clock) {
+  // Keep real zero-delay event-loop yields, but give the application's deadline
+  // the same controlled clock as admission/transport. Wall-time I/O contention
+  // cannot spuriously expire a logical deadline; exact expiry is tested above.
+  const realSet = globalThis.setTimeout, realClear = globalThis.clearTimeout;
+  t.mock.method(globalThis, 'setTimeout', (callback, delay = 0, ...args) => delay > 0
+    ? clock.setTimeout(() => callback(...args), delay) : realSet(callback, delay, ...args));
+  t.mock.method(globalThis, 'clearTimeout', handle => typeof handle === 'number'
+    ? clock.clearTimeout(handle) : realClear(handle));
+}
 test('receipt I/O cannot extend acceptance deadline', async t => {
   const root = await ledger(t), clock = clockFixture(), fake = fakeProcess(root);
   const admission = controller({ ledgerAdapter: { ...ledgerIo, async receipt(...args) {

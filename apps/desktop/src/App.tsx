@@ -4,7 +4,8 @@ import type { CevraLocale, TranslationKey } from "@cevra/i18n";
 import { translate } from "@cevra/i18n";
 import type { ProjectIR } from "@cevra/project-ir";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { DesktopBackend, DesktopBackendState, DesktopOperationError } from "./backend/desktop-backend";
+import type { DesktopBackend, DesktopBackendState, DesktopOperationError, NativeMediaDropState } from "./backend/desktop-backend";
+import { useNativeMediaDrop } from "./native-media-drop";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
 import { EditorialDraftPanel } from "./components/EditorialDraftPanel";
 import { DirectorPanel } from "./components/DirectorPanel";
@@ -37,6 +38,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [backendState, setBackendState] = useState<DesktopBackendState | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [runtimeNotice, setRuntimeNotice] = useState<TranslationKey | null>(null);
+  const [runtimeNoticeParameters, setRuntimeNoticeParameters] = useState<Record<string, number>>({});
   const [importBusy, setImportBusy] = useState(false);
   const [manualMutationBusy, setManualMutationBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
@@ -84,6 +86,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const t = useMemo(() => (key: TranslationKey, parameters: Readonly<Record<string, string | number>> = {}) => translate(locale, key, parameters), [locale]);
 
   const sourcePresentations = useMemo(() => project && backendState ? presentSources(project.sources, backendState.sourceNumbering, t) : new Map(), [project, backendState, t]);
+  const nativeDropHovering = useNativeMediaDrop(backend, receiveNativeDrop, backendState?.capabilities["media.import"].available === true && backendState.status !== "temporary-review");
 
   useEffect(() => {
     let current = true;
@@ -315,13 +318,38 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     setRuntimeNotice(null);
     try {
       const result = await backend.pickAndImportMedia(locale);
-      if (result.outcome === "imported") applyBackendState(result.state, result.importedSourceId);
+      if (result.outcome === "imported") {
+        applyBackendState(result.state, result.importedSourceId);
+        if (result.reused) setRuntimeNotice("media.alreadyImported");
+      }
       else setRuntimeNotice("media.pickerCancelled");
     } catch (cause) {
       handleRuntimeError(cause);
     } finally {
       setImportBusy(false);
     }
+  }
+
+  function receiveNativeDrop(state: NativeMediaDropState): boolean {
+    if (!state.receiptId) {
+      if (state.errorCode) setRuntimeNotice("media.dropInvalid");
+      return true;
+    }
+    if (!canonicalBackendState.current?.capabilities["media.import"].available || importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || transitionInFlight.current || checkpointPending || closePending || exportBusy) return false;
+    const receiptId = state.receiptId;
+    void afterRangeDraft(async () => {
+      setImportBusy(true); setRuntimeError(null); setRuntimeNotice(null);
+      try {
+        const result = await backend.importDroppedMedia!(receiptId, locale);
+        const last = [...result.results].reverse().find(item => item.outcome !== "failed");
+        applyBackendState(result.state, last && "sourceId" in last ? last.sourceId : undefined);
+        setRuntimeNoticeParameters({ imported: result.results.filter(item => item.outcome === "imported").length,
+          reused: result.results.filter(item => item.outcome === "reused").length, failed: result.results.filter(item => item.outcome === "failed").length });
+        setRuntimeNotice("media.dropFinished");
+      } catch (cause) { handleRuntimeError(cause); }
+      finally { setImportBusy(false); }
+    }).catch(cause => handleRuntimeError(cause));
+    return true;
   }
 
   async function changeHistory(direction: "undo" | "redo") {
@@ -432,12 +460,13 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       applyBackendState(result.state, undefined, true);
       if (startedSelection === selectionEpoch.current) {
         const ordered = [...result.state.project.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs);
-        const added = ordered.find(clip => !previousIds.has(clip.id));
-        const next = (request.type === "append" || request.type === "insert" || request.type === "duplicate") && added ? added
+        const additions = ordered.filter(clip => !previousIds.has(clip.id));
+        const added = additions[0];
+        const next = (request.type === "append" || request.type === "insert" || request.type === "duplicate" || request.type === "duplicate-many") && added ? added
           : (request.type === "remove" && request.clipId === selectedProjectItemId || request.type === "remove-many" && request.clipIds.includes(selectedProjectItemId ?? "")) ? ordered[Math.min(oldSelectedIndex, ordered.length - 1)]
           : ordered.find(clip => clip.id === selectedProjectItemId);
         if (next) {
-          if (request.type !== "reorder") setSelectedTimelineClipIds([next.id]);
+          if (request.type !== "reorder") setSelectedTimelineClipIds(request.type === "duplicate-many" ? additions.map(clip => clip.id) : [next.id]);
           setSelectedProjectItemId(next.id); setActiveSourceId(next.sourceId); setPlayheadMs(next.timelineStartMs);
           setPreviewSeek({ sequence: 0, timelineMs: next.timelineStartMs });
         }
@@ -559,7 +588,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} sidebarCompact={sidebarCompact} exportAvailable={exportAvailable && !manualActionBusy} status={backendState.status} retryAvailable={Boolean(backendState.checkpoint) && (backendState.status === "persistence-error" || backendState.status === "local-unsaved")} retryBusy={manualActionBusy} canUndo={backendState.canUndo && !manualActionBusy} canRedo={backendState.canRedo && !manualActionBusy} t={t} onWorkspaceChange={value => { void afterRangeDraft(() => setWorkspace(value)).catch(() => {}); }} onLocaleChange={value => requestAction(() => setLocale(value))} onMediaToggle={() => requestAction(() => setMediaOpen(value => !value))} onSidebarToggle={() => requestAction(() => setSidebarCompact(value => !value))} onUndo={() => { void afterRangeDraft(() => changeHistory("undo")).catch(() => {}); }} onRedo={() => { void afterRangeDraft(() => changeHistory("redo")).catch(() => {}); }} onRetryCheckpoint={() => requestAction(retryCheckpoint)} onExport={() => { void afterRangeDraft(() => setExportRequest(value => value + 1)).catch(() => {}); }} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={id => requestAction(() => { setActiveTool(id); if (id === "media") setMediaOpen(true); })} />
-        {mediaOpen && <MediaPanel backend={!backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? backend : undefined} snapshotId={project.history.headSnapshotId ?? undefined} thumbnailBusy={mutationBusy} actionBusy={manualActionBusy} onAction={action => afterRangeDraft(action)} sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !manualActionBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => requestAction(importMedia)} />}
+        {mediaOpen && <MediaPanel nativeDropHovering={nativeDropHovering} backend={!backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? backend : undefined} snapshotId={project.history.headSnapshotId ?? undefined} thumbnailBusy={mutationBusy} actionBusy={manualActionBusy} onAction={action => afterRangeDraft(action)} sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !manualActionBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => requestAction(importMedia)} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
             {realPreview ? sequenceClips && (sequenceClips.length > 1 || project.timeline.timingPolicy === "cfr30" && sequenceClips.length > 0)
@@ -567,14 +596,14 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
               : <ManualVideoPreview key={`${project.history.headSnapshotId}:${activeSourceId}:${previewClip?.id ?? "source"}`} backend={backend} source={project.sources.find((source) => source.id === activeSourceId)} sourceLabel={activeSourceId ? sourcePresentations.get(activeSourceId)?.label : undefined} snapshotId={project.history.headSnapshotId!} clip={previewClip} unsupportedClip={Boolean(selectedPreviewClip && !previewClip)} timelineOccupied={project.timeline.clips.length > 0 || project.captions.length > 0 || project.graphics.length > 0} sequenceEditing={sequenceClips !== undefined} frameEditing={sequenceClips !== undefined && (project.timeline.timingPolicy === "cfr30" || sequenceClips.length === 0)} busy={mutationBusy} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} /> : <WorkspaceStage presentations={sourcePresentations} workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={manualActionBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => requestAction(transcribeSource)} onCancelTranscription={() => void cancelTranscription()} />}
           </div>
           {visibleRuntimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(visibleRuntimeError))}</div>}
-          {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
+          {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice, runtimeNoticeParameters)}</div>}
         </div>
       </div>
       <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} controlsRequest={exportRequest} t={t} onAction={action => afterRangeDraft(action)} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
         directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || manualActionBusy} error={editorialError} t={t} onAction={action => afterRangeDraft(action)} onRefresh={() => requestAction(refreshEditorial)} onRevise={request => afterRangeDraft(() => reviseEditorial(request))} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
         contextualPanel={<Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t}
           exportPreparation={exportClips && exportClips.length > 0 && <ManualExportPreparationPanel key={project.project.id} backend={backend} snapshotId={project.history.headSnapshotId!} locale={locale} busy={editingBusy} actionBusy={manualActionBusy && !exportBusy} onConfirmAction={confirmActionSnapshot} available={exportAvailable} exportRequest={exportRequest} t={t} onBusyChange={value => { manualMutationInFlight.current = value; setExportBusy(value); }} onExported={result => applyBackendState(result.state, undefined, true)} onReconciled={(state, code) => handleRuntimeError({ code, reconciledState: state }, true)} />} />} />
-      <Timeline backend={backend} presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} selectedClipIds={selectedTimelineClipIds} onSelectClips={(ids, primary) => {
+      <Timeline backend={backend} presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} selectedClipIds={selectedTimelineClipIds} getSelectionEpoch={() => selectionEpoch.current} onSelectClips={(ids, primary) => {
         void afterRangeDraft(current => {
           if (primary && primary !== selectedProjectItemId) selectSettledProjectItem(current, primary, ids);
           else { selectionEpoch.current++; setSelectedTimelineClipIds(ids); setSelectedProjectItemId(primary); }
