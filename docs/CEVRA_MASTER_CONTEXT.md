@@ -3545,3 +3545,110 @@ action was performed, and no new layout or editing behavior was introduced.
 Director impact compatible, official progress stays 55%, F-A02 remains exhausted
 1/1. No real AI, human store inspection/copy, Take/iPhone/Xcode operation or
 merge is part of this approved follow-up.
+
+### 2026-10-09 — Verified 60-second preview and test execution boundary
+
+The approved autonomous follow-up exercised the frozen visual B package from
+Draft #93, commit `41decff63de969786b8c3d39831514a04b14a00b`, tree
+`0d983575cf1624bc01727ec249ab10fb8b3c56e0`. A new private technical store and
+copies of the verified synthetic A/B fixtures assembled ten six-second clips:
+1,800 CFR30 frames / 60 seconds. No existing app/project/window was operated.
+
+The initial `MANUAL_VIDEO_UNAVAILABLE` was an execution-environment failure.
+Memory-only diagnostic logging exposed
+`MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED` before render admission. The sandbox
+could not run the production own-group observer: `pgrep` could not obtain the
+process list and `ps` was denied. The raw FAIL remains preserved. An approved
+execution outside that restriction used the same uninstrumented harness,
+package, inputs, watchdog and resource limits, and passed all six preview calls
+and 40 Host responses. No product fix, observer stub or limit bypass was needed.
+
+Initial preview delivery was 4.947 s; same-snapshot warm delivery was 72.313 ms.
+After three reorders, preview delivery was 1.932 / 1.948 / 1.920 s, separately from
+edit acknowledgements of 23.425 / 21.080 / 20.009 ms. Reopened-Host cold delivery
+was 4.915 s. These are Host RPC measurements, not renderer dispatch, decode,
+paint, audible playback or human perception. Two outputs decoded to exactly
+1,800 frames / 60.000 s, with stereo 48 kHz audio. Normal Host close/reopen
+preserved Project IR exactly; Undo/Redo after reopen passed.
+
+[Method, evidence and limits](CEVRA_VIDS_USABILITY_AUDIT.md#60-second-preview-test-execution-boundary--2026-10-09)
+remain attached to the same
+[acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script),
+using its existing IDs. Native-window control and interface reservation are not
+available for concurrent EDVID testing; no native window was opened. Native
+close/reopen and perceived 60-second latency remain unexecuted. Draft #93 and its
+package stay frozen; this follow-up records evidence separately. Director impact:
+no new impact found within this checked scope; typed operations, IR/History,
+providers and authority are unchanged. Progress 55%, F-A02 exhausted 1/1 and full
+G1 unaccepted remain. No merge, real AI, account or Take/Xcode/iPhone operation.
+
+### 2026-10-09 — Native visual B approved; remaining functional round prepared
+
+After explicit coordinated authorization, the frozen Draft #93 package at
+`41decff63de969786b8c3d39831514a04b14a00b` was opened through the normal macOS
+LaunchServices path and revealed in Finder. Its exclusive bundle identifier
+`com.cevra.vids.visualb.41decff.review` and exact running executable were
+confirmed. The separate data directory did not exist before that opening;
+no old application was closed or personal project/store read or replaced.
+The Owner saw the opened version and replied **APROVADO** for visual B, which
+is now the accepted visual baseline. This approval is limited to presentation;
+functional completeness, performance, normal-window close/reopen and generic
+merge authority are not granted by it. Earlier pending checkpoints remain
+historical evidence, superseded only for opening and human visual acceptance.
+
+The subsequent request to continue Vids resumes the approved routine scope.
+PRs #92, #93 and #94 remain open Drafts with their existing heads and successful
+terminal CI at this preparation checkpoint. The source review remains valid
+for the unchanged product head. Terminal verification again confirmed all
+947 app inventory entries and its SHA256 tree, strict/deep signature, sealed
+runtime and synthetic A/B hashes. No product defect requiring a code correction
+was found within these checks, and no unchanged Host/preview trial was repeated.
+
+The [same acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+now provides one short remaining functional block: Finder import, reversible
+reorder/group duplication, fields/zoom, preview after edits, and normal isolated
+close/reopen. Verified fixture copies and machine-checked expected ranges/counts
+are supplied outside Git; accepted visuals and prior export/content are not
+requested again. Dedicated native-control tools are absent, but supported macOS
+APIs with
+existing access were discovered after the sandbox-only visibility check. A scoped
+AX observer confirmed the real window; native Importar/Cancelar preserved the
+empty project byte-for-byte, and a synthetic Director field retained its value
+after entering compact mode. The field was cleared. Keyboard/picker navigation
+did not produce a completed import, and restoration of open mode did not find
+the expected label; the window remains compact. Neither result proves a product
+defect. GUI work stopped immediately when Take needed Xcode. The parent
+coordinates the remaining physical/edited-project block; no further window
+actions, new feature, AI/account request or merge are part of this checkpoint.
+Director: no new impact found within the
+checked scope. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.
+
+### 2026-10-09 — Current Vids test reported OK; bounded owner round closed
+
+At 18:03 UTC the Owner reported **VIDS TESTE OK** after the current package's
+fixture folder was supplied. Record the communicated acceptance of that current
+test on #93 / `41decff63de969786b8c3d39831514a04b14a00b`, alongside the earlier
+visual B approval. Close this bounded owner-feedback round without asking for
+another human test or replaying the queued automatic round. No item-by-item
+execution trace was supplied: individual acceptance IDs, measured native
+performance, normal-window close/reopen and full G1 are not silently promoted.
+
+The technical evidence remains attached to the unchanged product: source review,
+successful exact-head CI, verified package/runtime/fixtures, six 60-second Host
+previews with separate RPC timings, and bounded native picker-cancel/field-retention
+checks. Preserve the raw environment FAIL, earlier pending checkpoints and the
+unexecuted automatic plan. This documentation closeout performs no further GUI,
+project, AI/provider/account or device action.
+
+Planning inspection found the open Draft chain rooted at main
+`60345a7db3fcfc1b78e6cc878cdbb217b1dac7a4`:
+#86 → #87 → #89 → #90 → #91 → #92 → #93 → #94. Each successor depends on the
+preceding branch; #94 carries documentation, leaving the approved #93 package
+frozen. The next proposed step is an ordered integration review of those exact
+heads and their CI/review/base gates. The ledger is not standing merge authority,
+ADR0036's preparation granted no merge, and this new test report grants none.
+No merge or branch retarget/rebase is performed; specific integration authority
+and dependency-gate confirmation remain required before taking that step.
+[Current evidence and limits](CEVRA_VIDS_USABILITY_AUDIT.md#current-owner-test-report-and-bounded-closeout--2026-10-09).
+Director: no new impact found within the checked scope. Progress55%, F-A02
+exhausted1/1 and full G1 unaccepted remain.

@@ -542,3 +542,161 @@ Director: compatible presentation, no new execution/provider authority.
 Progress55%, exhausted F-A021/1, prior technical/human limits and original media
 remain unchanged. No merge, real IA, account request, user app/project operation
 or Take/Xcode/iPhone action.
+
+### 60-second preview test execution boundary — 2026-10-09
+
+This autonomous follow-up uses the actual frozen package of Draft #93, commit
+`41decff63de969786b8c3d39831514a04b14a00b`, tree
+`0d983575cf1624bc01727ec249ab10fb8b3c56e0`, app tree SHA256
+`96abaecc90890630b5a823569631272d5dca300d6e257a330c831d715b833244`.
+It introduces no product code or function. Its own temporary project store,
+fixture copies and outputs are separate from previous technical/human projects.
+
+The plan has ten six-second occurrences of the existing A/B fixtures, with five
+distinct A ranges and one repeated B range: 1,800 CFR30 frames / 60,000 ms. Both
+source hashes are preserved. The measured uninstrumented run was
+04:17:36.853–04:17:56.550 UTC on 2026-10-09, macOS 27.2 / arm64.
+
+**Failure and cause.** The first sandboxed request returned
+`MANUAL_VIDEO_UNAVAILABLE` in 13.498 ms, with no delivered preview. Diagnostic
+logging added only in memory to the existing Host catch revealed the underlying
+`OwnedRenderResourceError: MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED` at the
+watchdog's first sample. Harmless own-PID/group probes confirmed that the sandbox
+cannot run `/bin/ps` (`operation not permitted`) and `/usr/bin/pgrep` cannot
+obtain a process list. The real production observer queries only its detached
+worker group and intentionally fails closed when observation is unavailable.
+This result is an execution-boundary failure, not a completed latency measurement
+or a demonstrated 60-second input/product defect.
+
+The approved uninstrumented recheck ran outside that restriction. The helper was
+byte-identical (SHA256
+`6e3d83f4b2974946f44e35dfb6c168cf567102e890ad924e27a0106d4b131793`),
+with the same package and fixture content. No diagnostic preload, observer stub,
+resource-limit change, source modification or cache prefill was used. The actual
+watchdog and source/output admission remained enabled. All six preview calls and
+40 Host responses passed. This resolves the reported failure without a product
+code change; the original FAIL and diagnostic receipts remain immutable evidence.
+
+| Phase | Edit acknowledgement (ms) | Preview RPC delivery (ms) | Sum of separate edit + preview RPC times (ms) |
+| --- | ---: | ---: | ---: |
+| Initial, new Host/store and no preview prefill | — | 4946.905 | — |
+| Same snapshot, warm whole-program entry | — | 72.313 | — |
+| Reorder 1, warm segment reuse | 23.425 | 1932.269 | 1955.694 |
+| Reorder 2, warm segment reuse | 21.080 | 1948.021 | 1969.101 |
+| Reorder 3, warm segment reuse | 20.009 | 1920.053 | 1940.062 |
+| New Host process after normal close/reopen | — | 4914.987 | — |
+
+Monotonic timers bound actual Host request/response delivery. The sum column is
+not a user-gesture-to-paint measurement. Artifact writes/probes occur outside the
+preview-delivery clock. Warm same-snapshot bytes match the initial packet exactly;
+reorders preserve canonical order/ranges and 60-second duration, with one Undo
+and Redo per edit. After normal `host.prepareClose`/`host.shutdown`, a new Host
+process restores Project IR exactly and Undo/Redo works. Both directly owned Host
+children close normally. This is Host lifecycle coverage, not native-window
+close/reopen.
+
+Two delivered MP4s were decoded with the packaged ffprobe: exactly 1,800 video
+frames, 60.000000 s video/audio/container duration, 720×404 H.264 CFR30 and stereo
+48 kHz AAC. Outputs are admitted previews; final export still uses originals.
+The receipt reports no instantaneous resource cap, latency SLA or representative
+performance distribution: these are descriptive samples from one synthetic
+session, with concurrent machine workload uncontrolled.
+
+External technical receipts are `host-60s-receipt.json` (original FAIL and
+separate uninstrumented PASS), `diagnostic-internal-cause-receipt.json`,
+`recheck-preparation.json` and preservation/review closeout receipts. App inventory,
+source/archive, earlier receipts/project and fixtures are checked after the run;
+none is rewritten to hide the failure. Packaged Host comparison to #92 found
+only four dependency source-path comments different; all other lines were
+byte-identical. Neither comparison nor the failure claims a new CSS-related bug.
+
+Native automation/interface-reservation tools are absent. The follow-up therefore
+opened no native window and did not contend with EDVID's active Codex-chat test.
+WKWebView/bootstrap/Finder/physical IME, native window close/reopen and perceived
+60-second latency remain unexecuted. This completes the objective Host fixture
+and measurement, under the existing I4-T1/X-T1/T7/X-T6/I17-T8/T9 catalog; it requests
+no new acceptance ID or human microtest. Full G1 remains unaccepted. Director:
+no new impact found in the checked scope; no provider/context/permission or
+IR/History authority change. Progress 55%, F-A02 exhausted 1/1, no merge, real AI,
+account request, human project/window or Take/Xcode/iPhone operation.
+
+### Native visual B owner approval and remaining functional review — 2026-10-09
+
+After the preceding Host-only checkpoint, the Owner explicitly authorized opening
+only the separate #93 package. Normal macOS LaunchServices opening and Finder
+reveal requests were accepted through the supported escalation mechanism. A
+read-only query confirmed the running executable's exact bundle path and
+`com.cevra.vids.visualb.41decff.review` identifier. Its own data directory had
+been absent before launch. The old app/window/project was not closed or replaced;
+no personal store or credentials were read, and permissions were not changed.
+The executor did not see or capture the window. The Owner then saw the opened
+version and replied **APROVADO** for visual B. That observed presentation becomes
+the accepted baseline at `41decff63de969786b8c3d39831514a04b14a00b`; functional,
+performance, native close/reopen and generic merge acceptance remain separate.
+Local opening/approval receipts preserve the earlier pending checkpoints rather
+than rewriting them as a broader PASS.
+
+The next request to continue Vids initially used terminal/inspection only
+because another task was using the browser. All947 package inventory entries,
+tree SHA256, strict/deep signature, sealed runtime and A/B fixture hashes matched
+the frozen receipts. PRs #92/#93/#94 and their latest exact-head workflow jobs
+were checked as open Drafts with successful terminal CI. Source/UI/Host tests and
+independent review remain valid at the unchanged product head; repeating them
+would not resolve physical native interactions. No code defect requiring a
+routine product correction was identified within this inspection scope.
+
+The [same catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+contains one five-step functional continuation with verified fixture copies and
+machine-checked expected counts/ranges, supplied outside Git. It does not request
+another visual round, ordinary export/content acceptance, manual RPC timing or a
+ten-clip manual montage. Dedicated native automation tools are not connected.
+After normal authorized
+activation, the existing macOS accessibility and capture preflights were true,
+and scoped AX reading exposed the real WKWebView controls. Native Importar and
+Cancelar returned success; the empty project stayed byte-identical and Salvo.
+A synthetic Director field set through AX survived entry to compact mode and
+was then cleared. Navigation to the fixture through synthesized shortcuts did
+not yield a completed import; no media was imported. The open-mode restoration
+selector was not found, so the window remains compact. These bounded findings
+do not prove a product defect, physical shortcut/IME correctness or edited-
+project lifecycle. No permission was requested/granted; a no-prompt System
+Events authorization query returned process-not-found, not an approval or denial.
+The executor stopped GUI work when Take required Xcode. Finder/drop, editing
+gestures, physical fields/IME and normal edited-project close/reopen remain in
+the same coordinated block. Full G1, native/perceived60s acceptance,
+progress55% and F-A021/1 are unchanged. Director: no new impact found in the
+checked scope. No feature, provider/permission/history change, real AI or merge.
+
+### Current owner test report and bounded closeout — 2026-10-09
+
+The Owner requested the fixture folder, whose A/B files were verified and opened
+through the normal Finder path. At18:03 UTC the Owner reported **VIDS TESTE OK**
+for the current test. This is a communicated human acceptance on the known #93
+package at `41decff63de969786b8c3d39831514a04b14a00b`, preserving the earlier
+**APROVADO** for visual B. The executor did not witness or capture item-by-item
+execution. Close the bounded owner-feedback round; do not claim each checklist
+item passed, measured native performance, a specific normal close/reopen or full
+G1. No unnecessary repetition of the accepted human test is requested.
+
+Technical consolidation retains the independent source review at the unchanged
+product head, successful exact-head CI, matched947-entry package inventory,
+strict/deep signature, sealed runtime and verified synthetic media. The 60-second
+Host record provides six delivered previews, 40 responses, exact decoded duration/
+frames and normal Host lifecycle/history; its RPC times are separate from native
+perception. The native AX record proves only picker opening/cancel with unchanged
+empty project and synthetic field retention on compact entry. Preserve its method
+limitations and the raw sandbox FAIL. The later automatic grouped plan was prepared
+behind a GUI reservation gate but never executed; retain it as such, with no replay
+automatically triggered by this owner report. No new access or inference is used.
+
+Current planning shows an open Draft dependency chain from main `60345a7` through
+#86/#87/#89/#90/#91/#92/#93/#94. The #92/#93/#94 snapshots were conflict-free on
+their declared bases; this alone is not integration authority or proof that every
+upstream gate is closed. The proposed next step is exact-head ordered integration
+review, with specific authority and each CI/review/base prerequisite verified.
+The ledger's no-standing-authority rule and ADR0036's no-merge preparation remain
+applicable; neither visual approval nor **VIDS TESTE OK** is a new merge instruction.
+No branch retarget, rebase, merge, source change, provider/permission extension,
+personal-project or device operation is performed by this closeout. Director:
+no new impact found within checked scope. Progress55%, F-A021/1 and full G1's
+unaccepted broader variants remain; the current owner-feedback round is closed.

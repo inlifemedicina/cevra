@@ -815,3 +815,65 @@ the new Draft/receipt; one future grouped functional+B round retains existing
 IDs. [Scope/evidence](CEVRA_VIDS_USABILITY_AUDIT.md#approved-visual-b-presentation--2026-10-09).
 Director impact compatible presentation only; no IA/provider/device/window
 operation or merge. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.
+
+### 2026-10-09 — 60-second Host follow-up, visual B package preserved
+
+The existing Draft #93 package (`41decff` / tree `0d983575`) now has an automated
+60-second fixture/method: ten clips, 1,800 CFR30 frames. The initial sandboxed
+preview failed because the real resource observer could not query its own
+process group. The original FAIL is preserved. The same uninstrumented harness
+passed outside that restriction with production monitoring/limits unchanged:
+six preview deliveries, 40 Host responses, two exact decoded 60-second outputs,
+normal Host close/reopen, exact Project IR and reopened Undo/Redo.
+
+After-reorder preview RPC delivery was 1.920–1.948 s; acknowledgement was measured
+separately. These facts do not establish native or perceived latency. No product
+code, function, dependency, permission, provider or IR/History change was made;
+Draft #93, its package and earlier receipts remain preserved.
+[Canonical evidence](CEVRA_VIDS_USABILITY_AUDIT.md#60-second-preview-test-execution-boundary--2026-10-09).
+Native window/close-reopen remains unexecuted because interface isolation from
+concurrent EDVID testing is not guaranteed by available tools. Reuse the same
+single acceptance catalog and IDs; no intermediate human microtests are requested.
+Director: no new impact found in this scope. Progress 55%, F-A02 1/1 and full G1
+unaccepted remain; no real AI, merge, human project/window or device operation.
+
+### 2026-10-09 — Native visual B accepted; functional continuation prepared
+
+The frozen #93 package at `41decff63de969786b8c3d39831514a04b14a00b` was
+subsequently opened under explicit authorization with its exclusive review
+identifier; the old app/project was preserved. The Owner saw it and replied
+**APROVADO** for visual B. This is the accepted presentation baseline, not full
+functional/performance/lifecycle acceptance or generic merge authority. Earlier
+not-opened checkpoints remain historical for their own execution scope.
+
+The request to continue Vids prepares the [same single functional block](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+with verified synthetic fixtures: import, reversible reorder/group duplication,
+fields/zoom, preview after edits and normal isolated close/reopen. Exact package
+inventory/signature/runtime/fixture checks passed again; unchanged source review
+and successful terminal CI are retained, with no repeated Host trial. Dedicated
+native tools remain absent; the supported macOS AX path using
+existing permissions provided bounded native checks: picker cancellation kept
+the empty project unchanged, and a synthetic Director field survived entry to
+compact mode. The field was cleared; the window remains compact after an
+unresolved selector restoration. No import or edited-project lifecycle is
+claimed. GUI work stopped for Take/Xcode; the parent coordinates remaining
+window interactions. No functions, engines/providers, IR/History
+authority or dependencies changed. Director: no new impact found within this
+scope. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain; no real AI
+or merge is performed by this continuation.
+
+### 2026-10-09 — Current Vids test accepted by owner report
+
+At18:03 UTC the Owner reported **VIDS TESTE OK** for the current test on the
+frozen #93 package `41decff`. This closes the bounded communicated owner round
+and retains visual B as the accepted baseline; no repeated human round is
+requested. Item-level results, measured native performance, normal-window
+close/reopen and full G1 are not inferred from that brief report. The automatic
+plan prepared during GUI reservation remains unexecuted, with no automatic replay.
+Existing source/CI/package/Host/native partial evidence and the original FAIL
+remain preserved. [Scoped closeout](CEVRA_VIDS_USABILITY_AUDIT.md#current-owner-test-report-and-bounded-closeout--2026-10-09).
+The next integration proposal concerns the open dependency chain
+#86 → #87 → #89 → #90 → #91 → #92 → #93 → #94; exact gates and specific merge
+authority must be confirmed before integration. No product/provider/history or
+GUI action is made by this record. Director: no new impact found in checked scope.
+Progress55%, F-A02 exhausted1/1 and broader G1 acceptance remain unchanged.
