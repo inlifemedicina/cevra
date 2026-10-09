@@ -861,3 +861,19 @@ window interactions. No functions, engines/providers, IR/History
 authority or dependencies changed. Director: no new impact found within this
 scope. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain; no real AI
 or merge is performed by this continuation.
+
+### 2026-10-09 — Current Vids test accepted by owner report
+
+At18:03 UTC the Owner reported **VIDS TESTE OK** for the current test on the
+frozen #93 package `41decff`. This closes the bounded communicated owner round
+and retains visual B as the accepted baseline; no repeated human round is
+requested. Item-level results, measured native performance, normal-window
+close/reopen and full G1 are not inferred from that brief report. The automatic
+plan prepared during GUI reservation remains unexecuted, with no automatic replay.
+Existing source/CI/package/Host/native partial evidence and the original FAIL
+remain preserved. [Scoped closeout](CEVRA_VIDS_USABILITY_AUDIT.md#current-owner-test-report-and-bounded-closeout--2026-10-09).
+The next integration proposal concerns the open dependency chain
+#86 → #87 → #89 → #90 → #91 → #92 → #93 → #94; exact gates and specific merge
+authority must be confirmed before integration. No product/provider/history or
+GUI action is made by this record. Director: no new impact found in checked scope.
+Progress55%, F-A02 exhausted1/1 and broader G1 acceptance remain unchanged.

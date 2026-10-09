@@ -666,3 +666,37 @@ gestures, physical fields/IME and normal edited-project close/reopen remain in
 the same coordinated block. Full G1, native/perceived60s acceptance,
 progress55% and F-A021/1 are unchanged. Director: no new impact found in the
 checked scope. No feature, provider/permission/history change, real AI or merge.
+
+### Current owner test report and bounded closeout — 2026-10-09
+
+The Owner requested the fixture folder, whose A/B files were verified and opened
+through the normal Finder path. At18:03 UTC the Owner reported **VIDS TESTE OK**
+for the current test. This is a communicated human acceptance on the known #93
+package at `41decff63de969786b8c3d39831514a04b14a00b`, preserving the earlier
+**APROVADO** for visual B. The executor did not witness or capture item-by-item
+execution. Close the bounded owner-feedback round; do not claim each checklist
+item passed, measured native performance, a specific normal close/reopen or full
+G1. No unnecessary repetition of the accepted human test is requested.
+
+Technical consolidation retains the independent source review at the unchanged
+product head, successful exact-head CI, matched947-entry package inventory,
+strict/deep signature, sealed runtime and verified synthetic media. The 60-second
+Host record provides six delivered previews, 40 responses, exact decoded duration/
+frames and normal Host lifecycle/history; its RPC times are separate from native
+perception. The native AX record proves only picker opening/cancel with unchanged
+empty project and synthetic field retention on compact entry. Preserve its method
+limitations and the raw sandbox FAIL. The later automatic grouped plan was prepared
+behind a GUI reservation gate but never executed; retain it as such, with no replay
+automatically triggered by this owner report. No new access or inference is used.
+
+Current planning shows an open Draft dependency chain from main `60345a7` through
+#86/#87/#89/#90/#91/#92/#93/#94. The #92/#93/#94 snapshots were conflict-free on
+their declared bases; this alone is not integration authority or proof that every
+upstream gate is closed. The proposed next step is exact-head ordered integration
+review, with specific authority and each CI/review/base prerequisite verified.
+The ledger's no-standing-authority rule and ADR0036's no-merge preparation remain
+applicable; neither visual approval nor **VIDS TESTE OK** is a new merge instruction.
+No branch retarget, rebase, merge, source change, provider/permission extension,
+personal-project or device operation is performed by this closeout. Director:
+no new impact found within checked scope. Progress55%, F-A021/1 and full G1's
+unaccepted broader variants remain; the current owner-feedback round is closed.

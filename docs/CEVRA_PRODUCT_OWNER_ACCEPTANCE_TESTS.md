@@ -224,6 +224,18 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 
 ### Single grouped G1 script
 
+**Aceite comunicado — 09/10/2026, 18:03 UTC:** após receber os arquivos de teste
+e usar a versão atual, o Owner informou **VIDS TESTE OK**. O retorno humano desta
+rodada limitada está **ENCERRADO / ACEITO CONFORME RELATO**, no pacote #93
+`41decff63de969786b8c3d39831514a04b14a00b`, mantendo o visual B já aprovado.
+Não pedir repetição desse teste. A mensagem não fornece execução/resultados por
+etapa: não registrar PASS individual inventado, tempo medido, fechamento/reabertura
+específico ou G1 completo. O plano automático preparado enquanto Take/Xcode
+reservava a GUI permanece registrado como não executado, sem replay automático.
+Este aceite não autoriza merge. Progresso55% e F-A02 consumido1/1 não mudam.
+O roteiro e checkpoints abaixo são preparação/histórico, não uma nova obrigação
+humana. [Consolidação e limites](CEVRA_VIDS_USABILITY_AUDIT.md#current-owner-test-report-and-bounded-closeout--2026-10-09).
+
 **Estado corrente — 09/10/2026, após abertura e aceite visual:** o pacote
 `41decff63de969786b8c3d39831514a04b14a00b` / Draft #93 foi aberto por autorização
 expressa, com identidade própria `com.cevra.vids.visualb.41decff.review`.

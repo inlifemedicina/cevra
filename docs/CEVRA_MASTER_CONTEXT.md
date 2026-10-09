@@ -3622,3 +3622,33 @@ coordinates the remaining physical/edited-project block; no further window
 actions, new feature, AI/account request or merge are part of this checkpoint.
 Director: no new impact found within the
 checked scope. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.
+
+### 2026-10-09 — Current Vids test reported OK; bounded owner round closed
+
+At 18:03 UTC the Owner reported **VIDS TESTE OK** after the current package's
+fixture folder was supplied. Record the communicated acceptance of that current
+test on #93 / `41decff63de969786b8c3d39831514a04b14a00b`, alongside the earlier
+visual B approval. Close this bounded owner-feedback round without asking for
+another human test or replaying the queued automatic round. No item-by-item
+execution trace was supplied: individual acceptance IDs, measured native
+performance, normal-window close/reopen and full G1 are not silently promoted.
+
+The technical evidence remains attached to the unchanged product: source review,
+successful exact-head CI, verified package/runtime/fixtures, six 60-second Host
+previews with separate RPC timings, and bounded native picker-cancel/field-retention
+checks. Preserve the raw environment FAIL, earlier pending checkpoints and the
+unexecuted automatic plan. This documentation closeout performs no further GUI,
+project, AI/provider/account or device action.
+
+Planning inspection found the open Draft chain rooted at main
+`60345a7db3fcfc1b78e6cc878cdbb217b1dac7a4`:
+#86 → #87 → #89 → #90 → #91 → #92 → #93 → #94. Each successor depends on the
+preceding branch; #94 carries documentation, leaving the approved #93 package
+frozen. The next proposed step is an ordered integration review of those exact
+heads and their CI/review/base gates. The ledger is not standing merge authority,
+ADR0036's preparation granted no merge, and this new test report grants none.
+No merge or branch retarget/rebase is performed; specific integration authority
+and dependency-gate confirmation remain required before taking that step.
+[Current evidence and limits](CEVRA_VIDS_USABILITY_AUDIT.md#current-owner-test-report-and-bounded-closeout--2026-10-09).
+Director: no new impact found within the checked scope. Progress55%, F-A02
+exhausted1/1 and full G1 unaccepted remain.
