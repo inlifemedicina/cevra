@@ -619,3 +619,50 @@ no new acceptance ID or human microtest. Full G1 remains unaccepted. Director:
 no new impact found in the checked scope; no provider/context/permission or
 IR/History authority change. Progress 55%, F-A02 exhausted 1/1, no merge, real AI,
 account request, human project/window or Take/Xcode/iPhone operation.
+
+### Native visual B owner approval and remaining functional review — 2026-10-09
+
+After the preceding Host-only checkpoint, the Owner explicitly authorized opening
+only the separate #93 package. Normal macOS LaunchServices opening and Finder
+reveal requests were accepted through the supported escalation mechanism. A
+read-only query confirmed the running executable's exact bundle path and
+`com.cevra.vids.visualb.41decff.review` identifier. Its own data directory had
+been absent before launch. The old app/window/project was not closed or replaced;
+no personal store or credentials were read, and permissions were not changed.
+The executor did not see or capture the window. The Owner then saw the opened
+version and replied **APROVADO** for visual B. That observed presentation becomes
+the accepted baseline at `41decff63de969786b8c3d39831514a04b14a00b`; functional,
+performance, native close/reopen and generic merge acceptance remain separate.
+Local opening/approval receipts preserve the earlier pending checkpoints rather
+than rewriting them as a broader PASS.
+
+The next request to continue Vids initially used terminal/inspection only
+because another task was using the browser. All947 package inventory entries,
+tree SHA256, strict/deep signature, sealed runtime and A/B fixture hashes matched
+the frozen receipts. PRs #92/#93/#94 and their latest exact-head workflow jobs
+were checked as open Drafts with successful terminal CI. Source/UI/Host tests and
+independent review remain valid at the unchanged product head; repeating them
+would not resolve physical native interactions. No code defect requiring a
+routine product correction was identified within this inspection scope.
+
+The [same catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+contains one five-step functional continuation with verified fixture copies and
+machine-checked expected counts/ranges, supplied outside Git. It does not request
+another visual round, ordinary export/content acceptance, manual RPC timing or a
+ten-clip manual montage. Dedicated native automation tools are not connected.
+After normal authorized
+activation, the existing macOS accessibility and capture preflights were true,
+and scoped AX reading exposed the real WKWebView controls. Native Importar and
+Cancelar returned success; the empty project stayed byte-identical and Salvo.
+A synthetic Director field set through AX survived entry to compact mode and
+was then cleared. Navigation to the fixture through synthesized shortcuts did
+not yield a completed import; no media was imported. The open-mode restoration
+selector was not found, so the window remains compact. These bounded findings
+do not prove a product defect, physical shortcut/IME correctness or edited-
+project lifecycle. No permission was requested/granted; a no-prompt System
+Events authorization query returned process-not-found, not an approval or denial.
+The executor stopped GUI work when Take required Xcode. Finder/drop, editing
+gestures, physical fields/IME and normal edited-project close/reopen remain in
+the same coordinated block. Full G1, native/perceived60s acceptance,
+progress55% and F-A021/1 are unchanged. Director: no new impact found in the
+checked scope. No feature, provider/permission/history change, real AI or merge.

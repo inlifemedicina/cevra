@@ -836,3 +836,28 @@ concurrent EDVID testing is not guaranteed by available tools. Reuse the same
 single acceptance catalog and IDs; no intermediate human microtests are requested.
 Director: no new impact found in this scope. Progress 55%, F-A02 1/1 and full G1
 unaccepted remain; no real AI, merge, human project/window or device operation.
+
+### 2026-10-09 — Native visual B accepted; functional continuation prepared
+
+The frozen #93 package at `41decff63de969786b8c3d39831514a04b14a00b` was
+subsequently opened under explicit authorization with its exclusive review
+identifier; the old app/project was preserved. The Owner saw it and replied
+**APROVADO** for visual B. This is the accepted presentation baseline, not full
+functional/performance/lifecycle acceptance or generic merge authority. Earlier
+not-opened checkpoints remain historical for their own execution scope.
+
+The request to continue Vids prepares the [same single functional block](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+with verified synthetic fixtures: import, reversible reorder/group duplication,
+fields/zoom, preview after edits and normal isolated close/reopen. Exact package
+inventory/signature/runtime/fixture checks passed again; unchanged source review
+and successful terminal CI are retained, with no repeated Host trial. Dedicated
+native tools remain absent; the supported macOS AX path using
+existing permissions provided bounded native checks: picker cancellation kept
+the empty project unchanged, and a synthetic Director field survived entry to
+compact mode. The field was cleared; the window remains compact after an
+unresolved selector restoration. No import or edited-project lifecycle is
+claimed. GUI work stopped for Take/Xcode; the parent coordinates remaining
+window interactions. No functions, engines/providers, IR/History
+authority or dependencies changed. Director: no new impact found within this
+scope. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain; no real AI
+or merge is performed by this continuation.

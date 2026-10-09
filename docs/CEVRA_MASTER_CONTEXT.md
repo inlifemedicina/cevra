@@ -3581,3 +3581,44 @@ package stay frozen; this follow-up records evidence separately. Director impact
 no new impact found within this checked scope; typed operations, IR/History,
 providers and authority are unchanged. Progress 55%, F-A02 exhausted 1/1 and full
 G1 unaccepted remain. No merge, real AI, account or Take/Xcode/iPhone operation.
+
+### 2026-10-09 — Native visual B approved; remaining functional round prepared
+
+After explicit coordinated authorization, the frozen Draft #93 package at
+`41decff63de969786b8c3d39831514a04b14a00b` was opened through the normal macOS
+LaunchServices path and revealed in Finder. Its exclusive bundle identifier
+`com.cevra.vids.visualb.41decff.review` and exact running executable were
+confirmed. The separate data directory did not exist before that opening;
+no old application was closed or personal project/store read or replaced.
+The Owner saw the opened version and replied **APROVADO** for visual B, which
+is now the accepted visual baseline. This approval is limited to presentation;
+functional completeness, performance, normal-window close/reopen and generic
+merge authority are not granted by it. Earlier pending checkpoints remain
+historical evidence, superseded only for opening and human visual acceptance.
+
+The subsequent request to continue Vids resumes the approved routine scope.
+PRs #92, #93 and #94 remain open Drafts with their existing heads and successful
+terminal CI at this preparation checkpoint. The source review remains valid
+for the unchanged product head. Terminal verification again confirmed all
+947 app inventory entries and its SHA256 tree, strict/deep signature, sealed
+runtime and synthetic A/B hashes. No product defect requiring a code correction
+was found within these checks, and no unchanged Host/preview trial was repeated.
+
+The [same acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+now provides one short remaining functional block: Finder import, reversible
+reorder/group duplication, fields/zoom, preview after edits, and normal isolated
+close/reopen. Verified fixture copies and machine-checked expected ranges/counts
+are supplied outside Git; accepted visuals and prior export/content are not
+requested again. Dedicated native-control tools are absent, but supported macOS
+APIs with
+existing access were discovered after the sandbox-only visibility check. A scoped
+AX observer confirmed the real window; native Importar/Cancelar preserved the
+empty project byte-for-byte, and a synthetic Director field retained its value
+after entering compact mode. The field was cleared. Keyboard/picker navigation
+did not produce a completed import, and restoration of open mode did not find
+the expected label; the window remains compact. Neither result proves a product
+defect. GUI work stopped immediately when Take needed Xcode. The parent
+coordinates the remaining physical/edited-project block; no further window
+actions, new feature, AI/account request or merge are part of this checkpoint.
+Director: no new impact found within the
+checked scope. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.

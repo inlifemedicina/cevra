@@ -224,6 +224,66 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 
 ### Single grouped G1 script
 
+**Estado corrente — 09/10/2026, após abertura e aceite visual:** o pacote
+`41decff63de969786b8c3d39831514a04b14a00b` / Draft #93 foi aberto por autorização
+expressa, com identidade própria `com.cevra.vids.visualb.41decff.review`.
+O Owner viu a versão e respondeu **APROVADO** para o visual B, que passa a ser a
+base visual. Isso substitui apenas o estado histórico de abertura/aceite visual
+nos checkpoints abaixo. Não aprova todos os testes funcionais, desempenho,
+fechamento/reabertura ou merge. O aplicativo/projeto existente foi preservado.
+
+**Bloco funcional restante, uma única rodada coordenada:** a equipe já verificou
+PRs #92/#93/#94, jobs de CI concluídos com sucesso, identidade/assinatura,
+947 arquivos do pacote, selo do runtime, hashes das fixtures e expectativas
+abaixo. Os testes offline e do Host permanecem evidência técnica válida; não
+pedir ao Owner repeti-los, medir RPC, executar comandos ou reconfirmar o visual.
+O foco foi liberado temporariamente; a equipe executou a observação nativa e
+o cancelamento do seletor sem alterar o projeto, mais retenção de texto do
+Diretor ao entrar em modo compacto. O texto sintético foi limpo. A janela ficou
+compacta, pois o seletor usado para voltar ao modo aberto não foi encontrado.
+As tentativas de navegação por teclado não concluíram importação. A equipe
+parou a GUI quando Take precisou do Xcode; coordenar o foco antes de retomar.
+Usar somente a variante acima e o projeto descartável preparado;
+se houver um projeto diferente, preservar o estado e informar a equipe.
+
+Os arquivos fornecidos são `Fonte-A-CFR24-8s.mp4` (faixa vermelha),
+`Fonte-B-NTSC-6s.mp4` (faixa azul) e `INVALID-MEDIA.txt` (erro esperado).
+As cópias verificadas, o caminho exato do aplicativo e uma pasta vazia para uma
+eventual exportação são fornecidos no recibo local, fora do repositório.
+Importar A antes de B em um projeto vazio; em **Controles da montagem**, escolher
+**Fonte**, digitar **IN (frames)** / **OUT (frames)** e usar **Adicionar trecho ao final**:
+
+| Ordem | Fonte | IN | OUT | Quadros |
+| --- | --- | ---: | ---: | ---: |
+| 1 | A vermelha | 15 | 60 | 45 |
+| 2 | B azul | 30 | 75 | 45 |
+| 3 | A vermelha, repetição | 15 | 60 | 45 |
+| 4 | A vermelha, outro trecho | 120 | 150 | 30 |
+
+Resultado de referência: quatro clips, 165 quadros / 5,5 s, indicação
+`00:05:15` (minutos:segundos:quadros). IN inclui o primeiro quadro; OUT o exclui.
+
+| Passo único | Ação e resultado esperado | IDs existentes |
+| --- | --- | --- |
+| Importar e montar | Arrastar A e depois B do Finder; repetir A junto do arquivo inválido. Permanecem duas fontes, com erro separado para o inválido e sem repetição automática. Montar as quatro linhas acima, sem usar mídia pessoal. | D1-T1, X-T5 |
+| Reorder e grupo | Começar a arrastar B sem um clique prévio; cancelar uma vez com Esc, mantendo A/B/A/A. Arrastar e soltar B no fim: A/A/A/B; um Desfazer restaura a referência. Clicar no primeiro clip e Cmd+clicar no segundo; Cmd+D cria A/B/cópiaA/cópiaB/A/A, seis clips / 255 quadros / 8,5 s. Desfazer remove o bloco; Refazer restaura; Desfazer deixa novamente quatro clips. | I4-T1, X-T1/T2/T7 |
+| Campos e escala | Escolher zoom manual. No primeiro clip, mudar OUT60 para59 e confirmar com Enter: 164 quadros / `00:05:14`; aguardar a atualização e Desfazer: 165 quadros. A escala manual permanece. Num campo de texto do Diretor, digitar um texto curto e usar Cmd+Z: desfaz texto, sem editar a montagem. A retenção ao entrar em compacto já passou tecnicamente; não repetir esse microteste. Conferir somente acesso/foco no fluxo e usar IME se já disponível, sem configurar outro método. | I4-T1, X-T1/T7 |
+| Prévia após editar | Com A/B/A/A restaurado, selecionar Sequência e reproduzir uma volta. Conferir a entrega da prévia, ordem e ausência de quadro fora do trecho; registrar eventual pausa/tela preta como regressão observada. Não medir manualmente a latência nem repetir o aceite anterior de conteúdo/export. | X-T6/T9, I8-T3/T6 |
+| Salvar e reabrir | Esperar Salvo; fechar normalmente somente esta variante e reabrir o mesmo aplicativo. Permanecem duas fontes, quatro clips e os mesmos IN/OUT; Desfazer/Refazer disponíveis preservam o histórico. A posição antiga do cursor não é requisito. Se houver Salvando/Alterações não salvas/fechamento pendente, manter aberto e informar a equipe, sem forçar encerramento. | X-T1/T2/T7, I17-T8/T9 |
+
+Registrar uma resposta por passo: PASS/FAIL/BLOCKED/NÃO EXECUTADO e a observação.
+Importação/drop e gestos físicos, teclado/IME e lifecycle do projeto editado
+dependem da rodada restante. A via AX oficial permitiu os controles limitados
+acima, mas não concluiu navegação/importação ou edição da montagem. Falha de salvamento,
+voz/lábios e medição perceptiva60s continuam BLOCKED/NÃO EXECUTADOS na variante
+sem método/capacidade preparados; não provocar falhas nem montar dez clips à mão.
+Exportar novamente só se a rodada revelar uma regressão que exija essa prova;
+a equipe inspeciona o arquivo, sem pedir ferramentas técnicas ao Owner.
+G1 completo, progresso55% e F-A02 consumido1/1 permanecem inalterados.
+
+Os checkpoints seguintes preservam a evolução anterior; seus estados de abertura
+e visual são históricos onde substituídos pelo estado corrente acima.
+
 **Medição técnica60s — 09/10/2026:** nos mesmos I4-T1/X-T1/T7/X-T6/I17-T8/T9,
 a equipe preparou automaticamente dez clips sintéticos (1.800 frames / 60 s).
 O FAIL inicial foi causado pelo sandbox impedindo a observação dos processos
