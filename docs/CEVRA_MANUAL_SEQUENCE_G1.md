@@ -1282,9 +1282,9 @@ still beneath it. The production causes and resulting implementation are:
   Save As names the output, Tags adds optional Finder metadata, and Where selects
   its destination. Export remains the existing MP4/H264/AAC original-master path.
 
-IN/OUT numerical fields deliberately retain the existing explicit Apply/Adjust
-button. Enter/blur/Esc automatic confirmation awaits a separate Owner decision;
-it does not block these approved corrections.
+At this historical checkpoint IN/OUT numerical fields retained Apply/Adjust.
+The Owner's 2026-10-07 00:22:58-UTC decision below supersedes that pending state
+for selected-clip trim; append/insert remain explicit creation actions.
 
 Offline validation passed full build, `test:ci` (UI167, Host181, Application318,
 Contracts26, i18n2, IR70, Store18, transcript-cache12, Alignment33, Media143,
@@ -1370,6 +1370,91 @@ unchanged History. The failed bundle receipt is retained. This narrow delta requ
 independent review and its own published-head CI; the earlier APPROVE does not
 approve the delta. No new app/human round, IN/OUT semantics or resource budget is
 changed. Director impact compatible; progress55%, F-A021/1, full G1 unaccepted.
+
+### Approved field/keyboard correction and incremental proposal — 2026-10-07
+
+The Owner approved valid IN/OUT Enter or blur, Escape cancellation, one History
+action and deduplication of Enter followed by blur. A separate branch
+`feat/vids-usability-keyboard-audit` starts at #89's `2382dae`; code checkpoint
+`10a66830e56a31e17a22ed6ad10efc7f5814f9fe` passed Desktop build, UI183/183 and
+i18n2/2 offline. Common existing-function keyboard actions share guarded visible
+controls; fields/contenteditable, IME/229, consumed/repeated events, dialogs,
+VoiceOver and browser/system shortcuts keep ownership. Multi-selection movement
+and removal remain one typed atomic request. Original marks and numeric clip
+drafts are explicitly distinct. No reverse playback or fictitious Save is added.
+
+The complete [33-row field audit](CEVRA_VIDS_USABILITY_AUDIT.md) records every
+received independent finding. Corrections preserve pending editorial text across
+transient refresh/revise errors, distinguish confirmed stale, gate composition
+and mixer fixtures to presentation mode, show canonical/unknown Inspector data,
+disable absent consumers honestly, and add accessible labels/tabs/thumbnail retry
+and resize cancellation/keyboard limits. This source delta needs proportional
+review and exact-head CI; the signed `2382dae` package remains a separate prior
+artifact. No human app/project was replaced or operated.
+
+Historical / SUPERSEDED first correction — the #90 review's P2 blur/button failure was addressed at code
+`3e4397d64a80fdc1687f0e42d10106a7c3f5f741`: an explicit button action takes
+priority over implicit trim, retaining the visible snapshot. Append/Insert use
+the range draft; other actions use canonical selection. UI194/194, i18n2/2 and
+build PASS include real focus/user.click, Enter/blur/Esc and null-relatedTarget
+regressions; exact-head CI/re-review remain required.
+
+P2 settlement foundation at code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
+restores the approved Enter/blur confirmation contract through explicit draft
+settlement and a captured following App intent. Selecting another clip commits
+the previous range before replacing its fields; Duplicate/Append/Insert confirms
+trim then operates at the actual backend head with OUT29. Trim and the next edit
+have separate recoverable Undo entries. Focus-only Tab is never activation;
+failed settlement retains the draft and stops the next intent; Esc cancels.
+Original/other-source range creation remains explicit. UI207/207, i18n2/2 and
+Desktop build PASS include 13 new integration regressions; nine were RED before
+implementation at5f9266c. New-head CI/re-review PENDING; #90 Draft, #89/package
+preserved. No native/user-app/Take operation or acceptance inference. Reuse the
+same grouped I4-T1/X-T1/T7/X-T6 checklist; no new round per field or button.
+
+Current follow-up code `63c89c026e4a18b216c69e0dbc2871d632239163` addresses the
+two remaining review P2 at57511e1. A failed range consumes any pointer/key/drag
+already in progress through release/click/Drop; retry requires a new gesture.
+Import button/Cmd+I and all action entries now share settlement; TopBar/Cmd+E/
+Inspector export uses the confirmed snapshot, retaining receipt/publication
+no-replay. Mode/repeat survives snapshot remount; actual decoder/media busy and
+stale drag/trim geometry still retire unsafe operations. Full routing inventory
+is in [the canonical audit](CEVRA_VIDS_USABILITY_AUDIT.md#inventário-completo-de-entradas-e-limites).
+Offline UI231/231, i18n2/2, build/diff PASS include 24 new cases; first12 were
+ten RED/two already PASS. Historical575 CI ended10/10 PASS, monorepo1,452/UI207,
+after alignment's pip-download failure and terminal retry. New-head CI/re-review
+PENDING; #90 remains Draft. Same grouped acceptance, no new human round, cache,
+provider, native GUI/device/Take operation or merge; no acceptance promotion.
+
+Firstf70c874 CI: PR Monorepo/UI231 passed; push's old temporary-editorial test
+failed. Wait for fields enabled and UI busy settled, retaining native-command
+checks and adding saved-title proof; production unchanged. Failure preserved;
+new head CI/re-review remain mandatory.
+
+Latest900da2a review resolved the two previous P2 and identified reviewed legacy
+conform30frames rebound after trim900ms. Code
+`f530b1d1b3db86e10f52f85259d8d6d335f35ebb` conserves the proposal's snapshot;
+App rejects that captured conform before backend after head changes. Reading
+waits for the confirmed IR; review drafts/display/confirmation keep immutable
+binding, and a new read/cancel retires old asynchronous replies. Read27frames
+after trim900ms, explicitly confirm, and retain separate trim/conform Undo.
+UI236/build/i18n2/diff PASS, five new cases, valid baseline4RED/1alreadyPASS.
+900da2a CI10/10 historical; new-head CI/review pending at publication. Existing
+grouped catalog only; no cache/GUI/merge/provider or native acceptance inference.
+[Complete conversion contract/routing](CEVRA_VIDS_USABILITY_AUDIT.md#p2-da-conversão-legada--proposta-vinculada-ao-snapshot-revisado).
+
+The Owner's requested edit fluency is not met by 6.85–8.05-s new-program waits.
+Two external proofs use the existing renderer and verify decoded-frame hashes,
+complete decoded PCM, grids/endpoints and original hashes. The immutable-memory
+segment proof measured reorder1.249s and one-frame trim1.753s versus uncached
+6.755/6.629s; Host/IPC/PNG/UI/decoder and production RSS admission are excluded.
+The concrete 32-MiB/64-entry worker-local segment/receipt LRU proposal, alternatives,
+costs/risks/estimates and receipt hashes are documented for approval. **No production
+cache implementation is authorized by the IN/OUT decision or present in this
+delta.** Full-program validation and original-master export stay mandatory.
+Prototype timing is not acceptance. Native delivery/perception, minimum layout,
+picker and human close/reopen await one coordinated regression, with no field-by-field
+human rounds, progress promotion or AI/provider execution.
 
 ## Product and Director boundaries
 

@@ -40,9 +40,11 @@ it("cancellation keeps replacement blocked until retirement and retains a confir
   render(<ManualExportPreparationPanel {...props({ exportManualSequence, cancelOperation: cancel } as unknown as DesktopBackend)} onExported={onExported} />);
   fireEvent.click(screen.getByRole("button", { name: translate("pt-BR", "export.choose") }));
   fireEvent.click(screen.getByRole("button", { name: translate("pt-BR", "export.cancel") }));
+  expect(screen.getByRole("progressbar").hasAttribute("value")).toBe(false);
   expect(cancel.mock.calls[0][0]).toBe(exportManualSequence.mock.calls[0][0].operationId);
   expect(screen.getByRole("button", { name: translate("pt-BR", "export.choose") }).matches(":disabled")).toBe(true);
   await act(async () => release()); await screen.findByText("new.mp4");
+  expect(screen.queryByRole("progressbar")).toBeNull();
   expect(onExported).toHaveBeenCalledExactlyOnceWith(exported);
   expect(screen.queryByText(translate("pt-BR", "export.cancelled"))).toBeNull();
   expect(exportManualSequence).toHaveBeenCalledTimes(1);

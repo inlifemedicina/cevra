@@ -238,6 +238,58 @@ revisão independente e próxima rodada agrupada aguardam coordenação. O rotei
 abaixo continua referência do pacote congelado, sem afirmar que o novo código
 foi instalado. Nenhum novo teste humano é solicitado nesta etapa.
 
+**Decisão e automação — 07/10/2026:** Enter ou blur confirma IN/OUT válido do
+trecho selecionado, Esc cancela, um Undo desfaz e Enter+blur não duplica o commit
+(Owner 00:22:58 UTC). Adicionar/Inserir e conversão de timing continuam explícitos.
+O [inventário completo de campos/atalhos e proposta de latência](CEVRA_VIDS_USABILITY_AUDIT.md)
+reúne achados P1/P2 e correções na branch separada
+`feat/vids-usability-keyboard-audit`, código `10a66830e56a31e17a22ed6ad10efc7f5814f9fe`:
+build, UI183/183 e i18n2/2 PASS offline; revisão exata/CI ainda requeridos.
+Na futura rodada única, reutilizar I4-T1, X-T1/T7 e variante X-T6 para campos e
+foco/atalhos/grupo, rascunho/erro/retry, prévia após editar, export e fechar/reabrir.
+Não criar aceite humano por campo nem repetir os casos já aceitos. A espera atual
+de 6,85–8,05 s não atende ao pedido; a prova incremental no worker não mede entrega
+completa do app nem aprova o cache de produção. Picker, percepção/áudio nativos,
+layout mínimo da ajuda e persistência humana continuam NÃO EXECUTADOS nesta etapa.
+
+A reavaliação P2 de `5f9266c` substitui a prioridade genérica de botões (histórico
+`3e4397d`) pelo settlement explícito, código `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`.
+No mesmo checklist agrupado: OUT30→29 + seleção confirma o clip antigo antes de
+mostrar OUT60; Duplicar confirma trim e copia OUT29; Adicionar/Inserir confirma
+trim e cria o range digitado. Há dois comandos recuperáveis quando ocorrem trim
++ ação: um Undo retira a ação, outro restaura OUT30. Tab em Adicionar sem ativar
+confirma o trim; clicar/editar no Director não cria clip. Enter/blur dedup, Esc,
+falha/retry e ativação pointer/Enter/Space/Cmd+D integram a mesma regressão.
+Build/UI207/i18n2 PASS offline; novo CI e revisão independente exata PENDENTES.
+Sem nova rodada por botão e sem inferir PASS nativo/humano do DOM.
+
+O fechamento dos dois P2 de57511e1, código
+`63c89c026e4a18b216c69e0dbc2871d632239163`, permanece neste mesmo checklist:
+press → falha de trim → release/click/Drop não repete comando nem ação; um gesto
+novo permite retry. Importar/Cmd+I, exportar/Inspector/Cmd+E, painéis, seleção,
+fonte e modo/repetição usam confirmação comum; export recebe o snapshot confirmado.
+Mídia/decoder e geometria antiga mantêm bloqueio/invalidação seguros. UI231,
+build/i18n2/diff PASS offline com 24 casos novos. CI de57511e1 terminou10/10 PASS
+(histórico); CI e revisão independente do novo head PENDENTES. Não adicionar
+IDs/rodadas por campo ou botão; não inferir PASS WKWebView/picker/humano. O
+[inventário técnico único](CEVRA_VIDS_USABILITY_AUDIT.md#inventário-completo-de-entradas-e-limites)
+registra os caminhos e limites, sem alterar a aprovação de cache nem executar IA.
+
+O primeiro CI em f70c874 teve Monorepo/UI231 PASS no PR e um teste editorial
+temporário falho no push. O teste aguarda campos habilitados/busy concluído e
+confere título guardado, sem mudança de produção. Falha preservada; CI e revisão
+do próximo head continuam obrigatórios, sem nova rodada humana.
+
+A revisão900da2a resolveu os dois P2 anteriores e encontrou conversão legada
+reusando proposta30frames após trim900ms. Código
+`f530b1d1b3db86e10f52f85259d8d6d335f35ebb`: proposta conserva snapshot original;
+trim que muda head impede o conform capturado antes do backend, exigindo reler/
+revisar27frames e confirmar explicitamente. Leitura aguarda range confirmado;
+resposta antiga não substitui revisão nova. Trim e conform têm Undo separados.
+UI236/build/i18n2/diff PASS, cinco casos novos (4RED/1jáPASS); novo CI/revisão
+pendentes na publicação, CI900da2a histórico. Incorporar ao mesmo grupo/catálogo,
+sem IDs/rodada novos e sem inferir aceite nativo. [Registro único](CEVRA_VIDS_USABILITY_AUDIT.md#p2-da-conversão-legada--proposta-vinculada-ao-snapshot-revisado).
+
 A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
 os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
 estava concluída no handoff histórico; a rodada teve os relatos parciais acima. Abrir somente esse aplicativo,

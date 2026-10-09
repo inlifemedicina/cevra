@@ -1,7 +1,9 @@
 import type { CaptionCue, GraphicItem, ProjectIR, TimelineClip, TimelineTrack } from "@cevra/project-ir";
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type HTMLAttributes } from "react";
 import type { ManualVideoSequenceEdit, TrimManualVideoClipRequest } from "@cevra/application";
-import { ManualSequenceControls } from "./ManualSequenceControls";
+import { ManualSequenceControls, type ManualRangeDraftController } from "./ManualSequenceControls";
+import type { RefObject } from "react";
+import type { RangeActionGate } from "../range-activation-guard";
 import { supportsManualClipPreview } from "./ManualVideoPreview";
 import { formatMilliseconds, formatTime, type Translate } from "../ui-model";
 import { Icon } from "./Icon";
@@ -9,7 +11,8 @@ import { Icon } from "./Icon";
 import type { SourcePresentation } from "../source-presentation";
 import type { DesktopBackend } from "../backend/desktop-backend";
 import { maximumSourceFrame, floorMsToFrames, framesToMilliseconds, nearestMsToFrames, formatFrames } from "../frame-timing";
-import { reorderedTimeline, timelineSelection, timelineShortcutBlocked, type TimelineSeekPhase } from "../timeline-interactions";
+import { gestureEscape, reorderedTimeline, timelineSelection, timelineShortcutBlocked, type TimelineSeekPhase } from "../timeline-interactions";
+import { shortcutAction, activateShortcut, shortcutProps } from "../keyboard-shortcuts";
 
 const trackKeys = {
   "track-v4": "timeline.track.v4",
@@ -47,10 +50,16 @@ interface TimelineProps {
   onTrim?(request: TrimManualVideoClipRequest): Promise<void>;
   sequenceClips?: readonly TimelineClip[];
   onSequenceEdit?(request: ManualVideoSequenceEdit): Promise<void>;
+  onCommitRange?(request: ManualVideoSequenceEdit): Promise<void>;
+  rangeDraft?: RefObject<ManualRangeDraftController | null>;
+  onRangeAction?: RangeActionGate;
   onSelect(id: string): void;
   onPlayheadChange(milliseconds: number, phase?: TimelineSeekPhase): void;
   onZoomChange(value: number): void;
   onResizeStart(event: ReactPointerEvent<HTMLButtonElement>): void;
+  onResizeCancel?(event: ReactPointerEvent<HTMLButtonElement>): void;
+  onResizeKey?(event: ReactKeyboardEvent<HTMLButtonElement>): void;
+  height?: number;
 }
 
 type TimelineVisual =
@@ -58,7 +67,7 @@ type TimelineVisual =
   | { id: string; kind: "caption"; startMs: number; endMs: number; label: string; caption: CaptionCue }
   | { id: string; kind: "graphic"; startMs: number; endMs: number; label: string; graphic: GraphicItem };
 
-export function Timeline({ project, presentations, selectedId, selectedClipIds, onSelectClips, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit, backend }: TimelineProps) {
+export function Timeline({ project, presentations, selectedId, selectedClipIds, onSelectClips, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, onResizeCancel, onResizeKey, height = 292, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit, onCommitRange, rangeDraft, onRangeAction, backend }: TimelineProps) {
   const selectedIds = selectedClipIds ?? (selectedId && project.timeline.clips.some(clip => clip.id === selectedId) ? [selectedId] : []);
   const orderedIds = sequenceClips?.map(clip => clip.id) ?? [];
   const anchor = useRef<string | null>(selectedId);
@@ -103,7 +112,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
   useLayoutEffect(() => { cancelScrub(false); dragging.current = null; }, [project.history.headSnapshotId, trimBusy]);
   useLayoutEffect(() => { cancelScrub(); dragging.current = null; }, [zoom]);
   useEffect(() => {
-    const cancel = (event: KeyboardEvent) => { if (event.key === "Escape") { cancelScrub(); dragging.current = null; } };
+    const cancel = (event: KeyboardEvent) => { if (gestureEscape(event)) { cancelScrub(); dragging.current = null; } };
     window.addEventListener("keydown", cancel);
     const blur = () => { cancelScrub(); dragging.current = null; };
     window.addEventListener("blur", blur);
@@ -122,8 +131,22 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
     finally { editPending.current = false; setPending(false); }
   }
   function keyboardSelection(event: ReactKeyboardEvent<HTMLElement>) {
-    if (!onSelectClips || sequenceClips === undefined || timelineShortcutBlocked(event.nativeEvent)) return;
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a" && !event.altKey) {
+    if (event.defaultPrevented || event.nativeEvent.defaultPrevented || event.repeat || timelineShortcutBlocked(event.nativeEvent)) return;
+    if (event.target === event.currentTarget) {
+      movePlayheadFromKeyboard(event);
+      if (event.defaultPrevented) return;
+    }
+    const action = shortcutAction(event, "timeline");
+    if (action === "zoom-in" || action === "zoom-out") {
+      event.preventDefault(); event.stopPropagation(); onZoomChange(Math.min(180, Math.max(70, zoom + (action === "zoom-in" ? 10 : -10)))); return;
+    }
+    if (action && action !== "remove" && activateShortcut(event, event.currentTarget, action)) return;
+    if (shortcutAction(event, "preview") === "play") {
+      const shell = event.currentTarget.closest<HTMLElement>(".app-shell");
+      if (shell && activateShortcut(event, shell, "play")) return;
+    }
+    if (!onSelectClips || sequenceClips === undefined || event.metaKey && event.ctrlKey || event.ctrlKey && event.altKey) return;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a" && !event.altKey && !event.shiftKey) {
       event.preventDefault(); onSelectClips([...orderedIds], selectedIds.includes(selectedId ?? "") ? selectedId : orderedIds[0] ?? null); return;
     }
     if (!["Delete", "Backspace"].includes(event.key) || event.repeat || event.metaKey || event.ctrlKey || event.altKey || editingDisabled || !onSequenceEdit || !selectedIds.length) return;
@@ -159,7 +182,8 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
   const selectedDuration = project.timeline.clips.filter(clip => selectedIds.includes(clip.id)).reduce((total, clip) => total + clip.timelineEndMs - clip.timelineStartMs, 0);
   const durationLabel = (duration: number) => t(grid ? "timeline.durationFrames" : "timeline.durationSeconds", { seconds: Number((duration / 1000).toFixed(3)), frames: nearestMsToFrames(duration) });
 
-  function movePlayheadFromKeyboard(event: ReactKeyboardEvent<HTMLDivElement>) {
+  function movePlayheadFromKeyboard(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || trimBusy || timelineShortcutBlocked(event.nativeEvent)) return;
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return;
     event.preventDefault();
     if (event.key === "Home") return onPlayheadChange(0);
@@ -174,18 +198,21 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
 
   return (
     <section className="timeline" aria-label={t("timeline.title")} tabIndex={0} onKeyDown={keyboardSelection}>
-      <button type="button" className="timeline-resizer" onPointerDown={onResizeStart} aria-label={t("timeline.resize")} title={t("timeline.resize")}><span /></button>
+      <button type="button" role="separator" className="timeline-resizer" onPointerDown={onResizeStart} onPointerCancel={onResizeCancel} onLostPointerCapture={onResizeCancel} onKeyDown={onResizeKey} aria-label={t("timeline.resize")} title={t("timeline.resize")} aria-orientation="horizontal" aria-valuemin={220} aria-valuemax={420} aria-valuenow={height}><span /></button>
       <div className="timeline-toolbar">
         <div><h2>{t("timeline.title")}</h2><span className="selected-item" data-testid="selected-item">{t("timeline.clipSelected", { name: selectedLabel(project, presentations, selectedId) })}</span></div>
         {trimClip && selectedId === trimClip.id && <span className="timeline-trim-hint">{t(grid ? "timeline.frameTrimHint" : "timeline.trimHint")}</span>}
-        <div className="timeline-zoom"><label htmlFor="timeline-zoom">{t("timeline.zoom")}</label><span>−</span><input id="timeline-zoom" type="range" min="70" max="180" value={zoom} onChange={(event) => onZoomChange(Number(event.target.value))} /><span>＋</span><button type="button" onClick={() => onZoomChange(100)}><Icon name="fit" size={14} />{t("timeline.fit")}</button></div>
+        <div className="timeline-zoom"><label htmlFor="timeline-zoom">{t("timeline.zoom")}</label><span>−</span><input id="timeline-zoom" type="range" min="70" max="180" value={zoom} onChange={(event) => onZoomChange(Number(event.target.value))} /><span>＋</span><button {...shortcutProps("fit", t)} type="button" onClick={() => onZoomChange(100)}><Icon name="fit" size={14} />{t("timeline.fit")}</button></div>
       </div>
       <div className="timeline-summary">
         <output data-testid="timeline-total-duration">{t("timeline.totalDuration", { duration: durationLabel(canonicalDuration) })}</output>
         {selectedIds.length > 0 && <output data-testid="timeline-selected-duration">{t("timeline.selectedDuration", { count: selectedIds.length, duration: durationLabel(selectedDuration) })}</output>}
-        {sequenceClips && onSelectClips && <button type="button" onClick={() => onSelectClips([...orderedIds], selectedId && orderedIds.includes(selectedId) ? selectedId : orderedIds[0] ?? null)}>{t("timeline.selectAll")}</button>}
+        {sequenceClips && onSelectClips && <>
+          <button {...shortcutProps("select-all", t)} type="button" onClick={() => onSelectClips([...orderedIds], selectedId && orderedIds.includes(selectedId) ? selectedId : orderedIds[0] ?? null)}>{t("timeline.selectAll")}</button>
+          <button {...shortcutProps("clear-selection", t)} type="button" disabled={!selectedIds.length} onClick={() => onSelectClips([], null)}>{t("keyboard.clearSelection")}</button>
+        </>}
       </div>
-      {sequenceClips && onSequenceEdit && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedIds.length === 1 ? selectedIds[0]! : null} playheadMs={playheadMs} busy={editingDisabled} t={t} onEdit={onSequenceEdit} />}
+      {sequenceClips && onSequenceEdit && onCommitRange && rangeDraft && onRangeAction && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedIds.length === 1 ? selectedIds[0]! : null} selectedClipIds={selectedIds} playheadMs={playheadMs} busy={editingDisabled} t={t} onEdit={onSequenceEdit} onCommitRange={onCommitRange} rangeDraft={rangeDraft} onAction={onRangeAction} />}
       <div className="timeline-table">
         <div className="timeline-corner"><span className="timecode">{grid ? formatFrames(floorMsToFrames(playheadMs)) : trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs)}</span></div>
         <div
@@ -262,7 +289,7 @@ function TrimTimelineClip({ clip, label, fileName, duration, sourceDuration, sna
   // changes still discard captured pointer geometry before another event.
   useLayoutEffect(() => { cancel(); }, [busy, snapshotId, zoom]);
   useEffect(() => {
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") cancel(); };
+    const escape = (event: KeyboardEvent) => { if (gestureEscape(event)) cancel(); };
     window.addEventListener("keydown", escape);
     window.addEventListener("blur", cancel);
     return () => { window.removeEventListener("keydown", escape); window.removeEventListener("blur", cancel); cancel(); };
@@ -309,6 +336,7 @@ function TrimTimelineClip({ clip, label, fileName, duration, sourceDuration, sna
     void commit(next);
   }
   function key(event: ReactKeyboardEvent<HTMLButtonElement>, edge: TrimEdge) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || timelineShortcutBlocked(event.nativeEvent)) return;
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key) || busy || pending || gesture.current) return;
     event.preventDefault(); event.stopPropagation();
     if (event.repeat) return;

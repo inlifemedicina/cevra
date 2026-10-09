@@ -16,6 +16,11 @@ interface Props {
   originalSourceId: string | null;
   originalSelected?: boolean;
   busy: boolean;
+  actionBusy?: boolean;
+  requestedMode?: "sequence" | "original" | null;
+  requestedLoop?: boolean;
+  onModeChange?(mode: "sequence" | "original"): void;
+  onLoopChange?(loop: boolean): void;
   seek: { sequence: number; timelineMs: number; phase?: TimelineSeekPhase };
   t: Translate;
   onPlayheadChange(value: number): void;
@@ -23,10 +28,12 @@ interface Props {
 }
 
 /** CFR30 montage uses one admitted derivative/decoder; Original keeps its source clock. */
-export function ManualSequenceVideoPreview({ backend, project, clips, presentations, originalSourceId, originalSelected = false, busy, seek, t, onPlayheadChange, onCreate }: Props) {
+export function ManualSequenceVideoPreview({ backend, project, clips, presentations, originalSourceId, originalSelected = false, busy, actionBusy = busy, requestedMode, requestedLoop, onModeChange, onLoopChange, seek, t, onPlayheadChange, onCreate }: Props) {
   const durationMs = project.timeline.durationMs;
-  const [mode, setMode] = useState<"sequence" | "original">(originalSelected ? "original" : "sequence");
-  const [loop, setLoop] = useState(false);
+  const [mode, setMode] = useState<"sequence" | "original">(requestedMode ?? (originalSelected ? "original" : "sequence"));
+  const [loop, setLoop] = useState(requestedLoop ?? false);
+  useEffect(() => { if (requestedMode) changeMode(requestedMode); }, [requestedMode]);
+  useEffect(() => { if (requestedLoop !== undefined) setLoop(requestedLoop); }, [requestedLoop]);
   const [transport, setTransport] = useState({ timelineMs: Math.min(durationMs, Math.max(0, seek.timelineMs)), sequence: 1, resume: false });
   const external = useRef({ sequence: seek.sequence, sourceId: originalSourceId });
   const position = useRef(transport.timelineMs);
@@ -74,9 +81,9 @@ export function ManualSequenceVideoPreview({ backend, project, clips, presentati
   }
   return <div className="manual-sequence-preview">
     <div className="manual-sequence-preview-modes" role="group" aria-label={t("sequence.previewMode")}>
-      <button type="button" className="secondary-button" aria-pressed={mode === "sequence"} disabled={busy} onClick={() => changeMode("sequence")}>{t("sequence.preview")}</button>
-      <button type="button" className="secondary-button" aria-pressed={mode === "original"} disabled={busy} onClick={() => changeMode("original")}>{t("preview.originalMode")}</button>
-      {mode === "sequence" && <label><input type="checkbox" checked={loop} disabled={busy} onChange={event => setLoop(event.target.checked)} />{t("sequence.repeat")}</label>}
+      <button type="button" className="secondary-button" aria-pressed={mode === "sequence"} disabled={actionBusy} onClick={() => onModeChange ? onModeChange("sequence") : changeMode("sequence")}>{t("sequence.preview")}</button>
+      <button type="button" className="secondary-button" aria-pressed={mode === "original"} disabled={actionBusy} onClick={() => onModeChange ? onModeChange("original") : changeMode("original")}>{t("preview.originalMode")}</button>
+      {mode === "sequence" && <label><input type="checkbox" checked={loop} disabled={actionBusy} onChange={event => onLoopChange ? onLoopChange(event.target.checked) : setLoop(event.target.checked)} />{t("sequence.repeat")}</label>}
     </div>
     <ManualVideoPreview key={`${mode}:${sourceId}:${mode === "sequence" ? continuous ? "continuous" : clip.id : "original"}`} backend={backend}
       source={project.sources.find(source => source.id === sourceId)} sourceLabel={currentSourceId ? presentations.get(currentSourceId)?.label : undefined}

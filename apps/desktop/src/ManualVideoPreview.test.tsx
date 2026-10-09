@@ -970,3 +970,20 @@ it.each(["end","cancel"] as const)("timeline drag pauses, rapid moves show canon
   rerender(f.view({sequence:3,timelineMs:phase==="cancel"?0:framesToMilliseconds(2),phase}));fireEvent.seeked(video);
   await waitFor(()=>expect(video.play).toHaveBeenCalled());expect(video.currentTime).toBe(phase==="cancel"?0:2/30);expect(f.requests).toHaveBeenCalledTimes(1);
 });
+it("focused viewer shortcuts share transport actions; buttons, sliders, IME and consumed events retain their own keys", async () => {
+  const f = gridPreviewFixture(); const { container } = render(f.view());
+  const video = await metadata(container, 4 / 30);
+  const viewer = screen.getByRole("region", { name: t("preview.localVideo") });
+  viewer.focus(); fireEvent.keyDown(viewer, { key: "ArrowRight" }); fireEvent.seeked(video);
+  expect(video.currentTime).toBe(1 / 30);
+  const slider = screen.getByRole("slider", { name: t("sequence.seek") });
+  fireEvent.keyDown(slider, { key: "ArrowRight" }); expect(video.currentTime).toBe(1 / 30);
+  fireEvent.keyDown(viewer, { key: "End", isComposing: true }); expect(video.currentTime).toBe(1 / 30);
+  fireEvent.keyDown(viewer, { key: "End" }); fireEvent.seeked(video); expect(video.currentTime).toBe(4 / 30);
+  fireEvent.keyDown(viewer, { key: "Home" }); fireEvent.seeked(video); expect(video.currentTime).toBe(0);
+  fireEvent.keyDown(screen.getByRole("button", { name: t("preview.playLocal") }), { key: " " });
+  expect(video.play).not.toHaveBeenCalled();
+  fireEvent.keyDown(viewer, { key: " " });
+  await waitFor(() => expect(video.play).toHaveBeenCalledTimes(1));
+  expect(f.requests).toHaveBeenCalledTimes(1);
+});

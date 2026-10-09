@@ -12,8 +12,13 @@ export function useSourceThumbnails(sources: readonly SourceAsset[], backend: De
   const cache = useRef(new Map<string, Thumbnail>());
   const finished = useRef(new Set<string>());
   const [revision, setRevision] = useState(0);
+  const [retryRequest, setRetryRequest] = useState({ key: "", serial: 0 });
+  const priorContext = useRef<{ backend: DesktopBackend | undefined; snapshotId: string | undefined; signature: string; busy: boolean; retry: number } | null>(null);
   const signature = JSON.stringify(sources.filter(source => source.kind === "video").map(thumbnailSourceKey));
   useEffect(() => {
+    const prior = priorContext.current;
+    const retryOnly = prior !== null && prior.backend === backend && prior.snapshotId === snapshotId && prior.signature === signature && prior.busy === busy && prior.retry !== retryRequest.serial;
+    priorContext.current = { backend, snapshotId, signature, busy, retry: retryRequest.serial };
     let active = true, operationId: string | undefined;
     const videos = sources.filter(source => source.kind === "video");
     const keys = new Set(videos.map(thumbnailSourceKey));
@@ -24,6 +29,7 @@ export function useSourceThumbnails(sources: readonly SourceAsset[], backend: De
       for (const source of videos) {
         if (!active) return;
         const key = thumbnailSourceKey(source);
+        if (retryOnly && key !== retryRequest.key && finished.current.has(key)) continue;
         operationId = `source-thumbnail-${crypto.randomUUID()}`;
         try {
           const frame = await backend.thumbnailLocalVideo!({ sourceId: source.id, expectedSnapshotId: snapshotId, operationId });
@@ -45,10 +51,16 @@ export function useSourceThumbnails(sources: readonly SourceAsset[], backend: De
       active = false;
       if (operationId) void backend.cancelOperation(operationId).catch(() => undefined);
     };
-  }, [backend, snapshotId, signature, busy]);
+  }, [backend, snapshotId, signature, busy, retryRequest]);
   return {
     get(source: SourceAsset) { void revision; return cache.current.get(thumbnailSourceKey(source)); },
     failed(source: SourceAsset) { void revision; return finished.current.has(thumbnailSourceKey(source)) && !cache.current.has(thumbnailSourceKey(source)); },
-    reject(source: SourceAsset) { const key = thumbnailSourceKey(source); cache.current.delete(key); finished.current.add(key); setRevision(value => value + 1); }
+    reject(source: SourceAsset) { const key = thumbnailSourceKey(source); cache.current.delete(key); finished.current.add(key); setRevision(value => value + 1); },
+    retry(source: SourceAsset) {
+      const key = thumbnailSourceKey(source);
+      if (busy || !backend?.thumbnailLocalVideo || !snapshotId || !finished.current.has(key) || cache.current.has(key)) return;
+      finished.current.delete(key);
+      setRetryRequest(old => ({ key, serial: old.serial + 1 })); setRevision(value => value + 1);
+    }
   };
 }

@@ -182,10 +182,67 @@ evidence and pending grouped regression. The new branch
 `feat/vids-timeline-usability-preview-continuity` adds offline-tested selection,
 drag/seek, atomic group removal, continuous CFR30 program preview and source
 thumbnails; [technical scope and limits](CEVRA_MANUAL_SEQUENCE_G1.md#human-findings-and-usability-follow-up--2026-10-06)
-remain explicit. IN/OUT retains Apply-button semantics pending a separate decision;
+remain explicit. The earlier Apply-only IN/OUT checkpoint is superseded by the
+Owner's 2026-10-07 00:22:58-UTC approval of valid Enter/blur, Esc cancellation,
+one Undo and no duplicate commit;
 native picker language and new perceptual acceptance are untested. Independent
 review is pending, with no replacement of the app/project in use. This is a
 compatible Director extension; progress55%, F-A021/1 and full G1 status are unchanged.
+
+The follow-up `feat/vids-usability-keyboard-audit` is separated from #89's
+`2382dae` head. Code `10a66830e56a31e17a22ed6ad10efc7f5814f9fe` passed Desktop
+build, UI183/183 and i18n2/2 offline. Existing-function shortcuts, text/IME/focus
+guards, transient editorial-draft preservation, truthful unavailable production
+composition/audio/Inspector controls, thumbnail retry and bounded accessible
+timeline resizing require proportional exact-head review/CI. The complete
+[field inventory and latency proposal](CEVRA_VIDS_USABILITY_AUDIT.md) records
+all received P1/P2 findings and one grouped regression. External synthetic-worker
+segment reuse measured reorder1.249s/trim1.753s, excluding full app delivery.
+The proposed 32-MiB/64-entry worker-local segment LRU is **not approved or
+implemented in production**; neither the 6.85–8.05-s current wait nor prototype
+times are acceptance. No live app/project/media or Take session was operated.
+
+Historical / SUPERSEDED approach — independent #90 review required a P2 correction: range blur consumed the next
+button action. Code `3e4397d64a80fdc1687f0e42d10106a7c3f5f741` preserves the
+explicit action/snapshot; build, UI194/194 and i18n2/2 pass with real-focus/click
+regressions. Exact new-head review/CI are required, with no cache implementation.
+
+Settlement foundation of #90 P2 re-evaluation: code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
+replaces generic blur suppression with explicit draft settlement before the next
+App intent. Enter/blur shares one trim; selection changes only after confirmation;
+duplicate/append/insert follows the returned snapshot and preserves OUT29. Two
+mutations have two recoverable Undo entries. Focus-only Tab never activates a
+button; failure retains the draft and stops the following action. UI207/207,
+i18n2/2, build PASS with 13 new App/backend regressions (nine initially RED).
+**New-head CI and exact independent review PENDING**; #90 Draft, #89 preserved.
+Director compatible, no provider/native-user-app/Take operation. Cache remains
+unapproved/unimplemented; progress55%, F-A021/1 and full G1 unaccepted remain.
+
+Current #90 follow-up closes the two P2 observed at57511e1 with code
+`63c89c026e4a18b216c69e0dbc2871d632239163`: one activation epoch consumes failed
+press/key/drag through release/click/Drop, requiring a new explicit retry; all
+action entry points share settlement, including Import/Cmd+I and Inspector export
+with actual confirmed snapshot. [Complete routing inventory](CEVRA_VIDS_USABILITY_AUDIT.md#inventário-completo-de-entradas-e-limites)
+distinguishes safe navigation/actions from decoder/lifecycle/layout guards.
+UI231/231, i18n2/2, build/diff PASS; 24 new regressions. Historical57511e1 CI
+finished10/10 PASS after alignment infrastructure retry (monorepo1,452/UI207).
+New-head CI and exact independent review PENDING. Draft only; no cache/provider/
+native GUI/device/Take/merge. Director compatible, progress55%, F-A021/1 and
+full G1 unaccepted unchanged; reuse the same grouped acceptance catalog.
+
+Firstf70c874 CI had PR Monorepo PASS and one push UI failure in the old temporary
+editorial test. Synchronize that test with editable/completed UI and verify saved
+title; no production change. Preserve failure; fresh head CI/re-review required.
+
+Latest review at900da2a resolved the two prior P2, then found a stale reviewed
+legacy conform payload rebound after trim. Code
+`f530b1d1b3db86e10f52f85259d8d6d335f35ebb` keeps proposal snapshot immutable,
+rejects captured conform if settlement changes head, and routes reading through
+the confirmed-IR gate. New review required after trim; async generations and
+snapshot binding retire stale replies/UI. UI236, build/i18n2/diff PASS; five new
+cases (4RED/1alreadyPASS). Historical900da2a CI10/10 does not cover new delta;
+CI/exact re-review pending at publication. [Full contract/inventory](CEVRA_VIDS_USABILITY_AUDIT.md#p2-da-conversão-legada--proposta-vinculada-ao-snapshot-revisado).
+Draft/no cache/GUI/merge/IA; Director compatible; same55%/F-A021/1/G1/checklist.
 
 ```text
 CEVRA VIDS

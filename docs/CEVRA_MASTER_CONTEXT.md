@@ -2658,7 +2658,128 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
-**Current follow-up — 2026-10-07:** coordination supplied independent APPROVE
+**Approved UI decision and completed investigation — 2026-10-07:** the Owner
+approved Enter/blur confirmation of valid selected-clip IN/OUT at 00:22:58 UTC,
+Escape cancellation, one Undo and no duplicate Enter-plus-blur commit. This
+supersedes the earlier Apply-only pending decision; append/insert and legacy
+timing-policy conversion still have explicit confirmation. Approved existing
+function shortcuts and a complete field/surface audit are prepared separately
+on `feat/vids-usability-keyboard-audit`, based on `2382dae` / Draft #89. Code
+checkpoint `10a66830e56a31e17a22ed6ad10efc7f5814f9fe` passed Desktop build,
+Desktop183/183 and i18n2/2 offline. The central catalogue uses guarded existing
+handlers, preserves text/IME/modal/system ownership and keeps browser shortcuts.
+The independent audit's P1 transient editorial-text loss and fabricated
+production composition/audio fixtures are corrected; P2 property/availability,
+tabs/labels/thumbnail retry and timeline resize gaps are covered. Exact-head CI
+and proportional independent review remain required; no new human package is
+installed/opened or claimed accepted.
+
+The measured 6.85–8.05-s whole-program edit wait does not meet the Owner request.
+Two external synthetic-worker proofs reuse validated segments and preserve all
+decoded video-frame hashes and PCM bytes versus uncached references. A bounded
+in-memory proof measured reorder1.249s, one-frame trim1.753s and delete1.016s,
+versus uncached reorder6.755s/trim6.629s; it excludes Host/IPC/PNG/UI and does not
+prove instantaneous response, production RSS admission or perceptual acceptance.
+The concrete proposal is a worker-local 32-MiB/64-entry LRU of immutable segment
+bytes/grid receipts, with full-program/fresh-origin validation and existing
+resource reservations, in a separate technical delta. **Proposal approval is
+pending; no production cache/pipeline change is implemented.** Alternatives,
+costs, risks, estimates, proof hashes and the 33-row field inventory are in the
+[canonical audit/proposal](CEVRA_VIDS_USABILITY_AUDIT.md). Issue #88 and the
+existing grouped I4-T1/X-T1/T7/X-T6 acceptance record remain authoritative;
+native perception, picker, minimum-layout and human close/reopen are pending.
+Director impact compatible on the same typed commands/IR/History, no provider
+execution; progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain recorded.
+
+Historical / SUPERSEDED approach — the independent #90 review then required one P2 focus correction: leaving dirty
+IN/OUT for Append/Insert or another button sent an implicit trim and disabled the
+intended button before click. Code `3e4397d64a80fdc1687f0e42d10106a7c3f5f741`
+preserves the explicit action at the visible snapshot, with no preceding queued
+trim. Append/Insert use the range draft; other controls keep canonical selection
+semantics. Normal valid blur, Enter dedup and Escape cancellation remain covered.
+Real focused-input/user.click regressions were red for seven cases at the former
+head; the corrected source passes UI194/194, i18n2/2 and build offline, including
+null-relatedTarget pointer intent with no mutation until click. Exact new-head
+CI/re-review are required; earlier 10/10 CI applies to `8bd9463`, not this delta.
+The incremental-cache proposal remains unapproved and unimplemented.
+
+The first `ba90d4d` CI exposed a legacy Enter/blur Undo-test synchronization race:
+History changed before the UI released its pending guard. Both tests now use real
+focus/click and await enabled Undo while retaining exact restoration/count checks.
+Build/UI194 pass again; no further production change. Failed CI logs are preserved
+and fresh exact-head CI remains mandatory, rather than relabeling the failed runs.
+
+**P2 settlement foundation — 2026-10-07, completed by the follow-up below:** review of `5f9266c`
+confirmed that generic button priority discarded a dirty range on selection or
+duplicate, and Tab focus was mistaken for activation. Code `ba8d5a6b7b5a71d2eb90f76249e88e19117a1b6a`
+supersedes that approach with an explicit draft state (clean/editing/committing/
+failed) and one settlement Promise shared by Enter, every valid blur and the App's
+next captured intent. The old owner/value stays visible until settlement succeeds;
+selection/duplicate/append/insert proceeds only against the actual returned IR/head.
+Failure retains the draft and stops the next action; no automatic replay. Focus and
+pointer press are not activation. A pending trim leaves action buttons available
+for the first captured intent, then normal guards block repeated mutation. The
+established ability to select Original while a submitted action completes remains.
+
+OUT30→29 then Duplicate produces trim + duplicate OUT29; Append/Insert produce trim
++ creation with that range; selection confirms the old clip before showing OUT60.
+Each typed mutation has its own Journal/Undo: action Undo preserves the trim, a
+second Undo restores OUT30. Undo after blur first reverses the confirmed trim.
+Esc cancels; Original/other-source ranges keep explicit creation. This restores the
+approved Enter/blur contract without a new product decision or IR/engine change.
+Desktop build/UI207/207, i18n2/2, diff check PASS. Thirteen new full App/backend/
+Application/History regressions cover pointer, focus-only Tab, Enter/Space/Cmd+D,
+selection, next actions, failure/retry and exact restoration; nine were RED at the
+prior head before implementation. **Exact new-head CI and re-review PENDING**;
+5f9266c's 10/10 CI is historical. Draft #90 only, #89 and native packages preserved;
+no native GUI/user media/Take/device/provider operation. Cache still unapproved and
+unimplemented. [Canonical evidence/contract](CEVRA_VIDS_USABILITY_AUDIT.md).
+Director compatible; progress55%, F-A02 exhausted1/1, full G1 unaccepted and the
+single grouped acceptance catalog remain unchanged.
+
+**Current P2 follow-up — 2026-10-07:** independent review still found two P2 at
+`57511e1`: failure between press and release could retry trim + duplicate in the
+same gesture, and Import bypassed settlement and lost its click to blur busy.
+Code `63c89c026e4a18b216c69e0dbc2871d632239163` adds one App activation-epoch guard
+and completes the shared range-action routing, including Import button/Cmd+I,
+export TopBar/Cmd+E/Inspector, panels/selection/accelerators, source chooser,
+editorial callbacks and preview mode/repeat. Failed pointer/key/drag consumes its
+release/click/Drop; only a new explicit gesture retries. Press records intent,
+never executes a command. Export uses the confirmed canonical snapshot and keeps
+publication/receipt no-replay semantics. Preview intentions survive the existing
+snapshot remount; actual decoder/readiness/busy and stale geometry guards remain.
+[Full entry-point inventory and evidence](CEVRA_VIDS_USABILITY_AUDIT.md#fechamento-dos-dois-p2-restantes--2026-10-07).
+Desktop UI231/231, build, i18n2/2 and diff check PASS offline, 24 new regression
+cases. Initial 12-case characterization was ten RED/two already PASS. `57511e1`
+CI is now terminal10/10 PASS (monorepo1,452/UI207); alignment's initial pip-download
+timeout was preserved and a single-job retry requested only after terminal, with
+five successful jobs observed in attempt2. **New-head CI and exact independent
+re-review PENDING**; prior green does not approve this code. #90 Draft/#89 preserved.
+No cache implementation/approval, merge, native app/package/media/Take/device or
+real provider operation. Director compatible with the same typed IR/History;
+progress55%, F-A021/1, full G1 unaccepted and one grouped checklist unchanged.
+
+First CI atf70c874: PR Monorepo/UI231 PASS, push failed the existing temporary
+editorial review test. That test now waits for editable fields and completed UI
+busy, and additionally proves the saved title. Production code unchanged;
+failure log preserved, fresh head needs its own CI/re-review.
+
+**Current legacy-conversion P2 — 2026-10-07:** independent900da2a review resolved
+the two prior P2 but found that a reviewed conform payload could be rebound to a
+new snapshot after range settlement (review30frames, trim900ms, old conform30).
+Code `f530b1d1b3db86e10f52f85259d8d6d335f35ebb` keeps the proposal snapshot
+immutable and rejects the captured conform before backend dispatch when trim
+changes head. Reading waits for settlement and uses the confirmed IR; display,
+frame drafts and confirmation require the proposal's exact snapshot. New read/
+cancel generations retire stale asynchronous replies. User must review27frames
+after trim900ms, then explicitly confirm; trim and conform retain separate Undo.
+Desktop236/236, build/i18n2/diff PASS; five new integration cases, valid baseline
+characterization4RED/1alreadyPASS. [Canonical repro, contract and routing](CEVRA_VIDS_USABILITY_AUDIT.md#p2-da-conversão-legada--proposta-vinculada-ao-snapshot-revisado).
+Historical900da2a CI10/10 (monorepo1,476/UI231) does not cover this delta; new-head
+CI/re-review PENDING at publication. Draft only, no cache/GUI/merge/provider;
+Director compatible, progress55%, F-A021/1/full G1 unaccepted/checklist unchanged.
+
+**Earlier follow-up — 2026-10-07:** coordination supplied independent APPROVE
 for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program
 preparation measured 2.153 s for four clips/5.5 s and 6.853–6.879 s for 12 unique
 clips/60 s; cache/Undo took 22–28 ms. A new montage cache miss still renders the
@@ -2682,8 +2803,9 @@ Branch `feat/vids-timeline-usability-preview-continuity`, based on Draft #87 hea
 `a6c099a5e37c669ed881443dd52b5aab7e2ce7d2`, now has offline-tested timeline
 interaction, atomic group removal, one continuous CFR30 program preview and
 automatic identity-bound thumbnails. See the [scoped technical record](CEVRA_MANUAL_SEQUENCE_G1.md#human-findings-and-usability-follow-up--2026-10-06).
-Seek follows the approved play/pause/drag/cancel policy; IN/OUT keeps explicit
-Apply-button confirmation pending the Owner's separate decision. Native bundle
+Seek follows the approved play/pause/drag/cancel policy. At this earlier
+checkpoint IN/OUT retained Apply; the 2026-10-07 decision above supersedes that
+pending state for selected-clip trim. Native bundle
 localization metadata is prepared, but the resulting picker language is untested.
 Independent review of this new diff and a coordinated future human round remain
 pending. The open app/project/export and earlier package receipts stay preserved;

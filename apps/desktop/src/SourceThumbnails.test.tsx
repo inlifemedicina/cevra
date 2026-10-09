@@ -48,3 +48,33 @@ it("failed extraction or image decode leaves a readable filename and fallback", 
   fireEvent.error(container.querySelector(".media-thumb img")!);
   expect(screen.getByText("Miniatura indisponível")).toBeTruthy();
 });
+it("explicit thumbnail retry uses the existing route, retains other admitted cards and never selects/plays", async () => {
+  const backend = new DemoDesktopBackend(); let failed = true;
+  const thumbnailLocalVideo = vi.fn(async (r: LocalVideoPreviewRequest) => {
+    if (r.sourceId === "a" && failed) throw Error("transient");
+    return packet(r.sourceId, r.expectedSnapshotId);
+  });
+  Object.assign(backend, { thumbnailLocalVideo });
+  const { container } = render(panel(backend, [source("a"), source("b")], "s1"));
+  const retry = await screen.findByRole("button", { name: "Tentar miniatura novamente · a" });
+  await waitFor(() => expect(container.querySelectorAll(".media-thumb img")).toHaveLength(1));
+  failed = false; fireEvent.click(retry);
+  await waitFor(() => expect(container.querySelectorAll(".media-thumb img")).toHaveLength(2));
+  expect(thumbnailLocalVideo.mock.calls.map(([request]) => request.sourceId)).toEqual(["a", "b", "a"]);
+  expect(screen.queryByRole("button", { name: "Tentar miniatura novamente · a" })).toBeNull();
+});
+
+it("media filter tabs rove and change with arrows/Home/End, while IME and VoiceOver modifiers remain owned", () => {
+  render(panel(new DemoDesktopBackend(), [source("a")], "s1"));
+  const tabs = screen.getAllByRole("tab");
+  expect(tabs.map(tab => tab.tabIndex)).toEqual([0, -1, -1, -1]);
+  tabs[0]!.focus(); fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+  expect(document.activeElement).toBe(tabs[1]);
+  expect(tabs[1]!.getAttribute("aria-selected")).toBe("true");
+  fireEvent.keyDown(tabs[1]!, { key: "End", ctrlKey: true, altKey: true });
+  expect(document.activeElement).toBe(tabs[1]);
+  fireEvent.keyDown(tabs[1]!, { key: "End", isComposing: true });
+  expect(document.activeElement).toBe(tabs[1]);
+  fireEvent.keyDown(tabs[1]!, { key: "End" }); expect(document.activeElement).toBe(tabs[3]);
+  fireEvent.keyDown(tabs[3]!, { key: "Home" }); expect(document.activeElement).toBe(tabs[0]);
+});

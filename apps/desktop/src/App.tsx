@@ -1,9 +1,9 @@
 import type { ManualVideoSequenceEdit, EditorialDraftState, ReviseEditorialDraftRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
-import { manualSequenceClips as manualSequence } from "./components/ManualSequenceControls";
+import { manualSequenceClips as manualSequence, type ManualRangeDraftController } from "./components/ManualSequenceControls";
 import type { CevraLocale, TranslationKey } from "@cevra/i18n";
 import { translate } from "@cevra/i18n";
 import type { ProjectIR } from "@cevra/project-ir";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { DesktopBackend, DesktopBackendState, DesktopOperationError } from "./backend/desktop-backend";
 import { DemoDesktopBackend } from "./backend/demo-desktop-backend";
 import { EditorialDraftPanel } from "./components/EditorialDraftPanel";
@@ -22,6 +22,9 @@ import { capabilityReasonKey, workspaceKeys, type Workspace } from "./ui-model";
 
 import { presentSources } from "./source-presentation";
 import { nearestMsToFrames, floorMsToFrames, framesToMilliseconds } from "./frame-timing";
+import { shortcutAction, activateShortcut } from "./keyboard-shortcuts";
+import { gestureEscape, timelineShortcutBlocked } from "./timeline-interactions";
+import { useRangeActivationGuard } from "./range-activation-guard";
 
 const defaultBackend = new DemoDesktopBackend();
 
@@ -45,6 +48,14 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const checkpointPending = backendState?.checkpoint?.pending === true;
   const closePending = nativeClosePending || backendState?.closePending === true;
   const manualMutationInFlight = useRef(false);
+  const rangeDraft = useRef<ManualRangeDraftController | null>(null);
+  const canonicalProject = useRef<Readonly<ProjectIR> | null>(null);
+  const [rangeCommitBusy, setRangeCommitBusy] = useState(false);
+  const transitionInFlight = useRef(false);
+  const waitingForRange = useRef(false);
+  const [transitionBusy, setTransitionBusy] = useState(false);
+  const rangeActivation = useRangeActivationGuard();
+  const canonicalBackendState = useRef<DesktopBackendState | null>(null);
   const selectionEpoch = useRef(0);
   const latestSelection = useRef<{ selectedId: string | null; sourceId: string | null }>({ selectedId: null, sourceId: null });
   const [previewSeek, setPreviewSeek] = useState<{ sequence: number; timelineMs: number; phase?: import("./timeline-interactions").TimelineSeekPhase }>({ sequence: 0, timelineMs: 0 });
@@ -55,10 +66,15 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [selectedTimelineClipIds, setSelectedTimelineClipIds] = useState<string[]>([]);
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
   latestSelection.current = { selectedId: selectedProjectItemId, sourceId: activeSourceId };
+  canonicalProject.current = project;
+  canonicalBackendState.current = backendState;
   const [playheadMs, setPlayheadMs] = useState(24300);
   const [playing, setPlaying] = useState(false);
+  const [previewModeRequest, setPreviewModeRequest] = useState<"sequence" | "original" | null>(null);
+  const [previewLoop, setPreviewLoop] = useState(false);
   const [timelineZoom, setTimelineZoom] = useState(100);
   const [timelineHeight, setTimelineHeight] = useState(292);
+  const timelineResize = useRef<{ id: number; startY: number; height: number; element: HTMLButtonElement } | null>(null);
   const [directorDraft, setDirectorDraft] = useState("");
   const [preset, setPreset] = useState("medical-consultation-clean");
   const [activeTool, setActiveTool] = useState("media");
@@ -154,7 +170,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       const state = await backend.loadEditorialDraft();
       if (generation === editorialGeneration.current) setEditorialState(state);
     } catch {
-      if (generation === editorialGeneration.current) { setEditorialState({ status: "empty" }); setEditorialError(true); }
+      if (generation === editorialGeneration.current) setEditorialError(true);
     } finally {
       if (generation === editorialGeneration.current) setEditorialBusy(false);
     }
@@ -168,31 +184,87 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     try {
       const state = await backend.reviseEditorialDraft(request);
       if (generation === editorialGeneration.current) setEditorialState(state);
-    } catch {
-      if (generation === editorialGeneration.current) { setEditorialState({ status: "stale" }); setEditorialError(true); }
+    } catch (cause) {
+      if (generation === editorialGeneration.current) {
+        if (desktopOperationError(cause).code === "EDITORIAL_DRAFT_STALE") setEditorialState({ status: "stale" });
+        setEditorialError(true);
+      }
     } finally {
       if (generation === editorialGeneration.current) setEditorialBusy(false);
     }
   }
 
+  function endTimelineResize(restore: boolean) {
+    const gesture = timelineResize.current; timelineResize.current = null;
+    if (!gesture) return;
+    if (gesture.element.hasPointerCapture?.(gesture.id)) gesture.element.releasePointerCapture?.(gesture.id);
+    if (restore) setTimelineHeight(gesture.height);
+  }
+  useEffect(() => {
+    function move(event: PointerEvent) {
+      const gesture = timelineResize.current;
+      if (gesture?.id === event.pointerId && Number.isFinite(event.clientY)) setTimelineHeight(Math.min(420, Math.max(220, gesture.height + gesture.startY - event.clientY)));
+    }
+    function finish(event: PointerEvent) { if (timelineResize.current?.id === event.pointerId) endTimelineResize(false); }
+    function cancel() { endTimelineResize(true); }
+    function pointerCancel(event: PointerEvent) { if (timelineResize.current?.id === event.pointerId) cancel(); }
+    function escape(event: KeyboardEvent) { if (gestureEscape(event)) cancel(); }
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", pointerCancel); window.addEventListener("blur", cancel); window.addEventListener("keydown", escape);
+    return () => {
+      endTimelineResize(false);
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", pointerCancel); window.removeEventListener("blur", cancel); window.removeEventListener("keydown", escape);
+    };
+  }, []);
   function startTimelineResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    const startY = event.clientY;
-    const startHeight = timelineHeight;
-    function move(pointerEvent: PointerEvent) {
-      setTimelineHeight(Math.min(420, Math.max(220, startHeight + startY - pointerEvent.clientY)));
+    if (event.button !== 0 || !Number.isFinite(event.clientY) || !Number.isFinite(event.pointerId) || timelineResize.current) return;
+    event.preventDefault(); event.currentTarget.focus({ preventScroll: true });
+    timelineResize.current = { id: event.pointerId, startY: event.clientY, height: timelineHeight, element: event.currentTarget };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+  function timelineResizeKey(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || timelineShortcutBlocked(event.nativeEvent) || !["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation(); endTimelineResize(false);
+    const value = event.key === "Home" ? 220 : event.key === "End" ? 420 : timelineHeight + (event.key === "ArrowUp" ? 1 : -1) * (event.shiftKey ? 48 : 16);
+    setTimelineHeight(Math.min(420, Math.max(220, value)));
+  }
+
+  /** Capture the next intent now; dispatch it only after the owning draft settles.
+   * Focus never implies activation, and a failed settlement never replays an action.
+   */
+  async function afterRangeDraft(action: (current: Readonly<ProjectIR>) => void | Promise<void>, selectionOnly = false) {
+    rangeActivation.assertCurrent();
+    if (transitionInFlight.current) {
+      // Preserve the established ability to select an Original while a submitted
+      // operation completes. The draft-owner transition itself must settle first.
+      if (selectionOnly && !waitingForRange.current && canonicalProject.current) action(canonicalProject.current);
+      return;
     }
-    function stop() {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-    }
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
+    transitionInFlight.current = true;
+    try {
+      const settlement = rangeDraft.current?.settle();
+      if (settlement) { waitingForRange.current = true; setTransitionBusy(true); await settlement; waitingForRange.current = false; }
+      const current = canonicalProject.current;
+      if (current) { const operation = action(current); if (operation) await operation; }
+    } finally { waitingForRange.current = false; transitionInFlight.current = false; setTransitionBusy(false); }
+  }
+  function requestAction(action: () => void | Promise<void>) { void afterRangeDraft(() => action()).catch(() => {}); }
+  async function confirmActionSnapshot(): Promise<string | null> {
+    let snapshot: string | null = null;
+    try { await afterRangeDraft(current => { snapshot = current.history.headSnapshotId!; }); }
+    catch { /* The failed range stays visible; never open a picker or replay. */ }
+    return snapshot;
   }
 
   function selectProjectItem(id: string, clipSelection?: readonly string[]) {
-    if (!project || !resolvesProjectItem(project, id)) return;
+    void afterRangeDraft(current => selectSettledProjectItem(current, id, clipSelection), true).catch(() => {});
+  }
+  function selectSettledProjectItem(current: Readonly<ProjectIR>, id: string, clipSelection?: readonly string[]) {
+    if (!resolvesProjectItem(current, id)) return;
+    setPreviewModeRequest(null);
     selectionEpoch.current++;
-    const source = project.sources.find((item) => item.id === id);
+    const source = current.sources.find((item) => item.id === id);
     if (source) {
       setSelectedTimelineClipIds([]);
       setSelectedProjectItemId(source.id);
@@ -200,7 +272,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       setPreviewSeek({ sequence: 0, timelineMs: 0 });
       return;
     }
-    const clip = project.timeline.clips.find((item) => item.id === id);
+    const clip = current.timeline.clips.find((item) => item.id === id);
     if (clip) {
       setSelectedTimelineClipIds(clipSelection ? [...clipSelection] : [clip.id]);
       setSelectedProjectItemId(clip.id);
@@ -208,13 +280,18 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       setPreviewSeek((current) => ({ sequence: current.sequence + 1, timelineMs: clip.timelineStartMs }));
       return;
     }
-    if (project.captions.some((item) => item.id === id) || project.graphics.some((item) => item.id === id)) {
+    if (current.captions.some((item) => item.id === id) || current.graphics.some((item) => item.id === id)) {
       setSelectedTimelineClipIds([]);
       setSelectedProjectItemId(id);
     }
   }
 
   function applyBackendState(value: DesktopBackendState, preferredSourceId?: string, preserveSelection = false, clearRuntimeError = true) {
+    if (canonicalProject.current?.history.headSnapshotId !== value.project.history.headSnapshotId) {
+      setPreviewModeRequest(null); setPreviewLoop(false);
+    }
+    canonicalProject.current = value.project;
+    canonicalBackendState.current = value;
     setSelectedTimelineClipIds(current => current.filter(id => value.project.timeline.clips.some(clip => clip.id === id)));
     setBackendState(value);
     setProject(value.project);
@@ -263,6 +340,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function retryCheckpoint() {
+    const backendState = canonicalBackendState.current;
     const token = backendState?.checkpoint?.token;
     if (!token || importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     manualMutationInFlight.current = true;
@@ -287,7 +365,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
 
   async function createManualClip(request: CreateManualVideoClipRequest) {
     if (project && manualSequence(project)) {
-      await editManualSequence(project.timeline.timingPolicy === "cfr30" || project.timeline.clips.length === 0
+      await editSequenceAfterRange(project.timeline.timingPolicy === "cfr30" || project.timeline.clips.length === 0
         ? { type: "append", version: 2, sourceId: request.sourceId, expectedSnapshotId: request.expectedSnapshotId, sourceStartFrame: nearestMsToFrames(request.sourceStartMs), sourceEndFrame: nearestMsToFrames(request.sourceEndMs) }
         : { type: "append", version: 1, ...request });
       return;
@@ -313,7 +391,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
 
   async function trimManualClip(request: TrimManualVideoClipRequest) {
     if (project && manualSequence(project)) {
-      try { await editManualSequence(project.timeline.timingPolicy === "cfr30"
+      try { await editSequenceAfterRange(project.timeline.timingPolicy === "cfr30"
         ? { type: "trim", version: 2, clipId: request.clipId, expectedSnapshotId: request.expectedSnapshotId, sourceStartFrame: nearestMsToFrames(request.sourceStartMs), sourceEndFrame: nearestMsToFrames(request.sourceEndMs) }
         : { type: "trim", version: 1, ...request }); } catch { /* Error already reconciled. */ }
       return;
@@ -341,13 +419,14 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function editManualSequence(request: ManualVideoSequenceEdit) {
-    if (!project || importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
+    const current = canonicalProject.current;
+    if (!current || importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) throw { code: "MANUAL_SEQUENCE_BUSY" };
     manualMutationInFlight.current = true;
     setManualMutationBusy(true);
     setRuntimeError(null); setRuntimeNotice(null);
     const startedSelection = selectionEpoch.current;
-    const previousIds = new Set(project.timeline.clips.map(clip => clip.id));
-    const oldSelectedIndex = [...project.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs).findIndex(clip => clip.id === selectedProjectItemId);
+    const previousIds = new Set(current.timeline.clips.map(clip => clip.id));
+    const oldSelectedIndex = [...current.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs).findIndex(clip => clip.id === selectedProjectItemId);
     try {
       const result = await backend.editManualVideoSequence(request);
       applyBackendState(result.state, undefined, true);
@@ -372,7 +451,32 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     }
   }
 
+  async function commitRange(request: ManualVideoSequenceEdit) {
+    setRangeCommitBusy(true);
+    try { await editManualSequence(request); }
+    catch (cause) { rangeActivation.failed(); throw cause; }
+    finally { setRangeCommitBusy(false); }
+  }
+  function editSequenceAfterRange(request: ManualVideoSequenceEdit) {
+    const visibleSnapshot = canonicalProject.current?.history.headSnapshotId;
+    if (request.type === "conform") return afterRangeDraft(current => {
+      // Reviewed conversion values belong immutably to their proposal snapshot.
+      // A preceding trim invalidates that review; never rebind its payload.
+      if (request.expectedSnapshotId !== current.history.headSnapshotId) {
+        const cause = { code: "MANUAL_SEQUENCE_STALE" };
+        handleRuntimeError(cause); throw cause;
+      }
+      return editManualSequence(request);
+    });
+    return afterRangeDraft(current => editManualSequence({ ...request,
+      // Rebind only a request captured at the visible head before this settlement.
+      // An already stale gesture keeps its token for normal backend rejection.
+      expectedSnapshotId: request.expectedSnapshotId === visibleSnapshot ? current.history.headSnapshotId! : request.expectedSnapshotId
+    }));
+  }
+
   function seekTimeline(value: number, phase?: import("./timeline-interactions").TimelineSeekPhase) {
+    setPreviewModeRequest(null);
     if (!backend.presentationOnly && project?.timeline.clips.length === 1 && selectedProjectItemId !== project.timeline.clips[0]!.id) selectProjectItem(project.timeline.clips[0]!.id);
     setPlayheadMs(value);
     setPreviewSeek((current) => ({ sequence: current.sequence + 1, timelineMs: value, phase }));
@@ -436,7 +540,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   if (!project || !backendState) return <main className="loading-screen"><span className="brand-mark">C</span><p>{visibleRuntimeError ? t(runtimeErrorKey(visibleRuntimeError)) : t("app.loadingProject")}</p></main>;
 
   const layoutStyle = { "--timeline-height": `${timelineHeight}px`, "--sidebar-width": `${sidebarCompact ? 286 : sidebarWidth}px` } as CSSProperties;
-  const editingBusy = importBusy || transcriptionOperationId !== null || editorialBusy || manualMutationBusy || checkpointPending || closePending;
+  const editingBusy = importBusy || transcriptionOperationId !== null || editorialBusy || manualMutationBusy || transitionBusy || checkpointPending || closePending;
+  const manualActionBusy = importBusy || transcriptionOperationId !== null || editorialBusy || manualMutationBusy && !rangeCommitBusy || transitionBusy || checkpointPending || closePending || exportBusy;
   const mutationBusy = editingBusy || exportBusy;
   const realPreview = !backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" && workspace === "edit";
   const sequenceClips = realPreview ? manualSequence(project) : undefined;
@@ -445,29 +550,36 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const selectedPreviewClip = project.timeline.clips.find((clip) => clip.id === selectedProjectItemId);
   const previewClip = selectedPreviewClip && supportsManualClipPreview(project, selectedPreviewClip) ? selectedPreviewClip : undefined;
   return (
-    <main className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${sidebarCompact ? " sidebar-compact" : " sidebar-open"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision} data-selected-project-item-id={selectedProjectItemId ?? undefined} data-active-source-id={activeSourceId ?? undefined}>
-      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} sidebarCompact={sidebarCompact} exportAvailable={exportAvailable && !mutationBusy} status={backendState.status} retryAvailable={Boolean(backendState.checkpoint) && (backendState.status === "persistence-error" || backendState.status === "local-unsaved")} retryBusy={mutationBusy} canUndo={backendState.canUndo && !mutationBusy} canRedo={backendState.canRedo && !mutationBusy} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onSidebarToggle={() => setSidebarCompact((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} onRetryCheckpoint={() => void retryCheckpoint()} onExport={() => setExportRequest(value => value + 1)} />
+    <main {...rangeActivation.captureProps} className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${sidebarCompact ? " sidebar-compact" : " sidebar-open"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision} data-selected-project-item-id={selectedProjectItemId ?? undefined} data-active-source-id={activeSourceId ?? undefined} onKeyDown={event => {
+      const action = shortcutAction(event, "shell");
+      if (action === "import" && backendState.capabilities["media.import"].available && !manualActionBusy) {
+        event.preventDefault(); event.stopPropagation(); requestAction(importMedia);
+      } else if (action) activateShortcut(event, event.currentTarget, action);
+    }}>
+      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} sidebarCompact={sidebarCompact} exportAvailable={exportAvailable && !manualActionBusy} status={backendState.status} retryAvailable={Boolean(backendState.checkpoint) && (backendState.status === "persistence-error" || backendState.status === "local-unsaved")} retryBusy={manualActionBusy} canUndo={backendState.canUndo && !manualActionBusy} canRedo={backendState.canRedo && !manualActionBusy} t={t} onWorkspaceChange={value => { void afterRangeDraft(() => setWorkspace(value)).catch(() => {}); }} onLocaleChange={value => requestAction(() => setLocale(value))} onMediaToggle={() => requestAction(() => setMediaOpen(value => !value))} onSidebarToggle={() => requestAction(() => setSidebarCompact(value => !value))} onUndo={() => { void afterRangeDraft(() => changeHistory("undo")).catch(() => {}); }} onRedo={() => { void afterRangeDraft(() => changeHistory("redo")).catch(() => {}); }} onRetryCheckpoint={() => requestAction(retryCheckpoint)} onExport={() => { void afterRangeDraft(() => setExportRequest(value => value + 1)).catch(() => {}); }} />
       <div className="editor-area">
-        <ToolRail selected={activeTool} t={t} onSelect={setActiveTool} />
-        {mediaOpen && <MediaPanel backend={!backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? backend : undefined} snapshotId={project.history.headSnapshotId ?? undefined} thumbnailBusy={mutationBusy} sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !mutationBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
+        <ToolRail selected={activeTool} t={t} onSelect={id => requestAction(() => { setActiveTool(id); if (id === "media") setMediaOpen(true); })} />
+        {mediaOpen && <MediaPanel backend={!backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? backend : undefined} snapshotId={project.history.headSnapshotId ?? undefined} thumbnailBusy={mutationBusy} actionBusy={manualActionBusy} onAction={action => afterRangeDraft(action)} sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !manualActionBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => requestAction(importMedia)} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
             {realPreview ? sequenceClips && (sequenceClips.length > 1 || project.timeline.timingPolicy === "cfr30" && sequenceClips.length > 0)
-              ? <ManualSequenceVideoPreview key={project.history.headSnapshotId} backend={backend} project={project} clips={sequenceClips} presentations={sourcePresentations} originalSourceId={activeSourceId} originalSelected={selectedProjectItemId === activeSourceId} busy={mutationBusy} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} />
-              : <ManualVideoPreview key={`${project.history.headSnapshotId}:${activeSourceId}:${previewClip?.id ?? "source"}`} backend={backend} source={project.sources.find((source) => source.id === activeSourceId)} sourceLabel={activeSourceId ? sourcePresentations.get(activeSourceId)?.label : undefined} snapshotId={project.history.headSnapshotId!} clip={previewClip} unsupportedClip={Boolean(selectedPreviewClip && !previewClip)} timelineOccupied={project.timeline.clips.length > 0 || project.captions.length > 0 || project.graphics.length > 0} sequenceEditing={sequenceClips !== undefined} frameEditing={sequenceClips !== undefined && (project.timeline.timingPolicy === "cfr30" || sequenceClips.length === 0)} busy={mutationBusy} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} /> : <WorkspaceStage presentations={sourcePresentations} workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={mutationBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />}
+              ? <ManualSequenceVideoPreview key={project.history.headSnapshotId} backend={backend} project={project} clips={sequenceClips} presentations={sourcePresentations} originalSourceId={activeSourceId} originalSelected={selectedProjectItemId === activeSourceId} busy={mutationBusy} actionBusy={manualActionBusy} requestedMode={previewModeRequest} requestedLoop={previewLoop} onModeChange={mode => requestAction(() => setPreviewModeRequest(mode))} onLoopChange={value => requestAction(() => setPreviewLoop(value))} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} />
+              : <ManualVideoPreview key={`${project.history.headSnapshotId}:${activeSourceId}:${previewClip?.id ?? "source"}`} backend={backend} source={project.sources.find((source) => source.id === activeSourceId)} sourceLabel={activeSourceId ? sourcePresentations.get(activeSourceId)?.label : undefined} snapshotId={project.history.headSnapshotId!} clip={previewClip} unsupportedClip={Boolean(selectedPreviewClip && !previewClip)} timelineOccupied={project.timeline.clips.length > 0 || project.captions.length > 0 || project.graphics.length > 0} sequenceEditing={sequenceClips !== undefined} frameEditing={sequenceClips !== undefined && (project.timeline.timingPolicy === "cfr30" || sequenceClips.length === 0)} busy={mutationBusy} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} /> : <WorkspaceStage presentations={sourcePresentations} workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={manualActionBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => requestAction(transcribeSource)} onCancelTranscription={() => void cancelTranscription()} />}
           </div>
           {visibleRuntimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(visibleRuntimeError))}</div>}
           {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
         </div>
       </div>
-      <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} controlsRequest={exportRequest} t={t} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
-        directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || mutationBusy} error={editorialError} t={t} onRefresh={() => void refreshEditorial()} onRevise={reviseEditorial} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
+      <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} controlsRequest={exportRequest} t={t} onAction={action => afterRangeDraft(action)} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
+        directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || manualActionBusy} error={editorialError} t={t} onAction={action => afterRangeDraft(action)} onRefresh={() => requestAction(refreshEditorial)} onRevise={request => afterRangeDraft(() => reviseEditorial(request))} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
         contextualPanel={<Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t}
-          exportPreparation={exportClips && exportClips.length > 0 && <ManualExportPreparationPanel key={project.project.id} backend={backend} snapshotId={project.history.headSnapshotId!} locale={locale} busy={editingBusy} available={exportAvailable} exportRequest={exportRequest} t={t} onBusyChange={value => { manualMutationInFlight.current = value; setExportBusy(value); }} onExported={result => applyBackendState(result.state, undefined, true)} onReconciled={(state, code) => handleRuntimeError({ code, reconciledState: state }, true)} />} />} />
+          exportPreparation={exportClips && exportClips.length > 0 && <ManualExportPreparationPanel key={project.project.id} backend={backend} snapshotId={project.history.headSnapshotId!} locale={locale} busy={editingBusy} actionBusy={manualActionBusy && !exportBusy} onConfirmAction={confirmActionSnapshot} available={exportAvailable} exportRequest={exportRequest} t={t} onBusyChange={value => { manualMutationInFlight.current = value; setExportBusy(value); }} onExported={result => applyBackendState(result.state, undefined, true)} onReconciled={(state, code) => handleRuntimeError({ code, reconciledState: state }, true)} />} />} />
       <Timeline backend={backend} presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} selectedClipIds={selectedTimelineClipIds} onSelectClips={(ids, primary) => {
-        if (primary && primary !== selectedProjectItemId) selectProjectItem(primary, ids);
-        else { selectionEpoch.current++; setSelectedTimelineClipIds(ids); setSelectedProjectItemId(primary); }
-      }} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} trimAvailable={realPreview} trimBusy={mutationBusy} onTrim={trimManualClip} sequenceClips={sequenceClips} onSequenceEdit={editManualSequence} />
+        void afterRangeDraft(current => {
+          if (primary && primary !== selectedProjectItemId) selectSettledProjectItem(current, primary, ids);
+          else { selectionEpoch.current++; setSelectedTimelineClipIds(ids); setSelectedProjectItemId(primary); }
+        }, true).catch(() => {});
+      }} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} onResizeCancel={event => { if (event.pointerId === timelineResize.current?.id) endTimelineResize(true); }} onResizeKey={timelineResizeKey} height={timelineHeight} trimAvailable={realPreview} trimBusy={manualActionBusy} onTrim={trimManualClip} sequenceClips={sequenceClips} onSequenceEdit={editSequenceAfterRange} onCommitRange={commitRange} rangeDraft={rangeDraft} onRangeAction={action => afterRangeDraft(action)} />
     </main>
   );
 }
