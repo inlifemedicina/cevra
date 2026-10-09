@@ -499,7 +499,9 @@ full-width Timeline. Sidebar width/split and Timeline height resizers retain
 existing code, limits, keyboard/pointer/focus and cancellation. Compact Director
 inner padding/textarea spacing is smaller, and its preset flexes within the
 existing row, so the draft scroller retains room; no field is conditionally hidden
-by this increment. The central grid width is unchanged. Timeline's two8px insets
+by this increment. At heights≤800px in compact mode, the draft heading shares
+the existing editorial scroller instead of staying sticky over a field.
+The central grid width is unchanged. Timeline's two8px insets
 reduce its width by16px: at1586×992,1210px open/1570px compact; at900×680,
 524px open/884px compact. No duration, zoom, timing or mode is inferred from color.
 
@@ -508,7 +510,8 @@ runtime-gated skip, i18n2/2 PASS. The external harness bundles the actual App an
 existing synthetic editorial backend; it adds no product UI or provider.
 Eighty outer-layout combinations cover five workspaces × two modes × PT/EN ×
 1586×992/1280×800/900×680/900×600. Eight separator-visibility/input-retention
-checks and one four-surface contrast check bring the receipt to89 PASS.
+checks, six complete-note visibility checks and one four-surface contrast check
+bring the receipt to95 PASS.
 Mode/tab transitions retain the typed Director text. Root bounds, central width,
 Timeline separation/width/height and native-minimum draft scroller were measured.
 Primary/secondary surface text contrasts are13.16–13.80:1 /6.49–6.81:1.
@@ -520,8 +523,12 @@ The first DEV fixture could not load because its Application barrel imported
 `node:url` into the browser. The compiled actual UI and an external production
 fixture bundle succeeded; no product workaround was introduced. Initial compact
 typography left only38px for draft at900×680; this observation drove the inner-
-spacing correction before freeze. Earlier measurements and the diagnostic are
-retained, rather than presented as native acceptance.
+spacing correction before freeze. Independent controlled comparison then found
+55px in the base scroller versus79px in B: its sticky heading covered36px versus
+13px of a52px note. This was an inherited limit, improved by B. Sharing the
+existing scroll in low compact windows makes the full note accessible; two
+directed visibility cases were RED before and GREEN after. Earlier measurements
+and diagnostics are retained, rather than presented as native acceptance.
 
 Final exact-tree independent review, exact-head CI and a new frozen-source
 combined package are recorded on the implementation Draft/technical receipt.

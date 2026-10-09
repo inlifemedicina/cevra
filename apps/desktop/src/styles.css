@@ -467,3 +467,6 @@ h1, h2, h3, p { margin: 0; }
   .media-panel .panel-heading { gap: 4px; }
   .media-panel .panel-heading h2 { font-size: 12px; }
 }
+@media (max-height: 800px) {
+  .editing-sidebar.compact .editorial-heading { position: static; }
+}

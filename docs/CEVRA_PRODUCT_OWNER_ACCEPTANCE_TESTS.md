@@ -231,7 +231,7 @@ Nos mesmos I4-T1/X-T1/T7/X-T6 abaixo, conferir a leitura dos painéis reais
 campos/foco/rolagem nos modos aberto e compacto e largura útil da Timeline.
 Preview/Timeline são neutros; controles ilustrativos da referência não são
 funções adicionadas. Não repetir toda a aceitação anterior nem abrir/substituir
-a janela humana durante o preparo. Screenshot/build/UI258/i18n2 e89 checks
+a janela humana durante o preparo. Screenshot/build/UI258/i18n2 e95 checks
 headless são evidência técnica, não APP/OWNER/nativa. O recibo do novo pacote
 fornece a identidade exata para a única futura rodada funcional+visual.
 

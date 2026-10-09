@@ -2672,12 +2672,13 @@ controls are not implemented. Open/compact modes, tabs, split/width/height
 resizers, actual fields, typed commands, IR/History and engines are preserved.
 
 Compiled actual-UI screenshots precede/follow CSS. Desktop258/258, i18n2/2,
-build and89 owned headless layout/presentation checks PASS across PT/EN, both
+build and95 owned headless layout/presentation checks PASS across PT/EN, both
 modes, five workspaces and1586×992/1280×800/900×680/900×600. These check outer
 geometry and existing transitions, not native decode/paint or complete product
 accessibility. Secondary text on the four tinted surfaces measures6.49–6.81:1.
 The compact Director's inner spacing is reduced to retain a usable draft scroller
-at the native minimum; no field is hidden. Preview grid width is preserved;
+at the native minimum; its heading shares the existing scroller in low compact
+windows so a complete note stays readable. No field is hidden. Preview grid width is preserved;
 Timeline loses16px only to its two8px border insets. The
 [existing audit](CEVRA_VIDS_USABILITY_AUDIT.md#approved-visual-b-presentation--2026-10-09)
 records scope and limits. Exact final-tree independent review/CI and new isolated

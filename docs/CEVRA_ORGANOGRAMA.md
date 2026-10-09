@@ -806,7 +806,7 @@ taupe contextual Inspector, neutral Preview/Timeline, rounded borders, gutters
 and readable type. Illustrated functions are not added; existing open/compact
 modes, tabs/resizers, fields, commands and IR/History remain shared.
 
-Actual compiled-UI comparison, Desktop258/258, i18n2/2, build and89 owned
+Actual compiled-UI comparison, Desktop258/258, i18n2/2, build and95 owned
 headless structure/presentation checks PASS. Secondary text on tinted surfaces
 measures6.49–6.81:1; compact inner spacing preserves the draft scroller at the
 native minimum. This is not native paint/perception, full accessibility or Owner
