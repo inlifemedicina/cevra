@@ -202,6 +202,13 @@ Classificações: `[V1]`, `[INT]` integração/provider, `[BENCH]` benchmark, `[
 
 ## F. Roteiro essencial para a build de homologação
 
+**Bloco aprovado em 2026-10-05:** fundação + G1 (montagem contínua manual,
+preview da sequência e export simples) seguem o [plano G1](CEVRA_MANUAL_SEQUENCE_G1.md),
+com G5/G6 acompanhando e automação antes da rodada humana agrupada. Reutilizar
+os IDs abaixo por variante; nenhum novo catálogo, G1 PASS ou microteste humano
+foi criado. Contratos/consumers/perfil pendentes ficam BLOCKED. Aceites limitados
+anteriores permanecem históricos; aprovação do plano não promove seus IDs completos.
+
 Este roteiro agrega os IDs de A–E; não substitui nem duplica os casos canônicos. Preencher um registro por ID/variante/target, inclusive quando vários IDs forem percorridos no mesmo fluxo. Nenhum cenário foi executado nesta reconciliação.
 
 **Execução** começa como `NÃO EXECUTADO`; isso não é resultado. Depois do teste, registrar o resultado objetivo das Regras e, quando necessário, o julgamento humano separado. Marcar `BLOCKED` com a dependência concreta antes de tentar uma função ausente. Uma fundação implementada ou um PASS de CI/fake não equivale a PASS do fluxo no app. A build deve declarar as capabilities realmente disponíveis.

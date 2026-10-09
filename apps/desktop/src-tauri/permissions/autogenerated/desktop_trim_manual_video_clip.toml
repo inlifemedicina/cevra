@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-trim-manual-video-clip"
+description = "Enables the desktop_trim_manual_video_clip command without any pre-configured scope."
+commands.allow = ["desktop_trim_manual_video_clip"]
+
+[[permission]]
+identifier = "deny-desktop-trim-manual-video-clip"
+description = "Denies the desktop_trim_manual_video_clip command without any pre-configured scope."
+commands.deny = ["desktop_trim_manual_video_clip"]

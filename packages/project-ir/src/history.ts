@@ -85,6 +85,8 @@ export class ProjectHistory {
   private transcriptBlobs = new Map<HistoryTranscriptBlobDigest, SourceTranscript>();
   private cursor = 0;
   private sourceNumbers = new SourceNumberRegistry();
+  // Cache invalidation only: never serialized or used as canonical history identity.
+  private journalGeneration = 0n;
 
   constructor(initialProject: ProjectIR, options: HistoryOptions = {}) {
     this.idGenerator = options.idGenerator ?? defaultId;
@@ -117,6 +119,17 @@ export class ProjectHistory {
 
   get entries(): readonly JournalEntry[] {
     return clone(this.entriesInternal);
+  }
+
+  /** Lightweight identity for immutable retained history; includes cursor and discarded-branch reservations. */
+  get journalIdentity(): string {
+    return JSON.stringify([
+      this.journalGeneration.toString(),
+      this.snapshotsInternal[this.cursor]!.id,
+      this.entriesInternal.map((entry) => [entry.id, entry.snapshotId, entry.parentEntryId, entry.revision]),
+      this.snapshotsInternal.map((snapshot) => [snapshot.id, snapshot.revision, snapshot.sourceTranscriptRefs]),
+      this.sourceNumbering
+    ]);
   }
 
   /** Compatibility API. Persistence should use toArchive() to avoid materializing every heavy snapshot. */
@@ -234,6 +247,7 @@ export class ProjectHistory {
     this.entriesInternal = [...retainedEntries, entry];
     this.snapshotsInternal = [...retainedSnapshots, snapshot];
     this.cursor = this.snapshotsInternal.length - 1;
+    this.journalGeneration += 1n;
     return validated;
   }
 
@@ -316,6 +330,7 @@ function transcriptMutationSource(command: EditCommand): Id | undefined {
     case "clip.add":
     case "clip.remove":
     case "clip.trim":
+    case "timeline.edit":
     case "caption.upsert":
     case "caption.remove":
     case "style.patch":

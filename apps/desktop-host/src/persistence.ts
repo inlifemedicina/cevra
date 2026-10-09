@@ -1,6 +1,6 @@
 import { deserializeProjectPackage, serializeProjectPackage, type SerializedProjectPackage } from "@cevra/project-store";
 import { createEmptyProject, ProjectHistory, type HistoryOptions, type ProjectIR } from "@cevra/project-ir";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { link, lstat, mkdir, open, readFile, readdir, rename, rm } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
@@ -22,7 +22,26 @@ const OWNER_VERSION = 1;
 const MAX_OWNER_BYTES = 1024;
 const MAX_STALE_RECLAIM_ATTEMPTS = 3;
 
-export type PersistenceState = "local-saved" | "local-recovered" | "persistence-error";
+export type PersistenceState = "local-saved" | "local-recovered" | "persistence-error" | "checkpoint-pending";
+
+const checkpointBindings = new WeakMap<ProjectHistory, { journal: string; token: string }>();
+
+/** Covers the complete persistible V3 archive; a snapshot alone omits redo and source reservations. */
+export function historyCheckpointToken(history: ProjectHistory): string {
+  const journal = history.journalIdentity;
+  const cached = checkpointBindings.get(history);
+  if (cached?.journal === journal) return cached.token;
+  const serialized = JSON.stringify(history.toArchive(), (_key, value: unknown) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const object = value as Record<string, unknown>;
+      return Object.fromEntries(Object.keys(object).sort().map((key) => [key, object[key]]));
+    }
+    return value;
+  });
+  const token = `checkpoint-v1:${createHash("sha256").update(serialized).digest("hex")}`;
+  checkpointBindings.set(history, { journal, token });
+  return token;
+}
 
 export interface DesktopProjectPersistenceOptions {
   initialProject?: ProjectIR;
@@ -47,7 +66,7 @@ export class DesktopPersistenceError extends Error {
   }
 }
 
-type PersistenceTestFaultPoint = "read-current" | "read-previous" | "checkpoint-write";
+type PersistenceTestFaultPoint = "read-current" | "read-previous" | "checkpoint-write" | "checkpoint-confirm";
 type PersistenceTestFaultInjector = (point: PersistenceTestFaultPoint) => void;
 
 interface OwnerMetadata {
@@ -69,6 +88,7 @@ interface HistoryReadResult {
 export class DesktopProjectPersistence {
   private sequence = 0;
   private stateInternal: PersistenceState;
+  private confirmedToken: string | undefined;
 
   /** @internal Instances are created only by the trusted open boundary. */
   constructor(
@@ -76,13 +96,50 @@ export class DesktopProjectPersistence {
     state: PersistenceState,
     private readonly clock: () => string,
     private readonly ownership: ActiveWriterOwnership,
-    private readonly injectFault?: PersistenceTestFaultInjector
+    private readonly injectFault?: PersistenceTestFaultInjector,
+    initialHistory?: ProjectHistory
   ) {
     this.stateInternal = state;
+    if (initialHistory) this.confirmedToken = historyCheckpointToken(initialHistory);
   }
 
   get state(): PersistenceState {
     return this.stateInternal;
+  }
+
+  stateFor(history: ProjectHistory): PersistenceState | "local-unsaved" {
+    if (this.stateInternal === "checkpoint-pending" || this.stateInternal === "persistence-error") return this.stateInternal;
+    return this.confirmedToken === historyCheckpointToken(history) ? this.stateInternal : "local-unsaved";
+  }
+
+  async retryCheckpoint(history: ProjectHistory): Promise<void> {
+    const expectedToken = historyCheckpointToken(history);
+    this.stateInternal = "checkpoint-pending";
+    try {
+      await this.ownership.assertOwned();
+      const current = resolve(this.root, CURRENT_FILE);
+      if (await regularFileExists(current)) {
+        const durable = decodePackage(await readFileAvailable(current));
+        if (historyCheckpointToken(durable) === expectedToken) {
+          // A late failure may have happened after rename but before directory fsync.
+          // Finish durability confirmation without replacing or rotating either checkpoint.
+          this.injectFault?.("checkpoint-confirm");
+          const file = await open(current, constants.O_RDONLY | constants.O_NOFOLLOW);
+          try { await file.sync(); } finally { await file.close(); }
+          await syncDirectory(this.root);
+          await this.ownership.assertOwned();
+          if (historyCheckpointToken(decodePackage(await readFileAvailable(current))) !== expectedToken) throw new DesktopPersistenceError("PROJECT_PERSISTENCE_FAILED");
+          this.confirmedToken = expectedToken;
+          this.stateInternal = "local-saved";
+          return;
+        }
+      }
+      if (historyCheckpointToken(history) !== expectedToken) throw new DesktopPersistenceError("PROJECT_PERSISTENCE_FAILED");
+      await this.checkpoint(history);
+    } catch {
+      this.stateInternal = "persistence-error";
+      throw new DesktopPersistenceError("PROJECT_PERSISTENCE_FAILED");
+    }
   }
 
   static async open(root: string, options: DesktopProjectPersistenceOptions = {}): Promise<OpenDesktopProjectResult> {
@@ -92,12 +149,14 @@ export class DesktopProjectPersistence {
   async checkpoint(history: ProjectHistory): Promise<void> {
     const current = resolve(this.root, CURRENT_FILE);
     const previous = resolve(this.root, PREVIOUS_FILE);
-    const payload = encodePackage(serializeProjectPackage(history, this.clock()));
+    this.stateInternal = "checkpoint-pending";
     const token = `${process.pid}-${++this.sequence}`;
     const nextTemp = resolve(this.root, `${TEMP_PREFIX}${token}.next`);
     const previousTemp = resolve(this.root, `${TEMP_PREFIX}${token}.previous`);
 
     try {
+      const expectedToken = historyCheckpointToken(history);
+      const payload = encodePackage(serializeProjectPackage(history, this.clock()));
       await this.ownership.assertOwned();
       this.injectFault?.("checkpoint-write");
       await writeDurably(nextTemp, payload);
@@ -113,8 +172,10 @@ export class DesktopProjectPersistence {
 
       if (await regularFileExists(previousTemp)) await rename(previousTemp, previous);
       await rename(nextTemp, current);
+      this.injectFault?.("checkpoint-confirm");
       await syncDirectory(this.root);
-      decodePackage(await readFileAvailable(current));
+      if (historyCheckpointToken(decodePackage(await readFileAvailable(current))) !== expectedToken) throw new DesktopPersistenceError("PROJECT_PERSISTENCE_FAILED");
+      this.confirmedToken = expectedToken;
       this.stateInternal = "local-saved";
     } catch {
       this.stateInternal = "persistence-error";
@@ -197,7 +258,8 @@ async function openDesktopProject(
           options.recoveredSession ? "local-recovered" : "local-saved",
           options.clock ?? (() => new Date().toISOString()),
           ownership,
-          injectFault
+          injectFault,
+          currentResult.history
         ),
         firstRun: false
       };
@@ -219,7 +281,8 @@ async function openDesktopProject(
         "local-recovered",
         options.clock ?? (() => new Date().toISOString()),
         ownership,
-        injectFault
+        injectFault,
+        previousResult.history
       ),
       firstRun: false
     };

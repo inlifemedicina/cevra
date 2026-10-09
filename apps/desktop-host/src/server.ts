@@ -7,6 +7,8 @@ import {
   ProtocolValidationError,
   parseRequest,
   validateCancelParams,
+  validateCheckpointParams,
+  validateCloseParams,
   validateEditorialRevisionParams,
   validateIngestParams,
   validateNoParams,
@@ -107,8 +109,15 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       validateNoParams(request.params, request.id);
       return { result: requireSession(session).state() };
     case "host.shutdown":
-      validateNoParams(request.params, request.id);
+      if (session) session.admitShutdown(validateCloseParams(request.params, request.id));
+      else validateNoParams(request.params, request.id);
       return { result: { shuttingDown: true }, shutdown: true };
+    case "host.prepareClose":
+      return { result: requireSession(session).prepareClose(validateCloseParams(request.params, request.id)) };
+    case "host.cancelClose":
+      return { result: requireSession(session).cancelClose(validateCloseParams(request.params, request.id)) };
+    case "project.checkpoint":
+      return { result: await requireSession(session).retryCheckpoint(validateCheckpointParams(request.params, request.id)) };
     case "media.ingestLocal":
       return { result: await requireSession(session).ingestLocal(validateIngestParams(request.params, request.id)) };
     case "video.previewLocal":
@@ -166,12 +175,16 @@ function safeMessage(code: string): string {
     case "PROJECT_PERSISTENCE_CORRUPT": return "The saved project failed integrity validation.";
     case "PROJECT_PERSISTENCE_UNAVAILABLE": return "Project persistence is unavailable.";
     case "PROJECT_MUTATION_BUSY": return "Another canonical project mutation is still active.";
+    case "PROJECT_CHECKPOINT_STALE": return "The checkpoint request no longer matches the current history.";
+    case "PROJECT_CLOSE_UNSAVED": return "The current history is not confirmed saved. Keep the session open and retry saving.";
+    case "PROJECT_CLOSE_BUSY": return "An operation is still active. Keep the session open until it settles.";
+    case "PROJECT_CLOSE_PENDING": return "The close request has not settled. Canonical mutations remain blocked.";
     default: return "The desktop operation failed.";
   }
 }
 
 function safeDetails(cause: unknown, code: string): { details?: Record<string, unknown> } {
-  if (code !== "PROJECT_PERSISTENCE_FAILED") return {};
+  if (!["PROJECT_PERSISTENCE_FAILED", "PROJECT_CHECKPOINT_STALE", "PROJECT_CLOSE_UNSAVED", "PROJECT_CLOSE_BUSY", "PROJECT_CLOSE_PENDING"].includes(code)) return {};
   if (typeof cause !== "object" || cause === null || !("details" in cause)) return {};
   const details = cause.details;
   if (typeof details !== "object" || details === null || Array.isArray(details) || !("state" in details)) return {};

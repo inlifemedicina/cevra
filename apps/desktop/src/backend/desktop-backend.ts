@@ -16,7 +16,9 @@ export interface DesktopBackendState {
   readonly sourceNumbering: SourceNumberingV1;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
-  readonly status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "host-unavailable" | "temporary-review";
+  readonly status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "checkpoint-pending" | "host-unavailable" | "temporary-review";
+  readonly checkpoint?: { readonly token: string; readonly pending: boolean };
+  readonly closePending?: boolean;
   readonly capabilities: Readonly<Record<DesktopRuntimeCapability, DesktopCapabilityState>>;
 }
 
@@ -43,5 +45,7 @@ export interface DesktopBackend {
   transcribeSource(sourceId: string, operationId: string, locale: "pt-BR" | "en-US"): Promise<DesktopBackendState>;
   undo(): Promise<DesktopBackendState>;
   redo(): Promise<DesktopBackendState>;
+  retryCheckpoint(expectedToken: string): Promise<DesktopBackendState>;
+  getNativeCloseState?(): Promise<{ sequence: number; pending: boolean; errorCode?: string }>;
   cancelOperation(operationId: string): Promise<{ operationId: string; cancelled: boolean }>;
 }

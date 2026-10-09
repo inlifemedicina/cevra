@@ -330,6 +330,13 @@ export interface ProjectIRv2 extends ProjectIRSharedState {
 
 export type ProjectIR = ProjectIRv2;
 
+/** Closed, nonrecursive operations for one atomic timeline action. */
+export type TimelineEditOperation =
+  | { type: "track.add"; track: TimelineTrack }
+  | { type: "clip.add"; clip: TimelineClip }
+  | { type: "clip.remove"; clipId: Id }
+  | { type: "clip.trim"; clipId: Id; timelineStartMs: Milliseconds; timelineEndMs: Milliseconds; sourceStartMs: Milliseconds; sourceEndMs: Milliseconds };
+
 export type EditCommand =
   | { type: "project.rename"; name: string }
   | { type: "source.add"; source: SourceAsset }
@@ -345,11 +352,9 @@ export type EditCommand =
     }
   | { type: "transcript.set"; transcript: SourceTranscript; expectedCurrentTranscriptDigest?: TranscriptDigest }
   | { type: "transcript.remove"; sourceId: Id; expectedTranscriptDigest: TranscriptDigest }
-  | { type: "track.add"; track: TimelineTrack }
+  | TimelineEditOperation
+  | { type: "timeline.edit"; version: 1; edits: readonly TimelineEditOperation[] }
   | { type: "track.remove"; trackId: Id }
-  | { type: "clip.add"; clip: TimelineClip }
-  | { type: "clip.remove"; clipId: Id }
-  | { type: "clip.trim"; clipId: Id; timelineStartMs: Milliseconds; timelineEndMs: Milliseconds; sourceStartMs: Milliseconds; sourceEndMs: Milliseconds }
   | { type: "caption.upsert"; caption: CaptionCue }
   | { type: "caption.remove"; captionId: Id }
   | { type: "style.patch"; patch: Partial<StyleState> }

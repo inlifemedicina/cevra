@@ -8,7 +8,35 @@ use std::sync::Arc;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
+#[tauri::command]
+pub fn desktop_get_close_state(supervisor: State<'_, Arc<DesktopHostSupervisor>>) -> Result<crate::supervisor::NativeCloseState, DesktopCommandError> {
+    // Constant-size native lifecycle metadata only; no Host launch, mutation or filesystem access.
+    supervisor.native_close_state()
+}
+
 static OPERATION_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CheckpointArgs {
+    expected_token: String,
+}
+
+#[tauri::command]
+pub async fn desktop_retry_checkpoint(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: CheckpointArgs,
+) -> Result<Value, DesktopCommandError> {
+    let hash = args.expected_token.strip_prefix("checkpoint-v1:").unwrap_or("");
+    if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
+        return Err(DesktopCommandError::new("HOST_INVALID_PARAMS", "Checkpoint token is invalid."));
+    }
+    supervisor.ensure_started(&app).await?;
+    // Save retry never kills the only unsaved canonical history on timeout.
+    // The host mutation gate remains held until I/O settles; the UI reconciles snapshots.
+    supervisor.request_control("project.checkpoint", json!({ "expectedToken": args.expected_token })).await
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

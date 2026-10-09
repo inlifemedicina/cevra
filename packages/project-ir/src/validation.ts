@@ -10,6 +10,7 @@ import {
   type SourceAsset,
   type SourceTechnicalDescriptorV1,
   type SourceTranscript,
+  type TimelineEditOperation,
   type TranscriptSpeakerState
 } from "./types.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
@@ -196,6 +197,49 @@ function validateClip(clip: unknown, index: number, issues: ValidationIssue[]): 
   if (!isFiniteNumber(clip.speed) || clip.speed <= 0) push(issues, `${path}.speed`, "range", "speed must be greater than 0.");
   if (!isFiniteNumber(clip.volume) || clip.volume < 0) push(issues, `${path}.volume`, "range", "volume must be 0 or greater.");
   if (!isFiniteNumber(clip.opacity) || clip.opacity < 0 || clip.opacity > 1) push(issues, `${path}.opacity`, "range", "opacity must be between 0 and 1.");
+}
+
+/** Payload validation only; references and the final project are checked by the reducer. */
+export function validateTimelineEditOperation(value: unknown): ValidationResult<TimelineEditOperation> {
+  const issues: ValidationIssue[] = [];
+  if (!isRecord(value)) return { ok: false, issues: [{ path: "edit", code: "type", message: "Timeline edit must be an object." }] };
+  switch (value.type) {
+    case "track.add":
+      rejectUnexpectedKeys(value, ["type", "track"], "edit", issues);
+      validateTrack(value.track, 0, issues);
+      if (isRecord(value.track)) {
+        rejectUnexpectedKeys(value.track, ["id", "name", "kind", "locked", "hidden", "muted"], "edit.track", issues);
+        if (typeof value.track.kind !== "string") push(issues, "edit.track.kind", "type", "Track kind must be a string.");
+      }
+      break;
+    case "clip.add":
+      rejectUnexpectedKeys(value, ["type", "clip"], "edit", issues);
+      validateClip(value.clip, 0, issues);
+      if (isRecord(value.clip)) {
+        rejectUnexpectedKeys(value.clip, ["id", "trackId", "sourceId", "timelineStartMs", "timelineEndMs", "sourceStartMs", "sourceEndMs", "speed", "volume", "opacity", "extensions"], "edit.clip", issues);
+        for (const key of ["timelineStartMs", "timelineEndMs", "sourceStartMs", "sourceEndMs"]) {
+          if (!Number.isSafeInteger(value.clip[key])) push(issues, `edit.clip.${key}`, "time", "Timeline time must be a safe integer.");
+        }
+        if (value.clip.extensions !== undefined && !isRecord(value.clip.extensions)) push(issues, "edit.clip.extensions", "type", "Clip extensions must be an object.");
+      }
+      break;
+    case "clip.remove":
+      rejectUnexpectedKeys(value, ["type", "clipId"], "edit", issues);
+      requireString(value, "clipId", "edit", issues);
+      break;
+    case "clip.trim":
+      rejectUnexpectedKeys(value, ["type", "clipId", "timelineStartMs", "timelineEndMs", "sourceStartMs", "sourceEndMs"], "edit", issues);
+      requireString(value, "clipId", "edit", issues);
+      validateLegacyTimeRange(value, "timelineStartMs", "timelineEndMs", "edit", issues);
+      validateLegacyTimeRange(value, "sourceStartMs", "sourceEndMs", "edit", issues);
+      for (const key of ["timelineStartMs", "timelineEndMs", "sourceStartMs", "sourceEndMs"]) {
+        if (!Number.isSafeInteger(value[key])) push(issues, `edit.${key}`, "time", "Timeline time must be a safe integer.");
+      }
+      break;
+    default:
+      push(issues, "edit.type", "enum", "Unsupported atomic timeline operation.");
+  }
+  return issues.length ? { ok: false, issues } : { ok: true, value: value as unknown as TimelineEditOperation };
 }
 
 function validateLegacyTranscript(transcript: unknown, issues: ValidationIssue[]): void {

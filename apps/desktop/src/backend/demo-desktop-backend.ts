@@ -29,6 +29,7 @@ export class DemoDesktopBackend implements DesktopBackend {
   async transcribeSource(): Promise<DesktopBackendState> { return this.loadState(); }
   async undo(): Promise<DesktopBackendState> { return this.loadState(); }
   async redo(): Promise<DesktopBackendState> { return this.loadState(); }
+  async retryCheckpoint(): Promise<never> { throw { code: "PROJECT_PERSISTENCE_UNAVAILABLE" }; }
   async cancelOperation(operationId: string): Promise<{ operationId: string; cancelled: boolean }> { return { operationId, cancelled: false }; }
 }
 

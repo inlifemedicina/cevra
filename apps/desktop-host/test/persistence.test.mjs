@@ -5,10 +5,10 @@ import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { computeTranscriptDigest } from "@cevra/project-ir";
+import { computeTranscriptDigest, createEmptyProject, ProjectHistory } from "@cevra/project-ir";
 import { deserializeProjectPackage } from "@cevra/project-store";
 import { DesktopHostProtocolServer, DesktopProjectPersistence, DesktopSession } from "../dist/index.js";
-import { __openDesktopProjectForTest } from "../dist/persistence.js";
+import { __openDesktopProjectForTest, historyCheckpointToken } from "../dist/persistence.js";
 
 const now = "2026-09-15T12:00:00.000Z";
 const unavailable = { available: false, reason: "runtime-not-configured" };
@@ -44,6 +44,192 @@ function options(prefix = "persist") {
     clock: () => now
   };
 }
+
+function checkpointSession(opened) {
+  return new DesktopSession({ history: opened.history, persistence: opened.persistence, mediaCapability: unavailable, transcriptionCapability: unavailable });
+}
+
+test("checkpoint cache invalidates when discarded redo IDs are legally reused", () => {
+  const ids = ["initial", "entry-a", "snapshot-a", "entry-b", "snapshot-b", "entry-b", "snapshot-b"];
+  const history = new ProjectHistory(createEmptyProject({ id: "reused-ids", now }), { idGenerator: () => ids.shift(), clock: () => now });
+  history.commit({ type: "project.rename", name: "A" });
+  history.commit({ type: "project.rename", name: "B" });
+  history.undo();
+  const oldArchive = history.toArchive(), before = historyCheckpointToken(history);
+  history.commit({ type: "project.rename", name: "C" });
+  history.undo();
+  const newArchive = history.toArchive();
+  // Both archives are valid, with the same retained IDs/revisions/cursor.
+  const oldLoaded = ProjectHistory.fromArchive(oldArchive);
+  const newLoaded = ProjectHistory.fromArchive(newArchive);
+  assert.deepEqual(newArchive.entries.map(e => [e.id, e.snapshotId, e.revision]), oldArchive.entries.map(e => [e.id, e.snapshotId, e.revision]));
+  assert.equal(newArchive.cursorSnapshotId, oldArchive.cursorSnapshotId);
+  assert.notEqual(historyCheckpointToken(history), before);
+  assert.equal(historyCheckpointToken(history), historyCheckpointToken(newLoaded));
+  assert.equal(before, historyCheckpointToken(oldLoaded));
+  history.redo();
+  assert.equal(history.current.project.name, "C");
+});
+
+test("close rejects unsaved and failed history, then admits an explicit successful retry without editing", async t => {
+  const root = await temporaryRoot(t);
+  let fail = false;
+  const opened = await __openDesktopProjectForTest(root, options("close-retry"), point => { if (fail && point === "checkpoint-write") throw rawFileError("ENOSPC"); });
+  const session = checkpointSession(opened);
+  t.after(() => session.close());
+  opened.history.commit({ type: "project.rename", name: "Unsaved" });
+  const archive = opened.history.toArchive();
+  assert.throws(() => session.prepareClose("close-a"), { code: "PROJECT_CLOSE_UNSAVED" });
+  assert.equal(session.state().closePending, false);
+  fail = true;
+  await assert.rejects(() => opened.persistence.checkpoint(opened.history));
+  assert.throws(() => session.prepareClose("close-a"), { code: "PROJECT_CLOSE_UNSAVED" });
+  assert.equal(session.state().status.persistence, "persistence-error");
+  fail = false;
+  await session.retryCheckpoint(session.state().checkpoint.token);
+  assert.deepEqual(session.prepareClose("close-a"), { ready: true, attemptId: "close-a" });
+  session.admitShutdown("close-a");
+  assert.deepEqual(session.cancelClose("close-a"), { released: false, committed: true });
+  assert.deepEqual(opened.history.toArchive(), archive);
+  await session.close();
+  const reopened = await DesktopProjectPersistence.open(root, options("close-reopen"));
+  assert.deepEqual(reopened.history.toArchive(), archive);
+  await reopened.persistence.close();
+});
+
+test("close freezes canonical admission and only its own uncommitted attempt can release it", async t => {
+  const opened = await DesktopProjectPersistence.open(await temporaryRoot(t), options("close-gate"));
+  const session = checkpointSession(opened);
+  t.after(() => session.close());
+  opened.history.commit({ type: "project.rename", name: "Saved" });
+  await opened.persistence.checkpoint(opened.history);
+  const archive = opened.history.toArchive();
+  const token = session.state().checkpoint.token;
+  assert.throws(() => session.admitShutdown("unprepared"), { code: "PROJECT_CLOSE_BUSY" });
+  session.prepareClose("close-a");
+  assert.equal(session.state().closePending, true);
+  assert.deepEqual(session.prepareClose("close-a"), { ready: true, attemptId: "close-a" });
+  assert.throws(() => session.prepareClose("close-b"), { code: "PROJECT_CLOSE_BUSY" });
+  assert.deepEqual(session.cancelClose("close-b"), { released: false, committed: false });
+  await assert.rejects(() => session.undo(), { code: "PROJECT_CLOSE_PENDING" });
+  await assert.rejects(() => session.retryCheckpoint(token), { code: "PROJECT_CLOSE_PENDING" });
+  assert.deepEqual(opened.history.toArchive(), archive);
+  assert.deepEqual(session.cancelClose("close-a"), { released: true, committed: false });
+  assert.equal(session.state().closePending, false);
+  assert.equal((await session.undo()).canRedo, true);
+});
+
+test("checkpoint in flight blocks close, and full-history ABA invalidates previously prepared shutdown", async t => {
+  const opened = await DesktopProjectPersistence.open(await temporaryRoot(t), options("close-aba"));
+  const session = checkpointSession(opened);
+  t.after(() => session.close());
+  opened.history.commit({ type: "project.rename", name: "A" });
+  const saving = session.retryCheckpoint(session.state().checkpoint.token);
+  assert.throws(() => session.prepareClose("close-busy"), { code: "PROJECT_CLOSE_BUSY" });
+  await saving;
+  const snapshot = opened.history.current.history.headSnapshotId;
+  session.prepareClose("close-ready");
+  // Trusted in-process interference is detected even when it restores the same cursor.
+  opened.history.commit({ type: "project.rename", name: "B" });
+  opened.history.undo();
+  assert.equal(opened.history.current.history.headSnapshotId, snapshot);
+  assert.throws(() => session.admitShutdown("close-ready"), { code: "PROJECT_CLOSE_UNSAVED" });
+  assert.equal(session.state().closePending, false);
+  assert.equal(session.state().status.persistence, "local-unsaved");
+  assert.equal(opened.history.canRedo, true);
+});
+
+test("failed checkpoint retries the full archive without new edits and repeated retry preserves previous", async t => {
+  const root = await temporaryRoot(t);
+  let fail = false;
+  const opened = await __openDesktopProjectForTest(root, options("retry"), point => { if (fail && point === "checkpoint-write") throw rawFileError("ENOSPC"); });
+  const session = checkpointSession(opened);
+  opened.history.commit({ type: "project.rename", name: "A" });
+  opened.history.commit({ type: "project.rename", name: "B" });
+  opened.history.undo();
+  const expected = opened.history.toArchive();
+  fail = true;
+  await assert.rejects(() => opened.persistence.checkpoint(opened.history), { code: "PROJECT_PERSISTENCE_FAILED" });
+  assert.equal(session.state().status.persistence, "persistence-error");
+  fail = false;
+  const saved = await session.retryCheckpoint(session.state().checkpoint.token);
+  assert.equal(saved.status.persistence, "local-saved");
+  assert.equal(saved.checkpoint.pending, false);
+  assert.deepEqual(opened.history.toArchive(), expected);
+  const previous = await readFile(resolve(root, "active-project.previous.cevra.json"), "utf8");
+  const current = await readFile(resolve(root, "active-project.current.cevra.json"), "utf8");
+  await session.retryCheckpoint(saved.checkpoint.token);
+  assert.equal(await readFile(resolve(root, "active-project.previous.cevra.json"), "utf8"), previous);
+  assert.equal(await readFile(resolve(root, "active-project.current.cevra.json"), "utf8"), current);
+  await session.close();
+  const reopened = await DesktopProjectPersistence.open(root, options("reopened"));
+  assert.deepEqual(reopened.history.toArchive(), expected);
+  assert.equal(reopened.history.canRedo, true);
+  await reopened.persistence.close();
+});
+
+test("retry confirms a checkpoint published before a late failure without rotating previous", async t => {
+  const root = await temporaryRoot(t);
+  let fail = false;
+  const opened = await __openDesktopProjectForTest(root, options("late"), point => { if (fail && point === "checkpoint-confirm") throw rawFileError("EIO"); });
+  const session = checkpointSession(opened);
+  opened.history.commit({ type: "project.rename", name: "Published" });
+  fail = true;
+  await assert.rejects(() => opened.persistence.checkpoint(opened.history));
+  const previous = await readFile(resolve(root, "active-project.previous.cevra.json"), "utf8");
+  const current = await readFile(resolve(root, "active-project.current.cevra.json"), "utf8");
+  await assert.rejects(() => session.retryCheckpoint(session.state().checkpoint.token));
+  assert.equal(session.state().status.persistence, "persistence-error");
+  fail = false;
+  assert.equal((await session.retryCheckpoint(session.state().checkpoint.token)).status.persistence, "local-saved");
+  assert.equal(await readFile(resolve(root, "active-project.previous.cevra.json"), "utf8"), previous);
+  assert.equal(await readFile(resolve(root, "active-project.current.cevra.json"), "utf8"), current);
+  await session.close();
+});
+
+test("full checkpoint token rejects stale redo-branch replacement and concurrent retry", async t => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options("branch"));
+  const session = checkpointSession(opened);
+  opened.history.commit({ type: "project.rename", name: "A" });
+  opened.history.commit({ type: "project.rename", name: "B" });
+  opened.history.undo();
+  const old = session.state().checkpoint.token;
+  const snapshot = opened.history.current.history.headSnapshotId;
+  opened.history.commit({ type: "project.rename", name: "C" });
+  opened.history.undo();
+  assert.equal(opened.history.current.history.headSnapshotId, snapshot);
+  assert.notEqual(session.state().checkpoint.token, old);
+  const before = await readFile(resolve(root, "active-project.current.cevra.json"), "utf8");
+  await assert.rejects(() => session.retryCheckpoint(old), error => error.code === "PROJECT_CHECKPOINT_STALE" && error.details.state.checkpoint.token === session.state().checkpoint.token);
+  assert.equal(await readFile(resolve(root, "active-project.current.cevra.json"), "utf8"), before);
+  const saving = session.retryCheckpoint(session.state().checkpoint.token);
+  assert.equal(session.state().checkpoint.pending, true);
+  await assert.rejects(() => session.retryCheckpoint(session.state().checkpoint.token), { code: "PROJECT_MUTATION_BUSY" });
+  await assert.rejects(() => session.undo(), { code: "PROJECT_MUTATION_BUSY" });
+  await saving;
+  assert.equal(session.state().checkpoint.pending, false);
+  const durable = await readDurableHistory(root);
+  assert.equal(historyCheckpointToken(durable), session.state().checkpoint.token);
+  await session.close();
+});
+
+test("retry never replaces corrupt current or claims a newer history was saved", async t => {
+  const root = await temporaryRoot(t);
+  const opened = await DesktopProjectPersistence.open(root, options("corrupt-retry"));
+  const session = checkpointSession(opened);
+  const original = await readFile(resolve(root, "active-project.current.cevra.json"), "utf8");
+  await writeFile(resolve(root, "active-project.current.cevra.json"), "invalid", "utf8");
+  await assert.rejects(() => session.retryCheckpoint(session.state().checkpoint.token), { code: "PROJECT_PERSISTENCE_FAILED" });
+  assert.equal(await readFile(resolve(root, "active-project.current.cevra.json"), "utf8"), "invalid");
+  await writeFile(resolve(root, "active-project.current.cevra.json"), original, "utf8");
+  const saving = opened.persistence.checkpoint(opened.history);
+  opened.history.commit({ type: "project.rename", name: "Newer memory" });
+  await saving;
+  assert.equal(opened.persistence.stateFor(opened.history), "local-unsaved");
+  assert.notEqual((await readDurableHistory(root)).current.project.name, "Newer memory");
+  await session.close();
+});
 
 test("true first run creates one durable canonical ProjectHistory", async (t) => {
   const root = await temporaryRoot(t);
@@ -503,7 +689,8 @@ async function runHost(persistenceRoot, recovered) {
   child.stdout.on("data", (chunk) => { stdout += chunk.toString("utf8"); });
   child.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8"); });
   child.stdin.write(`${JSON.stringify({ protocolVersion: 1, id: "state", method: "project.snapshot", params: {} })}\n`);
-  child.stdin.write(`${JSON.stringify({ protocolVersion: 1, id: "shutdown", method: "host.shutdown", params: {} })}\n`);
+  child.stdin.write(`${JSON.stringify({ protocolVersion: 1, id: "prepare", method: "host.prepareClose", params: { attemptId: "close-fixture" } })}\n`);
+  child.stdin.write(`${JSON.stringify({ protocolVersion: 1, id: "shutdown", method: "host.shutdown", params: { attemptId: "close-fixture" } })}\n`);
   const code = await new Promise((resolvePromise, reject) => {
     child.once("error", reject);
     child.once("exit", resolvePromise);
@@ -558,6 +745,9 @@ test("opening a valid V2 checkpoint initializes numbers in memory without rewrit
   const previousBytes = await readFile(previous, "utf8");
   const reopened = await DesktopProjectPersistence.open(root, options());
   assert.equal(reopened.history.sourceNumbering.sources[0].number, 1);
+  const session = checkpointSession(reopened);
+  await session.retryCheckpoint(session.state().checkpoint.token);
+  assert.equal(session.state().status.persistence, "local-saved");
   assert.equal(await readFile(current, "utf8"), legacyBytes);
   assert.equal(await readFile(previous, "utf8"), previousBytes);
   await reopened.persistence.close();

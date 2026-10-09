@@ -32,6 +32,12 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [runtimeNotice, setRuntimeNotice] = useState<TranslationKey | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [manualMutationBusy, setManualMutationBusy] = useState(false);
+  const [checkpointRetryBusy, setCheckpointRetryBusy] = useState(false);
+  const [checkpointReconcileTick, setCheckpointReconcileTick] = useState(0);
+  const [nativeClosePending, setNativeClosePending] = useState(false);
+  const [nativeCloseError, setNativeCloseError] = useState<string | null>(null);
+  const checkpointPending = backendState?.checkpoint?.pending === true;
+  const closePending = nativeClosePending || backendState?.closePending === true;
   const manualMutationInFlight = useRef(false);
   const selectionEpoch = useRef(0);
   const latestSelection = useRef<{ selectedId: string | null; sourceId: string | null }>({ selectedId: null, sourceId: null });
@@ -78,6 +84,48 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }, [locale]);
 
   useEffect(() => {
+    if (!backend.getNativeCloseState) return;
+    let current = true;
+    let reading = false;
+    let lastSequence = 0;
+    const timer = window.setInterval(() => {
+      if (reading) return;
+      reading = true;
+      void backend.getNativeCloseState!().then(async (close) => {
+        if (!current || close.sequence === lastSequence) return;
+        lastSequence = close.sequence;
+        setNativeClosePending(close.pending);
+        setNativeCloseError(close.errorCode ? (close.pending ? "PROJECT_CLOSE_UNKNOWN" : close.errorCode) : close.pending ? "PROJECT_CLOSE_PENDING" : null);
+        try {
+          const state = await backend.loadState();
+          if (current) applyBackendState(state, undefined, true, false);
+        } catch (cause) { if (current) handleRuntimeError(cause, true); }
+      }).catch((cause: unknown) => { if (current) handleRuntimeError(cause, true); }).finally(() => { reading = false; });
+    }, 1000);
+    return () => { current = false; window.clearInterval(timer); };
+  }, [backend]);
+
+  useEffect(() => {
+    if (!checkpointPending || checkpointRetryBusy || backendState?.status === "host-unavailable") return;
+    let current = true;
+    // A transport timeout does not stop a save. Only the canonical Host snapshot
+    // can reconcile a late result; never issue another editing command to do it.
+    const timer = window.setTimeout(() => {
+      void backend.loadState().then((state) => {
+        if (!current) return;
+        applyBackendState(state, undefined, true, false);
+        if (state.status === "local-saved" || state.status === "local-recovered") setRuntimeError((value) => value?.startsWith("PROJECT_CLOSE_") ? value : null);
+        else if (state.status === "persistence-error") setRuntimeError((value) => value?.startsWith("PROJECT_CLOSE_") ? value : "PROJECT_PERSISTENCE_FAILED");
+      }).catch((cause: unknown) => {
+        if (current) handleRuntimeError(cause, true);
+      }).finally(() => {
+        if (current) setCheckpointReconcileTick((value) => value + 1);
+      });
+    }, 1000);
+    return () => { current = false; window.clearTimeout(timer); };
+  }, [backend, checkpointPending, checkpointRetryBusy, checkpointReconcileTick, backendState?.status]);
+
+  useEffect(() => {
     if (!backend.presentationOnly || !playing || !project) return;
     const interval = window.setInterval(() => {
       setPlayheadMs((value) => value >= project.timeline.durationMs ? 0 : Math.min(project.timeline.durationMs, value + 100));
@@ -106,7 +154,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function reviseEditorial(request: ReviseEditorialDraftRequest) {
-    if (editorialBusy || importBusy || transcriptionOperationId || manualMutationInFlight.current) return;
+    if (editorialBusy || importBusy || transcriptionOperationId || manualMutationInFlight.current || checkpointPending || closePending) return;
     const generation = ++editorialGeneration.current;
     setEditorialBusy(true);
     setEditorialError(false);
@@ -156,10 +204,10 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     }
   }
 
-  function applyBackendState(value: DesktopBackendState, preferredSourceId?: string, preserveSelection = false) {
+  function applyBackendState(value: DesktopBackendState, preferredSourceId?: string, preserveSelection = false, clearRuntimeError = true) {
     setBackendState(value);
     setProject(value.project);
-    setRuntimeError(null);
+    if (clearRuntimeError) setRuntimeError(null);
     setPlayheadMs((current) => Math.min(current, value.project.timeline.durationMs));
     const selection = preserveSelection ? latestSelection.current : { selectedId: selectedProjectItemId, sourceId: activeSourceId };
     const selectedStillExists = selection.selectedId !== null && resolvesProjectItem(value.project, selection.selectedId);
@@ -170,7 +218,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function importMedia() {
-    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current) return;
+    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     setImportBusy(true);
     setRuntimeError(null);
     setRuntimeNotice(null);
@@ -186,7 +234,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function changeHistory(direction: "undo" | "redo") {
-    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current) return;
+    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     manualMutationInFlight.current = true;
     setManualMutationBusy(true);
     setRuntimeNotice(null);
@@ -200,8 +248,31 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     }
   }
 
+  async function retryCheckpoint() {
+    const token = backendState?.checkpoint?.token;
+    if (!token || importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
+    manualMutationInFlight.current = true;
+    setManualMutationBusy(true);
+    setCheckpointRetryBusy(true);
+    setBackendState((current) => current?.checkpoint ? { ...current, status: "checkpoint-pending", checkpoint: { ...current.checkpoint, pending: true } } : current);
+    setRuntimeNotice(null);
+    try {
+      applyBackendState(await backend.retryCheckpoint(token), undefined, true, false);
+      setRuntimeError((value) => value?.startsWith("PROJECT_CLOSE_") ? value : null);
+    } catch (cause) {
+      handleRuntimeError(cause, true);
+      if (!desktopOperationError(cause).reconciledState) {
+        try { applyBackendState(await backend.loadState(), undefined, true, false); } catch (readError) { handleRuntimeError(readError, true); }
+      }
+    } finally {
+      manualMutationInFlight.current = false;
+      setManualMutationBusy(false);
+      setCheckpointRetryBusy(false);
+    }
+  }
+
   async function createManualClip(request: CreateManualVideoClipRequest) {
-    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current) return;
+    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     manualMutationInFlight.current = true;
     setManualMutationBusy(true);
     setRuntimeError(null); setRuntimeNotice(null);
@@ -221,7 +292,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function trimManualClip(request: TrimManualVideoClipRequest) {
-    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current) return;
+    if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     manualMutationInFlight.current = true;
     setManualMutationBusy(true);
     setRuntimeError(null); setRuntimeNotice(null);
@@ -250,7 +321,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   }
 
   async function transcribeSource() {
-    if (!activeSourceId || transcriptionOperationId || importBusy || editorialBusy || manualMutationInFlight.current) return;
+    if (!activeSourceId || transcriptionOperationId || importBusy || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     const operationId = typeof globalThis.crypto?.randomUUID === "function"
       ? globalThis.crypto.randomUUID()
       : `transcription-${Date.now()}`;
@@ -303,24 +374,25 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     } : current);
   }
 
-  if (!project || !backendState) return <main className="loading-screen"><span className="brand-mark">C</span><p>{runtimeError ? t(runtimeErrorKey(runtimeError)) : t("app.loadingProject")}</p></main>;
+  const visibleRuntimeError = nativeCloseError ?? runtimeError;
+  if (!project || !backendState) return <main className="loading-screen"><span className="brand-mark">C</span><p>{visibleRuntimeError ? t(runtimeErrorKey(visibleRuntimeError)) : t("app.loadingProject")}</p></main>;
 
   const layoutStyle = { "--timeline-height": `${timelineHeight}px`, "--sidebar-width": `${sidebarCompact ? 286 : sidebarWidth}px` } as CSSProperties;
-  const mutationBusy = importBusy || transcriptionOperationId !== null || editorialBusy || manualMutationBusy;
+  const mutationBusy = importBusy || transcriptionOperationId !== null || editorialBusy || manualMutationBusy || checkpointPending || closePending;
   const realPreview = !backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" && workspace === "edit";
   const selectedPreviewClip = project.timeline.clips.find((clip) => clip.id === selectedProjectItemId);
   const previewClip = selectedPreviewClip && supportsManualClipPreview(project, selectedPreviewClip) ? selectedPreviewClip : undefined;
   return (
     <main className={`app-shell workspace-${workspace}${mediaOpen ? " media-open" : " media-closed"}${sidebarCompact ? " sidebar-compact" : " sidebar-open"}`} style={layoutStyle} data-testid="app-shell" data-project-revision={project.history.revision} data-selected-project-item-id={selectedProjectItemId ?? undefined} data-active-source-id={activeSourceId ?? undefined}>
-      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} sidebarCompact={sidebarCompact} exportAvailable={backendState.capabilities["project.export"].available} status={backendState.status} canUndo={backendState.canUndo && !mutationBusy} canRedo={backendState.canRedo && !mutationBusy} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onSidebarToggle={() => setSidebarCompact((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} />
+      <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} sidebarCompact={sidebarCompact} exportAvailable={backendState.capabilities["project.export"].available} status={backendState.status} retryAvailable={Boolean(backendState.checkpoint) && (backendState.status === "persistence-error" || backendState.status === "local-unsaved")} retryBusy={mutationBusy} canUndo={backendState.canUndo && !mutationBusy} canRedo={backendState.canRedo && !mutationBusy} t={t} onWorkspaceChange={setWorkspace} onLocaleChange={setLocale} onMediaToggle={() => setMediaOpen((value) => !value)} onSidebarToggle={() => setSidebarCompact((value) => !value)} onUndo={() => void changeHistory("undo")} onRedo={() => void changeHistory("redo")} onRetryCheckpoint={() => void retryCheckpoint()} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={setActiveTool} />
-        {mediaOpen && <MediaPanel sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !transcriptionOperationId && !editorialBusy && !manualMutationBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
+        {mediaOpen && <MediaPanel sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !mutationBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onSelect={selectProjectItem} onImport={() => void importMedia()} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
-            {realPreview ? <ManualVideoPreview key={`${project.history.headSnapshotId}:${activeSourceId}:${previewClip?.id ?? "source"}`} backend={backend} source={project.sources.find((source) => source.id === activeSourceId)} sourceLabel={activeSourceId ? sourcePresentations.get(activeSourceId)?.label : undefined} snapshotId={project.history.headSnapshotId!} clip={previewClip} unsupportedClip={Boolean(selectedPreviewClip && !previewClip)} timelineOccupied={project.timeline.clips.length > 0 || project.captions.length > 0 || project.graphics.length > 0} busy={mutationBusy} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} /> : <WorkspaceStage presentations={sourcePresentations} workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy || editorialBusy || manualMutationBusy} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />}
+            {realPreview ? <ManualVideoPreview key={`${project.history.headSnapshotId}:${activeSourceId}:${previewClip?.id ?? "source"}`} backend={backend} source={project.sources.find((source) => source.id === activeSourceId)} sourceLabel={activeSourceId ? sourcePresentations.get(activeSourceId)?.label : undefined} snapshotId={project.history.headSnapshotId!} clip={previewClip} unsupportedClip={Boolean(selectedPreviewClip && !previewClip)} timelineOccupied={project.timeline.clips.length > 0 || project.captions.length > 0 || project.graphics.length > 0} busy={mutationBusy} seek={previewSeek} t={t} onPlayheadChange={setPlayheadMs} onCreate={createManualClip} /> : <WorkspaceStage presentations={sourcePresentations} workspace={workspace} project={project} selectedProjectItemId={selectedProjectItemId} activeSourceId={activeSourceId} playheadMs={playheadMs} playing={playing} previewInteractive={backend.presentationOnly} transcriptionCapability={backendState.capabilities["transcription.transcribe"]} transcriptionBlocked={importBusy || editorialBusy || manualMutationBusy || checkpointPending || closePending} transcriptionOperationId={transcriptionOperationId} t={t} onProjectSelect={selectProjectItem} onPlayingChange={setPlaying} onTranscribe={() => void transcribeSource()} onCancelTranscription={() => void cancelTranscription()} />}
           </div>
-          {runtimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(runtimeError))}</div>}
+          {visibleRuntimeError && <div className="runtime-alert" role="alert">{t(runtimeErrorKey(visibleRuntimeError))}</div>}
           {runtimeNotice && <div className="runtime-notice" role="status">{t(runtimeNotice)}</div>}
         </div>
       </div>
@@ -380,6 +452,10 @@ function runtimeErrorKey(code: string): TranslationKey {
   if (code.startsWith("MANUAL_VIDEO_")) return "preview.localUnavailable";
   if (code === "OPERATION_TIMEOUT" || code === "HOST_TIMEOUT") return "runtime.operationTimedOut";
   if (code === "PROJECT_PERSISTENCE_FAILED") return "runtime.persistenceError";
+  if (code === "PROJECT_CHECKPOINT_STALE") return "runtime.checkpointStale";
+  if (code === "PROJECT_CLOSE_UNSAVED") return "runtime.closeUnsaved";
+  if (code === "PROJECT_CLOSE_BUSY") return "runtime.closeBusy";
+  if (code === "PROJECT_CLOSE_PENDING" || code === "PROJECT_CLOSE_UNKNOWN") return "runtime.closePending";
   if (code === "PROJECT_PERSISTENCE_CORRUPT") return "runtime.persistenceCorrupt";
   if (code === "PROJECT_PERSISTENCE_UNAVAILABLE") return "runtime.persistenceUnavailable";
   if (code === "TRANSCRIPTION_APP_PROJECT_CONFLICT") return "runtime.transcriptionProjectConflict";

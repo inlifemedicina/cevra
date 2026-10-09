@@ -36,6 +36,18 @@ test("bounded preview returns only verified bytes and canonical binding; no path
   assert.doesNotMatch(JSON.stringify(preview), new RegExp(path)); assert.deepEqual(opened.history.toArchive(), before);
 });
 
+test("legacy source preview remains tracked until its descriptor read settles, blocking native close", async t => {
+  const { session, opened, request, bytes } = await setup(t);
+  const archive = opened.history.toArchive();
+  const preview = session.previewLocalVideo(request);
+  assert.throws(() => session.prepareClose("close-preview"), { code: "PROJECT_CLOSE_BUSY" });
+  assert.equal(session.state().closePending, false);
+  assert.deepEqual(Buffer.from((await preview).base64, "base64"), bytes);
+  assert.deepEqual(session.prepareClose("close-preview"), { ready: true, attemptId: "close-preview" });
+  session.cancelClose("close-preview");
+  assert.deepEqual(opened.history.toArchive(), archive);
+});
+
 test("preview rejects replaced content, symlinks, nonregular files and oversized files", async (t) => {
   const { root, path, source, request, session } = await setup(t);
   await writeFile(path, Buffer.alloc(source.technicalDescriptor.content.sizeBytes, 88));

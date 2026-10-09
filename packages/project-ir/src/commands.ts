@@ -1,8 +1,10 @@
-import type { CaptionCue, EditCommand, ProjectIR, SourceTechnicalDescriptorV1, SourceTranscript, StyleState, TimelineClip, TranscriptProvenanceStage } from "./types.js";
+import type { CaptionCue, EditCommand, ProjectIR, SourceTechnicalDescriptorV1, SourceTranscript, StyleState, TimelineClip, TimelineEditOperation, TranscriptProvenanceStage } from "./types.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
-import { assertValidProjectIR, validateProjectIR } from "./validation.js";
+import { assertValidProjectIR, validateProjectIR, validateTimelineEditOperation } from "./validation.js";
 
 export type ProjectCommandErrorCode =
+  | "PROJECT_TIMELINE_EDIT_INVALID"
+  | "PROJECT_TIMELINE_EDIT_NO_OP"
   | "PROJECT_TRANSCRIPT_INVALID"
   | "PROJECT_TRANSCRIPT_SOURCE_UNKNOWN"
   | "PROJECT_TRANSCRIPT_SOURCE_INELIGIBLE"
@@ -80,6 +82,9 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
       applyTrim(clip, command);
       break;
     }
+    case "timeline.edit":
+      applyTimelineEdit(next, command);
+      break;
     case "caption.upsert":
       upsertCaption(next.captions, command.caption);
       break;
@@ -100,6 +105,53 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
   next.project.updatedAt = now;
   next.timeline.durationMs = calculateTimelineDuration(next.timeline.clips);
   return assertValidProjectIR(next);
+}
+
+function applyTimelineEdit(project: ProjectIR, command: Extract<EditCommand, { type: "timeline.edit" }>): void {
+  if (command.version !== 1 || !Array.isArray(command.edits) || command.edits.length === 0
+    || Object.keys(command).some((key) => !["type", "version", "edits"].includes(key))) {
+    throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_INVALID", "Atomic timeline edit requires version 1 and a nonempty operation list.");
+  }
+  const edits: readonly TimelineEditOperation[] = command.edits;
+  // Validate every payload even if a later operation would remove or replace it.
+  for (const edit of edits) {
+    const validation = validateTimelineEditOperation(edit);
+    if (!validation.ok) throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_INVALID", validation.issues.map((issue) => `${issue.path}: ${issue.message}`).join("\n"));
+  }
+  const before = JSON.stringify(project.timeline);
+  const tracks = new Map(project.timeline.tracks.map((track) => [track.id, track]));
+  const clips = new Map(project.timeline.clips.map((clip) => [clip.id, clip]));
+  const sources = new Set(project.sources.map((source) => source.id));
+  for (const edit of edits) {
+    switch (edit.type) {
+      case "track.add":
+        if (tracks.has(edit.track.id)) throw new Error(`Duplicate track id ${edit.track.id}.`);
+        tracks.set(edit.track.id, clone(edit.track));
+        break;
+      case "clip.add":
+        if (clips.has(edit.clip.id)) throw new Error(`Duplicate clip id ${edit.clip.id}.`);
+        if (!tracks.has(edit.clip.trackId) || !sources.has(edit.clip.sourceId)) throw new Error("Atomic timeline clip references an unknown track or source.");
+        clips.set(edit.clip.id, clone(edit.clip));
+        break;
+      case "clip.remove":
+        if (!clips.delete(edit.clipId)) throw new Error(`Unknown clip ${edit.clipId}.`);
+        break;
+      case "clip.trim": {
+        const clip = clips.get(edit.clipId);
+        if (!clip) throw new Error(`Unknown clip ${edit.clipId}.`);
+        applyTrim(clip, edit);
+        break;
+      }
+      default:
+        assertNever(edit);
+    }
+  }
+  project.timeline.tracks = [...tracks.values()];
+  project.timeline.clips = [...clips.values()];
+  project.timeline.durationMs = calculateTimelineDuration(project.timeline.clips);
+  if (JSON.stringify(project.timeline) === before) {
+    throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_NO_OP", "Atomic timeline edit has no effect.");
+  }
 }
 
 function applySourceTechnicalDescriptorSet(

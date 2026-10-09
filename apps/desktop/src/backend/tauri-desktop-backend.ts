@@ -17,7 +17,9 @@ interface HostState {
   sourceNumbering: SourceNumberingV1;
   canUndo: boolean;
   canRedo: boolean;
-  status: { hostAvailable: true; persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "temporary-review" };
+  status: { hostAvailable: true; persistence: "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "checkpoint-pending" | "temporary-review" };
+  checkpoint?: { token: string; pending: boolean };
+  closePending?: boolean;
   capabilities: {
     mediaImport: { available: boolean; reason: DesktopCapabilityReason };
     transcription: { available: boolean; reason: DesktopCapabilityReason };
@@ -82,6 +84,14 @@ export class TauriDesktopBackend implements DesktopBackend {
     return fromHostState(await this.call<HostState>("desktop_redo"));
   }
 
+  async retryCheckpoint(expectedToken: string): Promise<DesktopBackendState> {
+    return fromHostState(await this.call<HostState>("desktop_retry_checkpoint", { args: { expectedToken } }));
+  }
+
+  async getNativeCloseState(): Promise<{ sequence: number; pending: boolean; errorCode?: string }> {
+    return this.call("desktop_get_close_state");
+  }
+
   async cancelOperation(operationId: string): Promise<{ operationId: string; cancelled: boolean }> {
     return this.call("desktop_cancel_operation", { args: { operationId } });
   }
@@ -122,6 +132,8 @@ function fromHostState(state: HostState): DesktopBackendState {
     canUndo: state.canUndo,
     canRedo: state.canRedo,
     status: state.status.persistence,
+    ...(state.checkpoint ? { checkpoint: { ...state.checkpoint } } : {}),
+    ...(state.closePending !== undefined ? { closePending: state.closePending } : {}),
     capabilities: {
       "media.import": { ...state.capabilities.mediaImport },
       "transcription.transcribe": { ...state.capabilities.transcription },
