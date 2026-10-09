@@ -472,3 +472,73 @@ reúne somente o delta futuro, sem nova janela/microtestes neste preparo.
 Director: extensão compatível, autoridade em IR/History e comandos tipados.
 Full G1 unaccepted, progresso55% e F-A02 esgotado1/1 permanecem; sem merge,
 issue88 body, Take/Xcode/iPhone, provider ou chamada real de IA.
+
+## Approved visual B presentation — 2026-10-09
+
+**IMPLEMENTED / NOT MERGED:** `feat/vids-visual-b-soft-panels` starts at
+`a606db1b206b507d236ee7dbebf593b68795d344` / Draft #92. The Owner selected
+“B · Áreas com tons suaves · Conceito visual”. Original PNG1586×992, SHA256
+`93d9a4caf53c56c0038fe0b410389b6f6309abcece62bc904e4020480e18aa38`,
+was inspected; the reference-access blocker is resolved. Screenshots of the
+actual compiled UI were inspected before CSS and after. Heavy images/logs,
+browser profile, external harness and package receipts stay outside Git.
+
+| Real area | B presentation / preserved meaning |
+| --- | --- |
+| Media | Slate blue #1c2937; actual imported-source cards, filters, search and source labels remain. |
+| Editorial draft | Desaturated violet #292431; existing proposal, citations, caveats, temporary fields and review actions remain. |
+| Director | Petrol #1b2c30; existing text and preset selector, execution availability and authority remain. |
+| Contextual Inspector | Taupe #2e2923; actual selection/range/export and contextual controls remain. No illustrated context-tag editor. |
+| Preview / Timeline | Neutral surfaces; twelve-pixel panel radii and eight-pixel gutters. Actual preview geometry and timeline scale/cursor/actions remain. |
+
+The concept is a visual reference. Its project-rename pencil, aspect chooser,
+pace/style/mood fields and context chips do not authorize new functions.
+No component/backend/state/IR/History/engine/provider/dependency or model change.
+Open keeps the full-height sidebar and compact keeps the existing tabs plus
+full-width Timeline. Sidebar width/split and Timeline height resizers retain
+existing code, limits, keyboard/pointer/focus and cancellation. Compact Director
+inner padding/textarea spacing is smaller, and its preset flexes within the
+existing row, so the draft scroller retains room; no field is conditionally hidden
+by this increment. At heights≤800px in compact mode, the draft heading shares
+the existing editorial scroller instead of staying sticky over a field.
+The central grid width is unchanged. Timeline's two8px insets
+reduce its width by16px: at1586×992,1210px open/1570px compact; at900×680,
+524px open/884px compact. No duration, zoom, timing or mode is inferred from color.
+
+Local validation: Desktop build PASS; existing UI258/258 PASS with one separate
+runtime-gated skip, i18n2/2 PASS. The external harness bundles the actual App and
+existing synthetic editorial backend; it adds no product UI or provider.
+Eighty outer-layout combinations cover five workspaces × two modes × PT/EN ×
+1586×992/1280×800/900×680/900×600. Eight separator-visibility/input-retention
+checks, six complete-note visibility checks and one four-surface contrast check
+bring the receipt to95 PASS.
+Mode/tab transitions retain the typed Director text. Root bounds, central width,
+Timeline separation/width/height and native-minimum draft scroller were measured.
+Primary/secondary surface text contrasts are13.16–13.80:1 /6.49–6.81:1.
+These bounded checks do not claim absence of every legacy inner-panel clipping
+case, contrast of all disabled controls, complete WCAG certification or native
+WKWebView/compositor/perception acceptance.
+
+The first DEV fixture could not load because its Application barrel imported
+`node:url` into the browser. The compiled actual UI and an external production
+fixture bundle succeeded; no product workaround was introduced. Initial compact
+typography left only38px for draft at900×680; this observation drove the inner-
+spacing correction before freeze. Independent controlled comparison then found
+55px in the base scroller versus79px in B: its sticky heading covered36px versus
+13px of a52px note. This was an inherited limit, improved by B. Sharing the
+existing scroll in low compact windows makes the full note accessible; two
+directed visibility cases were RED before and GREEN after. Earlier measurements
+and diagnostics are retained, rather than presented as native acceptance.
+
+Final exact-tree independent review, exact-head CI and a new frozen-source
+combined package are recorded on the implementation Draft/technical receipt.
+The earlier #92 package is preserved. The
+[single future grouped script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+combines the approved functional delta and B presentation, with the exact new
+identity, and requests no intervening human microtests or new app window.
+Native picker/Finder/WKWebView paint, physical IME, normal-window close/reopen,
+measured human60s latency and full G1 acceptance remain unexecuted here.
+Director: compatible presentation, no new execution/provider authority.
+Progress55%, exhausted F-A021/1, prior technical/human limits and original media
+remain unchanged. No merge, real IA, account request, user app/project operation
+or Take/Xcode/iPhone action.
