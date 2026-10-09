@@ -12,6 +12,9 @@ on:
       - package.json
       - package-lock.json
       - packages/contracts/**
+      - packages/project-ir/**
+      - packages/project-store/**
+      - apps/desktop-host/**
       - packages/application/**
       - engines/media-ffmpeg/**
   pull_request:
@@ -20,6 +23,9 @@ on:
       - package.json
       - package-lock.json
       - packages/contracts/**
+      - packages/project-ir/**
+      - packages/project-store/**
+      - apps/desktop-host/**
       - packages/application/**
       - engines/media-ffmpeg/**
   workflow_dispatch:
@@ -51,13 +57,8 @@ jobs:
           gpgv --version
           python3 --version
       - run: npm ci
-      - name: Build the typed Media execution path
-        run: |
-          npm run build -w @cevra/project-ir
-          npm run build -w @cevra/contracts
-          npm run build -w @cevra/i18n
-          npm run build -w @cevra/application
-          npm run build -w @cevra/media-ffmpeg
+      - name: Build the typed Media execution path and Host resource guard
+        run: npm run build -w @cevra/desktop-host
       - name: Prepare signature-verified release inputs
         run: |
           python3 engines/media-ffmpeg/runtime/prepare_ffmpeg_source.py "${RUNNER_TEMP}/ffmpeg-source"
@@ -94,6 +95,12 @@ jobs:
           CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
           CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
         run: node engines/media-ffmpeg/test_functional/take-video-preview-runtime.mjs
+      - name: Verify original-master CFR30 manual preview and audited final export
+        env:
+          CEVRA_AUDIO_SEQUENCE_RELEASE: "1"
+          CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
+          CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
+        run: node engines/media-ffmpeg/test_functional/manual-sequence-runtime.mjs
       - name: Characterize native audio measurement candidate
         run: >-
           python3 engines/media-ffmpeg/test_functional/audio-measurement-feasibility.py

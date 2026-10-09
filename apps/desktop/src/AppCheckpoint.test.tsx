@@ -20,6 +20,7 @@ async function fixture() {
     previewLocalVideo: demo.previewLocalVideo.bind(demo),
     createManualVideoClip: demo.createManualVideoClip.bind(demo),
     trimManualVideoClip: demo.trimManualVideoClip.bind(demo),
+    editManualVideoSequence: demo.editManualVideoSequence.bind(demo),
     pickAndImportMedia: vi.fn(async () => ({ outcome: "cancelled" as const })),
     transcribeSource: vi.fn(async () => state),
     undo: vi.fn(async () => state), redo: vi.fn(async () => state),

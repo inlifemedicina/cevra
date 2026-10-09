@@ -1,6 +1,8 @@
 import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
 import type { LocalVideoPreviewRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
+import { validateManualVideoSequenceEdit, type ManualVideoSequenceEdit } from "@cevra/application";
+import { validateManualExportPreparationRequest, type ManualExportPreparationRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
 export const DESKTOP_HOST_IDENTITY = "cevra.desktop-host" as const;
@@ -21,8 +23,12 @@ export type HostMethod =
   | "editorial.revise"
   | "media.ingestLocal"
   | "video.previewLocal"
+  | "video.prepareManualExport"
+  | "video.exportManualSequence"
+  | "video.previewManualSequenceConform"
   | "video.trimManualClip"
   | "video.createManualClip"
+  | "video.editManualSequence"
   | "transcription.transcribeSource"
   | "history.undo"
   | "history.redo"
@@ -57,6 +63,7 @@ export interface DesktopHostState {
   capabilities: {
     mediaImport: CapabilityState;
     transcription: CapabilityState;
+    manualExport?: CapabilityState;
   };
 }
 
@@ -89,8 +96,12 @@ const METHODS = new Set<HostMethod>([
   "editorial.revise",
   "media.ingestLocal",
   "video.previewLocal",
+  "video.prepareManualExport",
+  "video.exportManualSequence",
+  "video.previewManualSequenceConform",
   "video.createManualClip",
   "video.trimManualClip",
+  "video.editManualSequence",
   "transcription.transcribeSource",
   "history.undo",
   "history.redo",
@@ -191,6 +202,20 @@ export function validateCancelParams(params: Record<string, unknown>, id: string
   return { operationId: operationId(params.operationId, id) };
 }
 
+/** Trusted native route. No command takes a WebView-supplied destination. */
+export function validateManualExportParams(params: Record<string, unknown>, id: string): { request: ManualExportPreparationRequest; destinationUri: string } {
+  exactKeys(params, ["version", "expectedSnapshotId", "operationId", "locale", "destinationUri"], id);
+  const { destinationUri, ...request } = params;
+  const stable = validateManualExportPreparationRequest(request);
+  return { request: stable, destinationUri: boundedString(destinationUri, 8192, "destinationUri", id) };
+}
+
+export function validateConformPreviewParams(params: Record<string, unknown>, id: string): { version: 1; expectedSnapshotId: string } {
+  exactKeys(params, ["version", "expectedSnapshotId"], id);
+  if (params.version !== 1) throw new ProtocolValidationError("HOST_INVALID_PARAMS", "Conform preview version is invalid.", id);
+  return { version: 1, expectedSnapshotId: boundedString(params.expectedSnapshotId, 128, "expectedSnapshotId", id) };
+}
+
 export function validateVideoPreviewParams(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {
   exactKeys(params, ["sourceId", "expectedSnapshotId", "clipId", "operationId"], id);
   if (params.clipId === undefined && params.operationId === undefined) return videoBinding(params, id);
@@ -215,6 +240,16 @@ export function validateManualTrimParams(params: Record<string, unknown>, id: st
   return { clipId: boundedString(params.clipId, 128, "clipId", id),
     expectedSnapshotId: boundedString(params.expectedSnapshotId, 128, "expectedSnapshotId", id),
     sourceStartMs: params.sourceStartMs as number, sourceEndMs: params.sourceEndMs as number };
+}
+
+export function validateManualSequenceParams(params: Record<string, unknown>, id: string): ManualVideoSequenceEdit {
+  const stable = validateManualVideoSequenceEdit(params as unknown as ManualVideoSequenceEdit);
+  // The Application owns intent/range validation; protocol IDs remain bounded.
+  for (const [key, value] of Object.entries(stable)) {
+    if (key.endsWith("Id")) boundedString(value, 128, key, id);
+    if (key === "clipIds") for (const clipId of value as string[]) boundedString(clipId, 128, "clipId", id);
+  }
+  return stable;
 }
 
 function videoBinding(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {

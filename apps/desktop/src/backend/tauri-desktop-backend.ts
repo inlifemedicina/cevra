@@ -1,12 +1,16 @@
 import { assertValidSourceNumbering, SourceNumberRegistry, type ProjectIR, type SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
+import type { ManualVideoSequenceEdit, ManualVideoSequenceConformPreview } from "@cevra/application";
+import type { ManualExportPreparation, ManualExportPreparationRequest } from "@cevra/application";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { isManualExportResourceCauseCode } from "./desktop-backend";
 import type {
   DesktopBackend,
   DesktopBackendState,
   DesktopCapabilityReason,
   DesktopOperationError,
+  ManualSequenceExportResult,
   ImportMediaResult
 } from "./desktop-backend";
 
@@ -23,6 +27,7 @@ interface HostState {
   capabilities: {
     mediaImport: { available: boolean; reason: DesktopCapabilityReason };
     transcription: { available: boolean; reason: DesktopCapabilityReason };
+    manualExport?: { available: boolean; reason: DesktopCapabilityReason };
   };
 }
 
@@ -44,6 +49,20 @@ export class TauriDesktopBackend implements DesktopBackend {
     return this.call("desktop_preview_local_video", { args: request });
   }
 
+  async prepareManualExport(request: ManualExportPreparationRequest): Promise<
+    { outcome: "cancelled" } | { outcome: "prepared"; preparation: ManualExportPreparation }> {
+    return this.call("desktop_prepare_manual_export", { args: request });
+  }
+
+  async exportManualSequence(request: ManualExportPreparationRequest): Promise<ManualSequenceExportResult> {
+    const result = await this.call<{ outcome: "cancelled" } | { outcome: "exported"; state: HostState; executionId: string; exportId: string; destinationLabel: string }>("desktop_export_manual_sequence", { args: request });
+    return result.outcome === "cancelled" ? result : { ...result, state: fromHostState(result.state) };
+  }
+
+  async previewManualSequenceConform(request: { version: 1; expectedSnapshotId: string }): Promise<ManualVideoSequenceConformPreview> {
+    return this.call("desktop_preview_manual_sequence_conform", { args: request });
+  }
+
   async createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }> {
     const result = await this.call<{ state: HostState; clipId: string }>("desktop_create_manual_video_clip", { args: request });
     return { state: fromHostState(result.state), clipId: result.clipId };
@@ -56,6 +75,14 @@ export class TauriDesktopBackend implements DesktopBackend {
 
   async reviseEditorialDraft(request: ReviseEditorialDraftRequest): Promise<EditorialDraftState> {
     return this.call("desktop_revise_editorial_draft", { args: request });
+  }
+
+  async editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopBackendState; changedClipIds: string[] }> {
+    const { version, expectedSnapshotId, ...action } = request;
+    const result = await this.call<{ state: HostState; changedClipIds: string[] }>("desktop_edit_manual_video_sequence", {
+      args: { version, expectedSnapshotId, action }
+    });
+    return { state: fromHostState(result.state), changedClipIds: result.changedClipIds };
   }
 
   async pickAndImportMedia(locale: "pt-BR" | "en-US"): Promise<ImportMediaResult> {
@@ -108,8 +135,13 @@ export class TauriDesktopBackend implements DesktopBackend {
 function normalizeInvokeError(cause: unknown): DesktopOperationError {
   if (typeof cause !== "object" || cause === null) return { code: "HOST_OPERATION_FAILED" };
   const candidate = cause as { code?: unknown; message?: unknown; details?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "HOST_OPERATION_FAILED";
+  const causeCode = (code === "MANUAL_EXPORT_PUBLICATION_UNVERIFIED" || code === "MANUAL_EXPORT_CLEANUP_FAILED")
+    && typeof candidate.details === "object" && candidate.details !== null && !Array.isArray(candidate.details) && "causeCode" in candidate.details
+    && isManualExportResourceCauseCode(candidate.details.causeCode) ? candidate.details.causeCode : undefined;
   const error: DesktopOperationError = {
-    code: typeof candidate.code === "string" ? candidate.code : "HOST_OPERATION_FAILED",
+    code,
+    ...(causeCode ? { causeCode } : {}),
     ...(typeof candidate.message === "string" ? { message: candidate.message } : {})
   };
   const state = reconciledHostState(candidate.details);
@@ -139,7 +171,7 @@ function fromHostState(state: HostState): DesktopBackendState {
       "transcription.transcribe": { ...state.capabilities.transcription },
       "director.execute": { available: false, reason: "desktop-runtime-deferred" },
       "changes.apply": { available: false, reason: "desktop-runtime-deferred" },
-      "project.export": { available: false, reason: "desktop-runtime-deferred" }
+      "project.export": state.capabilities.manualExport ? { ...state.capabilities.manualExport } : { available: false, reason: "desktop-runtime-deferred" }
     }
   };
 }

@@ -1,6 +1,6 @@
 use crate::protocol::DesktopCommandError;
 use crate::supervisor::DesktopHostSupervisor;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -65,6 +65,97 @@ pub struct VideoPreviewArgs {
     expected_snapshot_id: String,
     clip_id: Option<String>,
     operation_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualExportPreparationArgs {
+    version: u8,
+    expected_snapshot_id: String,
+    operation_id: String,
+    locale: String,
+}
+
+fn validate_export_preparation(args: &ManualExportPreparationArgs) -> Result<(), DesktopCommandError> {
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    validate_locale(&args.locale)?;
+    let operation = args.operation_id.as_bytes();
+    if args.version != 1 || operation.is_empty() || operation.len() > 128
+        || !operation[0].is_ascii_alphanumeric()
+        || !operation.iter().all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(byte)) {
+        return Err(DesktopCommandError::new("MANUAL_EXPORT_INVALID_REQUEST", "Export preparation arguments are invalid."));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn desktop_prepare_manual_export(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualExportPreparationArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_export_preparation(&args)?;
+    supervisor.ensure_started(&app).await?;
+    let lease = supervisor.begin_preparation_picker(&args.operation_id)?;
+    // Modal system picker owns its cancellation; the WebView has no path permission.
+    let picked = app.dialog().file().set_title("CEVRA Vids")
+        .set_file_name("CEVRA.mp4").add_filter("MP4", &["mp4"]).blocking_save_file();
+    let Some(picked) = picked else { return Ok(json!({ "outcome": "cancelled" })); };
+    let path = picked.into_path().map_err(|_| DesktopCommandError::new("MANUAL_EXPORT_DESTINATION_INVALID", "The destination is invalid."))?;
+    let path_text = path.to_str().filter(|_| path.is_absolute())
+        .ok_or_else(|| DesktopCommandError::new("MANUAL_EXPORT_DESTINATION_INVALID", "The destination is invalid."))?;
+    let result = supervisor.request_picked_preparation(&lease, "video.prepareManualExport", json!({
+        "version": args.version, "expectedSnapshotId": args.expected_snapshot_id,
+        "operationId": args.operation_id, "locale": args.locale, "destinationUri": path_text
+    })).await.map_err(|error| match error.code.as_str() {
+        "MANUAL_VIDEO_PREVIEW_TIMEOUT" => DesktopCommandError::new("MANUAL_EXPORT_PREPARATION_TIMEOUT", "The preparation timed out and settled."),
+        "MANUAL_VIDEO_PREVIEW_SETTLING" => DesktopCommandError::new("MANUAL_EXPORT_PREPARATION_SETTLING", "The preparation has not settled; keep the project open."),
+        _ => error
+    })?;
+    Ok(json!({ "outcome": "prepared", "preparation": result }))
+}
+
+#[tauri::command]
+pub async fn desktop_export_manual_sequence(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualExportPreparationArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_export_preparation(&args)?;
+    supervisor.ensure_started(&app).await?;
+    let lease = supervisor.begin_preparation_picker(&args.operation_id)?;
+    let picked = app.dialog().file().set_title("CEVRA Vids")
+        .set_file_name("CEVRA.mp4").add_filter("MP4", &["mp4"]).blocking_save_file();
+    let Some(picked) = picked else { return Ok(json!({ "outcome": "cancelled" })); };
+    let path = picked.into_path().map_err(|_| DesktopCommandError::new("MANUAL_EXPORT_DESTINATION_INVALID", "The destination is invalid."))?;
+    let path_text = path.to_str().filter(|_| path.is_absolute())
+        .ok_or_else(|| DesktopCommandError::new("MANUAL_EXPORT_DESTINATION_INVALID", "The destination is invalid."))?;
+    match supervisor.request_picked_mutation(&lease, "video.exportManualSequence", json!({
+        "version": args.version, "expectedSnapshotId": args.expected_snapshot_id,
+        "operationId": args.operation_id, "locale": args.locale, "destinationUri": path_text
+    })).await {
+        Ok(result) => Ok(result),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualSequenceConformPreviewArgs {
+    version: u8,
+    expected_snapshot_id: String,
+}
+
+#[tauri::command]
+pub async fn desktop_preview_manual_sequence_conform(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualSequenceConformPreviewArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    if args.version != 1 { return Err(DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Conform preview version is invalid.")); }
+    supervisor.ensure_started(&app).await?;
+    supervisor.request_control("video.previewManualSequenceConform", json!({ "version": 1, "expectedSnapshotId": args.expected_snapshot_id })).await
 }
 
 #[derive(Deserialize)]
@@ -161,6 +252,97 @@ pub struct EditorialBlockEdit {
     block_id: String,
     title: Option<String>,
     user_note: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualVideoSequenceArgs {
+    version: u8,
+    expected_snapshot_id: String,
+    action: Value,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase", rename_all_fields = "camelCase", deny_unknown_fields)]
+pub enum ManualVideoSequenceAction {
+    Append { source_id: String, source_start_ms: u64, source_end_ms: u64 },
+    Insert { before_clip_id: String, source_id: String, source_start_ms: u64, source_end_ms: u64 },
+    Duplicate { clip_id: String },
+    Remove { clip_id: String },
+    Trim { clip_id: String, source_start_ms: u64, source_end_ms: u64 },
+    Split { clip_id: String, timeline_at_ms: u64 },
+    Reorder { clip_ids: Vec<String> },
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualSequenceConformClip {
+    clip_id: String,
+    source_start_frame: u64,
+    source_end_frame: u64,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase", rename_all_fields = "camelCase", deny_unknown_fields)]
+pub enum ManualVideoSequenceFrameAction {
+    Append { source_id: String, source_start_frame: u64, source_end_frame: u64 },
+    Insert { before_clip_id: String, source_id: String, source_start_frame: u64, source_end_frame: u64 },
+    Duplicate { clip_id: String },
+    Remove { clip_id: String },
+    Trim { clip_id: String, source_start_frame: u64, source_end_frame: u64 },
+    Split { clip_id: String, timeline_at_frame: u64 },
+    Reorder { clip_ids: Vec<String> },
+    Conform { clips: Vec<ManualSequenceConformClip> },
+}
+
+fn manual_sequence_params(args: ManualVideoSequenceArgs) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    // Decode only the version's closed typed action. A V1 millisecond field can
+    // never be silently interpreted or rounded into a V2 frame field.
+    let action = match args.version {
+        1 => serde_json::from_value::<ManualVideoSequenceAction>(args.action).and_then(serde_json::to_value),
+        2 => serde_json::from_value::<ManualVideoSequenceFrameAction>(args.action).and_then(serde_json::to_value),
+        _ => return Err(DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Manual sequence version is invalid.")),
+    };
+    let mut params = action
+        .map_err(|_| DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Manual sequence action is invalid."))?;
+    for (key, value) in params.as_object().expect("typed action serializes as an object") {
+        if key.ends_with("Id") { validate_id(value.as_str().expect("typed ID"), key)?; }
+        if key == "clipIds" {
+            for id in value.as_array().expect("typed IDs") { validate_id(id.as_str().expect("typed ID"), "clipId")?; }
+        }
+        let time_limit = if key.ends_with("Frame") { 9_007_199_254_740 } else { 9_007_199_254_740_991 };
+        if (key.ends_with("Ms") || key.ends_with("Frame")) && value.as_u64().expect("typed time") > time_limit {
+            return Err(DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Manual sequence time is invalid."));
+        }
+        if key == "clips" {
+            let clips = value.as_array().expect("typed conform clips");
+            if clips.is_empty() { return Err(DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Conform clips are invalid.")); }
+            for clip in clips {
+                validate_id(clip["clipId"].as_str().expect("typed clip ID"), "clipId")?;
+                let start = clip["sourceStartFrame"].as_u64().expect("typed frame");
+                let end = clip["sourceEndFrame"].as_u64().expect("typed frame");
+                if start >= end || end > 9_007_199_254_740 { return Err(DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Conform frame range is invalid.")); }
+            }
+        }
+    }
+    params["version"] = json!(args.version);
+    params["expectedSnapshotId"] = json!(args.expected_snapshot_id);
+    Ok(params)
+}
+
+#[tauri::command]
+pub async fn desktop_edit_manual_video_sequence(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: ManualVideoSequenceArgs,
+) -> Result<Value, DesktopCommandError> {
+    let params = manual_sequence_params(args)?;
+    supervisor.ensure_started(&app).await?;
+    match supervisor.request_immediate_mutation("video.editManualSequence", params).await {
+        Ok(result) => Ok(result),
+        Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
 }
 
 #[derive(Deserialize)]
@@ -355,10 +537,7 @@ pub async fn desktop_cancel_operation(
     validate_id(&args.operation_id, "operationId")?;
     supervisor.ensure_started(&app).await?;
     match supervisor
-        .request_control(
-            "operation.cancel",
-            json!({ "operationId": args.operation_id }),
-        )
+        .cancel_operation(&args.operation_id)
         .await
     {
         Ok(result) => Ok(result),
@@ -424,6 +603,20 @@ mod video_boundary_tests {
     use super::*;
 
     #[test]
+    fn export_preparation_boundary_rejects_paths_render_overrides_and_invalid_operation_ids() {
+        let valid = json!({ "version": 1, "expectedSnapshotId": "snapshot", "operationId": "prepare-1", "locale": "pt-BR" });
+        assert!(validate_export_preparation(&serde_json::from_value::<ManualExportPreparationArgs>(valid.clone()).unwrap()).is_ok());
+        for extra in ["uri", "destinationUri", "path", "commands", "fps", "renderAvailable"] {
+            let mut injected = valid.clone(); injected[extra] = json!("injected");
+            assert!(serde_json::from_value::<ManualExportPreparationArgs>(injected).is_err());
+        }
+        for operation in ["", "../foreign", "/tmp/path", "bad\nidentifier"] {
+            let mut injected = valid.clone(); injected["operationId"] = json!(operation);
+            assert!(validate_export_preparation(&serde_json::from_value::<ManualExportPreparationArgs>(injected).unwrap()).is_err());
+        }
+    }
+
+    #[test]
     fn local_video_args_reject_paths_commands_and_duration_overrides() {
         for extra in ["uri", "path", "durationMs", "commands"] {
             let mut preview = json!({ "sourceId": "source", "expectedSnapshotId": "snapshot" });
@@ -439,6 +632,67 @@ mod video_boundary_tests {
             })).is_err());
         }
     }
+    #[test]
+    fn manual_sequence_boundary_accepts_only_closed_intents_and_safe_bindings() {
+        for action in [
+            json!({"type":"append","sourceId":"source","sourceStartMs":0,"sourceEndMs":700}),
+            json!({"type":"insert","beforeClipId":"clip","sourceId":"source","sourceStartMs":0,"sourceEndMs":700}),
+            json!({"type":"duplicate","clipId":"clip"}),
+            json!({"type":"remove","clipId":"clip"}),
+            json!({"type":"trim","clipId":"clip","sourceStartMs":0,"sourceEndMs":700}),
+            json!({"type":"split","clipId":"clip","timelineAtMs":350}),
+            json!({"type":"reorder","clipIds":["clip","other"]}),
+        ] {
+            let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":action});
+            let params = manual_sequence_params(serde_json::from_value(request.clone()).unwrap()).unwrap();
+            assert_eq!(params["type"], action["type"]);
+            assert_eq!(params["expectedSnapshotId"], "snapshot");
+            for extra in ["path", "commands", "edits", "outputUri"] {
+                let mut bad = request.clone(); bad["action"][extra] = json!("injected");
+                assert!(manual_sequence_params(serde_json::from_value::<ManualVideoSequenceArgs>(bad).unwrap()).is_err());
+            }
+            let mut bad = request.clone(); bad["version"] = json!(3);
+            assert!(manual_sequence_params(serde_json::from_value(bad).unwrap()).is_err());
+            let mut bad = request; bad["expectedSnapshotId"] = json!("x".repeat(129));
+            assert!(manual_sequence_params(serde_json::from_value(bad).unwrap()).is_err());
+        }
+        for invalid in [json!(-1), json!(0.5), json!(9_007_199_254_740_992_u64)] {
+            let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":{"type":"split","clipId":"clip","timelineAtMs":invalid}});
+            match serde_json::from_value::<ManualVideoSequenceArgs>(request) {
+                Err(_) => {},
+                Ok(args) => assert!(manual_sequence_params(args).is_err()),
+            }
+        }
+    }
+
+    #[test]
+    fn manual_sequence_v2_frame_actions_never_accept_millisecond_or_arbitrary_fields() {
+        for action in [
+            json!({"type":"append","sourceId":"source","sourceStartFrame":1,"sourceEndFrame":3}),
+            json!({"type":"insert","beforeClipId":"clip","sourceId":"source","sourceStartFrame":1,"sourceEndFrame":3}),
+            json!({"type":"trim","clipId":"clip","sourceStartFrame":1,"sourceEndFrame":3}),
+            json!({"type":"split","clipId":"clip","timelineAtFrame":2}),
+            json!({"type":"duplicate","clipId":"clip"}), json!({"type":"remove","clipId":"clip"}),
+            json!({"type":"reorder","clipIds":["clip","other"]}),
+            json!({"type":"conform","clips":[{"clipId":"clip","sourceStartFrame":1,"sourceEndFrame":3}]}),
+        ] {
+            let request = json!({"version":2,"expectedSnapshotId":"snapshot","action":action});
+            let params = manual_sequence_params(serde_json::from_value(request.clone()).unwrap()).unwrap();
+            assert_eq!(params["version"], 2); assert_eq!(params["type"], action["type"]);
+            for extra in ["sourceStartMs", "path", "fps", "commands", "filtergraph"] {
+                let mut injected = request.clone(); injected["action"][extra] = json!(0);
+                assert!(manual_sequence_params(serde_json::from_value(injected).unwrap()).is_err());
+            }
+        }
+        for invalid in [json!(-1), json!(1.5), json!(9_007_199_254_741_u64)] {
+            let request = json!({"version":2,"expectedSnapshotId":"snapshot","action":{"type":"split","clipId":"clip","timelineAtFrame":invalid}});
+            assert!(manual_sequence_params(serde_json::from_value(request).unwrap()).is_err());
+        }
+        let injected = json!({"version":2,"expectedSnapshotId":"snapshot","action":{"type":"conform","clips":[{"clipId":"clip","sourceStartFrame":0,"sourceEndFrame":3,"path":"foreign"}]}});
+        assert!(manual_sequence_params(serde_json::from_value(injected).unwrap()).is_err());
+        assert!(serde_json::from_value::<ManualSequenceConformPreviewArgs>(json!({"version":1,"expectedSnapshotId":"snapshot","clips":[]})).is_err());
+    }
+
     #[test]
     fn manual_trim_args_accept_only_clip_binding_and_integer_source_range() {
         let valid = json!({ "clipId": "clip", "expectedSnapshotId": "snapshot", "sourceStartMs": 1000, "sourceEndMs": 4000 });

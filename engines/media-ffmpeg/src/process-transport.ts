@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import type { PersistentWorkerTransport } from "./persistent-worker.js";
+import { OwnedRenderResourceError, OwnedRenderResourceWatchdog, type OwnedRenderResourceObserver, type OwnedRenderResourceEvidence } from "./owned-render-resources.js";
 
 export interface MediaWorkerProcessOptions {
   mode: "release" | "development";
@@ -42,6 +43,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   private readonly closed = new WeakSet<ChildProcessWithoutNullStreams>();
   private readonly expiredRetirements = new WeakSet<ChildProcessWithoutNullStreams>();
   private nextId = 1;
+  private resourceLease: { child?: ChildProcessWithoutNullStreams; terminalError?: Error } | undefined;
   private stdoutBuffer = "";
   private stderrTail = "";
   private readonly pending = new Map<number, PendingRequest>();
@@ -54,17 +56,82 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
 
   get workerPid(): number | undefined { return this.child?.pid; }
 
+  /** Trusted Host scope for all phases of one owned job. No RPC/UI budget overrides.
+   * The future export caller must register all live files and await retirement before cleanup.
+   */
+  async withOwnedRenderBudget<T>(options: {
+    ownedDirectory: string; rendererRssLimitBytes: number; ownedFileLimitBytes: number;
+    /** @internal Filesystem/process test seam, never product input. */ observe?: OwnedRenderResourceObserver;
+  }, operation: () => Promise<T>): Promise<{ result: T; resourceEvidence: OwnedRenderResourceEvidence }> {
+    if (this.resourceLease) throw new OwnedRenderResourceError("MEDIA_RENDER_RESOURCE_BUSY");
+    const lease: { child?: ChildProcessWithoutNullStreams; terminalError?: Error } = {};
+    this.resourceLease = lease;
+    let watchdog: OwnedRenderResourceWatchdog | undefined;
+    let failure: OwnedRenderResourceError | undefined;
+    let primaryError: unknown;
+    let failed = false;
+    let result: T | undefined;
+    let resourceEvidence: OwnedRenderResourceEvidence | undefined;
+    let retired = false;
+    try {
+      try {
+        await this.start();
+        const child = this.child;
+        if (!child?.pid || process.platform === "win32") throw new OwnedRenderResourceError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED");
+        lease.child = child;
+        watchdog = new OwnedRenderResourceWatchdog({ ...options, processGroupId: child.pid, onFailure: error => {
+          failure = error; this.failWorker(child, error);
+        } });
+        await watchdog.start();
+        if (!watchdog.processIds.includes(child.pid)) throw new OwnedRenderResourceError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED");
+        result = await operation();
+        await watchdog.check();
+        if (lease.terminalError) throw lease.terminalError;
+        if (this.child !== child || this.invalid.has(child) || child.exitCode !== null || child.signalCode !== null
+          || !watchdog.processIds.includes(child.pid) || watchdog.processIds.some(pid => pid !== child.pid)) {
+          throw new OwnedRenderResourceError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED");
+        }
+      } catch (error) { failed = true; primaryError = failure ?? error; }
+
+      if (failed) {
+        const child = lease.child;
+        if (child) this.failWorker(child, primaryError instanceof Error ? primaryError : new Error("Owned render scope failed.", { cause: primaryError }));
+        // Keep observation and admission held until the captured generation
+        // retires on every abnormal exit, including caller validation errors.
+        try { await this.settle(); } catch (cleanupError) { attachCleanupError(primaryError, cleanupError); }
+        retired = true;
+      }
+      try { resourceEvidence = await watchdog?.stop(); }
+      catch (error) {
+        if (!failed) { failed = true; primaryError = error; }
+        else if (error !== primaryError) attachCleanupError(primaryError, error);
+      }
+      if (failed && !retired) {
+        if (lease.child) this.failWorker(lease.child, primaryError instanceof Error ? primaryError : new Error("Owned render scope failed.", { cause: primaryError }));
+        try { await this.settle(); } catch (cleanupError) { attachCleanupError(primaryError, cleanupError); }
+      }
+      if (failed) throw primaryError;
+      return { result: result!, resourceEvidence: resourceEvidence! };
+    } finally {
+      this.resourceLease = undefined;
+    }
+  }
+
   /** Observe failure retirement before deleting caller-owned render inputs. */
   async settle(): Promise<void> { await this.stopping; await this.retirement; }
 
   async start(): Promise<void> {
+    this.assertResourceGeneration();
     if (this.stopping) await this.stopping;
+    this.assertResourceGeneration();
     if (this.retirement) {
       await this.retirement;
+      this.assertResourceGeneration();
       this.retirement = undefined;
     }
-    if (this.starting) return this.starting;
+    if (this.starting) { await this.starting; this.assertResourceGeneration(); return; }
     if (this.child && !this.invalid.has(this.child) && this.child.exitCode === null && this.child.signalCode === null) return;
+    this.assertResourceGeneration();
     this.starting ??= this.spawnWorker().finally(() => { this.starting = undefined; });
     return this.starting;
   }
@@ -84,6 +151,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
   }
 
   private async spawnWorker(): Promise<void> {
+    this.assertResourceGeneration();
     const runtimeRoot = resolve(dirname(this.options.workerScript), "..");
     const sourceEnv = this.options.env ?? process.env;
     const releaseMode = this.options.mode === "release";
@@ -111,6 +179,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       windowsHide: true
     });
     this.child = child;
+    if (this.resourceLease && !this.resourceLease.child) this.resourceLease.child = child;
     this.stdoutBuffer = "";
     this.stderrTail = "";
     child.stdin.on("error", (error) => this.failWorker(child, channelError(error)));
@@ -251,7 +320,9 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
       this.pending.delete(response.id);
       pending.cleanup();
       if (pending.terminalError) pending.reject(pending.terminalError);
-      else if (response.error) pending.reject(Object.assign(new Error(response.error.message), { code: response.error.code }));
+      else if (response.error) pending.reject(response.error.code === -32002 && response.error.message === "MEDIA_RENDER_DISK_LIMIT"
+        ? new OwnedRenderResourceError("MEDIA_RENDER_DISK_LIMIT")
+        : Object.assign(new Error(response.error.message), { code: response.error.code }));
       else pending.resolve(response.result);
     }
   }
@@ -281,6 +352,7 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
 
   private failWorker(child: ChildProcessWithoutNullStreams, error: Error): void {
     if (this.child !== child || this.invalid.has(child)) return;
+    if (this.resourceLease?.child === child) this.resourceLease.terminalError ??= error;
     this.invalid.add(child);
     let cleanupError: unknown;
     try { terminateOwned(child); } catch (cause) { cleanupError = cause; attachCleanupError(error, cause); }
@@ -313,6 +385,17 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
     this.child = undefined;
     this.retirement = undefined;
     this.expiredRetirements.delete(child);
+  }
+
+  private assertResourceGeneration(): void {
+    const lease = this.resourceLease;
+    if (!lease) return;
+    if (lease.terminalError) throw lease.terminalError;
+    if (lease.child && (this.child !== lease.child || this.invalid.has(lease.child)
+      || lease.child.exitCode !== null || lease.child.signalCode !== null)) {
+      lease.terminalError = new OwnedRenderResourceError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED");
+      throw lease.terminalError;
+    }
   }
 }
 

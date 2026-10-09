@@ -17,6 +17,7 @@ use tokio::sync::{mpsc, oneshot, watch, Mutex as AsyncMutex};
 struct SupervisorTimeouts {
     hello: Duration,
     control: Duration,
+    preparation: Duration,
     mutation: Duration,
     reconciliation: Duration,
     shutdown: Duration,
@@ -27,6 +28,7 @@ impl Default for SupervisorTimeouts {
         Self {
             hello: Duration::from_secs(30),
             control: Duration::from_secs(30),
+            preparation: Duration::from_secs(7 * 60),
             mutation: Duration::from_secs(6 * 60 * 60),
             reconciliation: Duration::from_secs(30),
             shutdown: Duration::from_secs(5),
@@ -92,6 +94,8 @@ struct LaunchedHost {
 struct SupervisorCore {
     close_admission: AtomicBool,
     exit_committed: AtomicBool,
+    unsettled_previews: Arc<AtomicU64>,
+    preview_gate: Mutex<()>,
     process: Mutex<Option<Arc<dyn ProcessControl>>>,
     pending: Mutex<PendingRequests>,
     lifecycle: watch::Sender<Lifecycle>,
@@ -106,6 +110,8 @@ impl SupervisorCore {
         Self {
             close_admission: AtomicBool::new(false),
             exit_committed: AtomicBool::new(false),
+            unsettled_previews: Arc::new(AtomicU64::new(0)),
+            preview_gate: Mutex::new(()),
             process: Mutex::new(None),
             pending: Mutex::new(PendingRequests::default()),
             lifecycle,
@@ -156,9 +162,27 @@ impl SupervisorCore {
         self.request_timed(method, params, timeout, true).await
     }
 
+    fn begin_preparation(&self, method: &str, params: Value) -> Result<(String, oneshot::Receiver<Result<Value, DesktopCommandError>>), DesktopCommandError> {
+        let _gate = self.preview_gate.lock().map_err(lock_error)?;
+        if self.unsettled_previews.load(Ordering::Acquire) != 0 {
+            return Err(DesktopCommandError::new("MANUAL_VIDEO_PREVIEW_SETTLING", "The previous preview is still settling; the project remains open."));
+        }
+        self.begin_request(method, params, false)
+    }
+
+    fn mark_unsettled_preview(&self) -> Result<(), DesktopCommandError> {
+        let _gate = self.preview_gate.lock().map_err(lock_error)?;
+        self.unsettled_previews.fetch_add(1, Ordering::AcqRel);
+        Ok(())
+    }
+
     async fn request_preparation(&self, method: &str, params: Value, operation_id: &str) -> Result<Value, DesktopCommandError> {
-        let (id, mut receiver) = self.begin_request(method, params, false)?;
-        match tokio::time::timeout(self.timeouts.control, &mut receiver).await {
+        let (_id, receiver) = self.begin_preparation(method, params)?;
+        self.await_preparation(receiver, operation_id).await
+    }
+
+    async fn await_preparation(&self, mut receiver: oneshot::Receiver<Result<Value, DesktopCommandError>>, operation_id: &str) -> Result<Value, DesktopCommandError> {
+        match tokio::time::timeout(self.timeouts.preparation, &mut receiver).await {
             Ok(Ok(outcome)) => return outcome,
             Ok(Err(_)) => return Err(DesktopCommandError::new("HOST_UNAVAILABLE", "Desktop host response channel closed.")),
             Err(_) => {}
@@ -169,10 +193,16 @@ impl SupervisorCore {
         match tokio::time::timeout(self.timeouts.reconciliation, &mut receiver).await {
             Ok(_) => Err(DesktopCommandError::new("MANUAL_VIDEO_PREVIEW_TIMEOUT", "The preview timed out and its preparation settled.")),
             Err(_) => {
-                self.pending.lock().map_err(lock_error)?.remove(&id);
-                let error = DesktopCommandError::new("HOST_UNAVAILABLE", "The preview did not settle after cancellation; the session was stopped.");
-                self.fail(error.clone());
-                Err(error)
+                // A read-only preview cannot destroy the only unsaved history.
+                // Keep one receiver per unsettled operation to discard its late
+                // result; block further previews until actual retirement.
+                self.mark_unsettled_preview()?;
+                let unsettled = self.unsettled_previews.clone();
+                tokio::spawn(async move {
+                    let _ = receiver.await;
+                    unsettled.fetch_sub(1, Ordering::AcqRel);
+                });
+                Err(DesktopCommandError::new("MANUAL_VIDEO_PREVIEW_SETTLING", "The preview has not settled after cancellation; the project remains open."))
             }
         }
     }
@@ -204,7 +234,16 @@ impl SupervisorCore {
         params: Value,
         operation_id: &str,
     ) -> Result<Value, DesktopCommandError> {
-        let (id, mut receiver) = self.begin_request(method, params, false)?;
+        let (id, receiver) = self.begin_request(method, params, false)?;
+        self.await_mutation(id, receiver, operation_id).await
+    }
+
+    async fn await_mutation(
+        &self,
+        id: String,
+        mut receiver: oneshot::Receiver<Result<Value, DesktopCommandError>>,
+        operation_id: &str,
+    ) -> Result<Value, DesktopCommandError> {
         match tokio::time::timeout(self.timeouts.mutation, &mut receiver).await {
             Ok(Ok(outcome)) => return outcome,
             Ok(Err(_)) => {
@@ -225,7 +264,7 @@ impl SupervisorCore {
             .await;
         match tokio::time::timeout(self.timeouts.reconciliation, &mut receiver).await {
             Ok(Ok(Ok(value))) => Ok(value),
-            Ok(Ok(Err(_))) => {
+            Ok(Ok(Err(error))) => {
                 let state = match self
                     .request_internal("project.snapshot", json!({}), self.timeouts.control)
                     .await
@@ -240,10 +279,19 @@ impl SupervisorCore {
                         return Err(error);
                     }
                 };
-                Err(DesktopCommandError::new(
-                    "OPERATION_TIMEOUT",
-                    "The desktop operation timed out, was cancelled, and the project state was reconciled.",
-                ).with_details(json!({ "state": state })))
+                if error.code == "OPERATION_CANCELLED" {
+                    return Err(DesktopCommandError::new(
+                        "OPERATION_TIMEOUT",
+                        "The desktop operation timed out, was cancelled, and the project state was reconciled.",
+                    ).with_details(json!({ "state": state })));
+                }
+                // A settled Host error may describe a published file or an
+                // already committed export. Preserve its sanitized evidence;
+                // only replace the state with the authoritative reconciliation.
+                let mut details = error.details.as_ref().and_then(Value::as_object)
+                    .cloned().unwrap_or_default();
+                details.insert("state".to_string(), state);
+                Err(error.with_details(Value::Object(details)))
             }
             Ok(Err(_)) => Err(DesktopCommandError::new(
                 "HOST_UNAVAILABLE",
@@ -442,6 +490,17 @@ pub struct DesktopHostSupervisor {
     close_guard: AsyncMutex<()>,
     close_state: Mutex<NativeCloseState>,
     close_attempt: Mutex<Option<String>>,
+    native_preparations: Mutex<BTreeMap<String, NativePreparationState>>,
+}
+
+#[derive(Default)]
+struct NativePreparationState { cancelled: bool, admitted: bool }
+
+pub struct NativePreparationPickerLease<'a> { supervisor: &'a DesktopHostSupervisor, operation_id: String }
+impl Drop for NativePreparationPickerLease<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut preparations) = self.supervisor.native_preparations.lock() { preparations.remove(&self.operation_id); }
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -464,6 +523,7 @@ impl DesktopHostSupervisor {
             close_guard: AsyncMutex::new(()),
             close_state: Mutex::new(NativeCloseState { sequence: 0, pending: false, error_code: None }),
             close_attempt: Mutex::new(None),
+            native_preparations: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -576,6 +636,70 @@ impl DesktopHostSupervisor {
     pub async fn request_preparation(&self, method: &str, params: Value, operation_id: &str) -> Result<Value, DesktopCommandError> {
         self.core.request_preparation(method, params, operation_id).await
     }
+
+    /** Native picker lifetime participates in Close and cancellation before any Host request exists. */
+    pub fn begin_preparation_picker(&self, operation_id: &str) -> Result<NativePreparationPickerLease<'_>, DesktopCommandError> {
+        let _close = self.close_guard.try_lock().map_err(|_| DesktopCommandError::new("PROJECT_CLOSE_PENDING", "A close request is active."))?;
+        if self.native_close_state()?.pending || self.core.state() != Lifecycle::Ready {
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_PENDING", "Preparation cannot start while the session is closing."));
+        }
+        if self.core.unsettled_previews.load(Ordering::Acquire) != 0 {
+            return Err(DesktopCommandError::new("MANUAL_EXPORT_PREPARATION_SETTLING", "The previous preparation is still settling."));
+        }
+        let mut preparations = self.native_preparations.lock().map_err(lock_error)?;
+        if !preparations.is_empty() { return Err(DesktopCommandError::new("MANUAL_EXPORT_PREPARATION_BUSY", "Another destination is still being prepared.")); }
+        preparations.insert(operation_id.to_owned(), NativePreparationState::default());
+        Ok(NativePreparationPickerLease { supervisor: self, operation_id: operation_id.to_owned() })
+    }
+
+    pub async fn request_picked_preparation(&self, lease: &NativePreparationPickerLease<'_>, method: &str, params: Value) -> Result<Value, DesktopCommandError> {
+        if !std::ptr::eq(self, lease.supervisor) { return Err(DesktopCommandError::new("OPERATION_CANCELLED", "Preparation was cancelled.")); }
+        let receiver = {
+            let mut preparations = self.native_preparations.lock().map_err(lock_error)?;
+            let preparation = preparations.get_mut(&lease.operation_id).ok_or_else(|| DesktopCommandError::new("OPERATION_CANCELLED", "Preparation was cancelled."))?;
+            if preparation.cancelled || preparation.admitted { return Err(DesktopCommandError::new("OPERATION_CANCELLED", "Preparation was cancelled.")); }
+            // Cancellation and Host registration are serialized; there is no gap
+            // where cancellation can be lost between picker and Host admission.
+            let (_, receiver) = self.core.begin_preparation(method, params)?;
+            preparation.admitted = true;
+            receiver
+        };
+        let result = self.core.await_preparation(receiver, &lease.operation_id).await?;
+        let preparations = self.native_preparations.lock().map_err(lock_error)?;
+        if preparations.get(&lease.operation_id).map(|state| state.cancelled).unwrap_or(true) {
+            return Err(DesktopCommandError::new("OPERATION_CANCELLED", "Preparation was cancelled."));
+        }
+        Ok(result)
+    }
+
+    /** A mutating export must reconcile canonical completion even when Cancel races its final reply. */
+    pub async fn request_picked_mutation(&self, lease: &NativePreparationPickerLease<'_>, method: &str, params: Value) -> Result<Value, DesktopCommandError> {
+        if !std::ptr::eq(self, lease.supervisor) { return Err(DesktopCommandError::new("OPERATION_CANCELLED", "Export was cancelled.")); }
+        let (id, receiver) = {
+            let mut preparations = self.native_preparations.lock().map_err(lock_error)?;
+            let preparation = preparations.get_mut(&lease.operation_id).ok_or_else(|| DesktopCommandError::new("OPERATION_CANCELLED", "Export was cancelled."))?;
+            if preparation.cancelled || preparation.admitted { return Err(DesktopCommandError::new("OPERATION_CANCELLED", "Export was cancelled.")); }
+            let request = self.core.begin_preparation(method, params)?;
+            preparation.admitted = true;
+            request
+        };
+        // Once admitted, only the Host can determine whether publication/commit
+        // preceded cancellation. Its success/state is authoritative, not this flag.
+        self.core.await_mutation(id, receiver, &lease.operation_id).await
+    }
+
+    pub async fn cancel_operation(&self, operation_id: &str) -> Result<Value, DesktopCommandError> {
+        let owned = {
+            let mut preparations = self.native_preparations.lock().map_err(lock_error)?;
+            if let Some(preparation) = preparations.get_mut(operation_id) {
+                preparation.cancelled = true;
+                if !preparation.admitted { return Ok(json!({ "operationId": operation_id, "cancelled": true })); }
+                true
+            } else { false }
+        };
+        let result = self.request_control("operation.cancel", json!({ "operationId": operation_id })).await?;
+        if owned { Ok(json!({ "operationId": operation_id, "cancelled": true })) } else { Ok(result) }
+    }
     pub async fn request_mutating(
         &self,
         method: &str,
@@ -629,6 +753,10 @@ impl DesktopHostSupervisor {
     pub async fn shutdown(&self) -> Result<(), DesktopCommandError> {
         let _guard = self.close_guard.try_lock().map_err(|_| DesktopCommandError::new("PROJECT_CLOSE_PENDING", "A close request is already active."))?;
         if self.core.exit_committed.load(Ordering::Acquire) { return Ok(()); }
+        if !self.native_preparations.lock().map_err(lock_error)?.is_empty() {
+            self.set_close_state(false, Some("PROJECT_CLOSE_BUSY"))?;
+            return Err(DesktopCommandError::new("PROJECT_CLOSE_BUSY", "A destination picker or preparation is still active."));
+        }
         // Serialize a stopped/startup decision with startup admission. Never cancel
         // an in-progress launch merely because native Close/Exit was requested.
         let _startup = self.start_guard.try_lock().map_err(|_| {
@@ -960,9 +1088,13 @@ mod tests {
         }
 
         fn send_error(&self, id: &str, code: &str) {
+            self.send_error_with_details(id, code, None);
+        }
+
+        fn send_error_with_details(&self, id: &str, code: &str, details: Option<Value>) {
             let line = format!(
                 "{}\n",
-                json!({ "protocolVersion": 1, "id": id, "error": { "code": code, "message": "safe" } })
+                json!({ "protocolVersion": 1, "id": id, "error": { "code": code, "message": "safe", "details": details } })
             );
             self.events
                 .try_send(HostEvent::Stdout(line.into_bytes()))
@@ -1030,6 +1162,7 @@ mod tests {
         SupervisorTimeouts {
             hello: Duration::from_millis(100),
             control: Duration::from_millis(100),
+            preparation: Duration::from_millis(100),
             mutation: Duration::from_millis(10),
             reconciliation: Duration::from_millis(100),
             shutdown: Duration::from_millis(20),
@@ -1276,6 +1409,229 @@ mod tests {
         assert_eq!(supervisor.core.state(), Lifecycle::Ready);
         assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
         assert!(!control.writes.lock().unwrap().iter().any(|request| request["method"] == "project.snapshot"));
+    }
+
+    #[tokio::test]
+    async fn native_picker_cancel_prevents_host_admission_and_close_preserves_the_session() {
+        let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let lease = supervisor.begin_preparation_picker("export-picker").unwrap();
+        assert_eq!(supervisor.shutdown().await.unwrap_err().code, "PROJECT_CLOSE_BUSY");
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert_eq!(supervisor.cancel_operation("export-picker").await.unwrap()["cancelled"], true);
+        assert_eq!(supervisor.request_picked_preparation(&lease, "video.prepareManualExport", json!({})).await.unwrap_err().code, "OPERATION_CANCELLED");
+        assert!(!control.writes.lock().unwrap().iter().any(|request| request["method"] == "video.prepareManualExport" || request["method"] == "operation.cancel"));
+        drop(lease);
+        assert!(supervisor.begin_preparation_picker("next-picker").is_ok());
+    }
+
+    #[tokio::test]
+    async fn native_export_cancellation_after_admission_discards_late_success_without_killing_host() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move {
+                let lease = supervisor.begin_preparation_picker("export-picked").unwrap();
+                supervisor.request_picked_preparation(&lease, "video.prepareManualExport", json!({ "operationId": "export-picked" })).await
+            })
+        };
+        let original = wait_for_write(&control, "video.prepareManualExport").await;
+        assert_eq!(supervisor.cancel_operation("export-picked").await.unwrap()["cancelled"], true);
+        control.send_result(original["id"].as_str().unwrap(), json!({ "late": true }));
+        assert_eq!(operation.await.unwrap().unwrap_err().code, "OPERATION_CANCELLED");
+        assert_eq!(control.request("operation.cancel")["params"]["operationId"], "export-picked");
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+    }
+
+    #[tokio::test]
+    async fn native_export_mutation_cancel_before_admission_never_dispatches_or_closes_host() {
+        let supervisor = DesktopHostSupervisor::with_timeouts(timeouts());
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let lease = supervisor.begin_preparation_picker("export-mutating-picker").unwrap();
+        assert_eq!(supervisor.shutdown().await.unwrap_err().code, "PROJECT_CLOSE_BUSY");
+        supervisor.cancel_operation("export-mutating-picker").await.unwrap();
+        assert_eq!(supervisor.request_picked_mutation(&lease, "video.exportManualSequence", json!({})).await.unwrap_err().code, "OPERATION_CANCELLED");
+        assert!(!control.writes.lock().unwrap().iter().any(|request| request["method"] == "video.exportManualSequence"));
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn native_export_cancel_racing_canonical_completion_returns_authoritative_saved_state() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move {
+                let lease = supervisor.begin_preparation_picker("export-committed").unwrap();
+                supervisor.request_picked_mutation(&lease, "video.exportManualSequence", json!({"operationId":"export-committed"})).await
+            })
+        };
+        let request = wait_for_write(&control, "video.exportManualSequence").await;
+        supervisor.cancel_operation("export-committed").await.unwrap();
+        let saved = json!({"outcome":"exported","executionId":"export-committed","exportId":"manual-export-export-committed","state":{"status":{"persistence":"local-saved"}}});
+        control.send_result(request["id"].as_str().unwrap(), saved.clone());
+        assert_eq!(operation.await.unwrap().unwrap(), saved);
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn native_export_mutation_timeout_reconciles_late_completion_without_automatic_replay() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move {
+                let lease = supervisor.begin_preparation_picker("export-deadline").unwrap();
+                supervisor.request_picked_mutation(&lease, "video.exportManualSequence", json!({"operationId":"export-deadline"})).await
+            })
+        };
+        let request = wait_for_write(&control, "video.exportManualSequence").await;
+        wait_for_write(&control, "operation.cancel").await;
+        control.send_result(request["id"].as_str().unwrap(), json!({"outcome":"exported","executionId":"export-deadline"}));
+        assert_eq!(operation.await.unwrap().unwrap()["outcome"], "exported");
+        assert_eq!(control.writes.lock().unwrap().iter().filter(|request| request["method"] == "video.exportManualSequence").count(), 1);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn native_export_timeout_preserves_late_uncertainty_and_resource_reason() {
+        for code in ["MANUAL_EXPORT_PUBLICATION_UNVERIFIED", "MANUAL_EXPORT_CLEANUP_FAILED"] {
+            for cause in ["MANUAL_EXPORT_MEMORY_LIMIT", "MANUAL_EXPORT_DISK_LIMIT", "MANUAL_EXPORT_RESOURCE_UNAVAILABLE"] {
+                let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+                let (launched, control) = fake_launch_with_revision(HelloMode::Valid, true, false, 7);
+                supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+                let operation = {
+                    let supervisor = supervisor.clone();
+                    tokio::spawn(async move {
+                        let lease = supervisor.begin_preparation_picker("export-uncertain").unwrap();
+                        supervisor.request_picked_mutation(&lease, "video.exportManualSequence", json!({"operationId":"export-uncertain"})).await
+                    })
+                };
+                let request = wait_for_write(&control, "video.exportManualSequence").await;
+                wait_for_write(&control, "operation.cancel").await;
+                control.send_error_with_details(request["id"].as_str().unwrap(), code, Some(json!({
+                    "state": {"project":{"history":{"revision":1}}}, "causeCode": cause
+                })));
+                let error = operation.await.unwrap().unwrap_err();
+                assert_eq!(error.code, code);
+                assert_eq!(error.message, "safe");
+                let details = error.details.unwrap();
+                assert_eq!(details["causeCode"], cause);
+                assert_eq!(details["state"]["project"]["history"]["revision"], 7);
+                assert_eq!(control.writes.lock().unwrap().iter().filter(|request| request["method"] == "video.exportManualSequence").count(), 1);
+                assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+                assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+                assert!(supervisor.begin_preparation_picker("next-export").is_ok());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn native_export_timeout_preserves_late_committed_error_without_replay() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch_with_revision(HelloMode::Valid, true, false, 8);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move {
+                let lease = supervisor.begin_preparation_picker("export-committed-late").unwrap();
+                supervisor.request_picked_mutation(&lease, "video.exportManualSequence", json!({"operationId":"export-committed-late"})).await
+            })
+        };
+        let request = wait_for_write(&control, "video.exportManualSequence").await;
+        wait_for_write(&control, "operation.cancel").await;
+        control.send_error_with_details(request["id"].as_str().unwrap(), "MANUAL_EXPORT_COMMITTED_ERROR", Some(json!({
+            "state":{"project":{"history":{"revision":7}}},
+            "executionId":"export-committed-late", "exportId":"manual-export-export-committed-late",
+            "destinationLabel":"export.mp4", "checkpointStatus":"persistence-error"
+        })));
+        let error = operation.await.unwrap().unwrap_err();
+        assert_eq!(error.code, "MANUAL_EXPORT_COMMITTED_ERROR");
+        let details = error.details.unwrap();
+        assert_eq!(details["state"]["project"]["history"]["revision"], 8);
+        assert_eq!(details["executionId"], "export-committed-late");
+        assert_eq!(details["exportId"], "manual-export-export-committed-late");
+        assert_eq!(details["destinationLabel"], "export.mp4");
+        assert_eq!(details["checkpointStatus"], "persistence-error");
+        assert_eq!(control.writes.lock().unwrap().iter().filter(|request| request["method"] == "video.exportManualSequence").count(), 1);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+    }
+
+    #[tokio::test]
+    async fn export_preparation_timeout_keeps_unsaved_host_and_discards_late_success() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move {
+                let lease = supervisor.begin_preparation_picker("export-timeout").unwrap();
+                supervisor.request_picked_preparation(&lease, "video.prepareManualExport", json!({ "operationId": "export-timeout" })).await
+            })
+        };
+        let original = wait_for_write(&control, "video.prepareManualExport").await;
+        wait_for_write(&control, "operation.cancel").await;
+        control.send_result(original["id"].as_str().unwrap(), json!({ "late": true }));
+        assert_eq!(operation.await.unwrap().unwrap_err().code, "MANUAL_VIDEO_PREVIEW_TIMEOUT");
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+    }
+
+    #[tokio::test]
+    async fn unsettled_preview_preserves_host_blocks_new_preview_and_releases_after_late_retirement() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let operation = {
+            let supervisor = supervisor.clone();
+            tokio::spawn(async move { supervisor.request_preparation("video.previewLocal", json!({ "operationId": "old-preview" }), "old-preview").await })
+        };
+        let original = wait_for_write(&control, "video.previewLocal").await;
+        assert_eq!(operation.await.unwrap().unwrap_err().code, "MANUAL_VIDEO_PREVIEW_SETTLING");
+        assert_eq!(supervisor.core.state(), Lifecycle::Ready);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 1);
+        assert_eq!(supervisor.request_control("project.snapshot", json!({})).await.unwrap()["project"]["history"]["revision"], 0);
+        assert_eq!(supervisor.request_preparation("video.previewLocal", json!({}), "new-preview").await.unwrap_err().code, "MANUAL_VIDEO_PREVIEW_SETTLING");
+        assert_eq!(control.writes.lock().unwrap().iter().filter(|r| r["method"] == "video.previewLocal").count(), 1);
+        control.send_result(original["id"].as_str().unwrap(), json!({ "late": true }));
+        tokio::time::timeout(Duration::from_millis(100), async {
+            while supervisor.core.unsettled_previews.load(Ordering::Acquire) != 0 { tokio::task::yield_now().await; }
+        }).await.unwrap();
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn retry_waiting_at_admission_cannot_cross_an_unknown_retirement_transition() {
+        let supervisor = Arc::new(DesktopHostSupervisor::with_timeouts(timeouts()));
+        let (launched, control) = fake_launch(HelloMode::Valid, true, false);
+        supervisor.ensure_started_with(|| Ok(launched)).await.unwrap();
+        let gate = supervisor.core.preview_gate.lock().unwrap();
+        let (started, ready) = std::sync::mpsc::channel();
+        let core = supervisor.core.clone();
+        let retry = std::thread::spawn(move || {
+            started.send(()).unwrap();
+            core.begin_preparation("video.previewLocal", json!({ "operationId": "racing-retry" })).err().unwrap().code
+        });
+        ready.recv().unwrap();
+        // Force unknown retirement while the retry is waiting at the gate.
+        // Production mark_unsettled_preview uses this same critical section.
+        supervisor.core.unsettled_previews.fetch_add(1, Ordering::AcqRel);
+        drop(gate);
+        assert_eq!(retry.join().unwrap(), "MANUAL_VIDEO_PREVIEW_SETTLING");
+        assert!(!control.writes.lock().unwrap().iter().any(|r| r["method"] == "video.previewLocal"));
+        assert_eq!(supervisor.core.pending.lock().unwrap().len(), 0);
+        assert_eq!(control.kills.load(Ordering::Relaxed), 0);
     }
 
     #[tokio::test]

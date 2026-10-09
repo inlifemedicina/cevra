@@ -209,6 +209,199 @@ os IDs abaixo por variante; nenhum novo catálogo, G1 PASS ou microteste humano
 foi criado. Contratos/consumers/perfil pendentes ficam BLOCKED. Aceites limitados
 anteriores permanecem históricos; aprovação do plano não promove seus IDs completos.
 
+Preparação técnica do consumer de sequência: UNIT/FAKE 134/134 UI e 149/149 Host
+passaram, reutilizando I4-T1, X-T1/T7 e a variante de preview X-T6. Cobertura:
+transições, seek nas junções, repetição explícita, seleção Original, edição durante
+preparação, redo preservado e eventos tardios. O app usa previews Take admitidos
+por clip e pode esperar na junção; APP/OWNER, reprodução nativa/gapless, sync e
+G1/G5/G6 completos continuam NÃO EXECUTADO/BLOCKED conforme a variante.
+O Owner aprovou timeline/export CFR30 em 2026-10-06 00:51 UTC, com edição visível
+em frames e conversão explícita/reversível dos projetos antigos (ADR0033).
+O caminho final CFR30 está implementado no Draft #87 com testes offline e provas
+sintéticas do worker; a prova anterior H.264 B-frames/7 ms permanece histórica.
+Isso não constitui aceite perceptual/OWNER do export pelo app. Nenhum teste humano
+foi feito; limites instantâneos e rodada coordenada permanecem abertos.
+
+### Single grouped G1 script
+
+Roteiro único para a futura rodada coordenada; **não abrir agora** nem interromper
+o teste Take existente. G1 é o bloco de montagem manual com prévia e exportação;
+os IDs de teste abaixo servem ao registro da equipe, não são botões do aplicativo.
+A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
+os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
+está concluída; a rodada humana ainda não começou. Abrir somente esse aplicativo,
+manualmente, quando a rodada estiver coordenada: sua abertura pode tomar o foco.
+O aplicativo deve começar no projeto descartável vazio. Se aparecer outro projeto,
+**parar e informar a equipe**, sem apagar, substituir ou importar projeto pessoal.
+
+Termos usados nesta rodada:
+
+| Termo | O que significa e o que fazer |
+| --- | --- |
+| Vídeos A/B | Vídeos de teste fornecidos pela equipe: `Fonte-A-CFR24-8s.mp4` tem faixa vermelha; `Fonte-B-NTSC-6s.mp4` tem faixa azul. Não é necessário criar vídeos ou usar mídia pessoal. |
+| CFR30 / frames | A timeline usa 30 quadros por segundo; o primeiro quadro tem número 0. Os originais A/B têm outra cadência, e continuam intactos. Digitar números inteiros nos campos **IN (frames)** e **OUT (frames)**. |
+| IN / OUT | IN inclui o primeiro quadro; OUT indica o primeiro quadro excluído. IN 15 / OUT 60 produz 45 quadros, de 0,5 s até antes de 2 s da fonte. |
+| Tempo `00:05:15` | A indicação em frames é **minutos:segundos:quadros**; isso significa 5 segundos mais 15 quadros, portanto 5,5 s. Não significa 5 minutos e 15 segundos. |
+| Cursor | Linha que indica a posição de reprodução na montagem. Para dividir, selecionar o clip e clicar na régua dentro dele. A posição visual do cursor não é prometida após fechar/reabrir. |
+| Salvo / Tentar salvar | O projeto é salvo automaticamente após alterações. Esperar **Salvo** ou **Sessão recuperada · salva** no topo. **Tentar salvar** é recuperação de falha, quando aparece; não existe comando Salvar/Abrir projeto disponível nesta variante. |
+
+**Plano de referência:** em **Controles da montagem**, junto à timeline, escolher
+**Fonte**, preencher IN/OUT e clicar **Adicionar trecho ao final** para cada linha.
+Importar A antes de B permite identificar Vídeo 1=A e Vídeo 2=B no projeto vazio;
+o nome de arquivo em detalhes confirma a correspondência. Hashes são conferidos
+pela equipe técnica, não estão expostos como controle humano na UI.
+
+| Ordem | Fonte | IN (frames) | OUT (frames) | Duração |
+| --- | --- | ---: | ---: | --- |
+| 1 | A vermelha | 15 | 60 | 45 quadros / 1,5 s |
+| 2 | B azul | 30 | 75 | 45 quadros / 1,5 s |
+| 3 | A vermelha, repetição exata do primeiro trecho | 15 | 60 | 45 quadros / 1,5 s |
+| 4 | A vermelha, outro trecho | 120 | 150 | 30 quadros / 1 s |
+
+O esperado dessa montagem é **quatro clips, 165 quadros / 5,5 s**, sem espaços.
+As junções estão em 1,5 s, 3 s e 4,5 s. Experimentos de edição mudam esse esperado:
+restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exportação.
+
+1. **I4-T1, X-T1/T7 — abertura e acesso:** abrir somente o aplicativo fornecido,
+   sem IA. No topo, **EN** muda para inglês e **PT** volta ao português. Alternar
+   **Modo compacto / Modo aberto**; no compacto, selecionar **Controles** para o
+   painel de edição e **Diretor** para sua aba. Usar scroll quando necessário.
+   **Esperado:** projeto vazio próprio, timeline e controles alcançáveis; alternar
+   idioma/coluna não edita o projeto. **Falha:** build errada, outro projeto, controle
+   anunciado inacessível ou erro de abertura. Parar nessa etapa e registrar a tela.
+2. **D1-T1, X-T5 — fontes e montagem:** em **Mídia**, clicar **Importar** e escolher
+   A, depois importar B. Montar as quatro linhas do plano acima.
+   **Esperado:** A/B identificáveis e clips na ordem A, B, A, A, total de 5,5 s.
+   **Falha:** importação recusada inesperadamente, trecho/conteúdo errado ou alteração
+   automática não pedida. Se a função estiver indisponível na build, registrar
+   `BLOCKED` com a mensagem, sem recorrer a mídia ou configuração pessoal.
+3. **D14-T2, X-T1/T2 — edição reversível:** selecionar um clip na timeline antes
+   de usar os botões abaixo. Após cada experiência, **Desfazer**, **Refazer** e
+   **Desfazer** novamente devem devolver a montagem de referência.
+
+   | Ação disponível | Como experimentar | Resultado esperado antes de desfazer |
+   | --- | --- | --- |
+   | Duplicar selecionado | Selecionar o primeiro clip e clicar no botão. | Cinco clips; trecho duplicado igual ao selecionado. |
+   | Inserir antes do selecionado | Selecionar o primeiro clip; Fonte B, IN 30, OUT 75; clicar no botão. | Cinco clips; o novo B precede o primeiro A. |
+   | Dividir no cursor | Selecionar o primeiro clip; clicar na régua dentro dele; clicar no botão habilitado. | Cinco clips; duas partes cobrem o trecho anterior e a duração total não muda. No limite do clip o botão deve ficar desabilitado. |
+   | Ajustar trecho selecionado | Selecionar o primeiro clip; confirmar Fonte A; mudar OUT de 60 para 59 e clicar no botão. | Mesmo número de clips e montagem um quadro menor; Desfazer restaura OUT 60. |
+   | Mover para antes / Mover para depois | Selecionar um clip que tenha vizinho na direção escolhida e clicar. | Ordem troca com o vizinho, sem espaço ou perda de conteúdo. |
+   | Remover selecionado | Selecionar o B e clicar. | Três clips, total 4 s; Desfazer restaura B e 5,5 s. |
+
+   **Esperado:** uma ação por Desfazer/Refazer, fontes e numeração preservadas.
+   Com as quatro linhas restauradas, aguardar **Salvo**, fechar normalmente a janela
+   isolada e reabrir o mesmo aplicativo. Conferir sequência/fontes e histórico
+   disponível; não exigir a antiga posição visual do cursor.
+   **Falha:** conteúdo perdido, duas ações desfeitas juntas ou estado salvo diferente.
+   Em **Salvando…**, **Alterações não salvas** ou fechamento pendente, manter aberto
+   e informar a equipe; não forçar encerramento nem substituir o projeto.
+4. **X-T6/T9, I8-T3/T6 — prévia:** selecionar **Sequência** e **Reproduzir**, ouvir
+   os beeps e observar a ordem vermelha/azul/vermelha/vermelha. Clicar na régua perto
+   das três junções; **Home/End** na régua levam ao início/fim, e ←/→ avançam um
+   quadro. Marcar **Repetir sequência** para uma volta e desmarcar para parar no
+   fim. Voltar a **Original**, selecionar uma fonte e experimentar **Marcar IN/OUT**
+   sem acrescentar outro clip; depois retornar à montagem de referência.
+   **Esperado:** conteúdo e cortes corretos; pode haver espera pela preparação na
+   junção. **Registrar separadamente:** pausas, sincronismo percebido, tela preta ou quadro
+   fora do trecho. Testes simulados não aprovam esse comportamento nativo. Estes vídeos não
+   têm voz: percepção de fala/lábios continua `BLOCKED` nesta variante.
+5. **X-T3/T5/T7 — exportação limitada aos vídeos de teste:** executar somente na rodada
+   limitada coordenada, com o plano restaurado e a capacidade confirmada pela equipe.
+   No modo compacto com **Diretor** selecionado,
+   clicar **Exportar** no topo deve revelar **Controles**, progresso e cancelamento.
+   No modo aberto, usar o painel contextual já visível. Em **Exportar sequência**, clicar
+   **Exportar MP4…**; o botão **Exportar** no topo usa a mesma operação.
+   Escolher nome novo, como `montagem-g1-01.mp4`, na pasta descartável fornecida.
+   **Esperado:** **Export salvo:** com o nome escolhido; MP4 abre com a ordem A/B/A/A
+   e duração 5,5 s. A equipe confirma quadros/amostras/cor/hashes, sem pedir ffprobe
+   ou comandos ao Owner. Cancelar no seletor não inicia render; **Cancelar export**
+   solicita parar e exige aguardar. Se a publicação confirmou antes do cancelamento,
+   o resultado pode ser **Export salvo**, nunca cancelamento falso. Tentar o nome
+   já existente deve recusá-lo e preservar o arquivo.
+   **Falha:** saída errada, arquivo anterior modificado ou sucesso falso. Publicação
+   incerta pede conferir o destino e preserva o arquivo; não repetir automaticamente.
+   Cancelamento durante render pode terminar rápido demais nestes vídeos: registrar
+   `NÃO EXECUTADO` para essa variante, sem iniciar um teste de carga maior. A conversão
+   legada deste ID está **BLOCKED**: não há importador de projeto na UI Normal;
+   não tentar abrir o arquivo técnico nem converter o projeto novo, já em CFR30.
+6. **I17-T8/T9, X-T2/T4 — falha de salvamento:** **BLOCKED na rodada humana atual**.
+   O Host descartável já teve falha/recuperação técnica, mas não há injeção pronta
+   dessa falha na UI. Não alterar permissões, encher disco ou forçar fechamento para
+   fabricá-la. Quando houver variante preparada, a equipe remove a causa e orienta
+   **Tentar salvar**, aguardar **Salvo** e fechar normalmente; não repetir export.
+   **Falha esperada a detectar nessa futura variante:** perda de estado/histórico ou
+   repetição da exportação. Se o fechamento ficar pendente, manter o projeto aberto.
+7. **D8-T2, I19-T1, X-T3/T5/T6/T9 — aceite completo:** **NÃO EXECUTADO**, com
+   as variantes ausentes descritas acima marcadas **BLOCKED**.
+   A revisão limitada do item 5 não aprova export geral, projetos arbitrários,
+   qualidade/voz/lip-sync ou G1 completo. Não pedir ao Owner provocar excesso de
+   RAM/disco. Registrar o que foi visto, a mensagem apresentada e o resultado
+   por variante. Se aparecer falha de recursos, aguardar a operação parar e
+   informar a equipe; não reduzir a qualidade nem repetir a exportação sozinho.
+
+Estado deste roteiro: **NÃO EXECUTADO / READY FOR HUMAN VALIDATION**. A preparação
+técnica do pacote atual passou; a abertura coordenada, os controles nativos e o
+julgamento humano continuam pendentes. Este roteiro não promove G1, G5/G6,
+progresso ou F-A02.
+
+### Technical preparation and historical packages
+
+A revisão independente recebida por coordenação aprovou o código `26c07e55` /
+árvore `38cab89a`; CI desse commit passou 11/11. O pacote atual usa o runtime
+selado R5 e passou assinatura estrita/profunda, vínculo de 470 arquivos de fonte
+e 29 respostas do Host empacotado, incluindo prévia manual, exportação e
+falha/recuperação de salvamento sem repetir render. O
+[ADR0034](adr/0034-operational-manual-render-resources.md#technical-closeout-and-human-handoff--2026-10-06)
+registra o handoff sem assinatura, os limites da prova e os identificadores.
+O contrato operacional aprovado reserva espaço lógico antes da escrita e
+interrompe após observar excesso de RAM. 512 MiB/2 GiB continuam orçamentos
+iniciais de validação, sem teto físico instantâneo ou limite comercial.
+A prova sintética de 60 s Full HD mediu 171507712 B RSS, 627486319 B lógicos e
+PSNR52.512757 dB; o excesso controlado de RAM foi 87015424 B antes do aborto.
+Abertura em segundo plano ficou BLOCKED porque Tao ativa a janela ao iniciar;
+nenhum aplicativo foi aberto ou projeto/sessão existente substituído. A cópia
+local do roteiro é extraída desta seção canônica, sem criar catálogo concorrente.
+
+Pacote histórico anterior: `CEVRA Vids G1 Review fb34610.app`, launcher
+`/private/tmp/vids-g1-compact-export-fb34610/launch-fb34610.command`. Build offline,
+assinatura estrita/profunda, resolução de recursos, inventário e `--check-only`
+passaram; a correção de visibilidade está incorporada. A entrada anterior foi
+redirecionada ao novo launcher, com seus bytes originais arquivados. Host, Node,
+Media e dependências permaneceram iguais: a prova de exportação descrita abaixo
+é herdada, sem render local repetido. Isso não executa janela/seletor/aceite humano.
+
+Prova nativa herdada de 2026-10-06: o pacote isolado `22e3c431` passou build,
+assinatura estrita/profunda e IPC do Host empacotado com uma exportação sintética,
+checkpoint/falha/reabertura/Undo/Redo. A janela, AppHandle/WebView e seletor nativo
+continuam **NÃO EXECUTADOS**. A/B são H264/SDR/BT709/1080p/AAC48k estéreo; o plano
+tem 264000 amostras por canal, conferidas pela equipe. Supervisão RAM/disco é
+amostrada; a admissão antes de publicação não prova teto instantâneo. Recibos e
+comandos do pacote acompanham a variante, sem criar outro catálogo de aceite.
+
+O primeiro smoke do Host empacotado parou antes de ingest/render/export por
+capability indisponível: o parser de filtros rejeitava as duas colunas reais do
+FFmpeg9. A correção aceita duas/três colunas; Python128 e catálogo selado R4 com
+health/capabilities reais PASS. O binário Node pinado mantém seus bytes oficiais,
+mas falha na verificação estrita da assinatura também antes do bundle; o primeiro
+pacote fica BLOCKED por assinatura. Uma cópia separada assinada localmente ad hoc
+passou no probe estrito/version, com hash pós assinatura declarado e original,
+pins/manifests e Media/Python preservados. O pacote final `22e3c431` passou
+separadamente na verificação completa e no Host; os primeiros recibos falhos
+continuam históricos. Compilação/headless não promovem os itens humanos acima.
+
+Histórico da primeira revisão, antes do novo pacote: o pacote congelado precisava selecionar
+Controles antes do export no compacto. A fonte recebeu uma correção independente:
+Exportar no topo revela Controles sem perder instrução do Diretor ou projeto.
+Duas regressões PT/EN falharam antes da correção; UI157 e typecheck passaram depois.
+A correção de fonte não está no aplicativo congelado e requer novo empacotamento
+antes de ser apresentada como comportamento daquela build. Nenhum render/CI,
+janela, projeto humano ou merge foi executado naquela revisão. O pacote corrigido
+acima sucede esse checkpoint e não promove os gates estritos ou humanos.
+
+Estado histórico anterior: **NÃO EXECUTADO / preparação nativa agrupada**. A
+preparação técnica foi sucedida pelo pacote atual acima; o aceite humano continua
+pendente e não promove G1, G5/G6, progresso ou F-A02.
+
 Este roteiro agrega os IDs de A–E; não substitui nem duplica os casos canônicos. Preencher um registro por ID/variante/target, inclusive quando vários IDs forem percorridos no mesmo fluxo. Nenhum cenário foi executado nesta reconciliação.
 
 **Execução** começa como `NÃO EXECUTADO`; isso não é resultado. Depois do teste, registrar o resultado objetivo das Regras e, quando necessário, o julgamento humano separado. Marcar `BLOCKED` com a dependência concreta antes de tentar uma função ausente. Uma fundação implementada ou um PASS de CI/fake não equivale a PASS do fluxo no app. A build deve declarar as capabilities realmente disponíveis.

@@ -63,6 +63,23 @@ class JobControlTests(unittest.TestCase):
 
 
 class WorkerContractTests(unittest.TestCase):
+    def test_logical_budget_rpc_is_closed_through_explicit_cause_and_cancellation_wins(self) -> None:
+        failure = job_control.LogicalFileBudgetError()
+        wrapped = RuntimeError("private-path-and-native-stderr")
+        wrapped.__cause__ = failure
+        for error, cancelled, code in ((failure, False, -32002), (wrapped, False, -32002), (wrapped, True, -32800)):
+            with self.subTest(cancelled=cancelled, wrapped=error is wrapped):
+                job_control.begin_job("budget-test")
+                if cancelled:
+                    job_control.cancel("budget-test")
+                with mock.patch.object(worker, "_call_tool_in_process", side_effect=error), mock.patch.object(worker, "_write_response") as response:
+                    worker._job_response(1, "budget-test", "render-manual-video-sequence", {})
+                payload = response.call_args.args[0]
+                self.assertEqual(payload["error"]["code"], code)
+                self.assertNotIn("private-path", json.dumps(payload))
+                if not cancelled:
+                    self.assertEqual(payload["error"]["message"], "MEDIA_RENDER_DISK_LIMIT")
+
     def tearDown(self) -> None:
         active = job_control.active_job_id()
         if active:
@@ -70,6 +87,20 @@ class WorkerContractTests(unittest.TestCase):
         worker._JOB_THREAD = None
         for name in ("CEVRA_VIDEO_ENCODER_H264", "CEVRA_VIDEO_ENCODER_HEVC", "CEVRA_VIDEO_ENCODER_AV1", "CEVRA_DECODE_ACCELERATION"):
             os.environ.pop(name, None)
+
+    def test_filter_inventory_accepts_ffmpeg9_and_legacy_flag_columns(self) -> None:
+        inventories = [
+            "Filters:\n  T. = Timeline support\n .. atrim A->A Trim the input\n .. fps V->V Force framerate\n TS scale V->V Scale input\n .. fps V->V Duplicate\n",
+            "Filters:\n ... atrim A->A Trim the input\n ... fps V->V Force framerate\n TSC scale V->V Scale input\n",
+        ]
+        for inventory in inventories:
+            with self.subTest(inventory=inventory), mock.patch.object(worker, "_tool", return_value="pinned-ffmpeg"), mock.patch.object(worker, "_run", return_value=mock.Mock(stdout=inventory)):
+                self.assertEqual(worker._filters(), ["atrim", "fps", "scale"])
+
+    def test_filter_inventory_rejects_legends_and_malformed_columns(self) -> None:
+        inventory = "Filters:\n T. = Timeline support\n .S = Slice threading\n . fps V->V Short flags\n .... fps V->V Long flags\n XX scale V->V Unknown flags\n"
+        with mock.patch.object(worker, "_tool", return_value="pinned-ffmpeg"), mock.patch.object(worker, "_run", return_value=mock.Mock(stdout=inventory)):
+            self.assertEqual(worker._filters(), [])
 
     def test_resource_limits_are_explicit_in_rpc_schemas(self) -> None:
         transcode = worker._schema_for_tool("cevra-transcode")
@@ -291,6 +322,107 @@ class AudioSequenceNativeToolTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "measured sample-frame"):
                 native_tools._run_audio_sequence(ShortOutputCommon(metadata), args)
             self.assertFalse(Path(str(args["output"])).exists())
+
+    def test_all_live_audio_sequence_allocations_share_the_owned_output_tree(self) -> None:
+        test = self
+
+        class ObservedCommon:
+            def __init__(self, metadata: dict[str, object], root: Path, cancel: bool) -> None:
+                self.metadata, self.root, self.cancel = metadata, root, cancel
+
+            def probe(self, path: str, role: str = "input") -> dict[str, object]:
+                if role == "output":
+                    return {"file": path, "duration": 0.3, "audio": {
+                        "codec": "pcm_f32le", "sample_rate": 48_000, "channels": 2}}
+                return self.metadata[path]
+
+            def verify_output(self, path: str) -> dict[str, object]:
+                return self.probe(path, "output")
+
+            def ffmpeg_base(self, overwrite: bool = True) -> list[str]:
+                return ["ffmpeg", "-n"]
+
+            def run(self, command: list[str]) -> None:
+                graph = Path(command[command.index("-/filter_complex") + 1])
+                staged = Path(command[-1])
+                test.assertTrue(graph.is_relative_to(self.root))
+                test.assertEqual(graph.parent, staged.parent)
+                if os.name == "posix":
+                    test.assertEqual(graph.parent.stat().st_mode & 0o777, 0o700)
+                test.assertIn("[cevra_audio_out]", graph.read_text(encoding="utf-8"))
+                write_sparse_float_wav(staged, 14_400)
+                live_owned = {p for p in self.root.rglob("*") if p.is_file()
+                              and p.name.startswith(("sequence.", "output."))}
+                test.assertEqual(live_owned, {graph, staged})
+                if self.cancel:
+                    job_control.cancel("owned-audio-graph-cancel")
+                    raise InterruptedError("injected cancelled render")
+
+        for cancel in (False, True):
+            with self.subTest(cancel=cancel), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve()
+                args = self.arguments(root)
+                metadata = args.pop("_metadata")
+                originals = {Path(source["uri"]): Path(source["uri"]).read_bytes()
+                             for source in args["sources"]}
+                if cancel:
+                    job_control.begin_job("owned-audio-graph-cancel")
+                try:
+                    if cancel:
+                        with self.assertRaisesRegex(InterruptedError, "cancelled render"):
+                            native_tools._run_audio_sequence(ObservedCommon(metadata, root, cancel), args)
+                        self.assertFalse(Path(args["output"]).exists())
+                    else:
+                        result = native_tools._run_audio_sequence(ObservedCommon(metadata, root, cancel), args)
+                        self.assertEqual(result["structuredContent"]["output"], args["output"])
+                    self.assertEqual(list(root.glob(".cevra-audio-sequence-*")), [])
+                    for path, content in originals.items():
+                        self.assertEqual(path.read_bytes(), content)
+                finally:
+                    if cancel:
+                        job_control.finish_job("owned-audio-graph-cancel")
+
+    def test_partial_graph_write_failure_leaves_no_unregistered_artifact(self) -> None:
+        class ProbeCommon:
+            def __init__(self, metadata: dict[str, object]) -> None:
+                self.metadata = metadata
+
+            def probe(self, path: str, role: str = "input") -> dict[str, object]:
+                return self.metadata[path]
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            args = self.arguments(root)
+            metadata = args.pop("_metadata")
+            originals = {p: p.read_bytes() for p in root.iterdir()}
+            original_open = Path.open
+
+            class FailedWrite:
+                def __init__(self, path: Path, *call_args: object, **kwargs: object) -> None:
+                    self.handle = original_open(path, *call_args, **kwargs)
+
+                def __enter__(self) -> "FailedWrite":
+                    return self
+
+                def __exit__(self, *exception: object) -> None:
+                    self.handle.close()
+
+                def write(self, data: str) -> None:
+                    self.handle.write(data[:16])
+                    self.handle.flush()
+                    raise OSError("ENOSPC: injected partial graph write")
+
+            def fail_graph_write(path: Path, *call_args: object, **kwargs: object) -> object:
+                if path.suffix == ".ffgraph":
+                    return FailedWrite(path, *call_args, **kwargs)
+                return original_open(path, *call_args, **kwargs)
+
+            with mock.patch.object(Path, "open", fail_graph_write):
+                with self.assertRaisesRegex(OSError, "partial graph write"):
+                    native_tools._run_audio_sequence(ProbeCommon(metadata), args)
+            self.assertEqual(set(root.iterdir()), set(originals))
+            for path, content in originals.items():
+                self.assertEqual(path.read_bytes(), content)
 
     def test_eacces_and_enospc_are_fail_closed_at_the_custom_tool_boundary(self) -> None:
         class FailingCommon:
@@ -560,6 +692,50 @@ class MuxAudioNativeToolTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "publication identity changed"):
                 native_tools._run_mux_audio(common, args)
             self.assertEqual(output.read_bytes(), b"foreign replacement")
+
+    def test_internal_manual_retention_preserves_failed_publication_while_default_mux_still_rolls_back(self) -> None:
+        class ResultFailureCommon(self.Common):
+            verify_calls = 0
+            def verify_output(inner_self, path: str) -> dict[str, object]:
+                inner_self.verify_calls += 1
+                if inner_self.verify_calls == 2:
+                    raise RuntimeError("injected post-publication verification failure")
+                return super().verify_output(path)
+        for retain in (False, True):
+            with self.subTest(retain=retain), tempfile.TemporaryDirectory() as directory:
+                args, video, audio, output = self.arguments(Path(directory))
+                common = ResultFailureCommon(video, audio, output)
+                with mock.patch.object(native_tools, "_unlink_published", wraps=native_tools._unlink_published) as unlink:
+                    with self.assertRaisesRegex(RuntimeError, "post-publication verification failure"):
+                        native_tools._run_mux_audio(common, args, retain_published_on_error=retain)
+                    self.assertEqual(unlink.call_count, 0 if retain else 1)
+                self.assertEqual(output.exists(), retain)
+                if retain:
+                    self.assertEqual(output.read_bytes(), b"owned staged mux")
+                self.assertEqual(video.read_bytes(), b"video fixture")
+                self.assertEqual(audio.read_bytes(), b"audio fixture")
+                self.assertEqual(list(Path(directory).glob(".cevra-mux-audio-*")), [])
+
+    def test_internal_manual_retention_never_rolls_back_public_destination_on_staging_cleanup_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            args, video, audio, output = self.arguments(Path(directory))
+            common = self.Common(video, audio, output)
+            original_unlink = Path.unlink
+            def fail_staging_cleanup(path: Path, *call_args: object, **call_kwargs: object) -> None:
+                if path.name == "output.mp4" and path.parent.name.startswith(".cevra-mux-audio-"):
+                    raise OSError("injected private mux staging cleanup failure")
+                if path == output:
+                    raise AssertionError("manual retention must never unlink public destination")
+                original_unlink(path, *call_args, **call_kwargs)
+            with mock.patch.object(Path, "unlink", fail_staging_cleanup), mock.patch.object(native_tools, "_unlink_published", side_effect=AssertionError("manual retention must not use path rollback")):
+                with self.assertRaisesRegex(RuntimeError, "public destination retained for recovery"):
+                    native_tools._run_mux_audio(common, args, retain_published_on_error=True)
+            self.assertEqual(output.read_bytes(), b"owned staged mux")
+            self.assertEqual(video.read_bytes(), b"video fixture")
+            self.assertEqual(audio.read_bytes(), b"audio fixture")
+            for public_flag in ("retain_published_on_error", "retainPublishedOnError"):
+                with self.assertRaises(ValueError):
+                    worker._validate_tool_arguments("cevra-mux-audio", {**args, public_flag: True})
 
     def test_mux_staging_cleanup_failure_rolls_back_only_the_exact_published_inode(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

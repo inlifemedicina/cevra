@@ -16,3 +16,6 @@ export * from "./semantic-editorial-analysis-contract.js";
 export * from "./semantic-editorial-analysis.js";
 export * from "./editorial-draft.js";
 export * from "./manual-video-clip.js";
+export * from "./manual-video-sequence.js";
+export * from "./manual-sequence-preview.js";
+export * from "./manual-sequence-export.js";

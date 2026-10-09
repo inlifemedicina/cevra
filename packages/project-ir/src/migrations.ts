@@ -1,6 +1,7 @@
 import {
   CURRENT_SCHEMA_VERSION,
   PROJECT_IR_SCHEMA_VERSION_V1,
+  PROJECT_IR_SCHEMA_VERSION_V2,
   type ProjectIR,
   type SourceTranscript,
   type TranscriptState,
@@ -11,6 +12,7 @@ import {
   V1_UNASSIGNED_TRANSCRIPT_EXTENSION,
   assertValidProjectIR,
   assertValidProjectIRv1,
+  assertValidProjectIRv2,
   deriveTranscriptSpeakerState
 } from "./validation.js";
 
@@ -48,7 +50,7 @@ export function migrateProject(input: unknown): ProjectIR {
 }
 
 export function migrateProjectIRV1ToV2(input: Record<string, unknown>, context: MigrationContext): Record<string, unknown> {
-  if (context.fromVersion !== PROJECT_IR_SCHEMA_VERSION_V1 || context.toVersion !== CURRENT_SCHEMA_VERSION) throw new Error("Project IR v1 migration requires a 1 to 2 context.");
+  if (context.fromVersion !== PROJECT_IR_SCHEMA_VERSION_V1 || context.toVersion !== PROJECT_IR_SCHEMA_VERSION_V2) throw new Error("Project IR v1 migration requires a 1 to 2 context.");
   const v1 = assertValidProjectIRv1(input);
   if (hasOwn(v1, "sourceTranscripts")) throw new Error("Schema v1 input must not contain sourceTranscripts.");
   const extensions = v1.extensions as Record<string, unknown>;
@@ -58,11 +60,11 @@ export function migrateProjectIRV1ToV2(input: Record<string, unknown>, context: 
   const sources = deepJsonClone(v1.sources as Array<Record<string, unknown>>);
   const eligible = sources.filter((source) => source.kind === "audio" || source.kind === "video");
   const output = deepJsonClone(v1);
-  output.schemaVersion = CURRENT_SCHEMA_VERSION;
+  output.schemaVersion = PROJECT_IR_SCHEMA_VERSION_V2;
   delete output.transcript;
   output.sourceTranscripts = [];
 
-  if (isExactFactoryEmptyTranscript(rawTranscript)) return assertValidProjectIR(output) as unknown as Record<string, unknown>;
+  if (isExactFactoryEmptyTranscript(rawTranscript)) return assertValidProjectIRv2(output) as unknown as Record<string, unknown>;
 
   let reason: V1TranscriptQuarantineReason;
   if (sources.length === 1 && eligible.length === 1) {
@@ -70,7 +72,7 @@ export function migrateProjectIRV1ToV2(input: Record<string, unknown>, context: 
     if (candidate) {
       output.sourceTranscripts = [candidate];
       try {
-        return assertValidProjectIR(output) as unknown as Record<string, unknown>;
+        return assertValidProjectIRv2(output) as unknown as Record<string, unknown>;
       } catch {
         output.sourceTranscripts = [];
       }
@@ -89,6 +91,16 @@ export function migrateProjectIRV1ToV2(input: Record<string, unknown>, context: 
     payload: rawTranscript,
     eligibleSourceIdsAtMigration: eligible.map((source) => source.id as string).sort()
   };
+  return assertValidProjectIRv2(output) as unknown as Record<string, unknown>;
+}
+
+export function migrateProjectIRV2ToV3(input: Record<string, unknown>, context: MigrationContext): Record<string, unknown> {
+  if (context.fromVersion !== PROJECT_IR_SCHEMA_VERSION_V2 || context.toVersion !== CURRENT_SCHEMA_VERSION) throw new Error("Project IR v2 migration requires a 2 to 3 context.");
+  const v2 = assertValidProjectIRv2(input);
+  if (Object.hasOwn(v2.timeline, "timingPolicy") || v2.timeline.clips.some(clip => Object.hasOwn(clip, "frameTiming"))) throw new Error("Schema v2 cannot carry schema v3 canonical timing fields.");
+  const output = deepJsonClone(v2) as unknown as Record<string, unknown>;
+  output.schemaVersion = CURRENT_SCHEMA_VERSION;
+  (output.timeline as Record<string, unknown>).timingPolicy = "legacy-milliseconds";
   return assertValidProjectIR(output) as unknown as Record<string, unknown>;
 }
 
@@ -103,7 +115,7 @@ function createLosslessMigrationCandidate(raw: Record<string, unknown>, source: 
   const speakerState = deriveTranscriptSpeakerState(transcript);
   const provenance: Record<string, unknown> = {
     ...(source.checksum === undefined ? {} : { sourceChecksum: source.checksum }),
-    stages: [{ kind: "migration", fromSchemaVersion: PROJECT_IR_SCHEMA_VERSION_V1, toSchemaVersion: CURRENT_SCHEMA_VERSION }]
+    stages: [{ kind: "migration", fromSchemaVersion: PROJECT_IR_SCHEMA_VERSION_V1, toSchemaVersion: PROJECT_IR_SCHEMA_VERSION_V2 }]
   };
   try {
     return {
@@ -167,3 +179,4 @@ function deepJsonClone<T>(value: T, ancestors: Set<object> = new Set()): T {
 }
 
 registerMigration(PROJECT_IR_SCHEMA_VERSION_V1, migrateProjectIRV1ToV2);
+registerMigration(PROJECT_IR_SCHEMA_VERSION_V2, migrateProjectIRV2ToV3);

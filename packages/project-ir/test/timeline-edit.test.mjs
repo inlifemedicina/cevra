@@ -84,7 +84,7 @@ test("no-op and closed-contract rejections consume no revision and preserve redo
   history.undo();
   const archive = history.toArchive();
   assert.throws(() => history.commit(edit(trim(clip("a")))), error => error instanceof ProjectCommandError && error.code === "PROJECT_TIMELINE_EDIT_NO_OP");
-  for (const action of [edit(), { ...edit(trim(clip("a"))), version: 2 },
+  for (const action of [edit(), { ...edit(trim(clip("a"))), version: 3 },
     edit({ type: "source.remove", sourceId: "source-a" }), edit(edit(trim(clip("a")))),
     edit({ ...trim(clip("a")), arbitrary: true }), { ...edit(trim(clip("a"))), arbitrary: true }]) {
     assert.throws(() => history.commit(action), error => error instanceof ProjectCommandError && error.code === "PROJECT_TIMELINE_EDIT_INVALID");

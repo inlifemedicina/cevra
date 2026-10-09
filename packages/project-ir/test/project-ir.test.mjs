@@ -189,11 +189,12 @@ function assertProjectCommandError(action, code) {
   assert.equal(error.code, code);
 }
 
-test("factory creates schema v2 with source-scoped transcripts and no legacy transcript", () => {
+test("factory creates schema v3 with explicit legacy timing and source-scoped transcripts", () => {
   const project = createEmptyProject({ id: "project-1", locale: "pt-BR", now: fixedTime });
-  assert.equal(CURRENT_SCHEMA_VERSION, 2);
+  assert.equal(CURRENT_SCHEMA_VERSION, 3);
   assert.equal(PROJECT_IR_SCHEMA_VERSION_V1, 1);
-  assert.equal(project.schemaVersion, 2);
+  assert.equal(project.schemaVersion, 3);
+  assert.equal(project.timeline.timingPolicy, "legacy-milliseconds");
   assert.deepEqual(project.sourceTranscripts, []);
   assert.equal(Object.hasOwn(project, "transcript"), false);
   assert.equal(validateProjectIR(project).ok, true);
@@ -724,7 +725,7 @@ test("history archive round-trips v2 snapshots and an active redo cursor", () =>
   history.commit({ type: "project.rename", name: "C" });
   history.undo();
   const restored = ProjectHistory.fromArchive(history.toArchive(), { idGenerator: () => `restored-${++sequence}`, clock: () => fixedTime });
-  assert.equal(restored.current.schemaVersion, 2);
+  assert.equal(restored.current.schemaVersion, 3);
   assert.equal(restored.current.project.name, "B");
   assert.equal(restored.canRedo, true);
   assert.equal(restored.redo().project.name, "C");

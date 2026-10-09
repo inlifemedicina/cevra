@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import subprocess
 import threading
+import os
+import signal
+import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
@@ -17,6 +21,67 @@ class ActiveJob:
 
 _LOCK = threading.RLock()
 _ACTIVE: Optional[ActiveJob] = None
+_FILE_BUDGET = threading.local()
+
+
+class LogicalFileBudgetError(RuntimeError):
+    """Closed resource failure; no native stderr or private path is exposed."""
+    def __init__(self) -> None:
+        super().__init__("MEDIA_RENDER_DISK_LIMIT")
+
+
+def is_logical_file_budget_failure(error: BaseException) -> bool:
+    cause, seen = error, set()
+    while cause is not None and id(cause) not in seen:
+        seen.add(id(cause))
+        if isinstance(cause, LogicalFileBudgetError):
+            return True
+        cause = cause.__cause__
+    return False
+
+
+@dataclass
+class NativeFileBudget:
+    maximum_bytes: int
+    directory: Path
+    process: Optional[subprocess.Popen[Any]] = None
+
+    def assert_not_exceeded(self) -> None:
+        if self.process is not None and self.process.returncode == -signal.SIGXFSZ:
+            raise LogicalFileBudgetError()
+
+
+@contextmanager
+def native_file_budget(maximum_bytes: int, directory: Path):
+    """Thread-local scope; never set limits on the persistent multi-thread worker."""
+    if os.name != "posix" or not isinstance(maximum_bytes, int) or isinstance(maximum_bytes, bool) or maximum_bytes < 1:
+        raise RuntimeError("MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED")
+    scope = NativeFileBudget(maximum_bytes, directory)
+    previous = getattr(_FILE_BUDGET, "scope", None)
+    _FILE_BUDGET.scope = scope
+    try:
+        yield scope
+    finally:
+        _FILE_BUDGET.scope = previous
+
+
+def _spawn(args: Sequence[str], **kwargs: Any) -> subprocess.Popen[Any]:
+    scope = getattr(_FILE_BUDGET, "scope", None)
+    command = list(args)
+    # A caller-controlled FFREPORT would create an unregistered output file.
+    supplied_environment = kwargs.pop("env", None)
+    environment = dict(os.environ if supplied_environment is None else supplied_environment)
+    environment.pop("FFREPORT", None)
+    if scope is not None:
+        environment["TMPDIR"] = str(scope.directory)
+        environment["TMP"] = str(scope.directory)
+        environment["TEMP"] = str(scope.directory)
+        command = [sys.executable, "-I", "-B", str(Path(__file__).resolve()),
+                   "--file-budget", str(scope.maximum_bytes), "--", *command]
+    process = subprocess.Popen(command, env=environment, **kwargs)
+    if scope is not None:
+        scope.process = process
+    return process
 
 
 def begin_job(job_id: str) -> None:
@@ -119,7 +184,7 @@ def run(
 ) -> subprocess.CompletedProcess[Any]:
     register_artifacts(artifact_paths)
     kwargs.setdefault("stdin", subprocess.DEVNULL)
-    process = subprocess.Popen(list(args), stdout=stdout, stderr=stderr, text=text, **kwargs)
+    process = _spawn(args, stdout=stdout, stderr=stderr, text=text, **kwargs)
     attach_process(process, artifact_paths)
     try:
         try:
@@ -139,7 +204,7 @@ def run(
 def popen(args: Sequence[str], *, artifact_paths: Iterable[str] = (), **kwargs: Any) -> subprocess.Popen[Any]:
     register_artifacts(artifact_paths)
     kwargs.setdefault("stdin", subprocess.DEVNULL)
-    process = subprocess.Popen(list(args), **kwargs)
+    process = _spawn(args, **kwargs)
     attach_process(process, artifact_paths)
     return process
 
@@ -185,3 +250,25 @@ def _cleanup_created_artifacts(job: ActiveJob) -> None:
                 path.unlink()
         except OSError:
             pass
+
+
+def _exec_file_budget() -> None:
+    """Internal exec-only entrypoint, retaining the job's PID/group and pipes."""
+    import resource
+    if len(sys.argv) < 5 or sys.argv[1] != "--file-budget" or sys.argv[3] != "--":
+        raise RuntimeError("Invalid internal file budget invocation")
+    limit = int(sys.argv[2])
+    if limit < 1 or not Path(sys.argv[4]).is_absolute():
+        raise RuntimeError("Invalid internal file budget invocation")
+    _, inherited_hard = resource.getrlimit(resource.RLIMIT_FSIZE)
+    if inherited_hard != resource.RLIM_INFINITY:
+        limit = min(limit, inherited_hard)
+    resource.setrlimit(resource.RLIMIT_FSIZE, (limit, limit))
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    # Python ignores SIGXFSZ; native producers must receive the default action.
+    signal.signal(signal.SIGXFSZ, signal.SIG_DFL)
+    os.execv(sys.argv[4], sys.argv[4:])
+
+
+if __name__ == "__main__":
+    _exec_file_budget()

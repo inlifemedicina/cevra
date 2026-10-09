@@ -37,7 +37,7 @@ test("native startup pair creates temporary review without opening or writing th
   const state = (await call("project.snapshot")).result;
   assert.equal(state.status.persistence, "temporary-review");
   assert.equal(state.canUndo, false); assert.equal(state.canRedo, false);
-  assert.deepEqual(state.capabilities, { mediaImport: { available: false, reason: "review-session" }, transcription: { available: false, reason: "review-session" } });
+  assert.deepEqual(state.capabilities, { mediaImport: { available: false, reason: "review-session" }, transcription: { available: false, reason: "review-session" }, manualExport: { available: false, reason: "review-session" } });
   const original = (await call("editorial.snapshot")).result.draft;
   assert.equal(original.blocks.length, 5); assert.equal(original.analysisReview.citationSupport, "PARTIAL");
   assert.equal(original.caveatObservationIds.length, 2); assert.deepEqual(original.analysis.candidate, p.result.result.candidate);

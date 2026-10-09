@@ -328,6 +328,16 @@ h1, h2, h3, p { margin: 0; }
 .source-file-details { margin: 8px 0 16px; color: var(--cevra-fg-muted); font-size: 11px; }
 .source-file-details p { overflow-wrap: anywhere; }
 .manual-video-preview { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; padding: 12px 18px; gap: 10px; }
+.manual-export-preparation { border-top: 1px solid var(--cevra-border); padding-top: 12px; font-size: 11px; line-height: 1.45; }
+.manual-export-preparation h3 { margin: 0; font-size: 12px; }
+.manual-export-preparation p { color: var(--cevra-fg-muted); }
+.manual-export-preparation button { margin: 0 6px 8px 0; padding: 6px 8px; border: 1px solid var(--cevra-border); border-radius: 4px; background: var(--cevra-surface-2); color: var(--cevra-fg-soft); }
+.manual-export-preparation button:disabled { opacity: .5; }
+.manual-export-preparation strong { overflow-wrap: anywhere; }
+.manual-sequence-preview { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; }
+.manual-sequence-preview > .manual-video-preview { flex: 1; height: auto; }
+.manual-sequence-preview-modes { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 18px 0; }
+.manual-sequence-preview-modes label { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .manual-preview-heading { display: flex; justify-content: space-between; gap: 12px; color: #c9d2e0; font-size: 12px; }
 .manual-preview-heading span { color: #8190a5; }
 .manual-video-stage { flex: 1; min-height: 80px; position: relative; display: grid; place-items: center; overflow: hidden; background: #050609; border-radius: 8px; }
@@ -340,7 +350,23 @@ h1, h2, h3, p { margin: 0; }
 .manual-preview-controls time { font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .manual-preview-timing { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; color: #b7c3d4; font-size: 11px; font-variant-numeric: tabular-nums; }
 .manual-preview-marks { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.manual-sequence-controls { flex: 0 0 auto; min-width: 0; max-height: 130px; overflow: auto; padding: 4px 12px 8px; border-bottom: 1px solid var(--cevra-border); font-size: 11px; }
+.timeline { display: flex; flex-direction: column; }
+.timeline-toolbar { flex-shrink: 0; }
+.timeline-table { flex: 1; min-height: 0; height: auto; }
+.manual-sequence-controls fieldset { display: flex; align-items: end; flex-wrap: wrap; gap: 6px 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.manual-sequence-controls legend { padding: 0; margin-bottom: 4px; color: var(--cevra-fg-muted); }
+.manual-sequence-controls label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.manual-sequence-controls input, .manual-sequence-controls select { height: 26px; width: 94px; max-width: 100%; border: 1px solid var(--cevra-border); border-radius: 4px; background: var(--cevra-surface-2); color: var(--cevra-fg); padding: 2px 6px; }
+.manual-sequence-controls select { width: 132px; }
+.manual-sequence-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.manual-sequence-actions span, .manual-sequence-controls fieldset > span { color: var(--cevra-fg-muted); }
 .manual-preview-marks output { font-size: 11px; font-variant-numeric: tabular-nums; color: #b7c3d4; }
+.manual-sequence-conform { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--cevra-border); }
+.manual-sequence-conform fieldset { margin: 8px 0; padding: 8px; border: 1px solid var(--cevra-border); border-radius: 4px; }
+.manual-sequence-conform output { flex: 1 0 100%; white-space: normal; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.manual-sequence-conform p { margin: 4px 0; }
+.manual-sequence-conform > button { margin-right: 6px; }
 .manual-create-clip-button { height: 29px; padding: 0 9px; border: 1px solid var(--cevra-accent); border-radius: var(--cevra-radius-sm); background: var(--cevra-accent); color: var(--cevra-accent-contrast); font-size: 11px; font-weight: 700; cursor: pointer; }
 .manual-create-clip-button:hover:not(:disabled) { background: var(--cevra-accent-strong); border-color: var(--cevra-accent-strong); }
 .manual-create-clip-button:disabled { background: var(--cevra-surface-3); border-color: var(--cevra-border); color: var(--cevra-fg-muted); }

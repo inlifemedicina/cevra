@@ -5,7 +5,8 @@ import { DemoDesktopBackend } from "./demo-desktop-backend";
 
 /** Explicit development/test fixture, not a saved-result import or production admission. */
 export class EditorialFixtureBackend extends DemoDesktopBackend {
-  readonly history = ProjectHistory.fromArchive(structuredClone(fixture.history) as HistoryArchive);
+  // The legacy JSON is admitted/migrated by the archive codec, not a live IR cast.
+  readonly history = ProjectHistory.fromArchive(structuredClone(fixture.history) as unknown as HistoryArchive);
   private readonly service = new EditorialDraftService(this.history);
   private draft = this.service.create(structuredClone(fixture.request) as CreateEditorialDraftRequest);
 

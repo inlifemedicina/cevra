@@ -15,6 +15,9 @@ import {
   validateTranscriptionParams,
   validateVideoPreviewParams,
   validateManualClipParams, validateManualTrimParams,
+  validateManualSequenceParams,
+  validateManualExportParams,
+  validateConformPreviewParams,
   type HostErrorPayload,
   type HostRequest,
   type HostResponse
@@ -122,6 +125,18 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       return { result: await requireSession(session).ingestLocal(validateIngestParams(request.params, request.id)) };
     case "video.previewLocal":
       return { result: await requireSession(session).previewLocalVideo(validateVideoPreviewParams(request.params, request.id)) };
+    case "video.prepareManualExport": {
+      const params = validateManualExportParams(request.params, request.id);
+      return { result: await requireSession(session).prepareManualExport(params.request, params.destinationUri) };
+    }
+    case "video.exportManualSequence": {
+      const params = validateManualExportParams(request.params, request.id);
+      return { result: await requireSession(session).exportManualSequence(params.request, params.destinationUri) };
+    }
+    case "video.previewManualSequenceConform":
+      return { result: requireSession(session).previewManualSequenceConform(validateConformPreviewParams(request.params, request.id)) };
+    case "video.editManualSequence":
+      return { result: await requireSession(session).editManualVideoSequence(validateManualSequenceParams(request.params, request.id)) };
     case "video.createManualClip":
       return { result: await requireSession(session).createManualVideoClip(validateManualClipParams(request.params, request.id)) };
     case "video.trimManualClip":
@@ -179,17 +194,34 @@ function safeMessage(code: string): string {
     case "PROJECT_CLOSE_UNSAVED": return "The current history is not confirmed saved. Keep the session open and retry saving.";
     case "PROJECT_CLOSE_BUSY": return "An operation is still active. Keep the session open until it settles.";
     case "PROJECT_CLOSE_PENDING": return "The close request has not settled. Canonical mutations remain blocked.";
+    case "MANUAL_EXPORT_COMMITTED_ERROR": return "The export was committed; inspect the current saved state before any further action.";
+    case "MANUAL_EXPORT_MEMORY_LIMIT": return "The export exceeded its renderer memory allowance.";
+    case "MANUAL_EXPORT_DISK_LIMIT": return "The export exceeded its owned job file allowance.";
+    case "MANUAL_EXPORT_RESOURCE_UNAVAILABLE": return "The export resource guard could not prove completion.";
+    case "MANUAL_EXPORT_PUBLICATION_UNVERIFIED": return "The export publication is uncertain; its private ownership evidence was retained.";
     default: return "The desktop operation failed.";
   }
 }
 
 function safeDetails(cause: unknown, code: string): { details?: Record<string, unknown> } {
-  if (!["PROJECT_PERSISTENCE_FAILED", "PROJECT_CHECKPOINT_STALE", "PROJECT_CLOSE_UNSAVED", "PROJECT_CLOSE_BUSY", "PROJECT_CLOSE_PENDING"].includes(code)) return {};
+  if (!["PROJECT_PERSISTENCE_FAILED", "PROJECT_CHECKPOINT_STALE", "PROJECT_CLOSE_UNSAVED", "PROJECT_CLOSE_BUSY", "PROJECT_CLOSE_PENDING", "MANUAL_EXPORT_CLEANUP_FAILED", "MANUAL_EXPORT_PUBLICATION_UNVERIFIED", "MANUAL_EXPORT_COMMITTED_ERROR", "MANUAL_EXPORT_MEMORY_LIMIT", "MANUAL_EXPORT_DISK_LIMIT", "MANUAL_EXPORT_RESOURCE_UNAVAILABLE"].includes(code)) return {};
   if (typeof cause !== "object" || cause === null || !("details" in cause)) return {};
   const details = cause.details;
   if (typeof details !== "object" || details === null || Array.isArray(details) || !("state" in details)) return {};
   const state = details.state;
-  return typeof state === "object" && state !== null && !Array.isArray(state)
-    ? { details: { state } }
-    : {};
+  if (typeof state !== "object" || state === null || Array.isArray(state)) return {};
+  const safe: Record<string, unknown> = { state };
+  if (["MANUAL_EXPORT_PUBLICATION_UNVERIFIED", "MANUAL_EXPORT_CLEANUP_FAILED"].includes(code)
+    && "causeCode" in details && ["MANUAL_EXPORT_MEMORY_LIMIT", "MANUAL_EXPORT_DISK_LIMIT", "MANUAL_EXPORT_RESOURCE_UNAVAILABLE"].includes(String(details.causeCode))) {
+    safe.causeCode = details.causeCode;
+  }
+  if (code === "MANUAL_EXPORT_COMMITTED_ERROR") {
+    const fields = details as Record<string, unknown>;
+    for (const key of ["executionId", "exportId", "destinationLabel"] as const) {
+      const value = fields[key];
+      if (typeof value === "string" && value.length <= 512 && !value.includes("\0")) safe[key] = value;
+    }
+    if ("checkpointStatus" in details && ["local-saved", "local-unsaved", "checkpoint-pending", "persistence-error"].includes(String(details.checkpointStatus))) safe.checkpointStatus = details.checkpointStatus;
+  }
+  return { details: safe };
 }

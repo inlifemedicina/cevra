@@ -1,6 +1,6 @@
-import { MANUAL_VIDEO_MAX_BYTES, MANUAL_VIDEO_FRAME_MAX_BYTES, manualVideoError, resolveManualVideo, type LocalVideoPreview, type LocalVideoPreviewRequest } from "@cevra/application";
-import type { MediaEngineAdapter } from "@cevra/contracts";
-import type { ProjectHistory } from "@cevra/project-ir";
+import { MANUAL_VIDEO_MAX_BYTES, MANUAL_VIDEO_FRAME_MAX_BYTES, localSourceProbeInput, manualVideoError, resolveManualVideo, resolveManualVideoSequence, type LocalVideoPreview, type LocalVideoPreviewRequest } from "@cevra/application";
+import { validateManualSequenceExecutionEvidence, type MediaEngineAdapter } from "@cevra/contracts";
+import { framesToMilliseconds, type ProjectHistory, type SourceAsset } from "@cevra/project-ir";
 import { constants, type BigIntStats } from "node:fs";
 import { createHash } from "node:crypto";
 import { chmod, lstat, mkdtemp, open, realpath, rm, type FileHandle } from "node:fs/promises";
@@ -8,28 +8,40 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { verifyAndCopyVideoSource } from "./local-video-preview.js";
 
+/** Early metadata rejection only; the runtime still performs complete admission. */
+export function supportsOriginalProxy(source: SourceAsset & { durationMs: number }): boolean {
+  const transfer = source.technicalDescriptor?.video?.colorTransfer?.toLowerCase();
+  return source.durationMs <= 60_000 && transfer !== "smpte2084" && transfer !== "arib-std-b67"
+    && (source.width === undefined || source.height === undefined || Math.min(source.width, source.height) >= 2 && Math.min(source.width, source.height) <= 1080 && Math.max(source.width, source.height) <= 1920)
+    && (!source.technicalDescriptor?.audio || (source.sampleRate === undefined || [44100, 48000].includes(source.sampleRate)) && (source.channels === undefined || [1, 2].includes(source.channels)));
+}
+
+/** Conservative preparation allowance, not a latency SLA or delivery policy. */
+export function previewPreparationBudgetMs(source: SourceAsset & { durationMs: number }, startMs: number, endMs: number): number {
+  const ioMs = source.technicalDescriptor!.content.sizeBytes * 4 / (8 * 1024 * 1024) * 1000;
+  return Math.min(360_000, Math.ceil(30_000 + source.durationMs * 2 + (endMs - startMs) + ioMs));
+}
+
 export function resolvePreviewClip(history: ProjectHistory, request: LocalVideoPreviewRequest) {
   const project = history.current;
   const source = resolveManualVideo(project, request);
-  const clip = project.timeline.clips.find((item) => item.id === request.clipId);
-  const track = project.timeline.tracks.find((item) => item.id === clip?.trackId);
-  if (!clip || clip.sourceId !== source.id || !track || track.kind !== "video" || track.hidden || track.muted
-    || project.timeline.clips.length !== 1 || project.captions.length || project.graphics.length
-    || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1 || Object.keys(clip.extensions ?? {}).length
-    || ![clip.sourceStartMs, clip.sourceEndMs, clip.timelineStartMs, clip.timelineEndMs].every(Number.isSafeInteger)
-    || clip.timelineStartMs !== 0 || clip.timelineEndMs !== clip.sourceEndMs - clip.sourceStartMs
-    || clip.sourceStartMs < 0 || clip.sourceStartMs >= clip.sourceEndMs || clip.sourceEndMs > source.durationMs || source.durationMs > 60_000) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+  const clip = resolveManualVideoSequence(project, request.expectedSnapshotId).find(item => item.id === request.clipId);
+  if (!clip || clip.sourceId !== source.id || source.durationMs > 60_000) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
   return { source, clip };
 }
 
 export function resolvePreviewRange(history: ProjectHistory, request: LocalVideoPreviewRequest) {
   if (request.clipId !== undefined) {
     const { source, clip } = resolvePreviewClip(history, request);
-    return { source, clip, startMs: clip.sourceStartMs, endMs: clip.sourceEndMs };
+    return { source, clip, startMs: clip.sourceStartMs, endMs: clip.sourceEndMs,
+      frameRange: clip.frameTiming ? { sourceStartFrame: clip.frameTiming.sourceStartFrame, sourceEndFrame: clip.frameTiming.sourceEndFrame } : undefined };
   }
   const source = resolveManualVideo(history.current, request);
   if (source.durationMs > 60_000) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
-  return { source, clip: undefined, startMs: 0, endMs: source.durationMs };
+  // Original remains a source-clock viewer. The manual CFR30 sampler is
+  // admitted only for a canonical clip, whose audio window is independently
+  // covered; Take's approved padding policy handles a source's initial gap.
+  return { source, clip: undefined, startMs: 0, endMs: source.durationMs, frameRange: undefined };
 }
 
 /** Read-only preparation: no Project IR, execution ledger or checkpoint writes. */
@@ -61,15 +73,16 @@ export class DerivedVideoPreview {
   private key(range: ReturnType<typeof resolvePreviewRange>): string {
     const s = range.source;
     return createHash("sha256").update(JSON.stringify([s.id, s.uri, s.durationMs, s.width, s.height, s.frameRate, s.sampleRate, s.channels,
-      s.technicalDescriptor, range.startMs, range.endMs, "take-v1", this.options.runtimeIdentity?.() ?? "session-bound-engine"])).digest("hex");
+      s.technicalDescriptor, range.startMs, range.endMs, range.frameRange, range.frameRange ? "manual-cfr30-preview-v1" : "take-v1", this.options.runtimeIdentity?.() ?? "session-bound-engine"])).digest("hex");
   }
 
   private packet(entry: PreparedPreview, request: LocalVideoPreviewRequest, range: ReturnType<typeof resolvePreviewRange>): LocalVideoPreview {
     return { sourceId: range.source.id, snapshotId: request.expectedSnapshotId, durationMs: entry.durationMs, mimeType: "video/mp4", base64: entry.video.toString("base64"),
-      proxy: { profile: "take-v1", sourceDurationMs: range.source.durationMs },
+      proxy: { profile: range.frameRange ? "manual-cfr30-preview-v1" : "take-v1", sourceDurationMs: range.source.durationMs },
       initialFrame: { mimeType: "image/png", base64: entry.frame.toString("base64"), width: entry.width, height: entry.height, sourceTimeMs: entry.firstFrameMs },
       ...(range.clip ? { clip: { id: range.clip.id, sourceStartMs: range.startMs, sourceEndMs: range.endMs,
-        firstFrameMs: entry.firstFrameMs, lastFrameMs: entry.lastFrameMs, frameCount: entry.frameCount } } : {}) };
+        firstFrameMs: entry.firstFrameMs, lastFrameMs: entry.lastFrameMs, frameCount: entry.frameCount,
+        ...(range.clip.frameTiming ? { frameTiming: structuredClone(range.clip.frameTiming) } : {}) } } : {}) };
   }
 
   private seal(key: string, entry: PreparedPreview): string {
@@ -101,7 +114,7 @@ export class DerivedVideoPreview {
     const { source, startMs, endMs } = range;
     const timeout = new AbortController();
     const combined = AbortSignal.any([signal, timeout.signal]);
-    const timer = setTimeout(() => timeout.abort(), 30_000);
+    const timer = setTimeout(() => timeout.abort(), previewPreparationBudgetMs(source, startMs, endMs));
     let root: string | undefined;
     let owned: Awaited<ReturnType<typeof lstat>> | undefined;
     let primary: Error | undefined;
@@ -124,31 +137,64 @@ export class DerivedVideoPreview {
       root = await mkdtemp(join(await realpath(this.options.temporaryRoot ?? tmpdir()), "cevra-video-preview-"));
       owned = await lstat(root);
       await chmod(root, 0o700);
-      const input = join(root, `input${extname(source.uri).toLowerCase()}`);
+      const input = range.frameRange ? localSourceProbeInput(source.uri)! : join(root, `input${extname(source.uri).toLowerCase()}`);
       const output = join(root, "preview.mp4");
-      await verifyAndCopyVideoSource(source, combined, input);
+      // The worker owns a sibling job tree, never the output's parent. Keep
+      // both under our private wrapper until the complete preview job retires.
+      const jobRoot = range.frameRange ? await mkdtemp(join(root, "job-")) : undefined;
+      if (jobRoot) await chmod(jobRoot, 0o700);
+      await verifyAndCopyVideoSource(source, combined, range.frameRange ? undefined : input);
       resolvePreviewRange(this.options.history, request);
       combined.throwIfAborted();
-      const result = await this.options.engine.execute({ type: "trim", inputUri: input, outputUri: output,
+      const result = await this.options.engine.execute(range.frameRange ? {
+        type: "render-manual-video-preview", version: 1, item: { inputUri: input, ...range.frameRange,
+          sourceContent: { ...source.technicalDescriptor!.content }, audioSelection: "single-source-stream" }, outputUri: output, ownedWorkspaceUri: jobRoot!
+      } : { type: "trim", inputUri: input, outputUri: output,
         startMs, endMs, boundedPreview: true, previewProfile: "take-v1" }, { jobId: `preview:${request.operationId}`, locale: "en-US", signal: combined });
       combined.throwIfAborted();
-      const evidence = result.type === "file" ? result.boundedPreview : undefined;
-      const duration = result.type === "file" ? result.durationMs : undefined;
-      if (result.type !== "file" || result.outputUri !== output || result.probe.uri !== output || !result.probe.hasVideo
-        || !evidence || evidence.version !== 2 || evidence.inputSha256 !== source.technicalDescriptor!.content.sha256
-        || evidence.sourceStartMs !== startMs || evidence.sourceEndMs !== endMs
-        || evidence.firstFrameMs < startMs || evidence.lastFrameMs >= endMs || evidence.frameCount < 1
-        || evidence.sourceTimesMs.length !== evidence.frameCount || evidence.outputTimesMs.length !== evidence.frameCount
-        || evidence.sourceTimesMs.some((time, index) => !Number.isFinite(time) || time < startMs || time >= endMs
-          || !Number.isFinite(evidence.outputTimesMs[index]) || Math.abs(evidence.outputTimesMs[index]! - (time - startMs)) > evidence.timeBaseToleranceMs)
-        || !Number.isFinite(evidence.durationToleranceMs) || evidence.durationToleranceMs > 102.001
-        || result.probe.width !== evidence.width || result.probe.height !== evidence.height || result.probe.rotationDegrees !== 0
+      if (result.type !== "file" || result.outputUri !== output || result.probe.uri !== output || !result.probe.hasVideo) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+      let evidence: { width: number; height: number; firstFrameMs: number; lastFrameMs: number; frameCount: number; outputSha256: string };
+      let duration = result.durationMs;
+      if (range.frameRange) {
+        let grid;
+        try { grid = validateManualSequenceExecutionEvidence(result.manualSequence); } catch { throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED"); }
+        const frames = range.frameRange.sourceEndFrame - range.frameRange.sourceStartFrame;
+        const original = grid.sources[0];
+        if (grid.profile !== "manual-cfr30-preview-v1" || grid.totalFrames !== frames || grid.itemCount !== 1 || grid.sources.length !== 1
+          || !original || original.inputUri !== input || original.sha256 !== source.technicalDescriptor!.content.sha256 || original.sizeBytes !== source.technicalDescriptor!.content.sizeBytes
+          || original.sampleRate !== source.sampleRate || original.channelLayout !== (source.channels === 2 ? "stereo" : "mono")
+          || result.probe.width !== 720 || result.probe.height !== 404 || result.probe.frameRate !== 30 || result.probe.rotationDegrees !== 0
+          || result.probe.videoCodec !== "h264"
+          || !result.probe.hasAudio || result.probe.audioCodec !== "aac" || result.probe.sampleRate !== 48000
+          || result.probe.channels !== (grid.audioChannelLayout === "stereo" ? 2 : 1) || result.probe.hdr === true
+          || result.effectiveProfile.container !== "mp4" || result.effectiveProfile.videoCodec !== "h264" || result.effectiveProfile.audioCodec !== "aac"
+          || !Number.isFinite(duration) || Math.abs(duration! - framesToMilliseconds(frames)) > 1
+          || endMs > original.sourceVideoEndMs + 1
+          || range.frameRange.sourceStartFrame * original.sampleRate / 30 < original.sourceAudioFirstSample
+          || range.frameRange.sourceEndFrame * original.sampleRate / 30 > original.sourceAudioFirstSample + original.sourceAudioSampleCount) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+        duration = framesToMilliseconds(frames);
+        evidence = { width: 720, height: 404, firstFrameMs: startMs,
+          lastFrameMs: framesToMilliseconds(range.frameRange.sourceEndFrame - 1), frameCount: frames, outputSha256: grid.outputSha256 };
+      } else {
+        const take = result.boundedPreview;
+        if (!take || take.version !== 2) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+        evidence = take;
+        if (result.outputUri !== output || result.probe.uri !== output || !result.probe.hasVideo
+        || take.inputSha256 !== source.technicalDescriptor!.content.sha256
+        || take.sourceStartMs !== startMs || take.sourceEndMs !== endMs
+        || take.firstFrameMs < startMs || take.lastFrameMs >= endMs || take.frameCount < 1
+        || take.sourceTimesMs.length !== take.frameCount || take.outputTimesMs.length !== take.frameCount
+        || take.sourceTimesMs.some((time, index) => !Number.isFinite(time) || time < startMs || time >= endMs
+          || !Number.isFinite(take.outputTimesMs[index]) || Math.abs(take.outputTimesMs[index]! - (time - startMs)) > take.timeBaseToleranceMs)
+        || !Number.isFinite(take.durationToleranceMs) || take.durationToleranceMs > 102.001
+        || result.probe.width !== take.width || result.probe.height !== take.height || result.probe.rotationDegrees !== 0
         || result.probe.hasAudio !== Boolean(source.technicalDescriptor?.audio)
-        || (result.probe.hasAudio && (result.probe.audioCodec !== "aac" || !evidence.audio || evidence.audio.sampleRate !== source.sampleRate || evidence.audio.channels !== source.channels
-          || evidence.audio.inputSamples !== Math.ceil(endMs * evidence.audio.sampleRate / 1000) - Math.ceil(startMs * evidence.audio.sampleRate / 1000)
-          || evidence.audio.decodedSamples < evidence.audio.inputSamples || evidence.audio.decodedSamples >= evidence.audio.inputSamples + 1024))
+        || (result.probe.hasAudio && (result.probe.audioCodec !== "aac" || !take.audio || take.audio.sampleRate !== source.sampleRate || take.audio.channels !== source.channels
+          || take.audio.inputSamples !== Math.ceil(endMs * take.audio.sampleRate / 1000) - Math.ceil(startMs * take.audio.sampleRate / 1000)
+          || take.audio.decodedSamples < take.audio.inputSamples || take.audio.decodedSamples >= take.audio.inputSamples + 1024))
         || result.effectiveProfile.container !== "mp4" || result.effectiveProfile.videoCodec !== "h264"
-        || !Number.isSafeInteger(duration) || duration! <= 0 || Math.abs(duration! - (endMs - startMs)) > evidence.durationToleranceMs + 1) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+        || !Number.isSafeInteger(duration) || duration! <= 0 || Math.abs(duration! - (endMs - startMs)) > take.durationToleranceMs + 1) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+      }
       const handle = await open(output, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
       let bytes: Buffer;
       let videoReadError: unknown;
@@ -171,11 +217,15 @@ export class DerivedVideoPreview {
         // Extract from the admitted derivative, never from movie-time-zero canvas
         // or by moving the video/audio clock. Retain its FD through extraction.
         const frameOutput = join(root, "first-frame.png");
-        const frameResult = await this.options.engine.execute({ type: "extract-frame", inputUri: output, outputUri: frameOutput, atMs: 0 },
+        const frameResult = await this.options.engine.execute({ type: "extract-frame", inputUri: output, outputUri: frameOutput, atMs: 0,
+          ...(range.frameRange ? { maxDimension: 720 as const } : {}) },
           { jobId: `preview-frame:${request.operationId}`, locale: "en-US", signal: combined });
         combined.throwIfAborted();
-        if (frameResult.type !== "file" || frameResult.outputUri !== frameOutput || frameResult.probe.uri !== frameOutput
-          || frameResult.probe.width !== evidence.width || frameResult.probe.height !== evidence.height) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+        if (frameResult.type !== "file" || frameResult.outputUri !== frameOutput || frameResult.probe.uri !== frameOutput) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+        const frameWidth = frameResult.probe.width!, frameHeight = frameResult.probe.height!;
+        if (!Number.isSafeInteger(frameWidth) || !Number.isSafeInteger(frameHeight) || Math.min(frameWidth, frameHeight) < 1 || Math.max(frameWidth, frameHeight) > 720
+          || (range.frameRange ? Math.abs(frameWidth * evidence.height - frameHeight * evidence.width) > Math.max(evidence.width, evidence.height)
+            : frameWidth !== evidence.width || frameHeight !== evidence.height)) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
         const frameHandle = await open(frameOutput, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
         let frame: Buffer;
         let frameReadError: unknown;
@@ -193,13 +243,12 @@ export class DerivedVideoPreview {
           const end = await frameHandle.stat({ bigint: true }), named = await lstat(frameOutput, { bigint: true });
           if (!sameFile(stamp, end) || !sameFile(end, named) || !named.isFile()) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
           if (!frame.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) || frame.readUInt32BE(8) !== 13 || frame.toString("ascii", 12, 16) !== "IHDR"
-            || frame.readUInt32BE(16) !== evidence.width || frame.readUInt32BE(20) !== evidence.height
-            || Math.min(evidence.width, evidence.height) < 1 || Math.max(evidence.width, evidence.height) > 720) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+            || frame.readUInt32BE(16) !== frameWidth || frame.readUInt32BE(20) !== frameHeight) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
         } catch (cause) { frameReadError = cause; throw cause; }
         finally { await closePreservingFailure(frameHandle, frameReadError); }
         const afterFrame = await handle.stat({ bigint: true }), named = await lstat(output, { bigint: true });
         if (!sameFile(initial, afterFrame) || !sameFile(afterFrame, named) || !named.isFile()) throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
-        const entry: PreparedPreview = { sourceId: source.id, video: bytes, frame, durationMs: duration!, width: evidence.width, height: evidence.height,
+        const entry: PreparedPreview = { sourceId: source.id, video: bytes, frame, durationMs: duration!, width: frameWidth, height: frameHeight,
           firstFrameMs: evidence.firstFrameMs, lastFrameMs: evidence.lastFrameMs, frameCount: evidence.frameCount, seal: "" };
         pendingCache = Object.freeze({ ...entry, seal: this.seal(key!, entry) });
       } catch (cause) { videoReadError = cause; throw cause; }
@@ -211,7 +260,7 @@ export class DerivedVideoPreview {
       return this.packet(pendingCache!, request, current);
     } catch (cause) {
       primary = combined.aborted ? manualVideoError(timeout.signal.aborted && !signal.aborted ? "MANUAL_VIDEO_PREVIEW_TIMEOUT" : "OPERATION_CANCELLED")
-        : cause instanceof Error && "code" in cause && String(cause.code).startsWith("MANUAL_VIDEO_") ? cause : manualVideoError("MANUAL_VIDEO_UNAVAILABLE");
+        : cause instanceof Error && "code" in cause && (String(cause.code).startsWith("MANUAL_VIDEO_") || String(cause.code).startsWith("MANUAL_SEQUENCE_")) ? cause : manualVideoError("MANUAL_VIDEO_UNAVAILABLE");
       if ("code" in primary && primary.code === "MANUAL_VIDEO_SOURCE_CHANGED") for (const [cachedKey, entry] of this.cache) if (entry.sourceId === source.id) this.forget(cachedKey);
       throw primary;
     } finally {

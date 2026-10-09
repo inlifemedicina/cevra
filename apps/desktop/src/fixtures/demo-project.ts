@@ -116,6 +116,7 @@ export function createDemoProject(): ProjectIR {
   })];
 
   project.timeline = {
+    timingPolicy: "legacy-milliseconds",
     durationMs: 78000,
     tracks: [
       { id: "track-v4", kind: "overlay", name: "V4", locked: false, hidden: false, muted: false },

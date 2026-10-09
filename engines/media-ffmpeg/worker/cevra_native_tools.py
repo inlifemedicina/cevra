@@ -14,13 +14,13 @@ import sys
 import tempfile
 from fractions import Fraction
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import cevra_job_control as job_control
 import cevra_audio_measurement as audio_measurement
 import cevra_bounded_preview as bounded_preview
 
-CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio", "cevra-render-audio-sequence", "cevra-measure-audio"}
+CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio", "cevra-render-audio-sequence", "cevra-measure-audio", "cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"}
 
 AUDIO_SEQUENCE_VERSION = 1
 AUDIO_SEQUENCE_SAMPLE_RATE = 48_000
@@ -324,13 +324,29 @@ def _run_extract_frame(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     meta = common.probe(input_path)
     if not meta.get("video"):
         raise ValueError("input has no video stream")
+    maximum = args.get("max_dimension")
+    if maximum is not None and (maximum != 720 or isinstance(maximum, bool)):
+        raise ValueError("extract-frame max_dimension must be the closed 720 profile")
     cmd = common.ffmpeg_base() + [
         "-ss", f"{at:.6f}", "-i", input_path,
-        "-map", "0:v:0", "-frames:v", "1", "-c:v", "png", output,
+        "-map", "0:v:0", "-frames:v", "1",
     ]
+    if maximum is not None:
+        cmd += ["-vf", "scale=w='min(720,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease"]
+    cmd += ["-c:v", "png", output]
     common.run(cmd)
     publication = _publication_evidence(Path(output))
-    return _file_result(common, output, {"publication": publication} if publication else None)
+    try:
+        result = _file_result(common, output, {"publication": publication} if publication else None)
+        if maximum is not None:
+            video = result["structuredContent"]["probe"].get("video", {})
+            if not isinstance(video.get("width"), int) or not isinstance(video.get("height"), int) or not 1 <= min(video["width"], video["height"]) <= max(video["width"], video["height"]) <= 720:
+                raise RuntimeError("extract-frame bounded PNG dimension postcondition failed")
+        return result
+    except BaseException:
+        if maximum is not None:
+            _unlink_published(Path(output), publication, "bounded preview frame")
+        raise
 
 
 def _run_overlay(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -570,7 +586,10 @@ def _run_transcode(common: Any, runtime: Any, args: Dict[str, Any]) -> Dict[str,
     return _file_result(common, output)
 
 
-def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
+def _run_mux_audio(common: Any, args: Dict[str, Any], *, owned_staging_parent: Optional[Path] = None,
+                   before_publish: Optional[Callable[[Path, Dict[str, Any]], None]] = None,
+                   owned_aac_bits_per_second: Optional[int] = None,
+                   retain_published_on_error: bool = False) -> Dict[str, Any]:
     video_path = _absolute_regular_input(_required_string(args, "video"), "video input")
     audio_path = _absolute_regular_input(_required_string(args, "audio"), "audio input")
     output = _absolute_new_mux_output(_required_string(args, "output"))
@@ -628,7 +647,7 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     promoted_evidence: Optional[Dict[str, Any]] = None
     cleanup_errors: List[str] = []
     try:
-        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-mux-audio-", dir=output.parent))
+        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-mux-audio-", dir=owned_staging_parent or output.parent))
         staging_output = staging_directory / f"output{output.suffix.lower()}"
         cmd = common.ffmpeg_base(overwrite=False) + [
             "-i", str(video_path), "-i", str(audio_path),
@@ -636,7 +655,12 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
         ]
         if not replace_existing and video_meta.get("audio"):
             cmd += ["-map", "0:a:0"]
-        cmd += _audio_args(common, audio_codec, True)
+        audio_args = _audio_args(common, audio_codec, True)
+        if owned_aac_bits_per_second is not None:
+            if audio_codec != "aac" or owned_aac_bits_per_second != 96_000 or "-b:a" not in audio_args:
+                raise ValueError("owned preview AAC bitrate override is invalid")
+            audio_args[audio_args.index("-b:a") + 1] = str(owned_aac_bits_per_second)
+        cmd += audio_args
         cmd += _container_args(container)
         try:
             common.run(cmd + [str(staging_output)])
@@ -662,6 +686,9 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
                     "outputVideoDurationMs": output_video_duration_ms,
                     "outputAudioDurationMs": output_audio_duration_ms,
                 })
+            if before_publish is not None:
+                before_publish(staging_output, staged_probe)
+            job_control.check_cancelled()
             promoted_evidence = _publication_evidence(staging_output)
             os.link(staging_output, output, follow_symlinks=False)
             if promoted_evidence is not None:
@@ -674,6 +701,11 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
                 **({"muxDuration": duration_evidence} if duration_evidence else {}),
             })
         except BaseException as execution_error:
+            if promoted_output and retain_published_on_error:
+                # Manual destinations are public paths. A dev/inode re-check
+                # followed by path unlink cannot prevent a replacement race.
+                # Preserve the destination and trusted accounting link instead.
+                raise RuntimeError(f"mux failed after publication; preserving public destination for recovery: {execution_error}") from execution_error
             if promoted_output:
                 try:
                     _unlink_published(output, promoted_evidence, "mux output")
@@ -698,12 +730,13 @@ def _run_mux_audio(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
             except OSError as exc:
                 cleanup_errors.append(f"staging directory cleanup failed: {exc}")
         if cleanup_errors:
-            if promoted_output:
+            if promoted_output and not retain_published_on_error:
                 try:
                     _unlink_published(output, promoted_evidence, "mux output")
                 except (OSError, RuntimeError) as exc:
                     cleanup_errors.append(f"promoted output rollback failed: {exc}")
-            raise RuntimeError(f"mux owned artifact cleanup failed: {'; '.join(cleanup_errors)}")
+            preservation = "; public destination retained for recovery" if promoted_output and retain_published_on_error else ""
+            raise RuntimeError(f"mux owned artifact cleanup failed: {'; '.join(cleanup_errors)}{preservation}")
 
 
 def _absolute_regular_input(raw: str, label: str) -> Path:
@@ -757,7 +790,10 @@ def _absolute_new_mux_output(raw: str) -> Path:
     return path.absolute()
 
 
-def _audio_sequence_graph(args: Dict[str, Any], source_indexes: Dict[str, int], source_metadata: Dict[str, Dict[str, Any]]) -> str:
+def _audio_sequence_graph(args: Dict[str, Any], source_indexes: Dict[str, int], source_metadata: Dict[str, Dict[str, Any]],
+                          *, sample_plan: Optional[Dict[str, Any]] = None) -> str:
+    if sample_plan is not None:
+        return _audio_sequence_sample_graph(sample_plan, source_indexes, source_metadata)
     output_layout = str(args["output_channel_layout"])
     output_samples = int(args["output_duration_ms"]) * (AUDIO_SEQUENCE_SAMPLE_RATE // 1000)
     uses: Dict[str, List[int]] = {source_id: [] for source_id in source_indexes}
@@ -823,6 +859,42 @@ def _audio_sequence_graph(args: Dict[str, Any], source_indexes: Dict[str, int], 
     result = ";".join(graph)
     if len(result.encode("utf-8")) > MAX_AUDIO_SEQUENCE_GRAPH_BYTES:
         raise ValueError("render-audio-sequence graph exceeds its bounded compiler size")
+    return result
+
+
+def _audio_sequence_sample_graph(plan: Dict[str, Any], source_indexes: Dict[str, int], metadata: Dict[str, Dict[str, Any]]) -> str:
+    """Internal sequential frame-clock mapping; V1 millisecond/mix semantics stay unchanged."""
+    uses = {source_id: [] for source_id in source_indexes}
+    for index, item in enumerate(plan["items"]):
+        uses[item["source_id"]].append(index)
+    graph, inputs, outputs = [], {}, []
+    layout = plan["output_channel_layout"]
+    for source_id, input_index in source_indexes.items():
+        indices = uses[source_id]
+        stream = metadata[source_id]["audio"]["index"]
+        original = f"[{input_index}:{stream}]"
+        if len(indices) == 1:
+            inputs[indices[0]] = original
+        else:
+            labels = "".join(f"[manual_src_{index}]" for index in indices)
+            graph.append(f"{original}asplit={len(indices)}{labels}")
+            for index in indices:
+                inputs[index] = f"[manual_src_{index}]"
+    for index, item in enumerate(plan["items"]):
+        source = metadata[item["source_id"]]["audio"]
+        filters = ["aresample=48000:async=0:first_pts=0",
+                   f"atrim=start_sample={item['source_start_sample']}:end_sample={item['source_end_sample']}", "asetpts=N/SR/TB"]
+        if source["channel_layout"] == "mono" and layout == "stereo":
+            filters.append("pan=stereo|c0=c0|c1=c0")
+        else:
+            filters.append(f"aformat=channel_layouts={layout}")
+        label = f"manual_audio_{index}"
+        graph.append(f"{inputs[index]}{','.join(filters)}[{label}]")
+        outputs.append(f"[{label}]")
+    graph.append("".join(outputs) + f"concat=n={len(outputs)}:v=0:a=1,aformat=sample_rates=48000:sample_fmts=flt:channel_layouts={layout}[cevra_audio_out]")
+    result = ";".join(graph)
+    if len(result.encode("utf-8")) > MAX_AUDIO_SEQUENCE_GRAPH_BYTES:
+        raise ValueError("manual audio graph exceeds the existing bounded compiler size")
     return result
 
 
@@ -967,12 +1039,14 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     promoted_evidence: Optional[Dict[str, Any]] = None
     cleanup_errors: List[str] = []
     try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="cevra-audio-sequence-", suffix=".ffgraph", delete=False) as handle:
+        # Keep every allocation under the existing operation-owned staging tree.
+        # Capture paths before writing so partial graph writes are cleaned too.
+        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-audio-sequence-", dir=output.parent))
+        graph_path = staging_directory / "sequence.ffgraph"
+        with graph_path.open("x", encoding="utf-8") as handle:
             handle.write(graph)
             handle.write("\n")
-            graph_path = Path(handle.name)
         job_control.register_artifacts([str(graph_path)])
-        staging_directory = Path(tempfile.mkdtemp(prefix=".cevra-audio-sequence-", dir=output.parent))
         staging_output = staging_directory / "output.wav"
         cmd = common.ffmpeg_base(overwrite=False) + ["-xerror"]
         for source in sources:
@@ -1083,6 +1157,9 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
                 return _run_mux_audio(common, args)
             if name == "cevra-render-audio-sequence":
                 return _run_audio_sequence(common, args)
+            if name in {"cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"}:
+                import cevra_manual_sequence
+                return cevra_manual_sequence.run(common, runtime, args, preview=name.endswith("-preview"))
             if name == "cevra-measure-audio":
                 report = audio_measurement.run(common, args)
                 return {"content": [{"type": "text", "text": json.dumps(report, allow_nan=False)}], "structuredContent": report}
@@ -1093,5 +1170,7 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
         text = "\n".join(stderr.getvalue().strip().splitlines()[-12:]) or stdout.getvalue().strip()
         return {"isError": True, "content": [{"type": "text", "text": f"{name} failed (exit {code})\n{text}"}]}
     except Exception as exc:
+        if name in {"cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"} and job_control.is_logical_file_budget_failure(exc):
+            raise
         return {"isError": True, "content": [{"type": "text", "text": f"{name} failed: {type(exc).__name__}: {exc}"}]}
     return {"isError": True, "content": [{"type": "text", "text": f"{name} failed without a result"}]}

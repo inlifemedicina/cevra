@@ -1,13 +1,193 @@
-import { createEmptyProject, ProjectHistory, type SourceAsset } from "@cevra/project-ir";
-import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreview, LocalVideoPreviewRequest } from "@cevra/application";
+import { createEmptyProject, ProjectHistory, frameTimingMilliseconds, framesToMilliseconds, type SourceAsset } from "@cevra/project-ir";
+import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreview, LocalVideoPreviewRequest, ManualVideoSequenceEdit } from "@cevra/application";
 import { translate } from "@cevra/i18n";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import type { DesktopBackend, DesktopBackendState } from "./backend/desktop-backend";
 import { App } from "./App";
 import { ManualVideoPreview, supportsManualClipPreview } from "./components/ManualVideoPreview";
+import { ManualSequenceVideoPreview } from "./components/ManualSequenceVideoPreview";
 import { Timeline } from "./components/Timeline";
 import { formatMilliseconds } from "./ui-model";
+it("mode round-trip retains a paused sequence position and the active Sequence button leaves playback unchanged", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container } = render(f.view());
+  const first = await metadata(container, 1);
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  fireEvent.play(first); first.currentTime = 0.432; fireEvent.timeUpdate(first);
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.preview") }));
+  expect(screen.getByRole("button", { name: t("preview.pauseLocal") })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: t("preview.pauseLocal") }));
+  fireEvent.click(screen.getByRole("button", { name: t("preview.originalMode") }));
+  await metadata(container, 6);
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.preview") }));
+  const restored = await metadata(container, 1);
+  expect(restored.currentTime).toBe(0.432);
+  fireEvent.seeked(restored);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Sequência 00:00.432 / 00:03.000");
+  expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+
+it("late ended events during a mutation or after failed media do not move the sequence clock", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container, rerender } = render(f.view());
+  const first = await metadata(container, 1);
+  rerender(f.view(true)); f.clock.mockClear();
+  fireEvent.ended(first);
+  expect(f.clock).not.toHaveBeenCalled();
+  expect(f.requests).toHaveBeenCalledTimes(1);
+  rerender(f.view(false)); fireEvent.error(first); f.clock.mockClear();
+  fireEvent.ended(first);
+  expect(f.clock).not.toHaveBeenCalled();
+  expect(f.requests).toHaveBeenCalledTimes(1);
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+function sequenceFixture() {
+  const admitted: SourceAsset = { ...source, technicalDescriptor: { version: 1, basis: "ingest", content: { sha256: "a".repeat(64), sizeBytes: 10 },
+    method: { profile: "cevra.source-technical.v1", engineId: "test", engineVersion: "1", engineApiVersion: 1 }, video: { codec: "h264" } },
+    extensions: { "cevra.ingest": { method: "local", hasVideo: true } } };
+  const backend = new ManualBackend(admitted);
+  backend.history.commit({ type: "source.add", source: { ...admitted, id: "other-video", uri: "/tmp/other-owned-fixture.mp4" } });
+  const clips = [
+    { id: "first", sourceId: source.id, sourceStartMs: 0, sourceEndMs: 1000, timelineStartMs: 0, timelineEndMs: 1000 },
+    { id: "second", sourceId: "other-video", sourceStartMs: 2000, sourceEndMs: 3500, timelineStartMs: 1000, timelineEndMs: 2500 },
+    { id: "third", sourceId: source.id, sourceStartMs: 5000, sourceEndMs: 5500, timelineStartMs: 2500, timelineEndMs: 3000 }
+  ].map(clip => ({ ...clip, trackId: "v1", speed: 1, volume: 1, opacity: 1 }));
+  backend.history.commit({ type: "timeline.edit", version: 1, edits: [
+    { type: "track.add", track: { id: "v1", kind: "video", name: "V1", hidden: false, locked: false, muted: false } },
+    ...clips.map(clip => ({ type: "clip.add" as const, clip }))
+  ] });
+  const clock = vi.fn();
+  const requests = vi.spyOn(backend, "previewLocalVideo");
+  const view = (busy = false) => <ManualSequenceVideoPreview key={backend.history.current.history.headSnapshotId} backend={backend}
+    project={backend.history.current} clips={backend.history.current.timeline.clips} presentations={new Map()} originalSourceId={source.id}
+    busy={busy} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={clock} onCreate={vi.fn()} />;
+  return { backend, clips, clock, requests, view };
+}
+
+it("plays canonical sequence joins once, waits for each decoder and stops without a frame at program OUT", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container } = render(f.view());
+  const first = await metadata(container, 1);
+  expect(first.play).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  await waitFor(() => expect(first.play).toHaveBeenCalled());
+  fireEvent.play(first);
+  first.currentTime = 1.04; fireEvent.timeUpdate(first); fireEvent.ended(first);
+  await waitFor(() => expect(f.requests).toHaveBeenCalledTimes(2));
+  expect(f.requests.mock.calls[1][0].clipId).toBe("second");
+  expect(f.requests.mock.calls[1][0].sourceId).toBe("other-video");
+  expect(revoke).toHaveBeenCalledWith(expect.stringMatching(/^blob:/));
+  const second = await metadata(container, 1.5); fireEvent.play(second);
+  second.currentTime = 1.5; fireEvent.timeUpdate(second);
+  await waitFor(() => expect(f.requests).toHaveBeenCalledTimes(3));
+  const last = await metadata(container, 0.5); fireEvent.play(last);
+  last.currentTime = 0.5; fireEvent.timeUpdate(last); fireEvent.ended(last);
+  expect(f.clock).toHaveBeenLastCalledWith(3000);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Sequência 00:03.000 / 00:03.000");
+  expect(last.hidden).toBe(true);
+  expect(f.requests).toHaveBeenCalledTimes(3);
+  expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+
+it("sequence seek selects the following clip at joins and exposes no frame at exact OUT", async () => {
+  const f = sequenceFixture();
+  const { container } = render(f.view());
+  await metadata(container, 1);
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "1000" } });
+  const second = await metadata(container, 1.5);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("second");
+  expect(second.currentTime).toBe(0);
+  expect(second.play).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "2499" } });
+  expect(second.currentTime).toBe(1.499); fireEvent.seeked(second);
+  expect(f.clock).toHaveBeenLastCalledWith(2499);
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "2500" } });
+  const last = await metadata(container, 0.5);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("third");
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "3000" } });
+  fireEvent.seeked(last);
+  expect(last.hidden).toBe(true);
+  expect(f.clock).toHaveBeenLastCalledWith(3000);
+  expect(last.play).not.toHaveBeenCalled();
+});
+
+it("explicit sequence repeat returns from OUT to the first canonical occurrence without an edit", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container } = render(f.view()); await metadata(container, 1);
+  fireEvent.click(screen.getByRole("checkbox", { name: t("sequence.repeat") }));
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "2500" } });
+  const last = await metadata(container, 0.5);
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  fireEvent.play(last); last.currentTime = 0.5; fireEvent.timeUpdate(last);
+  const first = await metadata(container, 1);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("first");
+  expect(f.clock).toHaveBeenLastCalledWith(0);
+  expect(first.currentTime).toBe(0);
+  expect(screen.getByRole("button", { name: t("preview.pauseLocal") })).toBeTruthy();
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+
+it("a project edit cancels pending sequence preparation and ignores the old snapshot response", async () => {
+  const f = sequenceFixture();
+  const original = f.backend.previewLocalVideo.bind(f.backend);
+  let release!: (value: LocalVideoPreview) => void;
+  const oldPacket = await original({ sourceId: source.id, clipId: "first", expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
+  f.requests.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  const cancel = vi.spyOn(f.backend, "cancelOperation");
+  const { container, rerender } = render(f.view());
+  await waitFor(() => expect(f.requests).toHaveBeenCalled());
+  const oldOperation = f.requests.mock.calls.at(-1)![0].operationId;
+  f.backend.history.commit({ type: "project.rename", name: "unsaved sequence edit preserved" });
+  const afterEdit = f.backend.history.toArchive();
+  rerender(f.view());
+  await metadata(container, 1);
+  const activeUrl = container.querySelector("video")!.getAttribute("src");
+  await act(async () => release(oldPacket));
+  expect(cancel).toHaveBeenCalledWith(oldOperation);
+  expect(container.querySelector("video")!.getAttribute("src")).toBe(activeUrl);
+  expect(f.requests.mock.calls.at(-1)![0].expectedSnapshotId).toBe(f.backend.history.current.history.headSnapshotId);
+  expect(f.backend.history.toArchive()).toEqual(afterEdit);
+  expect(f.backend.creates).toEqual([]);
+});
+
+it("a mutation gate during sequence transition clears playback intent before the late decoder becomes ready", async () => {
+  const f = sequenceFixture();
+  let release!: (packet: LocalVideoPreview) => void;
+  const original = f.backend.previewLocalVideo.bind(f.backend);
+  const { container, rerender } = render(f.view());
+  const first = await metadata(container, 1);
+  f.requests.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  fireEvent.play(first); first.currentTime = 1; fireEvent.timeUpdate(first);
+  await waitFor(() => expect(release).toBeDefined());
+  expect((screen.getByRole("button", { name: t("preview.pauseLocal") }) as HTMLButtonElement).disabled).toBe(false);
+  rerender(f.view(true));
+  const packet = await original(f.requests.mock.calls.at(-1)![0]);
+  vi.mocked(HTMLMediaElement.prototype.play).mockClear();
+  await act(async () => release(packet)); await metadata(container, 1.5);
+  rerender(f.view(false));
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
+});
+
+it("the production App exposes sequence playback and Original marking on the same canonical project", async () => {
+  const f = sequenceFixture(), before = f.backend.history.toArchive();
+  const { container } = render(<App backend={f.backend} />);
+  await screen.findByRole("button", { name: t("sequence.preview") });
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.preview") }));
+  await metadata(container, 1);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("first");
+  fireEvent.click(screen.getByRole("button", { name: t("preview.originalMode") }));
+  await metadata(container, 6);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBeUndefined();
+  expect(screen.getByRole("button", { name: t("preview.markIn") })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.preview") }));
+  await metadata(container, 1);
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
 
 const source: SourceAsset = { id: "original-video", kind: "video", uri: "/tmp/fixture.mp4", displayName: "fixture.mp4", durationMs: 6000 };
 const t = (key: Parameters<typeof translate>[1], parameters?: Parameters<typeof translate>[2]) => translate("pt-BR", key, parameters);
@@ -30,11 +210,22 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); });
 
 class ManualBackend implements DesktopBackend {
+  async editManualVideoSequence(request: ManualVideoSequenceEdit) {
+    if (request.version !== 2 || request.type !== "append") throw { code: "MANUAL_VIDEO_UNAVAILABLE" };
+    const frameTiming = { version: 1 as const, timelineStartFrame: 0, timelineEndFrame: request.sourceEndFrame - request.sourceStartFrame, sourceStartFrame: request.sourceStartFrame, sourceEndFrame: request.sourceEndFrame };
+    this.creates.push({ sourceId: request.sourceId, expectedSnapshotId: request.expectedSnapshotId, sourceStartMs: framesToMilliseconds(request.sourceStartFrame), sourceEndMs: framesToMilliseconds(request.sourceEndFrame) });
+    this.history.commit({ type: "timeline.edit", version: 2, edits: [
+      { type: "track.add", track: { id: "track-v1", kind: "video", name: "V1", locked: false, hidden: false, muted: false } },
+      { type: "timeline.timingPolicy.set", timingPolicy: "cfr30" },
+      { type: "clip.add", clip: { id: "manual-clip", sourceId: request.sourceId, trackId: "track-v1", frameTiming, ...frameTimingMilliseconds(frameTiming), speed: 1, volume: 1, opacity: 1 } }
+    ] });
+    return { state: await this.loadState(), changedClipIds: ["manual-clip"] };
+  }
   readonly adapterName = "ManualTestBackend";
   readonly presentationOnly = false;
   readonly history = new ProjectHistory(createEmptyProject({ id: "manual-ui" }));
   readonly creates: CreateManualVideoClipRequest[] = [];
-  constructor() { this.history.commit({ type: "source.add", source }); }
+  constructor(inputSource = source) { this.history.commit({ type: "source.add", source: inputSource }); }
   async loadState(): Promise<DesktopBackendState> {
     const unavailable = { available: false, reason: "desktop-runtime-deferred" as const };
     return { project: this.history.current, sourceNumbering: this.history.sourceNumbering, canUndo: this.history.canUndo, canRedo: this.history.canRedo,
@@ -89,6 +280,33 @@ async function metadata(container: HTMLElement, duration?: number, initialFrame 
   }
   return video;
 }
+
+it("preserves the project on an unsettled preview and retries once only when requested", async () => {
+  const backend = new ManualBackend();
+  const before = backend.history.toArchive();
+  const original = backend.previewLocalVideo.bind(backend);
+  let attempts = 0;
+  const requests: LocalVideoPreviewRequest[] = [];
+  backend.previewLocalVideo = async request => {
+    requests.push(request);
+    if (++attempts === 1) throw { code: "MANUAL_VIDEO_PREVIEW_SETTLING" };
+    return original(request);
+  };
+  const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId={backend.history.current.history.headSnapshotId!}
+    timelineOccupied={false} busy={false} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  const retry = await screen.findByRole("button", { name: t("preview.retryLocal") });
+  expect(screen.getByText(t("preview.localSettling"))).toBeTruthy();
+  expect(attempts).toBe(1);
+  expect(backend.history.toArchive()).toEqual(before);
+  fireEvent.click(retry);
+  await metadata(container);
+  expect(attempts).toBe(2);
+  expect(requests[1].operationId).not.toBe(requests[0].operationId);
+  expect(requests[1].expectedSnapshotId).toBe(requests[0].expectedSnapshotId);
+  expect(screen.queryByRole("button", { name: t("preview.retryLocal") })).toBeNull();
+  expect(backend.history.toArchive()).toEqual(before);
+  expect(backend.creates).toEqual([]);
+});
 
 for (const excerpt of [false, true]) {
   it(`waits for the decoded initial frame of ${excerpt ? "the selected clip" : "Original"} without play or clock advancement`, async () => {
@@ -258,7 +476,7 @@ it("marks from the actual media clock, creates a visible clip and verifies undo/
   expect(create().disabled).toBe(false);
   fireEvent.click(create());
   await waitFor(() => expect(backend.creates).toHaveLength(1));
-  expect(backend.creates[0]).toMatchObject({ sourceId: source.id, sourceStartMs: 1250, sourceEndMs: 3750 });
+  expect(backend.creates[0]).toMatchObject({ sourceId: source.id, sourceStartMs: framesToMilliseconds(38), sourceEndMs: framesToMilliseconds(113) });
   const track = await screen.findByTestId("timeline-track-track-v1");
   expect(within(track).getByRole("button", { name: "Vídeo 1 · fixture.mp4" })).toBeTruthy();
   expect(backend.history.current.timeline.durationMs).toBe(2500);
@@ -611,4 +829,131 @@ it("selected clip never admits original bytes or a mismatched range as its deriv
   const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId="snapshot" clip={clip} timelineOccupied busy={false} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
   await screen.findByText(t("preview.localChanged")); expect(container.querySelector("video")!.hasAttribute("src")).toBe(false);
   expect((screen.getByRole("button", { name: "Reproduzir" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+function gridPreviewFixture(inputSource = source) {
+  const backend = new ManualBackend(inputSource);
+  const clips = [[27, 28], [55, 58]].map(([sourceStartFrame, sourceEndFrame], index) => {
+    const frameTiming = { version: 1 as const, timelineStartFrame: index === 0 ? 0 : 1, timelineEndFrame: index === 0 ? 1 : 4, sourceStartFrame: sourceStartFrame!, sourceEndFrame: sourceEndFrame! };
+    return { id: `grid-${index}`, trackId: "grid-track", sourceId: inputSource.id, frameTiming, ...frameTimingMilliseconds(frameTiming), speed: 1, volume: 1, opacity: 1 };
+  });
+  backend.history.commit({ type: "timeline.edit", version: 2, edits: [
+    { type: "track.add", track: { id: "grid-track", kind: "video", name: "V1", locked: false, hidden: false, muted: false } },
+    { type: "timeline.timingPolicy.set", timingPolicy: "cfr30" },
+    ...clips.map(clip => ({ type: "clip.add" as const, clip }))
+  ] });
+  backend.previewLocalVideo = async request => {
+    const clip = clips.find(clip => clip.id === request.clipId)!;
+    const frameCount = clip.frameTiming.sourceEndFrame - clip.frameTiming.sourceStartFrame;
+    return { sourceId: inputSource.id, snapshotId: request.expectedSnapshotId, durationMs: framesToMilliseconds(frameCount), mimeType: "video/mp4", base64: btoa("offline-cfr30-admission-packet-only"),
+      proxy: { profile: "manual-cfr30-preview-v1", sourceDurationMs: inputSource.durationMs! },
+      initialFrame: { mimeType: "image/png", base64: admittedPng, width: 1, height: 1, sourceTimeMs: clip.sourceStartMs },
+      clip: { id: clip.id, sourceStartMs: clip.sourceStartMs, sourceEndMs: clip.sourceEndMs, firstFrameMs: clip.sourceStartMs, lastFrameMs: framesToMilliseconds(clip.frameTiming.sourceEndFrame - 1), frameCount, frameTiming: clip.frameTiming } };
+  };
+  const requests = vi.spyOn(backend, "previewLocalVideo"), clock = vi.fn(), create = vi.fn().mockResolvedValue(undefined);
+  const view = () => <ManualSequenceVideoPreview backend={backend} project={backend.history.current} clips={clips} presentations={new Map()} originalSourceId={inputSource.id}
+    busy={false} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={clock} onCreate={create} />;
+  return { backend, clips, requests, clock, create, view };
+}
+
+it("CFR30 grid admission uses frame seeks, half-open joins and exact OUT despite decoder duration rounding", async () => {
+  const f = gridPreviewFixture(), before = f.backend.history.toArchive();
+  const { container } = render(f.view());
+  const first = await metadata(container, 1 / 30);
+  first.currentTime = 0.007; fireEvent.timeUpdate(first);
+  expect(f.clock).toHaveBeenLastCalledWith(0);
+  const slider = screen.getByRole("slider", { name: t("sequence.seek") });
+  expect(slider.getAttribute("max")).toBe("4");
+  fireEvent.change(slider, { target: { value: "1" } });
+  const second = await metadata(container, 0.1);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("grid-1");
+  expect(second.currentTime).toBe(0);
+  fireEvent.click(screen.getByRole("button", { name: t("preview.nextFrame") }));
+  expect(second.currentTime).toBe(1 / 30);
+  fireEvent.seeked(second);
+  expect(f.clock).toHaveBeenLastCalledWith(framesToMilliseconds(2));
+  expect(screen.getByTestId("preview-timecode").textContent).toContain("Frame 2");
+  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "4" } });
+  // A browser may clamp its seek slightly below MP4 duration. Program OUT is canonical.
+  second.currentTime = 0.099999; fireEvent.seeked(second);
+  expect(f.clock).toHaveBeenLastCalledWith(framesToMilliseconds(4));
+  expect(second.hidden).toBe(true);
+  expect(screen.getByTestId("preview-timecode").textContent).toContain("Frame 4");
+  expect(f.requests).toHaveBeenCalledTimes(2);
+  expect(f.backend.history.toArchive()).toEqual(before);
+});
+
+it("a Take-profile packet cannot masquerade as a CFR30 program preview", async () => {
+  const f = gridPreviewFixture();
+  const packet = await f.backend.previewLocalVideo({ sourceId: source.id, clipId: "grid-0", expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
+  f.requests.mockResolvedValue({ ...packet, proxy: { profile: "take-v1", sourceDurationMs: 6000 } });
+  render(f.view());
+  expect(await screen.findByText(t("preview.gridUnavailable"))).toBeTruthy();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
+it("pausing a grid join while the next proxy is preparing prevents late autoplay", async () => {
+  const f = gridPreviewFixture();
+  const packet = await f.backend.previewLocalVideo({ sourceId: source.id, clipId: "grid-1", expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
+  let release!: (packet: LocalVideoPreview) => void;
+  const { container } = render(f.view());
+  const first = await metadata(container, 1 / 30);
+  f.requests.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
+  fireEvent.play(first); first.currentTime = 1 / 30; fireEvent.ended(first);
+  await waitFor(() => expect(release).toBeTypeOf("function"));
+  fireEvent.click(screen.getByRole("button", { name: t("preview.pauseLocal") }));
+  vi.mocked(HTMLMediaElement.prototype.play).mockClear();
+  await act(async () => release(packet));
+  const second = await metadata(container, 0.1);
+  expect(second.play).not.toHaveBeenCalled();
+  fireEvent.play(second);
+  expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
+});
+
+it.each(["pt-BR", "en-US"] as const)("%s Original marks show nearest frames and each millisecond delta before a frame action", async locale => {
+  const backend = new ManualBackend(), create = vi.fn().mockResolvedValue(undefined);
+  const translated = (key: Parameters<typeof translate>[1], params?: Parameters<typeof translate>[2]) => translate(locale, key, params);
+  const { container } = render(<ManualVideoPreview backend={backend} source={source} snapshotId="source-snap" timelineOccupied={false} sequenceEditing frameEditing busy={false}
+    seek={{ sequence: 0, timelineMs: 0 }} t={translated} onPlayheadChange={vi.fn()} onCreate={create} />);
+  const video = await metadata(container, 6);
+  video.currentTime = 1.251; fireEvent.click(screen.getByRole("button", { name: translated("preview.markIn") }));
+  video.currentTime = 1.301; fireEvent.click(screen.getByRole("button", { name: translated("preview.markOut") }));
+  expect(screen.getByText(/38.*15\.667/)).toBeTruthy();
+  expect(screen.getByText(/39.*-1\.000/)).toBeTruthy();
+  expect(create).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: translated("preview.createClip") }));
+  expect(create).toHaveBeenCalledExactlyOnceWith({ sourceId: source.id, expectedSnapshotId: "source-snap", sourceStartMs: framesToMilliseconds(38), sourceEndMs: framesToMilliseconds(39) });
+});
+
+it("CFR30 project Original admits the offset-audio source-clock Take packet and shows explicit frame-mark deltas", async () => {
+  // This is the Host's source-clock DTO for its 44.1kHz/1323-sample (30ms)
+  // audio-origin fixture; only the Host/Media tests admit padding and real samples.
+  const originalSource = { ...source, durationMs: 6007, sampleRate: 44100, channels: 1 };
+  const f = gridPreviewFixture(originalSource), before = f.backend.history.toArchive();
+  const gridPacket = await f.backend.previewLocalVideo({ sourceId: originalSource.id, clipId: "grid-0", expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
+  f.requests.mockClear();
+  f.requests.mockImplementation(async request => request.clipId ? gridPacket : {
+    sourceId: originalSource.id, snapshotId: request.expectedSnapshotId, durationMs: 6007,
+    mimeType: "video/mp4", base64: btoa("offline-Take-source-clock-packet-only"),
+    proxy: { profile: "take-v1", sourceDurationMs: 6007 },
+    initialFrame: { mimeType: "image/png", base64: admittedPng, width: 1, height: 1, sourceTimeMs: 0 }
+  });
+  const { container } = render(f.view());
+  await metadata(container, 1 / 30);
+  fireEvent.click(screen.getByRole("button", { name: t("preview.originalMode") }));
+  const original = await metadata(container, 6.007);
+  expect(f.requests.mock.calls.at(-1)![0].clipId).toBeUndefined();
+  expect(screen.queryByText(t("preview.gridUnavailable"))).toBeNull();
+  expect(screen.getByRole("button", { name: t("preview.markIn") }).matches(":disabled")).toBe(false);
+  original.currentTime = 0.501; fireEvent.timeUpdate(original);
+  expect(screen.getByTestId("preview-timecode").textContent).toContain("00:00.501");
+  fireEvent.click(screen.getByRole("button", { name: t("preview.markIn") }));
+  original.currentTime = 1.535; fireEvent.click(screen.getByRole("button", { name: t("preview.markOut") }));
+  expect(screen.getByText(/15.*-1\.000/)).toBeTruthy();
+  expect(screen.getByText(/46.*-1\.667/)).toBeTruthy();
+  expect(f.create).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: t("sequence.append") }));
+  expect(f.create).toHaveBeenCalledExactlyOnceWith({ sourceId: originalSource.id, expectedSnapshotId: f.backend.history.current.history.headSnapshotId!, sourceStartMs: framesToMilliseconds(15), sourceEndMs: framesToMilliseconds(46) });
+  expect(f.backend.history.toArchive()).toEqual(before);
 });

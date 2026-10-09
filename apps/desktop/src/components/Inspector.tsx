@@ -1,11 +1,12 @@
 import type { ProjectIR } from "@cevra/project-ir";
+import type { ReactNode } from "react";
 import { workspaceKeys, type Translate, type Workspace } from "../ui-model";
 
 import type { SourcePresentation } from "../source-presentation";
 
 const videoFields = [["inspector.position", "0, 0"], ["inspector.scale", "100%"], ["inspector.rotation", "0°"], ["inspector.opacity", "100%"]] as const;
 
-export function Inspector({ project, presentations, selectedProjectItemId, workspace, t }: { project: Readonly<ProjectIR>; presentations: ReadonlyMap<string, SourcePresentation>; selectedProjectItemId: string | null; workspace: Workspace; t: Translate }) {
+export function Inspector({ project, presentations, selectedProjectItemId, workspace, t, exportPreparation }: { project: Readonly<ProjectIR>; presentations: ReadonlyMap<string, SourcePresentation>; selectedProjectItemId: string | null; workspace: Workspace; t: Translate; exportPreparation?: ReactNode }) {
   const source = project.sources.find((item) => item.id === selectedProjectItemId);
   const clip = project.timeline.clips.find((item) => item.id === selectedProjectItemId);
   const clipSource = clip ? project.sources.find((item) => item.id === clip.sourceId) : undefined;
@@ -20,6 +21,7 @@ export function Inspector({ project, presentations, selectedProjectItemId, works
       <div className="inspector-heading"><div><span className="eyebrow">{t("inspector.context")}</span><h2>{t("inspector.title")}</h2></div><span className="workspace-context">{t(workspaceKeys[workspace])}</span></div>
       {selectedName ? <p className="selection-label" data-testid="inspector-selection">{t("inspector.selected", { name: selectedName })}</p> : <div className="inspector-empty" role="status"><span aria-hidden="true">◇</span><p>{t("inspector.emptySelection")}</p></div>}
       {selectedSource && <details className="source-file-details"><summary>{t("sourcePresentation.fileDetails")}</summary><p>{selectedSource.displayName}</p></details>}
+      {exportPreparation}
       {caption ? <CaptionInspector t={t} /> : isAudioSelection ? <AudioInspector t={t} /> : (source || clip || graphic) ? <VideoInspector t={t} /> : null}
     </aside>
   );

@@ -9,8 +9,9 @@ const MIN_CONTEXT_HEIGHT = 180;
 
 type Gesture = { kind: "width" | "split"; pointerId: number; start: number; width: number; height: number; share: number; usableHeight: number; target: HTMLButtonElement };
 
-export function EditingSidebar({ compact, width, editorialVisible, directorPanel, contextualPanel, t, onWidthChange, onModeToggle }: {
+export function EditingSidebar({ compact, width, editorialVisible, directorPanel, contextualPanel, controlsRequest = 0, t, onWidthChange, onModeToggle }: {
   compact: boolean; width: number; editorialVisible: boolean; directorPanel: ReactNode; contextualPanel: ReactNode;
+  controlsRequest?: number;
   t: Translate; onWidthChange(width: number): void; onModeToggle(): void;
 }) {
   const body = useRef<HTMLDivElement>(null);
@@ -18,6 +19,9 @@ export function EditingSidebar({ compact, width, editorialVisible, directorPanel
   const [bodyHeight, setBodyHeight] = useState(772);
   const [editorialShare, setEditorialShare] = useState(0.65);
   const [tab, setTab] = useState<"director" | "controls">("director");
+  useLayoutEffect(() => {
+    if (controlsRequest > 0) setTab("controls");
+  }, [controlsRequest]);
   const activeTab = editorialVisible ? tab : "controls";
   const directorVisible = editorialVisible && (!compact || activeTab === "director");
   const controlsVisible = !compact || activeTab === "controls";

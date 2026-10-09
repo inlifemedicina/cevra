@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-prepare-manual-export"
+description = "Enables the desktop_prepare_manual_export command without any pre-configured scope."
+commands.allow = ["desktop_prepare_manual_export"]
+
+[[permission]]
+identifier = "deny-desktop-prepare-manual-export"
+description = "Denies the desktop_prepare_manual_export command without any pre-configured scope."
+commands.deny = ["desktop_prepare_manual_export"]

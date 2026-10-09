@@ -153,7 +153,7 @@ test("V3 package and history preserve the optional source technical descriptor t
     clock: () => fixedTime
   });
 
-  assert.equal(manifest.projectSchemaVersion, 2);
+  assert.equal(manifest.projectSchemaVersion, 3);
   assert.equal(manifest.formatVersion, 3);
   assert.deepEqual(restored.current.sources[0].technicalDescriptor, technicalDescriptor("ingest"));
   assert.equal(restored.current.sources[0].checksum, "legacy:unchanged");
@@ -347,7 +347,7 @@ test("v1 package migrates every snapshot and writes V3 on the next save", () => 
   }};
 
   const restored = deserializeProjectPackage(serialized);
-  assert.equal(restored.current.schemaVersion, 2);
+  assert.equal(restored.current.schemaVersion, 3);
   assert.equal(restored.current.sourceTranscripts.length, 1);
   assert.equal(restored.current.history.headSnapshotId, "snapshot-0");
   assert.equal(restored.canRedo, true);
@@ -363,7 +363,7 @@ test("v1 package migrates every snapshot and writes V3 on the next save", () => 
   const roundTrip = serializeProjectPackage(restored, fixedTime);
   const roundTripManifest = JSON.parse(roundTrip.files["manifest.json"]);
   assert.equal(roundTripManifest.formatVersion, 3);
-  assert.equal(roundTripManifest.projectSchemaVersion, 2);
+  assert.equal(roundTripManifest.projectSchemaVersion, 3);
   const reopened = deserializeProjectPackage(roundTrip);
   assert.equal(reopened.canRedo, true);
   assert.equal(reopened.entries[0].id, "entry-1");

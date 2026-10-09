@@ -1,5 +1,6 @@
 import { assertValidSourceNumbering, SourceNumberRegistry, type SourceNumberingV1 } from "./source-numbering.js";
 import { applyCommand } from "./commands.js";
+import { migrateProject } from "./migrations.js";
 import {
   computeHistoryTranscriptBlobDigest,
   isHistoryTranscriptBlobDigest,
@@ -176,6 +177,7 @@ export class ProjectHistory {
   }
 
   static fromArchive(archive: HistoryArchive, options: HistoryOptions = {}): ProjectHistory {
+    archive = migrateHistoryProjects(archive);
     if (archive.version !== 3 && Object.hasOwn(archive, "sourceNumbering")) throw new Error("Source numbering requires history archive version 3.");
     if (archive.version === 1) {
       validateArchiveV1(archive);
@@ -308,6 +310,21 @@ export class ProjectHistory {
     if (cursor < 0) throw new Error(`History cursor references unknown snapshot ${cursorSnapshotId}.`);
     this.cursor = cursor;
   }
+}
+
+/** Upgrade every retained project, including redo, without replaying or rewriting journal identities. */
+function migrateHistoryProjects(archive: HistoryArchive): HistoryArchive {
+  const result = clone(archive);
+  if (result.version === 1) {
+    for (const snapshot of result.snapshots) snapshot.project = migrateProject(snapshot.project);
+  } else if (result.version === 2 || result.version === 3) {
+    for (const snapshot of result.snapshots) {
+      if (Object.hasOwn(snapshot.project, "sourceTranscripts")) throw new Error("Compact snapshots must reference transcript blobs.");
+      const { sourceTranscripts: _transcripts, ...project } = migrateProject({ ...snapshot.project, sourceTranscripts: [] });
+      snapshot.project = project;
+    }
+  }
+  return result;
 }
 
 function defaultId(): string {

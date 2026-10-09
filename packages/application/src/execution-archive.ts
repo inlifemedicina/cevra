@@ -1,5 +1,6 @@
 import {
   validateAudioMeasurementReport,
+  validateManualSequenceExecutionEvidence,
   validateMediaOperation,
   type MediaOperation,
   type MediaOperationResult,
@@ -244,10 +245,14 @@ function validateResult(value: unknown, operation: MediaOperation, jobId: string
   if (operation.type === "probe" || operation.type === "measure-audio" || operation.type === "detect-silence") {
     throw new Error("File result does not match operation.");
   }
-  object(value, ["type", "outputUri", "durationMs", "probe", "effectiveProfile", "audioSequence", "publication", "muxDuration"], "file result");
+  object(value, ["type", "outputUri", "durationMs", "probe", "effectiveProfile", "audioSequence", "publication", "muxDuration", "manualSequence"], "file result");
   if (!boundedString(value.outputUri, 4096) || (value.durationMs !== undefined && !nonNegativeNumber(value.durationMs))) throw new Error("Invalid file result.");
   const audioSequence = value.audioSequence === undefined ? undefined : validateAudioSequenceEvidence(value.audioSequence);
   const muxDuration = value.muxDuration === undefined ? undefined : validateMuxDurationEvidence(value.muxDuration);
+  const manualSequence = value.manualSequence === undefined ? undefined : validateManualSequenceExecutionEvidence(value.manualSequence);
+  if (manualSequence && operation.type !== "render-manual-video-sequence" && operation.type !== "render-manual-video-preview") {
+    throw new Error("Manual sequence evidence does not match its operation.");
+  }
   return {
     type: "file",
     outputUri: value.outputUri,
@@ -256,6 +261,7 @@ function validateResult(value: unknown, operation: MediaOperation, jobId: string
     effectiveProfile: validateEffectiveProfile(value.effectiveProfile),
     ...(audioSequence ? { audioSequence: clone(audioSequence) as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["audioSequence"]> } : {}),
     ...(value.publication !== undefined ? { publication: validatePublication(value.publication) } : {}),
+    ...(manualSequence ? { manualSequence: clone(manualSequence) } : {}),
     ...(muxDuration ? { muxDuration: clone(muxDuration) as unknown as NonNullable<Extract<MediaOperationResult, { type: "file" }>["muxDuration"]> } : {})
   };
 }

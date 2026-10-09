@@ -15,6 +15,7 @@ import {
   resolveTranscodeDelivery,
   validateCopyCompatibility,
   validateMediaOperation,
+  validateManualSequenceExecutionEvidence,
   validateAudioMeasurementReport,
   AUDIO_MEASUREMENT_ERROR_CODES,
   AudioMeasurementError,
@@ -85,6 +86,28 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
       }
       case "probe":
         return { type: "probe", probe: parseProbe(await call("probe", { inputs: [operation.inputUri] }), operation.inputUri) };
+      case "render-manual-video-sequence": case "render-manual-video-preview": {
+        const items = operation.type === "render-manual-video-preview" ? [operation.item] : operation.items;
+        const result = fileResult(await call(operation.type === "render-manual-video-preview" ? "cevra-render-manual-video-preview" : "cevra-render-manual-video-sequence", {
+          version: operation.version, output: operation.outputUri, owned_workspace: operation.ownedWorkspaceUri,
+          items: items.map(item => ({ input: item.inputUri, source_start_frame: item.sourceStartFrame,
+            source_end_frame: item.sourceEndFrame, source_content: { sha256: item.sourceContent.sha256, size_bytes: item.sourceContent.sizeBytes }, audio_selection: item.audioSelection }))
+        }), operation.outputUri);
+        if (result.type !== "file" || !result.manualSequence || !result.publication) throw Error("Manual sequence result lacks measured sequence/publication evidence.");
+        const evidence = result.manualSequence, expectedFrames = items.reduce((total, item) => total + item.sourceEndFrame - item.sourceStartFrame, 0);
+        if (evidence.totalFrames !== expectedFrames || evidence.itemCount !== items.length
+          || evidence.profile !== (operation.type === "render-manual-video-preview" ? "manual-cfr30-preview-v1" : "manual-cfr30-export-v1")) throw Error("Manual sequence result disagrees with the requested occurrences.");
+        const identities = new Map(items.map(item => [item.inputUri, item.sourceContent]));
+        if (evidence.sources.length !== identities.size || evidence.sources.some(source => {
+          const expected = identities.get(source.inputUri); return !expected || expected.sha256 !== source.sha256 || expected.sizeBytes !== source.sizeBytes;
+        })) throw Error("Manual sequence result source evidence disagrees with the original identities.");
+        if (!result.probe || !result.probe.hasVideo || !result.probe.hasAudio || result.probe.videoCodec !== "h264" || result.probe.audioCodec !== "aac"
+          || result.probe.width !== evidence.width || result.probe.height !== evidence.height || result.probe.frameRate !== 30
+          || result.probe.sampleRate !== 48_000 || result.probe.channels !== (evidence.audioChannelLayout === "stereo" ? 2 : 1)
+          || result.probe.hdr === true || result.effectiveProfile?.container !== "mp4" || result.effectiveProfile.videoCodec !== "h264" || result.effectiveProfile.audioCodec !== "aac"
+          || result.durationMs === undefined || Math.abs(result.durationMs - evidence.durationMs) > 1) throw Error("Manual sequence verified output disagrees with its fixed delivery evidence.");
+        return result;
+      }
       case "trim":
         return fileResult(await call("cut", { input: operation.inputUri, output: operation.outputUri, start: seconds(operation.startMs), end: seconds(operation.endMs), accurate: true, ...(operation.boundedPreview ? { bounded_preview: true } : {}), ...(operation.previewProfile ? { preview_profile: operation.previewProfile } : {}) }), operation.outputUri);
       case "concat":
@@ -115,7 +138,7 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
         }), operation.outputUri);
       }
       case "extract-frame":
-        return fileResult(await call("cevra-extract-frame", { input: operation.inputUri, output: operation.outputUri, at: seconds(operation.atMs) }), operation.outputUri);
+        return fileResult(await call("cevra-extract-frame", { input: operation.inputUri, output: operation.outputUri, at: seconds(operation.atMs), ...(operation.maxDimension ? { max_dimension: operation.maxDimension } : {}) }), operation.outputUri);
       case "detect-silence": {
         const payload = await call("silence", { input: operation.inputUri, threshold: operation.thresholdDb, min_silence: seconds(operation.minDurationMs), list: true });
         const silences = payload.silences;
@@ -342,6 +365,7 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
   const publication = parsePublicationEvidence(payload.publication);
   const muxDuration = parseMuxDurationEvidence(payload.muxDuration);
   const boundedPreview = parseBoundedPreviewEvidence(payload.boundedPreview);
+  const manualSequence = payload.manualSequence === undefined ? undefined : validateManualSequenceExecutionEvidence(payload.manualSequence);
   return {
     type: "file",
     outputUri: typeof payload.output === "string" ? payload.output : fallbackUri,
@@ -351,7 +375,8 @@ function fileResult(payload: Record<string, unknown>, fallbackUri: string): Medi
     ...(audioSequence ? { audioSequence } : {}),
     ...(publication ? { publication } : {}),
     ...(muxDuration ? { muxDuration } : {}),
-    ...(boundedPreview ? { boundedPreview } : {})
+    ...(boundedPreview ? { boundedPreview } : {}),
+    ...(manualSequence ? { manualSequence } : {})
   };
 }
 
@@ -463,6 +488,7 @@ function operationDelivery(operation: MediaOperation): ResolvedMediaDelivery | u
   switch (operation.type) {
     case "trim": return resolveStandardAvDelivery(operation.outputUri, !operation.boundedPreview);
     case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
+    case "render-manual-video-sequence": case "render-manual-video-preview": return { container: "mp4", audioOnly: false, videoCodec: "h264", audioCodec: "aac" };
     case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
     case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
     case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);

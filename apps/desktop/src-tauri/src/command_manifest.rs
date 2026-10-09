@@ -1,5 +1,6 @@
 #[allow(dead_code)]
 pub const APPLICATION_COMMANDS: &[&str] = &[
+    "desktop_edit_manual_video_sequence",
     "desktop_get_close_state",
     "desktop_retry_checkpoint",
     "desktop_get_state",
@@ -11,6 +12,9 @@ pub const APPLICATION_COMMANDS: &[&str] = &[
     "desktop_get_editorial_draft",
     "desktop_revise_editorial_draft",
     "desktop_preview_local_video",
+    "desktop_prepare_manual_export",
+    "desktop_export_manual_sequence",
+    "desktop_preview_manual_sequence_conform",
     "desktop_create_manual_video_clip",
     "desktop_trim_manual_video_clip",
 ];

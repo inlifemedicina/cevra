@@ -31,6 +31,7 @@ it("reorders while retaining unsaved title/note edits, immutable evidence and pr
   const backend = new EditorialFixtureBackend(); const before = backend.history.toArchive(); const original = await backend.loadEditorialDraft();
   const user = userEvent.setup(); render(<App backend={backend} />);
   const titles = await screen.findAllByLabelText("Título do bloco");
+  await waitFor(() => expect((titles[1] as HTMLInputElement).disabled).toBe(false));
   fireEvent.change(titles[1], { target: { value: "Condição essencial" } });
   fireEvent.change(screen.getAllByLabelText("Sua nota")[1], { target: { value: "Preservar junto ao prazo." } });
   await user.click(screen.getByRole("button", { name: "Mover bloco 2 para cima" }));

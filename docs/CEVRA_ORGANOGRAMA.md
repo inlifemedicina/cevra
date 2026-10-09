@@ -1,6 +1,6 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-10-05
+**Updated:** 2026-10-06
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 **Current global weighted roadmap progress:** 55%.
 
@@ -10,15 +10,154 @@ audio/captions/refinement → presets/Director → distribution. G5 fluency and 
 recovery accompany each available flow; automation precedes grouped owner review.
 [Milestones and pending material choices](CEVRA_MANUAL_SEQUENCE_G1.md).
 After explicit approval of their exact heads, #84→#85 merged at `6e2cce16` and
-`60345a7d`. Post-#85 exact runtime passed; general CI requires its requested
-rerun after hosted-runner acquisition failures. Insert before selection, duplicate
+`60345a7d`. Post-#85 exact runtime passed; general CI attempt 4 completed SUCCESS
+5/5 after fresh-runner evidence supported one targeted retry. Earlier failed
+attempts remain preserved.
+Insert before selection, duplicate
 after selection and explicit Retry after failed save are approved.
+**Historical M0/M1 checkpoints before the CFR30 implementation:**
 M0 is published as [technical Draft #86](https://github.com/inlifemedicina/cevra/pull/86)
 now targeting main, with bounded automated/exact-tree-review evidence and a
-private-Node CI smoke close-handshake correction recorded in the plan. Fresh
-exact-head CI is required; continuous editing proceeds while render-profile
+private-Node CI smoke close-handshake correction recorded in the plan. Corrected
+head `58531d6` passed push and PR CI 5/5; continuous editing proceeds while render-profile
 choices and sequence/render consumers remain open. Historical R3/Take PASS
-remains limited. No G1 PASS, real AI, dependency, human
+remains limited. M1 API is [Draft #87](https://github.com/inlifemedicina/cevra/pull/87),
+stacked on #86; UI head `508436e` passed tests/build, twelve owned PT/EN layout
+cases, independent reviews and push/PR/exact-runtime CI. Canonical read-only
+preview preparation `6b9c737` passed Application 296/296 and review. The bounded
+preview follow-up passed Host 145/145, offline Rust 38/38, UI 126/126, i18n/build
+and source reviews, preserving unsaved Host on unknown preview retirement and
+allowing explicit Retry; recovery head `230c3ff` passed push/PR/exact-runtime CI.
+The next bounded consumer connects canonical sequence occurrences to the existing
+clip route and production App, with all-source/journal revalidation, seek, repeat,
+Original mode and preserved edits/paused position. Host 149/149, Application
+296/296, UI 134/134, Rust 38/38, i18n/build and independent source reviews passed.
+It uses the existing Take envelope and may wait at joins; native/gapless/sync and
+whole-flow acceptance remain open. Publication continues in the same Draft;
+export remains open. The owner approved initial MP4/H264/AAC 1080p/30-fps
+SDR, 20-Mb/s target, preserved IN/OUT and 512-MiB memory/2-GiB owned temporary-file
+limits with clear errors and no silent quality drop. Synthetic export measurements,
+proof limits and the exact-cut versus strict-CFR boundary distinction remain in
+the same G1 plan; technical temporal admission remains open.
+H.264 B-frame fixtures and the 7-ms active-picture feasibility passed under
+approved execution outside the sandbox; identical sandbox commands retained the
+`-12908` failure. No encoder/profile change was adopted. The same plan recommends
+exact project cuts with nominal-30 variable boundary exposure, or explicit
+export-only quantization for strict CFR30; owner decision is still required.
+
+Independent destination preparation now spans Application/Host/native/UI without
+creating output/history/archive/checkpoint or exposing a WebView path. Picker
+cancel/Close, Host supersession and late-result/journal guards preserve unsaved
+state; final Export remains unavailable. The existing transport adds a trusted,
+generation-bound sampled resource scope for a registered owned POSIX job. Review
+corrected lifecycle/restart/empty-group/retirement races and Inspector clipping.
+Synthetic 60-s whole-frame quality/resource probes include sealed originals and
+candidate/staging; scoped fully tagged BT709 preservation passed. These do not
+prove instantaneous 512-MiB/2-GiB ceilings, mixed-colour compatibility, final
+pipeline or G1/G5/G6/owner acceptance. Complete live-file registration, sealed
+0.3.4 integration and final admission remain engineering work alongside the
+temporal decision. A subsequent executor correction keeps Audio Sequence's graph
+and PCM inside the existing private staging tree, including partial-write/cancel
+cleanup (44 worker / 103 full Media Python tests PASS; filesystem fixtures).
+Publication, `export.add`, durable checkpoint and no-replay recovery already exist
+under ADR0027/0028 and will be reused. A real cadence-bound visual producer and
+explicit audio binding for the video-only G1 sequence remain required; no new
+audio admission policy or unused publisher/journal/service was introduced.
+The [single grouped G1 script](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script)
+is prepared, not executed. #86/#87 stay unmerged; progress 55%, F-A02 exhausted 1/1.
+Final render/publication/resource-budget integration remains open.
+The subsequent Owner decision at 2026-10-06 00:51 UTC supersedes the OPEN temporal
+alternatives above: CFR30 visual timeline and matching export, visible frame
+edits, shared actual-PTS preview/render sampling, independent audio timing and
+explicit reversible review/conversion of legacy cuts. [ADR0033](adr/0033-manual-sequence-cfr30-clock.md)
+records the category comparison and actual feasibility. The real path now uses
+existing Project IR/History/Media publication/archive and checkpoint/recovery
+contracts in Draft #87, including source-master render and explicit source audio.
+Local evidence: IR70, Store18, Application314, Contracts25, Host172, UI155,
+MediaNode140 (combined native/sandbox), Python121, Rust48 and offline-agent391
+tests passed. Current
+source-worker fixtures passed B-frame/fractional/VFR/one-frame/repeated cuts and
+60-s Full HD final/preview, exact decoded counts, immutable originals and measured
+quality/resources. The long preview was 4452793 B; sampled peaks were 178257920 B
+RSS and 604991488 B allocated job files. Exact sealed R2 functional passed the
+production guard before commit, late NTSC/source-PTS barcode and stereo clocks,
+Original with audio offset, persisted reopen/Undo without replay and 60-s output.
+Manual failure cleanup preserves the public final. Uncertain uncommitted
+publication or unproved retirement also retains account/root; confirmed commit
+and proved retirement allow private cleanup with final/`export.add` preserved.
+Native timeout reconciliation retains late sanitized publication/commit errors
+and their evidence with the current state; Original keeps Take source timing. Independent exact-tree
+review and published-head CI receipts accompany the Draft. Sampled supervision
+does not establish instantaneous ceilings; broader source/perceptual/gapless/
+owner acceptance remains open.
+The subsequent isolated native-package preparation adds quiescent aggregate disk
+admission before public publication, including projected/actual accounting links.
+Python126 and the sealed R3 functional catalog passed; R2 quality receipts retain
+their historical binding. Native packaging/Host validation and final-head review/CI
+receipts accompany the same Draft. The 100-ms watchdog waits after each scan;
+instantaneous RAM/disk ceilings and real-project/perceptual/Owner acceptance stay
+open. Two synthetic flash/beep fixtures are prepared; no human app was opened.
+The first packaged Host exposed unavailable manual capabilities: FFmpeg9's two
+filter flags failed the three-column parser, before any ingest/render/export.
+The bounded two/three-column fix passed Python128 and sealed R4 actual health/
+manual-capability plus full functional acceptance. The catalog now checks those
+capabilities before rendering. Native compilation/resource hashes passed, but
+strict signature verification fails in the unchanged pinned Node even before
+bundling; that GUI_PACKAGE_BLOCKED_SIGNATURE receipt is retained. A separately
+declared ad-hoc signed Node copy passed strict verification/version while the
+original pin, official manifests and sealed Media/Python remain unchanged.
+Whole-bundle/Host verification is separate. Exact-head package/Host/review/CI
+receipts accompany the Draft; no GUI/Owner or hard-cap PASS follows.
+Corrected compact-export package `fb346106` is now built offline in the isolated
+`vids-g1-compact-export-fb34610` root. Frontend/native builds, resource resolution,
+strict/deep signatures, inventory and launcher check-only passed; only Info.plist
+and native executable changed. Host/Node/Media/dependency identity supports inherited
+backend export/recovery proof without another local render. New launcher and the
+redirected previous command target the corrected app; the single human script was
+updated. Package review is APPROVE; at this pre-publication checkpoint final source
+binding/remote CI are PENDING and will be recorded with Draft #87 and its receipt.
+Strict resources remain BLOCKED and human GUI/picker/perception
+pending; Director compatible, 55%, F-A02 1/1, no Take/device/AI/merge/release.
+[Scoped record](CEVRA_MANUAL_SEQUENCE_G1.md#compact-export-package-refresh-and-inherited-backend-evidence--2026-10-06).
+Final grouped-script review found no frozen-package/launcher identity defect;
+build/signature/packaged-Host export/recovery PASS remains separate from unexecuted
+GUI/picker/Owner. The single acceptance script now defines technical labels,
+actual actions/expected/failure, reference restoration and automatic save;
+unavailable legacy/save-failure/full resource variants stay BLOCKED. A bounded
+source fix reveals Controls when toolbar export starts, preserving Director/project
+state; PT/EN regressions, UI157/typecheck and review passed. It is not in the frozen
+`22e3c431` app; select Controls before export in compact mode there. No repackage/render/CI/GUI/AI
+or merge. [Scoped record](CEVRA_MANUAL_SEQUENCE_G1.md#final-grouped-script-review-and-bounded-ui-correction--2026-10-06).
+Director impact compatible presentation correction, progress 55%, F-A02 1/1.
+The subsequent read-only resource-feasibility finding against `22e3c431` leaves
+the strict gate BLOCKED. Reservation/child file-size limits can contain logical
+writes, while allocated blocks and aggregate physical/framework RAM remain
+unproved. The
+[single decision proposal](CEVRA_MANUAL_SEQUENCE_G1.md#resource-ceiling-feasibility-and-pending-decision--2026-10-06)
+compares unchanged strict guarantees with separately approved isolation/quota
+research, versus an explicitly weaker operational contract for the present stack.
+No guarantee was relaxed or runtime changed; the frozen signed package and its
+export/recovery receipts stay preserved. No render proofs were repeated;
+focus-isolated UI/picker automation remains NOT_RUN, human Take untouched.
+At 10:38:21 UTC the Owner approved the operational route, superseding that pending
+choice. [ADR0034](adr/0034-operational-manual-render-resources.md) now has logical
+pre-write reservations and sampled memory abort, with initial validation budgets
+512 MiB/2 GiB. Sealed R5 synthetic evidence passed: 60-s Full HD sampled peaks
+171507712 B RSS and 627486319 B logical files, with 52.512757-dB decoded PSNR.
+Controlled RAM excess overshot by 87015424 B before abort; no instantaneous
+physical quota or commercial limit is claimed. Independent APPROVE arrived via
+coordination for code `26c07e55` / tree `38cab89a`; exact-head CI passed 11/11,
+and the isolated arm64 package passed strict/deep signatures plus 29 Host
+responses. The bounded technical gate is closed and the package is READY FOR
+HUMAN VALIDATION; documentation closeout binds its CI separately without changing
+production bytes. Window/picker/perception remain unexecuted. Background opening
+is blocked by Tao startup activation, preserving the ongoing session and focus.
+The single human script uses the isolated package and synthetic A/B only.
+Old R4/fb34610 receipts stay frozen.
+Director impact: compatible internal extension; existing
+typed/IR/History/provider boundaries and 55%/F-A02 1/1 remain unchanged.
+No G1 PASS,
+real AI, dependency, human
 media/app/device action or release claim is implied. Creator=Lite, Studio=Full,
 Vids=Desktop; Lite/Full share core and Full visual output does not require Vids.
 
