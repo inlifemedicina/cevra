@@ -877,3 +877,12 @@ The next integration proposal concerns the open dependency chain
 authority must be confirmed before integration. No product/provider/history or
 GUI action is made by this record. Director: no new impact found in checked scope.
 Progress55%, F-A02 exhausted1/1 and broader G1 acceptance remain unchanged.
+
+
+### Ordered main integration closed — 2026-10-09
+
+The Owner's separate authorization was executed in order: #86 → #87 → #89 → #90 → #91 → #92 → #93 → #94. All eight reviewed incoming heads and resulting trees were preserved under normal merges; final main is `48353df62901aed7f102fc7e186a7c64c92949e3` / tree `9ca35fe4af61741af5b42c9caa25d21852f779ad`. Post-merge CI is terminal PASS, 44/44 checks across twelve runs. #89/#90 proportional reviews closed APPROVE with no P1/P2; #90's original zlib download timeout and single failed-job retry request remain recorded alongside final attempt 2 PASS.
+
+[The canonical integration ledger](CEVRA_MASTER_CONTEXT.md#ordered-main-integration--2026-10-09) owns the exact heads, merge commits, CI links, review provenance and failure limits. Earlier open-Draft/preparation-only entries remain historical and are superseded for these eight integrations. The dedicated follow-up changes only the master context and this organogram.
+
+The current `41decff` review package remains preserved; the accepted visual B and bounded 18:03 UTC **VIDS TESTE OK** owner round stay closed without replay. Individual unreported IDs, native perception/lifecycle and full G1 keep their existing gates. Director impact remains the reviewed compatible typed IR/History extension, with no further planning/provider/context/permission authority. Integration performed no real AI/account request, GUI/user-project or Take/Xcode/iPhone operation. Progress 55% and F-A02 exhausted 1/1 remain; commercial distribution and broader acceptance retain their separate scope.
