@@ -448,5 +448,12 @@
   "export.settling": "Export is still retiring. Keep the project open and wait before another export.",
   "export.publicationUnverified": "A file may have been published, but the result could not be verified. Check the destination before exporting again; the file was preserved.",
   "export.sourceUnverified": "The identity of the originals could not be verified. Check the files.",
-  "export.failed": "Export could not finish. Check the files and destination folder."
+  "export.failed": "Export could not finish. Check the files and destination folder.",
+  "timeline.durationFrames": "{seconds} s · {frames} frames",
+  "timeline.durationSeconds": "{seconds} s",
+  "timeline.totalDuration": "Total duration: {duration}",
+  "timeline.selectedDuration": "Selection ({count}): {duration}",
+  "timeline.selectAll": "Select all clips",
+  "media.thumbnailLoading": "Preparing thumbnail…",
+  "media.thumbnailUnavailable": "Thumbnail unavailable"
 }

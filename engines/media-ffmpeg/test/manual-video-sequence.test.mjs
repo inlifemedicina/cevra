@@ -74,3 +74,14 @@ test("bounded initial preview frame forwards only literal 720 and rejects arbitr
   await assert.rejects(() => engine.execute({ type: "extract-frame", inputUri: "/preview.mp4", outputUri: "/first.png", atMs: 0, maxDimension: 1080 }, context));
   assert.equal(worker.calls.length, 1);
 });
+
+
+test("whole-montage preview requires its closed V2 items shape and preserves occurrence accounting", async () => {
+  const worker=new Worker(),engine=new FfmpegMediaEngine(worker);
+  const operation={...final(),type:"render-manual-video-preview",version:2};
+  const result=await engine.execute(operation,context);
+  assert.equal(result.manualSequence.itemCount,2);assert.equal(result.manualSequence.totalFrames,2);
+  assert.equal(worker.calls[0].name,"cevra-render-manual-video-preview");assert.equal(worker.calls[0].args.version,2);
+  for(const bad of [{...operation,version:1},{...operation,item:item()},{...operation,items:[]},{...operation,type:"render-manual-video-sequence"}]) await assert.rejects(engine.execute(bad,context));
+  assert.equal(worker.calls.length,1);
+});

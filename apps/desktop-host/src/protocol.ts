@@ -1,6 +1,6 @@
 import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
-import type { LocalVideoPreviewRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
+import type { LocalVideoPreviewRequest, SourceThumbnailRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
 import { validateManualVideoSequenceEdit, type ManualVideoSequenceEdit } from "@cevra/application";
 import { validateManualExportPreparationRequest, type ManualExportPreparationRequest } from "@cevra/application";
 
@@ -23,6 +23,7 @@ export type HostMethod =
   | "editorial.revise"
   | "media.ingestLocal"
   | "video.previewLocal"
+  | "video.thumbnailLocal"
   | "video.prepareManualExport"
   | "video.exportManualSequence"
   | "video.previewManualSequenceConform"
@@ -96,6 +97,7 @@ const METHODS = new Set<HostMethod>([
   "editorial.revise",
   "media.ingestLocal",
   "video.previewLocal",
+  "video.thumbnailLocal",
   "video.prepareManualExport",
   "video.exportManualSequence",
   "video.previewManualSequenceConform",
@@ -216,10 +218,16 @@ export function validateConformPreviewParams(params: Record<string, unknown>, id
   return { version: 1, expectedSnapshotId: boundedString(params.expectedSnapshotId, 128, "expectedSnapshotId", id) };
 }
 
+export function validateVideoThumbnailParams(params: Record<string, unknown>, id: string): SourceThumbnailRequest {
+  exactKeys(params, ["sourceId", "expectedSnapshotId", "operationId"], id);
+  return { ...videoBinding(params, id), operationId: operationId(params.operationId, id) };
+}
+
 export function validateVideoPreviewParams(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {
-  exactKeys(params, ["sourceId", "expectedSnapshotId", "clipId", "operationId"], id);
+  exactKeys(params, ["sourceId", "expectedSnapshotId", "clipId", "operationId", "sequence"], id);
+  if (params.sequence !== undefined && (params.sequence !== true || params.clipId !== undefined || params.operationId === undefined)) throw new ProtocolValidationError("HOST_INVALID_PARAMS", "Sequence preview binding is invalid.", id);
   if (params.clipId === undefined && params.operationId === undefined) return videoBinding(params, id);
-  return { ...videoBinding(params, id), ...(params.clipId === undefined ? {} : { clipId: boundedString(params.clipId, 128, "clipId", id) }), operationId: operationId(params.operationId, id) };
+  return { ...videoBinding(params, id), ...(params.sequence === true ? { sequence: true as const } : {}), ...(params.clipId === undefined ? {} : { clipId: boundedString(params.clipId, 128, "clipId", id) }), operationId: operationId(params.operationId, id) };
 }
 
 export function validateManualClipParams(params: Record<string, unknown>, id: string): CreateManualVideoClipRequest {

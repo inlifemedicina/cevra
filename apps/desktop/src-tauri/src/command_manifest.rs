@@ -11,6 +11,7 @@ pub const APPLICATION_COMMANDS: &[&str] = &[
     "desktop_cancel_operation",
     "desktop_get_editorial_draft",
     "desktop_revise_editorial_draft",
+    "desktop_thumbnail_local_video",
     "desktop_preview_local_video",
     "desktop_prepare_manual_export",
     "desktop_export_manual_sequence",

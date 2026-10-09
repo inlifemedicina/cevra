@@ -11,7 +11,17 @@ export interface LocalVideoPreviewRequest {
   expectedSnapshotId: string;
   /** A clip requires an operation; Original may also prepare a cancellable proxy. */
   clipId?: string;
+  /** Whole admitted CFR30 montage; mutually exclusive with clipId. */
+  sequence?: true;
   operationId?: string;
+}
+
+export interface SourceThumbnailRequest {
+  sourceId: string; expectedSnapshotId: string; operationId: string;
+}
+
+export interface SourceThumbnail {
+  sourceId: string; snapshotId: string; mimeType: "image/png"; base64: string; width: number; height: number;
 }
 
 export interface LocalVideoPreview {
@@ -23,6 +33,7 @@ export interface LocalVideoPreview {
   proxy?: { profile: "take-v1" | "manual-cfr30-preview-v1"; sourceDurationMs: number };
   /** Ephemeral first admitted frame; never a source, poster asset or project edit. */
   initialFrame?: { mimeType: "image/png"; base64: string; width: number; height: number; sourceTimeMs: number };
+  sequence?: { timingPolicy: "cfr30"; totalFrames: number; clipIds: string[] };
   clip?: { id: string; sourceStartMs: number; sourceEndMs: number; firstFrameMs: number; lastFrameMs: number; frameCount: number; frameTiming?: ClipFrameTimingV1 };
 }
 

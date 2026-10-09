@@ -602,7 +602,7 @@ for (const [zoom, measuredWidth] of [[70, 1000], [180, 1800]]) {
     vi.spyOn(ruler, "getBoundingClientRect").mockReturnValue({ left: 50, width: 1000 } as DOMRect);
     vi.spyOn(ruler.querySelector(".timeline-width")!, "getBoundingClientRect").mockReturnValue({ left: 50, width: measuredWidth } as DOMRect);
     fireEvent(ruler, new MouseEvent("pointerdown", { bubbles: true, clientX: 50 + measuredWidth / 2 }));
-    expect(onPlayheadChange).toHaveBeenLastCalledWith(30000);
+    expect(onPlayheadChange).toHaveBeenLastCalledWith(30000, "start");
   });
 }
 
@@ -843,6 +843,9 @@ function gridPreviewFixture(inputSource = source) {
     ...clips.map(clip => ({ type: "clip.add" as const, clip }))
   ] });
   backend.previewLocalVideo = async request => {
+    if (request.sequence) return { sourceId: inputSource.id, snapshotId: request.expectedSnapshotId, durationMs: framesToMilliseconds(4), mimeType: "video/mp4", base64: btoa("offline-whole-montage-packet-only"),
+      proxy: { profile: "manual-cfr30-preview-v1", sourceDurationMs: inputSource.durationMs! }, initialFrame: { mimeType: "image/png", base64: admittedPng, width: 1, height: 1, sourceTimeMs: 0 },
+      sequence: { timingPolicy: "cfr30", totalFrames: 4, clipIds: clips.map(clip => clip.id) } };
     const clip = clips.find(clip => clip.id === request.clipId)!;
     const frameCount = clip.frameTiming.sourceEndFrame - clip.frameTiming.sourceStartFrame;
     return { sourceId: inputSource.id, snapshotId: request.expectedSnapshotId, durationMs: framesToMilliseconds(frameCount), mimeType: "video/mp4", base64: btoa("offline-cfr30-admission-packet-only"),
@@ -851,64 +854,53 @@ function gridPreviewFixture(inputSource = source) {
       clip: { id: clip.id, sourceStartMs: clip.sourceStartMs, sourceEndMs: clip.sourceEndMs, firstFrameMs: clip.sourceStartMs, lastFrameMs: framesToMilliseconds(clip.frameTiming.sourceEndFrame - 1), frameCount, frameTiming: clip.frameTiming } };
   };
   const requests = vi.spyOn(backend, "previewLocalVideo"), clock = vi.fn(), create = vi.fn().mockResolvedValue(undefined);
-  const view = () => <ManualSequenceVideoPreview backend={backend} project={backend.history.current} clips={clips} presentations={new Map()} originalSourceId={inputSource.id}
-    busy={false} seek={{ sequence: 0, timelineMs: 0 }} t={t} onPlayheadChange={clock} onCreate={create} />;
+  const view = (seek: { sequence: number; timelineMs: number; phase?: import("./timeline-interactions").TimelineSeekPhase } = { sequence: 0, timelineMs: 0 }) => <ManualSequenceVideoPreview backend={backend} project={backend.history.current} clips={clips} presentations={new Map()} originalSourceId={inputSource.id}
+    busy={false} seek={seek} t={t} onPlayheadChange={clock} onCreate={create} />;
   return { backend, clips, requests, clock, create, view };
 }
 
-it("CFR30 grid admission uses frame seeks, half-open joins and exact OUT despite decoder duration rounding", async () => {
+it("CFR30 seeks cross joins with one decoder and exact canonical OUT", async () => {
   const f = gridPreviewFixture(), before = f.backend.history.toArchive();
   const { container } = render(f.view());
-  const first = await metadata(container, 1 / 30);
-  first.currentTime = 0.007; fireEvent.timeUpdate(first);
+  const video = await metadata(container, 4 / 30);
+  video.currentTime = 0.007; fireEvent.timeUpdate(video);
   expect(f.clock).toHaveBeenLastCalledWith(0);
   const slider = screen.getByRole("slider", { name: t("sequence.seek") });
   expect(slider.getAttribute("max")).toBe("4");
   fireEvent.change(slider, { target: { value: "1" } });
-  const second = await metadata(container, 0.1);
-  expect(f.requests.mock.calls.at(-1)![0].clipId).toBe("grid-1");
-  expect(second.currentTime).toBe(0);
+  expect(video.currentTime).toBe(1 / 30); fireEvent.seeked(video);
+  expect(container.querySelector("video")).toBe(video);
   fireEvent.click(screen.getByRole("button", { name: t("preview.nextFrame") }));
-  expect(second.currentTime).toBe(1 / 30);
-  fireEvent.seeked(second);
+  expect(video.currentTime).toBe(2 / 30); fireEvent.seeked(video);
   expect(f.clock).toHaveBeenLastCalledWith(framesToMilliseconds(2));
-  expect(screen.getByTestId("preview-timecode").textContent).toContain("Frame 2");
-  fireEvent.change(screen.getByRole("slider", { name: t("sequence.seek") }), { target: { value: "4" } });
-  // A browser may clamp its seek slightly below MP4 duration. Program OUT is canonical.
-  second.currentTime = 0.099999; fireEvent.seeked(second);
+  fireEvent.change(slider, { target: { value: "4" } });
+  video.currentTime = 0.133333; fireEvent.seeked(video);
   expect(f.clock).toHaveBeenLastCalledWith(framesToMilliseconds(4));
-  expect(second.hidden).toBe(true);
-  expect(screen.getByTestId("preview-timecode").textContent).toContain("Frame 4");
-  expect(f.requests).toHaveBeenCalledTimes(2);
+  expect(video.hidden).toBe(true);
+  expect(f.requests).toHaveBeenCalledTimes(1);
+  expect(f.requests.mock.calls[0]![0]).toMatchObject({ sequence: true });
   expect(f.backend.history.toArchive()).toEqual(before);
 });
 
-it("a Take-profile packet cannot masquerade as a CFR30 program preview", async () => {
+it("a Take-profile packet cannot masquerade as a CFR30 montage", async () => {
   const f = gridPreviewFixture();
-  const packet = await f.backend.previewLocalVideo({ sourceId: source.id, clipId: "grid-0", expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
-  f.requests.mockResolvedValue({ ...packet, proxy: { profile: "take-v1", sourceDurationMs: 6000 } });
+  const packet = await f.backend.previewLocalVideo({ sourceId: source.id, sequence: true, expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
+  f.requests.mockClear(); f.requests.mockResolvedValue({ ...packet, proxy: { profile: "take-v1", sourceDurationMs: 6000 } });
   render(f.view());
-  expect(await screen.findByText(t("preview.gridUnavailable"))).toBeTruthy();
+  expect(await screen.findByText(t("preview.localChanged"))).toBeTruthy();
   expect(URL.createObjectURL).not.toHaveBeenCalled();
 });
 
-it("pausing a grid join while the next proxy is preparing prevents late autoplay", async () => {
-  const f = gridPreviewFixture();
-  const packet = await f.backend.previewLocalVideo({ sourceId: source.id, clipId: "grid-1", expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
-  let release!: (packet: LocalVideoPreview) => void;
-  const { container } = render(f.view());
-  const first = await metadata(container, 1 / 30);
-  f.requests.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
-  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") }));
-  fireEvent.play(first); first.currentTime = 1 / 30; fireEvent.ended(first);
-  await waitFor(() => expect(release).toBeTypeOf("function"));
-  fireEvent.click(screen.getByRole("button", { name: t("preview.pauseLocal") }));
-  vi.mocked(HTMLMediaElement.prototype.play).mockClear();
-  await act(async () => release(packet));
-  const second = await metadata(container, 0.1);
-  expect(second.play).not.toHaveBeenCalled();
-  fireEvent.play(second);
-  expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
+it("CFR30 playback crosses cuts without pausing, loading or asking Host for another clip", async () => {
+  const f = gridPreviewFixture(), { container } = render(f.view());
+  const video = await metadata(container, 4 / 30);
+  fireEvent.click(screen.getByRole("button", { name: t("preview.playLocal") })); fireEvent.play(video);
+  vi.mocked(HTMLMediaElement.prototype.pause).mockClear(); vi.mocked(HTMLMediaElement.prototype.load).mockClear();
+  video.currentTime = 1 / 30; fireEvent.timeUpdate(video);
+  expect(video.pause).not.toHaveBeenCalled(); expect(video.load).not.toHaveBeenCalled();
+  expect(f.requests).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: t("preview.pauseLocal") })).toBeTruthy();
+  expect(f.clock).toHaveBeenLastCalledWith(framesToMilliseconds(1));
 });
 
 it.each(["pt-BR", "en-US"] as const)("%s Original marks show nearest frames and each millisecond delta before a frame action", async locale => {
@@ -931,16 +923,16 @@ it("CFR30 project Original admits the offset-audio source-clock Take packet and 
   // audio-origin fixture; only the Host/Media tests admit padding and real samples.
   const originalSource = { ...source, durationMs: 6007, sampleRate: 44100, channels: 1 };
   const f = gridPreviewFixture(originalSource), before = f.backend.history.toArchive();
-  const gridPacket = await f.backend.previewLocalVideo({ sourceId: originalSource.id, clipId: "grid-0", expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
+  const gridPacket = await f.backend.previewLocalVideo({ sourceId: originalSource.id, sequence: true, expectedSnapshotId: f.backend.history.current.history.headSnapshotId! });
   f.requests.mockClear();
-  f.requests.mockImplementation(async request => request.clipId ? gridPacket : {
+  f.requests.mockImplementation(async request => request.sequence ? gridPacket : {
     sourceId: originalSource.id, snapshotId: request.expectedSnapshotId, durationMs: 6007,
     mimeType: "video/mp4", base64: btoa("offline-Take-source-clock-packet-only"),
     proxy: { profile: "take-v1", sourceDurationMs: 6007 },
     initialFrame: { mimeType: "image/png", base64: admittedPng, width: 1, height: 1, sourceTimeMs: 0 }
   });
   const { container } = render(f.view());
-  await metadata(container, 1 / 30);
+  await metadata(container, 4 / 30);
   fireEvent.click(screen.getByRole("button", { name: t("preview.originalMode") }));
   const original = await metadata(container, 6.007);
   expect(f.requests.mock.calls.at(-1)![0].clipId).toBeUndefined();
@@ -956,4 +948,25 @@ it("CFR30 project Original admits the offset-audio source-clock Take packet and 
   fireEvent.click(screen.getByRole("button", { name: t("sequence.append") }));
   expect(f.create).toHaveBeenCalledExactlyOnceWith({ sourceId: originalSource.id, expectedSnapshotId: f.backend.history.current.history.headSnapshotId!, sourceStartMs: framesToMilliseconds(15), sourceEndMs: framesToMilliseconds(46) });
   expect(f.backend.history.toArchive()).toEqual(before);
+});
+
+
+it("playing click seek continues and paused click seek stays paused on the same CFR30 decoder", async () => {
+  const f=gridPreviewFixture(),{container,rerender}=render(f.view());const video=await metadata(container,4/30);
+  fireEvent.click(screen.getByRole("button",{name:t("preview.playLocal")}));fireEvent.play(video);vi.mocked(video.play).mockClear();
+  rerender(f.view({sequence:1,timelineMs:framesToMilliseconds(2),phase:"single"}));fireEvent.seeked(video);
+  await waitFor(()=>expect(video.play).toHaveBeenCalled());expect(video.currentTime).toBe(2/30);expect(f.requests).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button",{name:t("preview.pauseLocal")}));vi.mocked(video.play).mockClear();
+  rerender(f.view({sequence:2,timelineMs:framesToMilliseconds(1),phase:"single"}));fireEvent.seeked(video);
+  expect(video.play).not.toHaveBeenCalled();expect(video.currentTime).toBe(1/30);
+});
+
+it.each(["end","cancel"] as const)("timeline drag pauses, rapid moves show canonical frames, and %s restores prior playback intent", async phase => {
+  const f=gridPreviewFixture(),{container,rerender}=render(f.view());const video=await metadata(container,4/30);
+  fireEvent.click(screen.getByRole("button",{name:t("preview.playLocal")}));fireEvent.play(video);vi.mocked(video.play).mockClear();
+  rerender(f.view({sequence:1,timelineMs:framesToMilliseconds(1),phase:"start"}));fireEvent.seeked(video);
+  expect(video.play).not.toHaveBeenCalled();expect(screen.getByRole("button",{name:t("preview.playLocal")})).toBeTruthy();
+  rerender(f.view({sequence:2,timelineMs:framesToMilliseconds(3),phase:"move"}));fireEvent.seeked(video);expect(video.currentTime).toBe(0.1);expect(video.play).not.toHaveBeenCalled();
+  rerender(f.view({sequence:3,timelineMs:phase==="cancel"?0:framesToMilliseconds(2),phase}));fireEvent.seeked(video);
+  await waitFor(()=>expect(video.play).toHaveBeenCalled());expect(video.currentTime).toBe(phase==="cancel"?0:2/30);expect(f.requests).toHaveBeenCalledTimes(1);
 });

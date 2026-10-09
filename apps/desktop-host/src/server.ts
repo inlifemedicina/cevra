@@ -13,7 +13,7 @@ import {
   validateIngestParams,
   validateNoParams,
   validateTranscriptionParams,
-  validateVideoPreviewParams,
+  validateVideoPreviewParams, validateVideoThumbnailParams,
   validateManualClipParams, validateManualTrimParams,
   validateManualSequenceParams,
   validateManualExportParams,
@@ -123,6 +123,8 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       return { result: await requireSession(session).retryCheckpoint(validateCheckpointParams(request.params, request.id)) };
     case "media.ingestLocal":
       return { result: await requireSession(session).ingestLocal(validateIngestParams(request.params, request.id)) };
+    case "video.thumbnailLocal":
+      return { result: await requireSession(session).thumbnailLocalVideo(validateVideoThumbnailParams(request.params, request.id)) };
     case "video.previewLocal":
       return { result: await requireSession(session).previewLocalVideo(validateVideoPreviewParams(request.params, request.id)) };
     case "video.prepareManualExport": {

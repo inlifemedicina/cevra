@@ -763,8 +763,8 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
                 "required": ["sha256", "size_bytes"]}},
         "required": ["input", "source_start_frame", "source_end_frame", "audio_selection", "source_content"]}
     def manual_schema(preview: bool) -> Dict[str, Any]:
-        return {"properties": {"version": {"type": "integer", "enum": [1]}, "output": path, "owned_workspace": path,
-            "items": {"type": "array", "minItems": 1, "maxItems": 1 if preview else 2048, "items": manual_item}},
+        return {"properties": {"version": {"type": "integer", "enum": [1, 2] if preview else [1]}, "output": path, "owned_workspace": path,
+            "items": {"type": "array", "minItems": 1, "maxItems": 2048, "items": manual_item}},
             "required": ["version", "output", "owned_workspace", "items"]}
     audio_source = {
         "type": "object", "additionalProperties": False,
@@ -806,7 +806,7 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
             "required": ["version", "input", "stream_index", "start_ms", "end_ms"],
         },
         "cevra-extract-frame": {
-            "properties": {"input": path, "output": path, "at": non_negative, "max_dimension": {"type": "integer", "enum": [720]}},
+            "properties": {"input": path, "output": path, "at": non_negative, "max_dimension": {"type": "integer", "enum": [160, 720]}},
             "required": ["input", "output", "at"],
         },
         "cevra-scale": {
@@ -917,6 +917,9 @@ def _validate_tool_arguments(name: str, arguments: Dict[str, Any]) -> None:
     if _contains_non_finite_number(arguments):
         raise ValueError("tool arguments must contain only finite numbers")
     _validate_schema_value(arguments, _schema_for_tool(name), f"tool {name} arguments")
+    if name in ("cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"):
+        from cevra_manual_sequence import validate
+        validate(arguments, name == "cevra-render-manual-video-preview")
     output = arguments.get("output")
     if isinstance(output, str) and Path(output).absolute().is_symlink():
         raise ValueError("media output path must not be a symlink")

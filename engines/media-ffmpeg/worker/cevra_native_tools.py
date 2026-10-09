@@ -325,14 +325,14 @@ def _run_extract_frame(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
     if not meta.get("video"):
         raise ValueError("input has no video stream")
     maximum = args.get("max_dimension")
-    if maximum is not None and (maximum != 720 or isinstance(maximum, bool)):
-        raise ValueError("extract-frame max_dimension must be the closed 720 profile")
+    if maximum is not None and (maximum not in (160, 720) or isinstance(maximum, bool)):
+        raise ValueError("extract-frame max_dimension must be a closed card/preview profile")
     cmd = common.ffmpeg_base() + [
         "-ss", f"{at:.6f}", "-i", input_path,
         "-map", "0:v:0", "-frames:v", "1",
     ]
     if maximum is not None:
-        cmd += ["-vf", "scale=w='min(720,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease"]
+        cmd += ["-vf", f"scale=w='min({maximum},iw)':h='min({maximum},ih)':force_original_aspect_ratio=decrease"]
     cmd += ["-c:v", "png", output]
     common.run(cmd)
     publication = _publication_evidence(Path(output))
@@ -340,7 +340,7 @@ def _run_extract_frame(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
         result = _file_result(common, output, {"publication": publication} if publication else None)
         if maximum is not None:
             video = result["structuredContent"]["probe"].get("video", {})
-            if not isinstance(video.get("width"), int) or not isinstance(video.get("height"), int) or not 1 <= min(video["width"], video["height"]) <= max(video["width"], video["height"]) <= 720:
+            if not isinstance(video.get("width"), int) or not isinstance(video.get("height"), int) or not 1 <= min(video["width"], video["height"]) <= max(video["width"], video["height"]) <= maximum:
                 raise RuntimeError("extract-frame bounded PNG dimension postcondition failed")
         return result
     except BaseException:

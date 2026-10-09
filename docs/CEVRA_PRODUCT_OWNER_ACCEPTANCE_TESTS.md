@@ -227,9 +227,20 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 Roteiro único para a futura rodada coordenada; **não abrir agora** nem interromper
 o teste Take existente. G1 é o bloco de montagem manual com prévia e exportação;
 os IDs de teste abaixo servem ao registro da equipe, não são botões do aplicativo.
+**Atualização da rodada — 06/10/2026:** o Owner relatou abertura/importação,
+edição pelos botões e conteúdo/export A/B/A/A corretos na variante isolada.
+Registrou pausas nas junções da prévia, cartões sem miniaturas e problemas de
+escala/leitura/interação da timeline. **Fechar/reabrir continua NÃO TESTADO.**
+[Issue #88](https://github.com/inlifemedicina/cevra/issues/88) reúne a evidência
+parcial e o checklist de regressão pendente sob estes mesmos IDs. As correções
+na branch `feat/vids-timeline-usability-preview-continuity` têm automação offline;
+revisão independente e próxima rodada agrupada aguardam coordenação. O roteiro
+abaixo continua referência do pacote congelado, sem afirmar que o novo código
+foi instalado. Nenhum novo teste humano é solicitado nesta etapa.
+
 A equipe fornece o aplicativo isolado **CEVRA Vids G1 Resources 26c07e5.app**,
 os dois vídeos de teste e uma pasta vazia para a exportação. A preparação técnica
-está concluída; a rodada humana ainda não começou. Abrir somente esse aplicativo,
+estava concluída no handoff histórico; a rodada teve os relatos parciais acima. Abrir somente esse aplicativo,
 manualmente, quando a rodada estiver coordenada: sua abertura pode tomar o foco.
 O aplicativo deve começar no projeto descartável vazio. Se aparecer outro projeto,
 **parar e informar a equipe**, sem apagar, substituir ou importar projeto pessoal.
@@ -339,10 +350,12 @@ restaurar estas quatro linhas com **Desfazer** antes de comparar prévia/exporta
    por variante. Se aparecer falha de recursos, aguardar a operação parar e
    informar a equipe; não reduzir a qualidade nem repetir a exportação sozinho.
 
-Estado deste roteiro: **NÃO EXECUTADO / READY FOR HUMAN VALIDATION**. A preparação
-técnica do pacote atual passou; a abertura coordenada, os controles nativos e o
-julgamento humano continuam pendentes. Este roteiro não promove G1, G5/G6,
-progresso ou F-A02.
+Estado deste roteiro: **EXECUÇÃO HUMANA PARCIAL; REGRESSÃO PENDENTE**. O relato
+de abertura/importação, botões de edição, conteúdo e export é limitado à variante
+testada. Pausas/miniaturas/timeline exigem correção e nova revisão; fechar/reabrir,
+variantes ausentes e aceite completo permanecem NÃO EXECUTADO/BLOCKED conforme
+o caso. O próximo pacote não foi instalado e aguarda revisão independente antes
+da rodada agrupada. Este roteiro não promove G1, G5/G6, progresso ou F-A02.
 
 ### Technical preparation and historical packages
 

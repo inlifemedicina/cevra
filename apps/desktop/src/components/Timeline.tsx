@@ -1,5 +1,5 @@
 import type { CaptionCue, GraphicItem, ProjectIR, TimelineClip, TimelineTrack } from "@cevra/project-ir";
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type HTMLAttributes } from "react";
 import type { ManualVideoSequenceEdit, TrimManualVideoClipRequest } from "@cevra/application";
 import { ManualSequenceControls } from "./ManualSequenceControls";
 import { supportsManualClipPreview } from "./ManualVideoPreview";
@@ -9,6 +9,7 @@ import { Icon } from "./Icon";
 import type { SourcePresentation } from "../source-presentation";
 import type { DesktopBackend } from "../backend/desktop-backend";
 import { maximumSourceFrame, floorMsToFrames, framesToMilliseconds, nearestMsToFrames, formatFrames } from "../frame-timing";
+import { reorderedTimeline, timelineSelection, timelineShortcutBlocked, type TimelineSeekPhase } from "../timeline-interactions";
 
 const trackKeys = {
   "track-v4": "timeline.track.v4",
@@ -36,6 +37,8 @@ interface TimelineProps {
   project: Readonly<ProjectIR>;
   presentations: ReadonlyMap<string, SourcePresentation>;
   selectedId: string | null;
+  selectedClipIds?: readonly string[];
+  onSelectClips?(ids: string[], primary: string | null): void;
   playheadMs: number;
   zoom: number;
   t: Translate;
@@ -45,7 +48,7 @@ interface TimelineProps {
   sequenceClips?: readonly TimelineClip[];
   onSequenceEdit?(request: ManualVideoSequenceEdit): Promise<void>;
   onSelect(id: string): void;
-  onPlayheadChange(milliseconds: number): void;
+  onPlayheadChange(milliseconds: number, phase?: TimelineSeekPhase): void;
   onZoomChange(value: number): void;
   onResizeStart(event: ReactPointerEvent<HTMLButtonElement>): void;
 }
@@ -55,7 +58,17 @@ type TimelineVisual =
   | { id: string; kind: "caption"; startMs: number; endMs: number; label: string; caption: CaptionCue }
   | { id: string; kind: "graphic"; startMs: number; endMs: number; label: string; graphic: GraphicItem };
 
-export function Timeline({ project, presentations, selectedId, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit, backend }: TimelineProps) {
+export function Timeline({ project, presentations, selectedId, selectedClipIds, onSelectClips, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit, backend }: TimelineProps) {
+  const selectedIds = selectedClipIds ?? (selectedId && project.timeline.clips.some(clip => clip.id === selectedId) ? [selectedId] : []);
+  const orderedIds = sequenceClips?.map(clip => clip.id) ?? [];
+  const anchor = useRef<string | null>(selectedId);
+  const dragging = useRef<{ ids: string[]; snapshot: string } | null>(null);
+  const scrub = useRef<{ id: number; originalMs: number; element: HTMLDivElement } | null>(null);
+  const seekCallback = useRef(onPlayheadChange);
+  seekCallback.current = onPlayheadChange;
+  const editPending = useRef(false);
+  const [pending, setPending] = useState(false);
+  const editingDisabled = Boolean(trimBusy || pending);
   const grid = project.timeline.timingPolicy === "cfr30";
   const canonicalDuration = project.timeline.durationMs;
   const trimClip = trimAvailable && onTrim ? sequenceClips?.find(clip => clip.id === selectedId) ?? project.timeline.clips.find((clip) => supportsManualClipPreview(project, clip)
@@ -63,20 +76,88 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
   const sourceDuration = trimClip ? project.sources.find((source) => source.id === trimClip.sourceId)!.durationMs! : 0;
   const geometryLimit = grid ? framesToMilliseconds(maximumSourceFrame(Number.MAX_SAFE_INTEGER)) : Number.MAX_SAFE_INTEGER;
   const sourceGeometry = grid ? framesToMilliseconds(maximumSourceFrame(sourceDuration)) : sourceDuration;
-  const geometryDuration = trimClip ? Math.max(1000, canonicalDuration, Math.min(geometryLimit, trimClip.timelineStartMs + sourceGeometry))
-    : sequenceClips ? Math.max(1000, canonicalDuration) : Math.max(60_000, canonicalDuration);
+  // Selection never changes the sequence viewport scale. Source handles retain
+  // their source bounds, independently of this canonical timeline geometry.
+  const geometryDuration = sequenceClips ? Math.max(1000, canonicalDuration)
+    : trimClip ? Math.max(1000, canonicalDuration, Math.min(geometryLimit, trimClip.timelineStartMs + sourceGeometry)) : Math.max(60_000, canonicalDuration);
   const tracks = project.timeline.tracks.length > 0 ? project.timeline.tracks : EMPTY_TRACK_SCAFFOLD;
   const playheadPercent = canonicalDuration === 0 ? 0 : (playheadMs / geometryDuration) * 100;
-  const tickIntervals = trimClip ? Math.min(13, Math.max(1, Math.floor(geometryDuration / 1000))) : 13;
+  const tickIntervals = sequenceClips ? Math.min(10, Math.max(1, Math.ceil(geometryDuration / 1000))) : trimClip ? Math.min(13, Math.max(1, Math.floor(geometryDuration / 1000))) : 13;
   const ticks = canonicalDuration === 0 ? [0] : Array.from({ length: tickIntervals + 1 }, (_, index) => Math.round((geometryDuration / tickIntervals) * index));
 
-  function setPlayheadFromPointer(event: ReactPointerEvent<HTMLDivElement>) {
+  function pointerPosition(event: ReactPointerEvent<HTMLDivElement>) {
     const rect = event.currentTarget.querySelector<HTMLElement>(".timeline-width")!.getBoundingClientRect();
-    if (rect.width <= 0) return;
+    if (rect.width <= 0 || !Number.isFinite(event.clientX)) return null;
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     const milliseconds = Math.min(canonicalDuration, Math.max(0, ratio * geometryDuration));
-    onPlayheadChange(grid ? framesToMilliseconds(nearestMsToFrames(milliseconds)) : Math.round(milliseconds));
+    return grid ? framesToMilliseconds(nearestMsToFrames(milliseconds)) : Math.round(milliseconds);
   }
+
+  function cancelScrub(restore = true) {
+    const active = scrub.current;
+    scrub.current = null;
+    if (!active) return;
+    if (active.element.hasPointerCapture?.(active.id)) active.element.releasePointerCapture(active.id);
+    if (restore) seekCallback.current(active.originalMs, "cancel");
+  }
+  useLayoutEffect(() => { cancelScrub(false); dragging.current = null; }, [project.history.headSnapshotId, trimBusy]);
+  useLayoutEffect(() => { cancelScrub(); dragging.current = null; }, [zoom]);
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => { if (event.key === "Escape") { cancelScrub(); dragging.current = null; } };
+    window.addEventListener("keydown", cancel);
+    const blur = () => { cancelScrub(); dragging.current = null; };
+    window.addEventListener("blur", blur);
+    return () => { window.removeEventListener("keydown", cancel); window.removeEventListener("blur", blur); cancelScrub(false); };
+  }, []);
+  function selectClip(id: string, event: MouseEvent) {
+    if (!onSelectClips || sequenceClips === undefined) return onSelect(id);
+    const next = timelineSelection(orderedIds, selectedIds, id, anchor.current, { shift: event.shiftKey, toggle: event.metaKey || event.ctrlKey });
+    if (!event.shiftKey) anchor.current = id;
+    onSelectClips(next, next.includes(id) ? id : next.at(-1) ?? null);
+  }
+  async function editSequence(request: ManualVideoSequenceEdit) {
+    if (editingDisabled || editPending.current || !onSequenceEdit) return;
+    editPending.current = true; setPending(true);
+    try { await onSequenceEdit(request); } catch { /* App presents the canonical error/reconciliation. */ }
+    finally { editPending.current = false; setPending(false); }
+  }
+  function keyboardSelection(event: ReactKeyboardEvent<HTMLElement>) {
+    if (!onSelectClips || sequenceClips === undefined || timelineShortcutBlocked(event.nativeEvent)) return;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a" && !event.altKey) {
+      event.preventDefault(); onSelectClips([...orderedIds], selectedIds.includes(selectedId ?? "") ? selectedId : orderedIds[0] ?? null); return;
+    }
+    if (!["Delete", "Backspace"].includes(event.key) || event.repeat || event.metaKey || event.ctrlKey || event.altKey || editingDisabled || !onSequenceEdit || !selectedIds.length) return;
+    event.preventDefault(); event.stopPropagation();
+    void editSequence({ type: "remove-many", version: grid ? 2 : 1, expectedSnapshotId: project.history.headSnapshotId!, clipIds: selectedIds });
+  }
+  function clipInteraction(id: string): HTMLAttributes<HTMLElement> & { draggable: boolean } {
+    return {
+      draggable: sequenceClips !== undefined && !editingDisabled,
+      onClick: event => selectClip(id, event),
+      onDragStart: event => {
+        if (editingDisabled || !onSelectClips || event.target instanceof Element && event.target.closest(".timeline-trim-handle")) { event.preventDefault(); return; }
+        const ids = selectedIds.includes(id) ? orderedIds.filter(item => selectedIds.includes(item)) : [id];
+        if (!selectedIds.includes(id)) onSelectClips(ids, id);
+        dragging.current = { ids, snapshot: project.history.headSnapshotId! };
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("application/x-cevra-timeline", JSON.stringify({ ids, snapshot: project.history.headSnapshotId }));
+      },
+      onDragOver: event => { if (dragging.current && !editingDisabled) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; } },
+      onDrop: event => {
+        const active = dragging.current; dragging.current = null;
+        if (!active || editingDisabled || active.snapshot !== project.history.headSnapshotId) return;
+        event.preventDefault(); event.stopPropagation();
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (!Number.isFinite(event.clientX) || rect.width <= 0) return;
+        const ids = reorderedTimeline(orderedIds, active.ids, id, event.clientX >= rect.left + rect.width / 2);
+        if (ids.every((item, index) => item === orderedIds[index])) return;
+        void editSequence({ type: "reorder", version: grid ? 2 : 1, expectedSnapshotId: active.snapshot, clipIds: ids });
+      },
+      onDragEnd: () => { dragging.current = null; }
+    };
+  }
+  const selectedDuration = project.timeline.clips.filter(clip => selectedIds.includes(clip.id)).reduce((total, clip) => total + clip.timelineEndMs - clip.timelineStartMs, 0);
+  const durationLabel = (duration: number) => t(grid ? "timeline.durationFrames" : "timeline.durationSeconds", { seconds: Number((duration / 1000).toFixed(3)), frames: nearestMsToFrames(duration) });
 
   function movePlayheadFromKeyboard(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return;
@@ -92,14 +173,19 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
   }
 
   return (
-    <section className="timeline" aria-label={t("timeline.title")}>
+    <section className="timeline" aria-label={t("timeline.title")} tabIndex={0} onKeyDown={keyboardSelection}>
       <button type="button" className="timeline-resizer" onPointerDown={onResizeStart} aria-label={t("timeline.resize")} title={t("timeline.resize")}><span /></button>
       <div className="timeline-toolbar">
         <div><h2>{t("timeline.title")}</h2><span className="selected-item" data-testid="selected-item">{t("timeline.clipSelected", { name: selectedLabel(project, presentations, selectedId) })}</span></div>
         {trimClip && selectedId === trimClip.id && <span className="timeline-trim-hint">{t(grid ? "timeline.frameTrimHint" : "timeline.trimHint")}</span>}
         <div className="timeline-zoom"><label htmlFor="timeline-zoom">{t("timeline.zoom")}</label><span>−</span><input id="timeline-zoom" type="range" min="70" max="180" value={zoom} onChange={(event) => onZoomChange(Number(event.target.value))} /><span>＋</span><button type="button" onClick={() => onZoomChange(100)}><Icon name="fit" size={14} />{t("timeline.fit")}</button></div>
       </div>
-      {sequenceClips && onSequenceEdit && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedId} playheadMs={playheadMs} busy={Boolean(trimBusy)} t={t} onEdit={onSequenceEdit} />}
+      <div className="timeline-summary">
+        <output data-testid="timeline-total-duration">{t("timeline.totalDuration", { duration: durationLabel(canonicalDuration) })}</output>
+        {selectedIds.length > 0 && <output data-testid="timeline-selected-duration">{t("timeline.selectedDuration", { count: selectedIds.length, duration: durationLabel(selectedDuration) })}</output>}
+        {sequenceClips && onSelectClips && <button type="button" onClick={() => onSelectClips([...orderedIds], selectedId && orderedIds.includes(selectedId) ? selectedId : orderedIds[0] ?? null)}>{t("timeline.selectAll")}</button>}
+      </div>
+      {sequenceClips && onSequenceEdit && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedIds.length === 1 ? selectedIds[0]! : null} playheadMs={playheadMs} busy={editingDisabled} t={t} onEdit={onSequenceEdit} />}
       <div className="timeline-table">
         <div className="timeline-corner"><span className="timecode">{grid ? formatFrames(floorMsToFrames(playheadMs)) : trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs)}</span></div>
         <div
@@ -111,7 +197,17 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
           aria-valuemax={grid ? floorMsToFrames(canonicalDuration) : canonicalDuration}
           aria-valuenow={grid ? floorMsToFrames(playheadMs) : playheadMs}
           aria-valuetext={grid ? t("sequence.framePosition", { frame: floorMsToFrames(playheadMs), time: formatFrames(floorMsToFrames(playheadMs)) }) : t("timeline.playhead", { time: trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs) })}
-          onPointerDown={setPlayheadFromPointer}
+          onPointerDown={event => {
+            if (event.button !== 0 || scrub.current || trimBusy) return;
+            const value = pointerPosition(event); if (value === null) return;
+            event.preventDefault(); event.currentTarget.focus({ preventScroll: true });
+            scrub.current = { id: event.pointerId, originalMs: playheadMs, element: event.currentTarget };
+            event.currentTarget.setPointerCapture?.(event.pointerId); onPlayheadChange(value, "start");
+          }}
+          onPointerMove={event => { if (scrub.current?.id !== event.pointerId) return; const value = pointerPosition(event); if (value !== null) onPlayheadChange(value, "move"); }}
+          onPointerUp={event => { if (scrub.current?.id !== event.pointerId) return; const value = pointerPosition(event); if (value === null) { cancelScrub(); return; } cancelScrub(false); onPlayheadChange(value, "end"); }}
+          onPointerCancel={() => cancelScrub()}
+          onLostPointerCapture={() => cancelScrub()}
           onKeyDown={movePlayheadFromKeyboard}
         >
           <div className="timeline-width" style={{ width: `${zoom}%` }}>
@@ -121,22 +217,22 @@ export function Timeline({ project, presentations, selectedId, playheadMs, zoom,
         {tracks.map((track) => {
           const labelKey = trackKeys[track.id as keyof typeof trackKeys];
           const label = labelKey ? t(labelKey) : track.name;
-          return <TimelineRow key={track.id} track={track} label={label} visuals={visualsForTrack(project, presentations, track)} duration={geometryDuration} zoom={zoom} playheadPercent={playheadPercent} selectedId={selectedId} t={t} onSelect={onSelect} trimClipId={trimClip?.id} sourceDuration={sourceDuration} snapshotId={project.history.headSnapshotId!} trimBusy={trimBusy} onTrim={onTrim} />;
+          return <TimelineRow key={track.id} track={track} label={label} visuals={visualsForTrack(project, presentations, track)} duration={geometryDuration} zoom={zoom} playheadPercent={playheadPercent} selectedId={selectedId} selectedIds={selectedIds} clipInteraction={clipInteraction} durationLabel={durationLabel} t={t} onSelect={onSelect} trimClipId={selectedIds.length === 1 ? trimClip?.id : undefined} sourceDuration={sourceDuration} snapshotId={project.history.headSnapshotId!} trimBusy={editingDisabled} onTrim={onTrim} />;
         })}
       </div>
     </section>
   );
 }
 
-function TimelineRow({ track, label, visuals, duration, zoom, playheadPercent, selectedId, t, onSelect, trimClipId, sourceDuration, snapshotId, trimBusy, onTrim }: { trimClipId?: string; sourceDuration: number; snapshotId: string; trimBusy?: boolean; onTrim?: TimelineProps["onTrim"]; track: TimelineTrack; label: string; visuals: TimelineVisual[]; duration: number; zoom: number; playheadPercent: number; selectedId: string | null; t: Translate; onSelect(id: string): void }) {
+function TimelineRow({ track, label, visuals, duration, zoom, playheadPercent, selectedId, selectedIds, clipInteraction, durationLabel, t, onSelect, trimClipId, sourceDuration, snapshotId, trimBusy, onTrim }: { trimClipId?: string; sourceDuration: number; snapshotId: string; trimBusy?: boolean; onTrim?: TimelineProps["onTrim"]; track: TimelineTrack; label: string; visuals: TimelineVisual[]; duration: number; zoom: number; playheadPercent: number; selectedId: string | null; selectedIds: readonly string[]; clipInteraction(id: string): HTMLAttributes<HTMLElement> & { draggable: boolean }; durationLabel(value: number): string; t: Translate; onSelect(id: string): void }) {
   const isAudio = track.kind === "audio";
   return <div className="timeline-row" data-testid={`timeline-track-${track.id}`}>
     <div className="track-head"><strong>{track.name}</strong><span>{label.replace(/^.. — /, "")}</span><div className="track-actions"><button type="button" disabled aria-label={t("timeline.lockTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="lock" size={12} /></button><button type="button" disabled aria-label={t("timeline.showTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="eye" size={12} /></button>{isAudio && <button type="button" disabled aria-label={t("timeline.muteTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="mute" size={12} /></button>}</div></div>
     <div className={`track-lane track-${track.kind}`}>
       <div className="timeline-width" style={{ width: `${zoom}%` }}>
         {visuals.map((visual) => visual.kind === "clip" && visual.id === trimClipId && selectedId === visual.id && onTrim
-          ? <TrimTimelineClip key={visual.id} clip={visual.clip} label={visual.label} fileName={visual.fileName} duration={duration} sourceDuration={sourceDuration} snapshotId={snapshotId} zoom={zoom} busy={Boolean(trimBusy)} t={t} onSelect={onSelect} onTrim={onTrim} />
-          : <button key={visual.id} type="button" className={`timeline-item item-${visual.kind}${selectedId === visual.id ? " selected" : ""}`} style={{ left: `${(visual.startMs / duration) * 100}%`, width: `${Math.max(1.4, ((visual.endMs - visual.startMs) / duration) * 100)}%` }} onClick={() => onSelect(visual.id)} title={visual.kind === "clip" ? visual.fileName : visual.label} aria-label={visual.kind === "clip" && visual.fileName ? `${visual.label} · ${visual.fileName}` : visual.label} aria-pressed={selectedId === visual.id}>{isAudio && <span className="item-wave" aria-hidden="true">{waveformBars.map((height, index) => <i key={index} style={{ height }} />)}</span>}<span>{visual.label}</span></button>)}
+          ? <TrimTimelineClip key={visual.id} clip={visual.clip} label={visual.label} fileName={visual.fileName} duration={duration} sourceDuration={sourceDuration} snapshotId={snapshotId} zoom={zoom} busy={Boolean(trimBusy)} t={t} onSelect={onSelect} onTrim={onTrim} interaction={clipInteraction(visual.id)} />
+          : <button key={visual.id} type="button" {...(visual.kind === "clip" ? clipInteraction(visual.id) : { onClick: () => onSelect(visual.id) })} className={`timeline-item item-${visual.kind}${(visual.kind === "clip" ? selectedIds.includes(visual.id) : selectedId === visual.id) ? " selected" : ""}`} data-clip-id={visual.kind === "clip" ? visual.id : undefined} style={{ left: `${(visual.startMs / duration) * 100}%`, width: `${Math.max(1.4, ((visual.endMs - visual.startMs) / duration) * 100)}%` }} title={visual.kind === "clip" ? `${visual.label} · ${visual.fileName ?? ""} · ${durationLabel(visual.endMs - visual.startMs)}` : visual.label} aria-label={visual.kind === "clip" && visual.fileName ? `${visual.label} · ${visual.fileName}` : visual.label} aria-pressed={visual.kind === "clip" ? selectedIds.includes(visual.id) : selectedId === visual.id}>{isAudio && <span className="item-wave" aria-hidden="true">{waveformBars.map((height, index) => <i key={index} style={{ height }} />)}</span>}<span>{visual.label}</span>{visual.kind === "clip" && <small>{durationLabel(visual.endMs - visual.startMs)}</small>}</button>)}
         <i className="playhead-line" style={{ left: `${playheadPercent}%` }} aria-hidden="true"><b /></i>
       </div>
     </div>
@@ -146,9 +242,10 @@ function TimelineRow({ track, label, visuals, duration, zoom, playheadPercent, s
 type TrimRange = { sourceStartMs: number; sourceEndMs: number };
 type TrimEdge = "in" | "out";
 
-function TrimTimelineClip({ clip, label, fileName, duration, sourceDuration, snapshotId, zoom, busy, t, onSelect, onTrim }: {
+function TrimTimelineClip({ clip, label, fileName, duration, sourceDuration, snapshotId, zoom, busy, t, onSelect, onTrim, interaction }: {
   clip: TimelineClip; label: string; fileName?: string; duration: number; sourceDuration: number; snapshotId: string; zoom: number; busy: boolean;
   t: Translate; onSelect(id: string): void; onTrim: NonNullable<TimelineProps["onTrim"]>;
+  interaction?: HTMLAttributes<HTMLElement> & { draggable: boolean };
 }) {
   const [draft, setDraft] = useState<TrimRange | null>(null);
   const [pending, setPending] = useState(false);
@@ -224,12 +321,12 @@ function TrimTimelineClip({ clip, label, fileName, duration, sourceDuration, sna
   // placement stays at zero; only release confirms and reanchors the new range.
   // Right anchoring also preserves OUT when the minimum visual width applies.
   const draggingIn = draft !== null && gesture.current?.edge === "in";
-  return <div className="timeline-trim-clip" style={{
+  return <div className="timeline-trim-clip" data-clip-id={clip.id} draggable={interaction?.draggable} onDragStart={interaction?.onDragStart} onDragOver={interaction?.onDragOver} onDrop={interaction?.onDrop} onDragEnd={interaction?.onDragEnd} style={{
     left: draggingIn ? undefined : `${clip.timelineStartMs / duration * 100}%`,
     right: draggingIn ? `${gesture.current!.outRightPercent}%` : undefined,
     width: `${(range.sourceEndMs - range.sourceStartMs) / duration * 100}%`
   }}>
-    <button type="button" className="timeline-item item-clip selected" aria-pressed="true" aria-label={fileName ? `${label} · ${fileName}` : label} title={fileName} onClick={() => onSelect(clip.id)}><span>{label}</span></button>
+    <button type="button" className="timeline-item item-clip selected" aria-pressed="true" aria-label={fileName ? `${label} · ${fileName}` : label} title={fileName} onClick={interaction?.onClick ?? (() => onSelect(clip.id))}><span>{label}</span></button>
     {(["in", "out"] as const).map((edge) => <button key={edge} type="button" role="slider" className={`timeline-trim-handle trim-${edge}`} aria-disabled={busy || pending} tabIndex={busy || pending ? -1 : 0}
       aria-label={t(edge === "in" ? "timeline.trimIn" : "timeline.trimOut")} aria-orientation="horizontal"
       aria-valuemin={edge === "in" ? 0 : clip.frameTiming ? nearestMsToFrames(range.sourceStartMs) + 1 : range.sourceStartMs + 1} aria-valuemax={edge === "in" ? clip.frameTiming ? nearestMsToFrames(range.sourceEndMs) - 1 : range.sourceEndMs - 1 : clip.frameTiming ? maximumSourceFrame(sourceDuration) : sourceDuration}

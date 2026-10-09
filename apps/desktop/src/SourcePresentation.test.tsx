@@ -20,7 +20,7 @@ it("keeps source numbers across media search/filter and names non-video sources 
   render(<MediaPanel sources={sources} presentations={presentSources(sources, sourceNumberingForSources(sources), pt)} selectedId={null} workspace="edit" importAvailable={false} importReason="review-session" importBusy={false} t={pt} onSelect={select} onImport={() => {}} />);
   expect(screen.getByText("Áudio 2")).toBeTruthy();
   expect(screen.getByText("Imagem 4")).toBeTruthy();
-  expect(screen.queryByText("long-second-name.mov")).toBeNull();
+  expect(screen.getByText("long-second-name.mov")).toBeTruthy();
   fireEvent.click(screen.getByRole("tab", { name: pt("media.filter.video") }));
   fireEvent.change(screen.getByRole("textbox", { name: pt("media.searchPlaceholder") }), { target: { value: "Vídeo 3" } });
   const second = screen.getByRole("button", { name: "Vídeo 3 · long-second-name.mov" });

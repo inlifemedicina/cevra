@@ -2658,6 +2658,38 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
+**Current follow-up — 2026-10-07:** coordination supplied independent APPROVE
+for `abf862f` and its exact-head CI passed 11/11. Representative Full HD program
+preparation measured 2.153 s for four clips/5.5 s and 6.853–6.879 s for 12 unique
+clips/60 s; cache/Undo took 22–28 ms. A new montage cache miss still renders the
+whole program, with a focused cancellation/new-delivery case near eight seconds.
+There is no per-cut preparation on the loaded CFR30 program, but editing latency
+is an explicit remaining limitation. The isolated bundle's localization/MP4
+metadata passed; Foundation preferred en-US here and no picker was opened or Mac
+language changed. Packaged Full HD card validation found a retained 720-pixel
+filter behind the 160-pixel request. A narrow filter/postcondition correction and
+large-source regressions follow; this delta needs proportional independent review
+and its own CI before readiness. [Measured record and scope](CEVRA_MANUAL_SEQUENCE_G1.md#representative-preparation-and-large-card-correction--2026-10-07).
+IN/OUT, live app/project/export, progress55% and F-A021/1 remain preserved.
+
+**Active usability follow-up — 2026-10-06:** the Owner's coordinated G1 round
+reported opening/import, the implemented editing buttons and A/B/A/A export as
+working within that variant. In-app preview paused at joins; source cards lacked
+thumbnails; selection affected timeline scale and duration/ruler readability was
+insufficient. Human close/reopen persistence was **NOT TESTED**. The evidence and
+pending grouped regression are recorded in [issue #88](https://github.com/inlifemedicina/cevra/issues/88).
+Branch `feat/vids-timeline-usability-preview-continuity`, based on Draft #87 head
+`a6c099a5e37c669ed881443dd52b5aab7e2ce7d2`, now has offline-tested timeline
+interaction, atomic group removal, one continuous CFR30 program preview and
+automatic identity-bound thumbnails. See the [scoped technical record](CEVRA_MANUAL_SEQUENCE_G1.md#human-findings-and-usability-follow-up--2026-10-06).
+Seek follows the approved play/pause/drag/cancel policy; IN/OUT keeps explicit
+Apply-button confirmation pending the Owner's separate decision. Native bundle
+localization metadata is prepared, but the resulting picker language is untested.
+Independent review of this new diff and a coordinated future human round remain
+pending. The open app/project/export and earlier package receipts stay preserved;
+no new package has been installed or launched. Director impact compatible typed
+editing/ephemeral-preview extension; progress55%, F-A021/1, full G1 unaccepted.
+
 **Active resource decision — 2026-10-06 10:38:21 UTC:** the Owner approved the
 proposed operational contract: reserve logical space before each producer writes,
 and supervise renderer RAM with interruption after observed excess. Initial

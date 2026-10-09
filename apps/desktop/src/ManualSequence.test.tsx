@@ -82,6 +82,66 @@ async function mount(backend = new SequenceBackend()) {
   return { backend, ...rendered };
 }
 
+async function gestureFixture() {
+  const backend = new SequenceBackend();
+  for (const [sourceId, sourceStartFrame, sourceEndFrame] of [["s0", 0, 30], ["s0", 30, 60], ["s0", 0, 30], ["s1", 0, 60]] as const) {
+    await backend.service.edit({ version: 2, type: "append", expectedSnapshotId: backend.history.current.history.headSnapshotId!, sourceId, sourceStartFrame, sourceEndFrame });
+  }
+  const view = await mount(backend);
+  const item = (id: string) => view.container.querySelector<HTMLElement>(`[data-clip-id="${id}"]`)!;
+  const click = (id: string, modifiers = {}) => { const root = item(id); fireEvent.click(root.querySelector(".timeline-trim-select") ?? root, modifiers); };
+  return { ...view, item, click, ids: clips(backend).map(clip => clip.id), timeline: view.container.querySelector<HTMLElement>(".timeline")! };
+}
+
+it("clip selection retains timeline scale and exposes exact total and selected durations", async () => {
+  const f = await gestureFixture();
+  const positions = () => [...f.container.querySelectorAll<HTMLElement>("[data-clip-id]")].map(item => item.style.cssText);
+  f.click(f.ids[0]!); const first = positions();
+  f.click(f.ids[3]!); expect(positions()).toEqual(first);
+  expect(screen.getByTestId("timeline-total-duration").textContent).toContain("5 s · 150 quadros");
+  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("2 s · 60 quadros");
+  f.click(f.ids[1]!); f.click(f.ids[3]!, { shiftKey: true });
+  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (3): 4 s · 120 quadros");
+  f.click(f.ids[2]!, { metaKey: true });
+  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (2): 3 s · 90 quadros");
+});
+
+it("Cmd+A and Delete remove a montage in one Undo while typing, composition and modal dialogs are guarded", async () => {
+  const f = await gestureFixture(), before = f.backend.history.current;
+  f.click(f.ids[0]!);
+  const input = controls().getByLabelText("IN (frames)");
+  fireEvent.keyDown(input, { key: "Delete" }); fireEvent.keyDown(input, { key: "a", metaKey: true });
+  expect(f.backend.requests).toHaveLength(0);
+  fireEvent.keyDown(f.timeline, { key: "a", metaKey: true });
+  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (4)");
+  fireEvent.keyDown(f.timeline, { key: "Delete", isComposing: true, keyCode: 229 });
+  const modal = document.createElement("div"); modal.setAttribute("role", "dialog"); modal.setAttribute("aria-modal", "true"); document.body.append(modal);
+  fireEvent.keyDown(f.timeline, { key: "Backspace" }); modal.remove();
+  expect(f.backend.requests).toHaveLength(0);
+  fireEvent.keyDown(f.timeline, { key: "Delete" }); fireEvent.keyDown(f.timeline, { key: "Delete", repeat: true });
+  await waitFor(() => expect(clips(f.backend)).toHaveLength(0));
+  expect(f.backend.requests).toHaveLength(1);
+  expect(f.backend.requests[0]).toMatchObject({ version: 2, type: "remove-many", clipIds: f.ids });
+  fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(f.backend.history.current).toEqual(before));
+});
+
+it("dragging an already selected group preserves its members and publishes one reorder", async () => {
+  const f = await gestureFixture(), before = f.backend.history.current;
+  f.click(f.ids[0]!); f.click(f.ids[2]!, { metaKey: true });
+  const transfer = { setData: vi.fn(), effectAllowed: "", dropEffect: "" };
+  fireEvent.dragStart(f.item(f.ids[0]!), { dataTransfer: transfer });
+  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (2)");
+  const target = f.item(f.ids[3]!);
+  vi.spyOn(target, "getBoundingClientRect").mockReturnValue({ left: 0, width: 100 } as DOMRect);
+  const drop = new MouseEvent("drop", { bubbles: true, clientX: 90 }); Object.defineProperty(drop, "dataTransfer", { value: transfer }); fireEvent(target, drop);
+  await waitFor(() => expect(clips(f.backend).map(clip => clip.id)).toEqual([f.ids[1], f.ids[3], f.ids[0], f.ids[2]]));
+  expect(f.backend.requests).toHaveLength(1);
+  expect(f.backend.requests[0].type).toBe("reorder");
+  fireEvent.click(screen.getByRole("button", { name: "Desfazer" }));
+  await waitFor(() => expect(f.backend.history.current).toEqual(before));
+});
+
 it("assembles four retained source ranges through UI with one Undo per action and unchanged source numbering", async () => {
   const { backend, container } = await mount();
   const numbering = structuredClone(backend.history.sourceNumbering);
@@ -332,4 +392,18 @@ it("keeps a larger legacy source duration intact while bounding disposable frame
   expect((controls().getByLabelText("OUT (frames)") as HTMLInputElement).value).toBe(String(Math.floor(Number.MAX_SAFE_INTEGER / 1000)));
   expect(backend.history.toArchive()).toEqual(before);
   expect(backend.history.current.sources.at(-1)!.durationMs).toBe(Number.MAX_SAFE_INTEGER);
+});
+
+
+it("pointer playhead dragging uses the fixed ruler geometry and Escape restores its original position", async () => {
+  const f=await gestureFixture();const ruler=f.container.querySelector<HTMLElement>(".timeline-ruler")!;
+  vi.spyOn(ruler.querySelector(".timeline-width")!,"getBoundingClientRect").mockReturnValue({left:100,width:500} as DOMRect);
+  function pointer(type:string,x:number) {const event=new MouseEvent(type,{bubbles:true,button:0,clientX:x});Object.defineProperty(event,"pointerId",{value:7});fireEvent(ruler,event);}
+  const before=f.backend.history.toArchive();fireEvent.keyDown(ruler,{key:"Home"});fireEvent.keyDown(ruler,{key:"ArrowRight"});expect(ruler.getAttribute("aria-valuenow")).toBe("1");
+  pointer("pointerdown",200);expect(ruler.getAttribute("aria-valuenow")).toBe("30");
+  pointer("pointermove",350);expect(ruler.getAttribute("aria-valuenow")).toBe("75");
+  fireEvent.keyDown(window,{key:"Escape"});expect(ruler.getAttribute("aria-valuenow")).toBe("1");
+  pointer("pointerup",400);expect(ruler.getAttribute("aria-valuenow")).toBe("1");
+  pointer("pointerdown",200);pointer("pointermove",350);pointer("pointerup",400);expect(ruler.getAttribute("aria-valuenow")).toBe("90");
+  expect(f.backend.history.toArchive()).toEqual(before);expect(f.backend.requests).toHaveLength(0);
 });

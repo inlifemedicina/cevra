@@ -448,5 +448,12 @@
   "export.settling": "A exportação ainda está encerrando. Mantenha o projeto aberto e aguarde antes de outra exportação.",
   "export.publicationUnverified": "Um arquivo pode ter sido publicado, mas o resultado não pôde ser verificado. Confira o destino antes de exportar novamente; o arquivo foi preservado.",
   "export.sourceUnverified": "Não foi possível verificar a identidade dos originais. Confira os arquivos.",
-  "export.failed": "Não foi possível concluir a exportação. Confira os arquivos e a pasta de destino."
+  "export.failed": "Não foi possível concluir a exportação. Confira os arquivos e a pasta de destino.",
+  "timeline.durationFrames": "{seconds} s · {frames} quadros",
+  "timeline.durationSeconds": "{seconds} s",
+  "timeline.totalDuration": "Duração total: {duration}",
+  "timeline.selectedDuration": "Seleção ({count}): {duration}",
+  "timeline.selectAll": "Selecionar todos os clips",
+  "media.thumbnailLoading": "Preparando miniatura…",
+  "media.thumbnailUnavailable": "Miniatura indisponível"
 }

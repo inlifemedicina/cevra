@@ -1,6 +1,6 @@
 import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { EditorialDraftState, ReviseEditorialDraftRequest } from "@cevra/application";
-import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview } from "@cevra/application";
+import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview, SourceThumbnail, SourceThumbnailRequest } from "@cevra/application";
 import type { ManualVideoSequenceEdit, ManualVideoSequenceConformPreview } from "@cevra/application";
 import type { ManualExportPreparation, ManualExportPreparationRequest } from "@cevra/application";
 
@@ -55,6 +55,7 @@ export interface DesktopBackend {
   loadState(): Promise<DesktopBackendState>;
   loadEditorialDraft(): Promise<EditorialDraftState>;
   reviseEditorialDraft(request: ReviseEditorialDraftRequest): Promise<EditorialDraftState>;
+  thumbnailLocalVideo?(request: SourceThumbnailRequest): Promise<SourceThumbnail>;
   previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview>;
   prepareManualExport?(request: ManualExportPreparationRequest): Promise<
     { readonly outcome: "cancelled" } | { readonly outcome: "prepared"; readonly preparation: ManualExportPreparation }>;
