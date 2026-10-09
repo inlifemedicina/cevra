@@ -224,6 +224,20 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 
 ### Single grouped G1 script
 
+**Medição técnica60s — 09/10/2026:** nos mesmos I4-T1/X-T1/T7/X-T6/I17-T8/T9,
+a equipe preparou automaticamente dez clips sintéticos (1.800 frames / 60 s).
+O FAIL inicial foi causado pelo sandbox impedindo a observação dos processos
+próprios do watchdog; está preservado. A repetição sem instrumentação, com o
+mesmo pacote #93/`41decff`, entradas e monitoramento real, passou: seis prévias,
+40 respostas do Host, dois outputs decodificados exatos, fechamento/reabertura
+do Host e Undo/Redo. Entrega da prévia após reorder: 1.920–1.948 s, separada da
+confirmação da edição. [Método e limites](CEVRA_VIDS_USABILITY_AUDIT.md#60-second-preview-test-execution-boundary--2026-10-09).
+Isso conclui a medição técnica do Host, sem afirmar latência percebida ou pintura
+nativa. Janela nativa/fechar-reabrir/IME/Finder e percepção humana continuam
+NÃO EXECUTADOS por ausência de isolamento de interface em relação ao EDVID.
+O pacote #93 e os recibos anteriores permanecem congelados; nenhuma nova rodada
+humana passo a passo é solicitada e G1 completo continua não aprovado.
+
 **Visual B aprovado — 09/10/2026:** a próxima variante agrupa a edição básica
 do Draft #92 com a apresentação B em um único pacote/commit, após review e CI.
 Nos mesmos I4-T1/X-T1/T7/X-T6 abaixo, conferir a leitura dos painéis reais

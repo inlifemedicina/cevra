@@ -542,3 +542,80 @@ Director: compatible presentation, no new execution/provider authority.
 Progress55%, exhausted F-A021/1, prior technical/human limits and original media
 remain unchanged. No merge, real IA, account request, user app/project operation
 or Take/Xcode/iPhone action.
+
+### 60-second preview test execution boundary — 2026-10-09
+
+This autonomous follow-up uses the actual frozen package of Draft #93, commit
+`41decff63de969786b8c3d39831514a04b14a00b`, tree
+`0d983575cf1624bc01727ec249ab10fb8b3c56e0`, app tree SHA256
+`96abaecc90890630b5a823569631272d5dca300d6e257a330c831d715b833244`.
+It introduces no product code or function. Its own temporary project store,
+fixture copies and outputs are separate from previous technical/human projects.
+
+The plan has ten six-second occurrences of the existing A/B fixtures, with five
+distinct A ranges and one repeated B range: 1,800 CFR30 frames / 60,000 ms. Both
+source hashes are preserved. The measured uninstrumented run was
+04:17:36.853–04:17:56.550 UTC on 2026-10-09, macOS 27.2 / arm64.
+
+**Failure and cause.** The first sandboxed request returned
+`MANUAL_VIDEO_UNAVAILABLE` in 13.498 ms, with no delivered preview. Diagnostic
+logging added only in memory to the existing Host catch revealed the underlying
+`OwnedRenderResourceError: MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED` at the
+watchdog's first sample. Harmless own-PID/group probes confirmed that the sandbox
+cannot run `/bin/ps` (`operation not permitted`) and `/usr/bin/pgrep` cannot
+obtain a process list. The real production observer queries only its detached
+worker group and intentionally fails closed when observation is unavailable.
+This result is an execution-boundary failure, not a completed latency measurement
+or a demonstrated 60-second input/product defect.
+
+The approved uninstrumented recheck ran outside that restriction. The helper was
+byte-identical (SHA256
+`6e3d83f4b2974946f44e35dfb6c168cf567102e890ad924e27a0106d4b131793`),
+with the same package and fixture content. No diagnostic preload, observer stub,
+resource-limit change, source modification or cache prefill was used. The actual
+watchdog and source/output admission remained enabled. All six preview calls and
+40 Host responses passed. This resolves the reported failure without a product
+code change; the original FAIL and diagnostic receipts remain immutable evidence.
+
+| Phase | Edit acknowledgement (ms) | Preview RPC delivery (ms) | Sum of separate edit + preview RPC times (ms) |
+| --- | ---: | ---: | ---: |
+| Initial, new Host/store and no preview prefill | — | 4946.905 | — |
+| Same snapshot, warm whole-program entry | — | 72.313 | — |
+| Reorder 1, warm segment reuse | 23.425 | 1932.269 | 1955.694 |
+| Reorder 2, warm segment reuse | 21.080 | 1948.021 | 1969.101 |
+| Reorder 3, warm segment reuse | 20.009 | 1920.053 | 1940.062 |
+| New Host process after normal close/reopen | — | 4914.987 | — |
+
+Monotonic timers bound actual Host request/response delivery. The sum column is
+not a user-gesture-to-paint measurement. Artifact writes/probes occur outside the
+preview-delivery clock. Warm same-snapshot bytes match the initial packet exactly;
+reorders preserve canonical order/ranges and 60-second duration, with one Undo
+and Redo per edit. After normal `host.prepareClose`/`host.shutdown`, a new Host
+process restores Project IR exactly and Undo/Redo works. Both directly owned Host
+children close normally. This is Host lifecycle coverage, not native-window
+close/reopen.
+
+Two delivered MP4s were decoded with the packaged ffprobe: exactly 1,800 video
+frames, 60.000000 s video/audio/container duration, 720×404 H.264 CFR30 and stereo
+48 kHz AAC. Outputs are admitted previews; final export still uses originals.
+The receipt reports no instantaneous resource cap, latency SLA or representative
+performance distribution: these are descriptive samples from one synthetic
+session, with concurrent machine workload uncontrolled.
+
+External technical receipts are `host-60s-receipt.json` (original FAIL and
+separate uninstrumented PASS), `diagnostic-internal-cause-receipt.json`,
+`recheck-preparation.json` and preservation/review closeout receipts. App inventory,
+source/archive, earlier receipts/project and fixtures are checked after the run;
+none is rewritten to hide the failure. Packaged Host comparison to #92 found
+only four dependency source-path comments different; all other lines were
+byte-identical. Neither comparison nor the failure claims a new CSS-related bug.
+
+Native automation/interface-reservation tools are absent. The follow-up therefore
+opened no native window and did not contend with EDVID's active Codex-chat test.
+WKWebView/bootstrap/Finder/physical IME, native window close/reopen and perceived
+60-second latency remain unexecuted. This completes the objective Host fixture
+and measurement, under the existing I4-T1/X-T1/T7/X-T6/I17-T8/T9 catalog; it requests
+no new acceptance ID or human microtest. Full G1 remains unaccepted. Director:
+no new impact found in the checked scope; no provider/context/permission or
+IR/History authority change. Progress 55%, F-A02 exhausted 1/1, no merge, real AI,
+account request, human project/window or Take/Xcode/iPhone operation.

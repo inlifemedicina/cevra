@@ -3545,3 +3545,39 @@ action was performed, and no new layout or editing behavior was introduced.
 Director impact compatible, official progress stays 55%, F-A02 remains exhausted
 1/1. No real AI, human store inspection/copy, Take/iPhone/Xcode operation or
 merge is part of this approved follow-up.
+
+### 2026-10-09 — Verified 60-second preview and test execution boundary
+
+The approved autonomous follow-up exercised the frozen visual B package from
+Draft #93, commit `41decff63de969786b8c3d39831514a04b14a00b`, tree
+`0d983575cf1624bc01727ec249ab10fb8b3c56e0`. A new private technical store and
+copies of the verified synthetic A/B fixtures assembled ten six-second clips:
+1,800 CFR30 frames / 60 seconds. No existing app/project/window was operated.
+
+The initial `MANUAL_VIDEO_UNAVAILABLE` was an execution-environment failure.
+Memory-only diagnostic logging exposed
+`MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED` before render admission. The sandbox
+could not run the production own-group observer: `pgrep` could not obtain the
+process list and `ps` was denied. The raw FAIL remains preserved. An approved
+execution outside that restriction used the same uninstrumented harness,
+package, inputs, watchdog and resource limits, and passed all six preview calls
+and 40 Host responses. No product fix, observer stub or limit bypass was needed.
+
+Initial preview delivery was 4.947 s; same-snapshot warm delivery was 72.313 ms.
+After three reorders, preview delivery was 1.932 / 1.948 / 1.920 s, separately from
+edit acknowledgements of 23.425 / 21.080 / 20.009 ms. Reopened-Host cold delivery
+was 4.915 s. These are Host RPC measurements, not renderer dispatch, decode,
+paint, audible playback or human perception. Two outputs decoded to exactly
+1,800 frames / 60.000 s, with stereo 48 kHz audio. Normal Host close/reopen
+preserved Project IR exactly; Undo/Redo after reopen passed.
+
+[Method, evidence and limits](CEVRA_VIDS_USABILITY_AUDIT.md#60-second-preview-test-execution-boundary--2026-10-09)
+remain attached to the same
+[acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#single-grouped-g1-script),
+using its existing IDs. Native-window control and interface reservation are not
+available for concurrent EDVID testing; no native window was opened. Native
+close/reopen and perceived 60-second latency remain unexecuted. Draft #93 and its
+package stay frozen; this follow-up records evidence separately. Director impact:
+no new impact found within this checked scope; typed operations, IR/History,
+providers and authority are unchanged. Progress 55%, F-A02 exhausted 1/1 and full
+G1 unaccepted remain. No merge, real AI, account or Take/Xcode/iPhone operation.

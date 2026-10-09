@@ -815,3 +815,24 @@ the new Draft/receipt; one future grouped functional+B round retains existing
 IDs. [Scope/evidence](CEVRA_VIDS_USABILITY_AUDIT.md#approved-visual-b-presentation--2026-10-09).
 Director impact compatible presentation only; no IA/provider/device/window
 operation or merge. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.
+
+### 2026-10-09 — 60-second Host follow-up, visual B package preserved
+
+The existing Draft #93 package (`41decff` / tree `0d983575`) now has an automated
+60-second fixture/method: ten clips, 1,800 CFR30 frames. The initial sandboxed
+preview failed because the real resource observer could not query its own
+process group. The original FAIL is preserved. The same uninstrumented harness
+passed outside that restriction with production monitoring/limits unchanged:
+six preview deliveries, 40 Host responses, two exact decoded 60-second outputs,
+normal Host close/reopen, exact Project IR and reopened Undo/Redo.
+
+After-reorder preview RPC delivery was 1.920–1.948 s; acknowledgement was measured
+separately. These facts do not establish native or perceived latency. No product
+code, function, dependency, permission, provider or IR/History change was made;
+Draft #93, its package and earlier receipts remain preserved.
+[Canonical evidence](CEVRA_VIDS_USABILITY_AUDIT.md#60-second-preview-test-execution-boundary--2026-10-09).
+Native window/close-reopen remains unexecuted because interface isolation from
+concurrent EDVID testing is not guaranteed by available tools. Reuse the same
+single acceptance catalog and IDs; no intermediate human microtests are requested.
+Director: no new impact found in this scope. Progress 55%, F-A02 1/1 and full G1
+unaccepted remain; no real AI, merge, human project/window or device operation.
