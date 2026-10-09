@@ -275,11 +275,22 @@ do worker. A espera de 1,0–1,8 s do protótipo também não é definida como a
 Um programa inválido/antigo permanece retirado e a preparação visível; nunca
 disfarçar waiting nem rotular a versão anterior como corrente.
 
-**Estado da decisão:** proposta preparada, **não implementada no produto**.
+**Estado histórico da proposta:** preparada, **não implementada naquele checkpoint**.
 O novo aceite de atalhos/IN/OUT não aprova automaticamente esta integração.
 Se a exigência for atualização efetivamente imediata também após edição inédita,
 o cache é uma etapa mensurável, não uma garantia; a reprodução incremental exige
 viabilidade e decisão própria.
+
+**Decisão e implementação aprovada — 07/10/2026:** o Owner aprovou o delta
+separado sobre `278627e` / Draft #90, registrado em [ADR0035](adr/0035-preview-segment-memory-reuse.md).
+O cache de produção compartilha32MiB/64 entradas entre objetos/pending, dentro
+de512MiB RSS; restaurar reserva bytes dentro de2GiB antes de escrever. Comparação
+integral de frames/PCM e cancelamento/restart PASS no runtime selado. Host real
+reorder2.148s, trim2.794s, remoção1.747s; bytes reais entregues à UI levaram123–166ms
+até React/Blob/PNG DOM. Isso não comprova frame nativo pronto nem percepção.
+[Registro canônico](CEVRA_PREVIEW_SEGMENT_REUSE_V1.md) separa cold/Host warm,
+limites e falhas preservadas. CI exato/revisão independente seguem obrigatórios
+antes de um pacote e da rodada única; G1/percepção permanecem sem aceite.
 
 ## 3. Inventário de superfícies e campos existentes
 

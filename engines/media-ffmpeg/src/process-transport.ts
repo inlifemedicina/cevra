@@ -147,7 +147,12 @@ export class ProcessMediaWorkerTransport implements PersistentWorkerTransport {
 
   async request<T>(method: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
     await this.start();
-    return this.send<T>(method, params, signal);
+    // This private transport marker comes from the captured, live Host lease,
+    // never operation/UI input. Retained preview bytes consume that same RSS
+    // allowance; calls outside it cannot ask the worker to preserve retention.
+    const ownedPreviewCache = Boolean(this.resourceLease?.child === this.child
+      && this.child && !this.resourceLease?.terminalError && !this.invalid.has(this.child));
+    return this.send<T>(method, { ...params, ownedPreviewCache }, signal);
   }
 
   private async spawnWorker(): Promise<void> {

@@ -7,6 +7,7 @@ on:
       - feat/audio-sequence-runtime-v1
       - feat/typed-audio-measurement-v1
       - feat/application-resolved-audio-plan-v1
+      - feat/vids-preview-segment-reuse
     paths:
       - .github/workflows/audio-sequence-runtime.yml
       - package.json
@@ -101,6 +102,18 @@ jobs:
           CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
           CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
         run: node engines/media-ffmpeg/test_functional/manual-sequence-runtime.mjs
+      - name: Verify preview segment reuse, decoded equality and actual Host delivery
+        env:
+          CEVRA_AUDIO_SEQUENCE_RELEASE: "1"
+          CEVRA_AUDIO_SEQUENCE_RUNTIME_ROOT: ${{ runner.temp }}/cevra-media-runtime
+          CEVRA_AUDIO_SEQUENCE_PYTHON: ${{ runner.temp }}/cevra-media-runtime/python/bin/python3.12
+          CEVRA_PREVIEW_SEGMENT_UI_RECEIPT_OUTPUT: ${{ runner.temp }}/preview-segment-ui-deliveries.json
+        run: node engines/media-ffmpeg/test_functional/preview-segment-runtime.mjs
+      - name: Measure actual Host packet delivery through the UI consumer
+        env:
+          CEVRA_PREVIEW_SEGMENT_UI_RECEIPT: ${{ runner.temp }}/preview-segment-ui-deliveries.json
+          CEVRA_PREVIEW_SEGMENT_UI_RESULT: ${{ runner.temp }}/preview-segment-ui-result.json
+        run: npm exec -w @cevra/desktop -- vitest run src/PreviewSegmentDelivery.runtime.test.tsx
       - name: Characterize native audio measurement candidate
         run: >-
           python3 engines/media-ffmpeg/test_functional/audio-measurement-feasibility.py

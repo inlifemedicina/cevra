@@ -18,7 +18,7 @@ test("abrupt Node parent death closes the pipe and terminates the transcription 
   const python = process.env.PYTHON ?? "python3";
   const parent = spawn(process.execPath, [parentFixture, python, workerFixture, worker], { stdio: ["ignore", "pipe", "pipe"] });
   context.after(() => { if (parent.exitCode === null && parent.signalCode === null) parent.kill("SIGKILL"); });
-  const workerPid = Number(await firstLine(parent.stdout));
+  const workerPid = Number(await firstLine(parent));
   assert.ok(Number.isSafeInteger(workerPid) && workerPid > 1);
   await waitForProcess(workerPid, true, 2_000);
   parent.kill("SIGKILL");
@@ -34,7 +34,7 @@ test("abrupt Node parent death makes the media lifecycle reap its active subproc
   context.after(() => rm(temporaryRoot, { recursive: true, force: true }));
   const parent = spawn(process.execPath, [mediaParentFixture, python, repositoryRoot, resolve(temporaryRoot, "subprocess.pid")], { stdio: ["ignore", "pipe", "pipe"] });
   context.after(() => { if (parent.exitCode === null && parent.signalCode === null) parent.kill("SIGKILL"); });
-  const [workerPid, subprocessPid] = (await firstLine(parent.stdout)).split(" ").map(Number);
+  const [workerPid, subprocessPid] = (await firstLine(parent)).split(" ").map(Number);
   assert.ok(Number.isSafeInteger(workerPid) && workerPid > 1);
   assert.ok(Number.isSafeInteger(subprocessPid) && subprocessPid > 1);
   await waitForProcess(workerPid, true, 2_000);
@@ -46,14 +46,32 @@ test("abrupt Node parent death makes the media lifecycle reap its active subproc
   context.diagnostic(`SIGKILL parent PID ${parent.pid}; media worker PID ${workerPid} and subprocess PID ${subprocessPid} returned ESRCH`);
 });
 
-async function firstLine(stream) {
-  let buffered = "";
-  for await (const chunk of stream) {
-    buffered += chunk.toString("utf8");
-    const newline = buffered.indexOf("\n");
-    if (newline >= 0) return buffered.slice(0, newline);
-  }
-  throw new Error("Parent fixture exited before publishing its child PID.");
+async function firstLine(parent) {
+  return new Promise((resolvePromise, reject) => {
+    let buffered = "";
+    let stderr = "";
+    const settle = (cause, line) => {
+      clearTimeout(timer);
+      parent.stdout.off("data", onData);
+      parent.stderr.off("data", onStderr);
+      parent.off("error", onError);
+      parent.off("close", onClose);
+      if (cause) reject(cause); else resolvePromise(line);
+    };
+    const onData = (chunk) => {
+      buffered += chunk.toString("utf8");
+      const newline = buffered.indexOf("\n");
+      if (newline >= 0) settle(undefined, buffered.slice(0, newline));
+    };
+    const onStderr = (chunk) => { stderr = (stderr + chunk.toString("utf8")).slice(-8_192); };
+    const onError = (cause) => settle(cause);
+    const onClose = (code, signal) => settle(new Error(`Parent fixture exited before publishing its child PID (${code ?? signal}): ${stderr}`));
+    const timer = setTimeout(() => settle(new Error(`Parent fixture did not publish its child PID within 15 seconds: ${stderr}`)), 15_000);
+    parent.stdout.on("data", onData);
+    parent.stderr.on("data", onStderr);
+    parent.once("error", onError);
+    parent.once("close", onClose);
+  });
 }
 
 async function waitForProcess(pid, expectedAlive, timeoutMs) {

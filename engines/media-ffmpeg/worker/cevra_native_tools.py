@@ -1128,7 +1128,7 @@ def _run_audio_sequence(common: Any, args: Dict[str, Any]) -> Dict[str, Any]:
             raise RuntimeError(f"audio sequence owned artifact cleanup failed: {'; '.join(cleanup_errors)}")
 
 
-def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Optional[Dict[str, Any]]:
+def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path, *, retain_preview_segments: bool = False) -> Optional[Dict[str, Any]]:
     if "preview_profile" in args and (name != "cut" or args.get("bounded_preview") is not True):
         raise ValueError("preview profile requires bounded cut")
     if name not in CUSTOM_TOOLS and not (name == "cut" and args.get("bounded_preview") is True):
@@ -1159,7 +1159,7 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path) -> Opti
                 return _run_audio_sequence(common, args)
             if name in {"cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"}:
                 import cevra_manual_sequence
-                return cevra_manual_sequence.run(common, runtime, args, preview=name.endswith("-preview"))
+                return cevra_manual_sequence.run(common, runtime, args, preview=name.endswith("-preview"), retain_segments=retain_preview_segments)
             if name == "cevra-measure-audio":
                 report = audio_measurement.run(common, args)
                 return {"content": [{"type": "text", "text": json.dumps(report, allow_nan=False)}], "structuredContent": report}

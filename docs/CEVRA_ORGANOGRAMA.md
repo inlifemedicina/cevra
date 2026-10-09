@@ -746,3 +746,26 @@ cancellations. Awake native painting/scroll and owner acceptance remain PENDING;
 no display wake, human-session/device operation or synthetic promotion to PASS.
 Final exact review/CI/package identity is PENDING at this checkpoint; results
 will be recorded in Draft #85 and its local receipt.
+
+### 2026-10-07 — Approved preview segment reuse
+
+Owner-approved delta `feat/vids-preview-segment-reuse` starts at Draft #90
+`278627e`, under ADR0035. The existing Media worker retains admitted immutable
+preview segment/grid objects in a shared32MiB/64-entry LRU inside aggregate512MiB;
+restoration reserves within the existing2GiB ledger before writing. The current
+preview's first PNG receives the same guard. Other worker operations release
+retention before unguarded work; failure/cancellation/restart clear it.
+
+Local Python151/11/11, full offline/inert Claude-PoC and exact sealed original-master
+runtime catalogs PASS. Real reorder/trim/removal outputs match every decoded
+picture and PCM sample against uncached original-derived references. Actual Host
+handoff measured2.148/2.794/1.747s; actual packet React/Blob/PNG DOM123–166ms does
+not establish native decode, paint or perceived latency. Pressure/corruption,
+lease-marker, live-job cancellation/restart and stale UI response gates PASS.
+
+[Canonical record](CEVRA_PREVIEW_SEGMENT_REUSE_V1.md) preserves failures and separates
+worker, Host, whole-program warm and UI delivery. Exact-head CI and independent
+review remain pending before a new grouped package. Director impact is compatible:
+context, permissions/providers and typed IR/History remain authoritative. No new
+human/device/AI operation, merge or issue88 body publication; progress55%, F-A021/1
+and full G1 unaccepted remain. Reuse the existing single acceptance catalog.

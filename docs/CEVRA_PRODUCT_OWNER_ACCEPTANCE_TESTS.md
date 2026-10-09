@@ -224,6 +224,14 @@ foi feito; limites instantâneos e rodada coordenada permanecem abertos.
 
 ### Single grouped G1 script
 
+**Cache de segmentos aprovado — 07/10/2026:** a extensão separada em RAM sobre
+`278627e` tem [validação técnica local](CEVRA_PREVIEW_SEGMENT_REUSE_V1.md): todos
+os frames/PCM, pressão, cancelamento/restart, Host e entrega à UI. Reorder2.148s,
+trim2.794s e remoção1.747s são medições de entrega; DOM123–166ms não é decode/paint
+nativo ou aceite de espera. CI exato e revisão independente precedem um pacote.
+Continuar somente o grupo I4-T1/X-T1/T7/X-T6 abaixo, sem rodada por campo/botão;
+o aplicativo humano permanece congelado e nenhuma nova rodada foi executada.
+
 Roteiro único para a futura rodada coordenada; **não abrir agora** nem interromper
 o teste Take existente. G1 é o bloco de montagem manual com prévia e exportação;
 os IDs de teste abaixo servem ao registro da equipe, não são botões do aplicativo.

@@ -2658,6 +2658,26 @@ When the user shows a new video/product:
 
 # 28. Immediate next actions
 
+**Approved preview segment reuse — 2026-10-07:** following the bounded feasibility
+proposal, the Owner approved integration and confirmed resending the dispatch
+cancelled before execution. A separate `feat/vids-preview-segment-reuse` delta
+starts at `278627e` / Draft #90. [ADR 0035](adr/0035-preview-segment-memory-reuse.md)
+records worker-local immutable preview segment reuse, candidate 32-MiB/64-entry
+limits inside aggregate512MiB, restore reservations inside2GiB, and release
+before unguarded work. Implementation and local validation PASS: 151/11/11 Python
+tests, offline monorepo1,485/inert Claude-PoC391, sealed original-master runtime catalog,
+all-picture/PCM equality, real cache pressure, live-job cancellation/restart and
+actual Host/UI packet handoff. Host reorder2.148s, one-frame trim2.794s and
+removal1.747s; UI DOM handoff123–166ms does not prove native decode/paint or
+perceived waiting. [Canonical evidence](CEVRA_PREVIEW_SEGMENT_REUSE_V1.md) records
+separate cold/whole-program warm timings and preserved failures. Exact new-head
+CI and independent review are required before a grouped package; their exact
+status is recorded on the implementation Draft/terminal receipt.
+No export/original/IR authority changes, human app/phone/Take operation,
+new AI call, merge or issue88 body publication. Earlier statements that this
+specific proposal awaited approval remain historical. Director compatible;
+progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.
+
 **Approved UI decision and completed investigation — 2026-10-07:** the Owner
 approved Enter/blur confirmation of valid selected-clip IN/OUT at 00:22:58 UTC,
 Escape cancellation, one Undo and no duplicate Enter-plus-blur commit. This
