@@ -265,3 +265,69 @@ Provider; a cópia anterior ao selo foi conferida byte a byte, e o runtime não
 foi modificado pela assinatura. É teste local ad hoc, sem notarização. O app
 anterior não foi encerrado/substituído, e o agente não abriu projetos humanos.
 Obsoletos próprios ficam recuperáveis em `~/Documents/CEVRA/Apagar`.
+
+
+## Isolated offline hardening — 2026-10-11
+
+The Owner requested further overnight offline checks while preserving the exact
+app and fixtures already delivered. This follow-up uses
+`fix/vids-ux-hardening-2026-10-11`, based on delivered head `45131a9`, in
+`~/Documents/CEVRA/Vids/ux-hardening-2026-10-11/checkout`. It does not replace the
+app, update PR96 or open another human round. The original checkout stays clean.
+
+Two concrete P2 cases were reproduced and fixed here: keyboard proportional
+resize rejected valid titles when its next step crossed a size/canvas limit;
+Escape after rejected text left a stale invalid-title alert. Pointer and
+keyboard now use the same closed bounds, with strict numeric endpoint
+normalization and no new command at an unchanged limit. Independent review
+identified a one-ULP minimum-scale failure (`0.501169` →
+`0.49999999999999994`), reproduced in both aspects and both input paths before
+normalizing the products to the domain's existing bounds. Draft cancellation
+clears its error while retaining the saved title. No domain, schema, engine,
+provider, dependency or security change is introduced.
+
+Additional coverage, distinct from the sealed delivery totals:
+
+- 151 relevant UI tests PASS, including 12 new title boundary/rejection tests;
+  existing text/IME, gesture cancellation, selection/Delete, precise time,
+  source-removal review and export tests remain passing.
+- 53 Application/Host tests PASS. One new deterministic test covers 48 varied
+  CFR30 sequences, all source occurrences, survivor source intervals, three
+  Undo/Redo cycles per source, archive-cursor restores, rejected stale/repeated
+  requests and complete restoration. Physical Host checkpoint/reopen and
+  export cancellation tests use exclusively owned synthetic stores.
+- Final TypeScript/Vite build and diff whitespace check PASS. Existing
+  BigInt target warnings remain outside this UI-only change.
+
+**Supplemental real-render gate BLOCKED:** the new canvas-edge/title/removal/
+reopen harness reached the release worker, but its preview file failed the
+existing identity guard (`preview file identity changed`) under Documents.
+A separate `.nosync` directory within CEVRA failed with the same symptom.
+No integrity guard was relaxed, no Filesystem/iCloud/security setting was
+changed, and no PASS is claimed for those attempts. The previous sealed
+17 renders / 27 jobs remain unchanged and are not rerun or added to this count.
+The metadata cause remains an inference consistent with the earlier recorded
+File Provider interference, not a new isolated causal proof.
+
+External evidence is under the hardening base: `evidence/title-boundary-red.log`,
+`title-rounding-red.log`, `title-manual-final.log`, `manual-history-host-tests.log`,
+`desktop-build-final.log`, the two failed render receipts/stderr logs, and
+`delivery-preservation-after.json`. Preservation checks matched all 1,024 app
+files, both fixture pins, the shortcut target, original clean head and sealed
+delivery receipt; deep/strict signature verification outside the restricted
+executor also passed. No new app was packaged or signed.
+
+Director impact: no new impact found within this delta in either direction.
+It changes only UI draft arithmetic/error presentation and regression coverage;
+typed operations, permissions, Project IR and ProjectHistory are unchanged.
+The current [grouped acceptance round](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#integrated-manual-title-app-round--2026-10-11)
+remains **APP/OWNER PENDING** on the frozen delivered package.
+
+The canonical ordering in the Master Context is a gate, not implementation
+authority for the next block: finish this grouped acceptance, then delimit
+audiovisual finishing, then AI strategy/selection/cut planning. Audio-plan and
+caption IR primitives do not establish an accepted finishing workflow.
+MR-V02/K2 color/HDR gates and the bounded execution-feasibility/product decision
+remain prerequisites for affected finishing work. F-A02 stays exhausted1/1;
+no real AI or provider execution is authorized. No later feature was invented
+or started to fill the waiting period.

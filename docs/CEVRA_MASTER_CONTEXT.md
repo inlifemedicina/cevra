@@ -3778,3 +3778,35 @@ Director impact: compatible extension in both directions; proposed validated
 V1/V2 titles and reviewed removal execute through existing IR/History commands.
 Progress55% and F-A02 exhausted1/1 remain; later audiovisual/AI blocks are not
 started by this extension.
+
+
+### 2026-10-11 — Frozen delivery and isolated overnight hardening
+
+**IN DEVELOPMENT / NOT MERGED.** The Owner requested further offline checks
+while preserving the exact next-day UX app/fixtures. Delivered Draft #96 stays
+at `45131a9`, open/unmerged, with successful fresh-head CI740 (5/5) and Audio
+Sequence Exact Runtime103 (1/1). All 1,024 app files, synthetic fixture pins,
+shortcut and sealed receipt matched the before inventory; deep/strict signature
+verification passed outside the restricted executor. Original checkout remains
+clean. No app replacement, second human round or merge occurred.
+
+An isolated `fix/vids-ux-hardening-2026-10-11` delta fixes valid title resizing at
+strict bounds and a stale alert after Escape cancels rejected text. The review's
+one-ULP minimum-scale finding was reproduced before correction. UI151,
+Application/Host53 and final desktop build passed; the new removal matrix covers
+48 sequences with repeated Undo/Redo and archive restoration. These scoped
+totals overlap previous gates and are not added to the delivery's totals.
+Supplemental edge/reopen real renders remain **BLOCKED** by preview-file
+identity changes in Documents, including `.nosync`; guards were not relaxed.
+See the [canonical follow-up proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#isolated-offline-hardening--2026-10-11)
+for reproduced cases, external evidence and gate limits.
+
+The approved sequence still requires the one grouped **APP/OWNER PENDING**
+round before delimiting audiovisual finishing; it does not authorize the next
+implementation now. Existing audio/caption primitives need a bounded workflow
+proposal and feasibility check; affected color/HDR remains behind MR-V02/K2.
+Later AI strategy/selection/cut planning is also not started, and F-A02 remains
+exhausted1/1. No new scope, provider, engine, schema, dependency or security
+change was introduced. Director impact: no new impact found within this delta;
+UI arithmetic/error handling preserves the typed execution and IR/History
+boundaries in both directions. Progress55% remains unchanged.
