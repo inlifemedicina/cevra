@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { chmod, lstat, mkdtemp, open, realpath, rm, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
+import { nativeTitleFontIdentity } from "./native-title-font-identity.js";
 import { verifyAndCopyVideoSource } from "./local-video-preview.js";
 
 /** Early metadata rejection only; the runtime still performs complete admission. */
@@ -86,7 +87,7 @@ export class DerivedVideoPreview {
   private key(range: ReturnType<typeof resolvePreviewRange>): string {
     const s = range.source;
     return createHash("sha256").update(JSON.stringify([s.id, s.uri, s.durationMs, s.width, s.height, s.frameRate, s.sampleRate, s.channels,
-      s.technicalDescriptor, range.sources.map(item => [item.id, item.uri, item.technicalDescriptor, item.durationMs, item.sampleRate, item.channels]), range.sequenceClips, range.composition, range.composition ? this.options.history.current.history.headSnapshotId : undefined, range.startMs, range.endMs, range.frameRange, range.frameRange ? "manual-cfr30-preview-v1" : "take-v1", this.options.runtimeIdentity?.() ?? "session-bound-engine"])).digest("hex");
+      s.technicalDescriptor, range.sources.map(item => [item.id, item.uri, item.technicalDescriptor, item.durationMs, item.sampleRate, item.channels]), range.sequenceClips, range.composition, range.composition ? nativeTitleFontIdentity() : undefined, range.startMs, range.endMs, range.frameRange, range.frameRange ? "manual-cfr30-preview-v1" : "take-v1", this.options.runtimeIdentity?.() ?? "session-bound-engine"])).digest("hex");
   }
 
   private packet(entry: PreparedPreview, request: LocalVideoPreviewRequest, range: ReturnType<typeof resolvePreviewRange>): LocalVideoPreview {

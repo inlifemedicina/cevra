@@ -497,7 +497,7 @@
   "timeline.cursor": "Cursor {time} · frame {frame}",
   "timeline.cursorTime": "Cursor {time}",
   "title.controls": "Title",
-  "title.fixedStyle": "Select in the preview. Drag to move, use the corner to resize, and double-click to edit the text. Available symbols use this style’s font. Others appear as □; emoji use text presentation. Saved text is preserved. Titles that do not fit need shorter text or a size adjustment.",
+  "title.fixedStyle": "Select in the preview. Drag to move, use the corner to resize, and double-click to edit text. Emoji and symbols use the presentation available on macOS. Unavailable symbols appear as □; saved text is preserved. Titles that do not fit need shorter text or a smaller size.",
   "title.unavailable": "Title unavailable in this environment.",
   "title.text": "Title text",
   "title.in": "IN",
@@ -512,7 +512,7 @@
   "title.invalid": "Check the title text and range. IN is included; OUT is excluded.",
   "title.pending": "Add the title or discard its changes before continuing.",
   "editing.help": "Help",
-  "editing.fineTime": "Milliseconds appear while editing time. ↑ and ↓ make fine adjustments; Shift adjusts one second. Existing cuts retain their precision.",
+  "editing.fineTime": "IN/OUT and preview show hundredths. ↑ and ↓ make fine adjustments; Shift adjusts one second. Existing cuts keep their precision.",
   "media.remove": "Remove media from project",
   "media.removeCancel": "Cancel",
   "media.removeConfirm": "Remove media and clips",
@@ -528,5 +528,10 @@
   "sequence.boundaryUnchanged": "Unchanged",
   "sequence.boundaryPrecision": "Original {original} ms; proposed {projected} ms; difference {delta} ms.",
   "editing.helpTip": "Click for tips about this control.",
-  "editing.mediaTitleCaption": "The media name identifies the original file in the project. A title is text overlaid on the video. Captions are text segments synchronized with speech."
+  "editing.mediaTitleCaption": "The media name identifies the original file in the project. A title is text overlaid on the video. Captions are text segments synchronized with speech.",
+  "title.timelineRange": "Title duration",
+  "title.timelineIn": "Timeline title IN",
+  "title.timelineOut": "Timeline title OUT",
+  "title.timelineTrimIn": "Adjust title IN",
+  "title.timelineTrimOut": "Adjust title OUT"
 }

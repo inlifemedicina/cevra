@@ -38,8 +38,8 @@ export function formatTime(milliseconds: number, durationMs = milliseconds): str
 }
 
 export function formatPreciseTime(milliseconds: number, durationMs = milliseconds): string {
-  const rounded = Math.max(0, Math.round(milliseconds));
-  return `${formatTime(rounded, durationMs)},${String(rounded % 1000).padStart(3, "0")}`;
+  const centiseconds = Math.max(0, Math.round(milliseconds / 10));
+  return `${formatTime(centiseconds * 10, durationMs)},${String(centiseconds % 100).padStart(2, "0")}`;
 }
 
 export function capabilityReasonKey(reason: DesktopCapabilityReason): TranslationKey {

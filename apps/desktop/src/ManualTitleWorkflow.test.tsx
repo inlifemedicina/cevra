@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { createEmptyProject, ProjectHistory, frameTimingMilliseconds } from "@cevra/project-ir";
+import { createEmptyProject, ProjectHistory, frameTimingMilliseconds, resolveManualTitle } from "@cevra/project-ir";
 import { removeManualProjectSource, ManualTitleApplicationService, type ManualTitleEdit } from "@cevra/application";
 import { translate } from "@cevra/i18n";
 import { App } from "./App";
@@ -350,4 +350,91 @@ it("rejects a transparent decoded-video capture instead of retaining a blank fra
   const canvas = container.querySelector<HTMLCanvasElement>(".manual-held-frame")!;
   expect(canvas.hidden).toBe(true); expect(canvas.width).toBe(0);
   expect(container.querySelector(".manual-preview-refreshing")).toBeNull();
+});
+
+
+async function selectTimelineTitle(f: Awaited<ReturnType<typeof mountTitle>>) {
+ const item=within(screen.getByRole("region",{name:translate("pt-BR","timeline.title")})).getByRole("button",{name:f.history.current.graphics[0]!.text!});
+ await act(async()=>fireEvent.click(item));
+ return {input:screen.getByLabelText(translate("pt-BR","title.timelineIn")),out:screen.getByLabelText(translate("pt-BR","title.timelineOut")),
+   edge:screen.getByRole("slider",{name:translate("pt-BR","title.timelineTrimIn")}),item};
+}
+it("edits selected title IN/OUT in the timeline once per Enter/blur and restores exact ranges through repeated Undo/Redo",async()=>{
+ const f=await mountTitle(), before=f.history.current, entries=f.history.entries.length;
+ const {input,out}=await selectTimelineTitle(f);
+ fireEvent.focus(input);fireEvent.blur(input);expect(f.history.entries.length).toBe(entries);
+ fireEvent.focus(input);fireEvent.change(input,{target:{value:"00:01,03"}});
+ await act(async()=>{fireEvent.keyDown(input,{key:"Enter"});fireEvent.blur(input)});
+ expect(f.history.entries.length).toBe(entries+1);expect(resolveManualTitle(f.history.current.graphics[0]!).startFrame).toBe(31);
+ fireEvent.focus(out);fireEvent.change(out,{target:{value:"00:09,97"}});await act(async()=>fireEvent.blur(out));
+ const changed=f.history.current;expect(resolveManualTitle(changed.graphics[0]!).endFrame).toBe(299);
+ expect(changed.timeline).toEqual(before.timeline);expect(changed.sources).toEqual(before.sources);
+ for(let n=0;n<3;n++){
+  await act(async()=>fireEvent.click(screen.getByRole("button",{name:"Desfazer"})));
+  await act(async()=>fireEvent.click(screen.getByRole("button",{name:"Desfazer"})));
+  expect(f.history.current.graphics).toEqual(before.graphics);
+  await act(async()=>fireEvent.click(screen.getByRole("button",{name:"Refazer"})));
+  await act(async()=>fireEvent.click(screen.getByRole("button",{name:"Refazer"})));
+  expect(f.history.current.graphics).toEqual(changed.graphics);
+ }
+});
+it("bounds title edge keyboard edits to one frame, preserves shortcuts and cancels invalid/Escape/IME drafts",async()=>{
+ const f=await mountTitle();const {input,out,edge}=await selectTimelineTitle(f), before=f.history.current;
+ fireEvent.focus(input);fireEvent.change(input,{target:{value:"00:11,00"}});await act(async()=>fireEvent.blur(input));expect(f.history.current).toEqual(before);
+ fireEvent.focus(input);await act(async()=>fireEvent.keyDown(input,{key:"Escape"}));await act(async()=>fireEvent.blur(input));expect(f.history.current).toEqual(before);
+ await act(async()=>fireEvent.keyDown(edge,{key:"ArrowRight"}));expect(resolveManualTitle(f.history.current.graphics[0]!).startFrame).toBe(1);
+ await act(async()=>fireEvent.keyDown(edge,{key:"ArrowRight",shiftKey:true}));expect(resolveManualTitle(f.history.current.graphics[0]!).startFrame).toBe(11);
+ await act(async()=>fireEvent.keyDown(edge,{key:"End"}));let title=resolveManualTitle(f.history.current.graphics[0]!);expect(title.startFrame).toBe(title.endFrame-1);
+ const count=f.history.entries.length;await act(async()=>fireEvent.keyDown(edge,{key:"ArrowRight"}));expect(f.history.entries.length).toBe(count);
+ await act(async()=>fireEvent.keyDown(edge,{key:"Home"}));expect(resolveManualTitle(f.history.current.graphics[0]!).startFrame).toBe(0);
+ const current=f.history.current;fireEvent.focus(out);fireEvent.change(out,{target:{value:"00:00,00"}});fireEvent.compositionStart(out);
+ await act(async()=>fireEvent.keyDown(out,{key:"Enter",isComposing:true,keyCode:229}));expect(f.history.current).toEqual(current);fireEvent.compositionEnd(out);
+});
+it("commits a title pointer trim once and cancels pointercancel, Escape and window blur",async()=>{
+ const f=await mountTitle();const {edge}=await selectTimelineTitle(f);const lane=edge.closest(".timeline-width")!;
+ const width=parseFloat((lane as HTMLElement).style.width)||800;
+ lane.getBoundingClientRect=()=>({x:0,y:0,left:0,top:0,right:width,bottom:50,width,height:50,toJSON(){}});
+ const entries=f.history.entries.length;
+ await act(async()=>fireEvent.pointerDown(edge,{button:0,pointerId:71,clientX:0}));
+ fireEvent.pointerMove(edge,{pointerId:71,clientX:100});await act(async()=>fireEvent.pointerUp(edge,{pointerId:71,clientX:100}));
+ expect(f.history.entries.length).toBe(entries+1);expect(resolveManualTitle(f.history.current.graphics[0]!).startFrame).toBeGreaterThan(0);
+ const before=f.history.current;
+ for(const cancel of [()=>fireEvent.pointerCancel(edge,{pointerId:72}),()=>fireEvent.keyDown(window,{key:"Escape"}),()=>fireEvent(window,new Event("blur"))]){
+  await act(async()=>fireEvent.pointerDown(edge,{button:0,pointerId:72,clientX:100}));fireEvent.pointerMove(edge,{pointerId:72,clientX:0});cancel();
+  await act(async()=>fireEvent.pointerUp(edge,{pointerId:72,clientX:0}));expect(f.history.current).toEqual(before);
+ }
+});
+
+
+it("settles a dirty inspector before title duration without restoring old text",async()=>{
+ const f=await mountTitle();const {input}=await selectTimelineTitle(f);const entries=f.history.entries.length;
+ fireEvent.change(screen.getByLabelText("Texto do título"),{target:{value:"Ação ❤️ 👩🏽‍⚕️"}});
+ fireEvent.focus(input);fireEvent.change(input,{target:{value:"00:01,03"}});
+ await act(async()=>{fireEvent.keyDown(input,{key:"Enter"});fireEvent.blur(input)});
+ const title=resolveManualTitle(f.history.current.graphics[0]!);expect(title.text).toBe("Ação ❤️ 👩🏽‍⚕️");expect(title.startFrame).toBe(31);expect(f.history.entries.length).toBe(entries+2);
+});
+it("consumes a failed duration press/release before Export and only a new gesture retries the retained range",async()=>{
+ const f=await mountTitle();const {input}=await selectTimelineTitle(f),user=userEvent.setup(),before=f.history.current;
+ await user.click(input);await user.clear(input);await user.type(input,"00:01,03");
+ const original=f.backend.editManualTitle!;let reject!:(cause:unknown)=>void;
+ const commit=vi.fn(()=>new Promise<Awaited<ReturnType<typeof original>>>((_resolve,rej)=>{reject=rej}));f.backend.editManualTitle=commit;
+ const next=screen.getByRole("button",{name:"Exportar"});
+ await user.pointer({target:next,keys:"[MouseLeft>]"});await waitFor(()=>expect(commit).toHaveBeenCalledTimes(1));
+ await act(async()=>reject({code:"MANUAL_TITLE_INVALID"}));await user.pointer({target:next,keys:"[/MouseLeft]"});
+ expect(commit).toHaveBeenCalledTimes(1);expect(f.history.current).toEqual(before);expect(f.backend.exportManualSequence).not.toHaveBeenCalled();
+ expect((screen.getByLabelText(translate("pt-BR","title.timelineIn")) as HTMLInputElement).value).toBe("00:01,03");
+ f.backend.editManualTitle=original;await user.click(next);await waitFor(()=>expect(f.backend.exportManualSequence).toHaveBeenCalledTimes(1));
+ expect(resolveManualTitle(f.history.current.graphics[0]!).startFrame).toBe(31);
+});
+it("release during pending inspector settlement cannot start a late title edge gesture",async()=>{
+ const f=await mountTitle();const {edge}=await selectTimelineTitle(f),before=f.history.current;
+ const lane=edge.closest(".timeline-width")!;lane.getBoundingClientRect=()=>({x:0,y:0,left:0,top:0,right:800,bottom:50,width:800,height:50,toJSON(){}});
+ fireEvent.change(screen.getByLabelText("Texto do título"),{target:{value:"Texto mais recente"}});
+ const original=f.backend.editManualTitle!;let release!:()=>void;
+ f.backend.editManualTitle=vi.fn((request:ManualTitleEdit)=>new Promise<Awaited<ReturnType<typeof original>>>(resolve=>{release=()=>{void original(request).then(resolve)}}));
+ await act(async()=>fireEvent.pointerDown(edge,{button:0,pointerId:88,clientX:0}));
+ await waitFor(()=>expect(f.backend.editManualTitle).toHaveBeenCalledTimes(1));
+ fireEvent.pointerUp(edge,{pointerId:88,clientX:100});await act(async()=>release());
+ expect(f.history.current.graphics[0]!.text).toBe("Texto mais recente");expect(resolveManualTitle(f.history.current.graphics[0]!).startFrame).toBe(resolveManualTitle(before.graphics[0]!).startFrame);
+ expect(f.backend.editManualTitle).toHaveBeenCalledTimes(1);
 });

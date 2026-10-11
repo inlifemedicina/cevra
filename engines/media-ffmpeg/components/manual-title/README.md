@@ -9,19 +9,28 @@ license in OFL.txt. Source: google/fonts, revision
 Font SHA256: 29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031.
 OFL SHA256: 5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57.
 
-The private font is loaded directly without OS registration or fallback.
+Inter is loaded privately without OS registration. CoreText preserves complete
+Unicode graphemes, variation selectors, ZWJ sequences and modifiers. Emoji
+presentation uses native AppleColorEmoji; text presentation stays textual. The
+primary Inter cascade includes native Arial Unicode for missing scripts. Only
+faces from the sealed `/System/Library/Fonts` collection or pinned private Inter
+are admitted. No system font bytes are redistributed or globally registered.
+A genuinely unavailable cluster renders one □; canonical text is unchanged.
+The report records normalized drawn text, substitutions, used faces and exact
+font-file SHA-256. Isolated selectors render □; selectors on bases are preserved.
+
 Fixed size: 56 px horizontal, 48 px vertical. Full geometry: 1920×1080 or
 1080×1920; margin 8% horizontally and 10% from the bottom; bar 84% wide.
-Preview reduces the composed canonical picture to 720×404 or 404×720.
-Glyph availability and overflow fail before publication; no clipping/fallback.
-A covered base may carry the Unicode text-presentation selector FE0E; the
-selector is shaped with its base, and every shaped run must retain private Inter.
-Leading/repeated FE0E, emoji presentation, missing base glyphs and fallback fail.
-The helper receives only runtime font path, canonical dimensions, bounded text
-and worker-owned output. PNG allocation is reserved before spawning it.
+Preview reduces the same composed canonical picture to 720×404 or 404×720.
+Overflow rejects before publication. The helper receives only runtime font path,
+canonical dimensions, bounded text/layout and worker-owned output. PNG allocation
+is reserved before spawning it.
 
 build_worker.py stages the assets and builds the Swift helper on macOS.
 The runtime manifest tree seal covers source, font, license and binary;
 the font is additionally verified against its fixed pin and the segment cache
-includes the binary digest, component, text, local interval and aspect.
+includes the binary digest, component, text, local interval and aspect. Host and
+worker caches also include fresh OS build/system-font file identities; post-render
+identity checks reject changes. Untitled occurrences retain aspect but are not
+invalidated by invisible title text or layout edits.
 Non-macOS builds advertise this component unavailable.

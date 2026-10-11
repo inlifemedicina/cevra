@@ -841,28 +841,29 @@ grouped subjective round; do not repeat this approved offline visual test.
 
 ## Integrated manual-title app round — 2026-10-11
 
-**FIRST OWNER ROUND REPORTED; REGRESSIONS OPEN.** This single grouped app round includes
+**SECOND OWNER REPORT RECORDED; CURRENT TECHNICAL GATES IN CLOSEOUT.** This single grouped app round includes
 both Owner-approved UX scopes: organization/time/removal, then direct title
 manipulation. It supersedes the earlier pending app instructions at this same
 anchor; the accepted offline fixed-title visual proof remains closed. Reuse the
 stable IDs below without a blanket catalog PASS or new scenario ID.
 [Implemented contracts and gate bounds](CEVRA_MANUAL_TITLE_PROOF_V1.md#ux-e-manipulação-direta-aprovadas--2026-10-11).
 
-Open the isolated `CEVRA Vids UX.app` shortcut in
-`~/Documents/CEVRA/Vids/ux-titulos-2026-10-11` (0.1.0/runtime0.3.6). The signed
-package stays in Applications. Import `fixtures/revisao-horizontal.mp4`, then
-`fixtures/revisao-vertical.mp4` for the second aspect; these admitted synthetic
-fixtures each last ten seconds, with a visible cut at five seconds and an audio
-tone/pulse. Keep human exports in the base's `rodada-humana` folder.
+The previous UX/Unicode candidates and their reported Owner results remain
+historical evidence. Do not repeat that full initial round. After the current
+source/CI/package gates finish, use the new shortcut
+`~/Documents/CEVRA/Vids/human-review-regressions-2026-10-11/round-2/CEVRA Vids Revisao 2.app`
+(runtime0.3.9). The signed package stays in Applications. The existing app and
+project remain preserved; close the old variant normally after Saved before
+manually opening the new one with the same isolated project identity.
+Synthetic fixtures are `review-assets/source-horizontal.mp4` and
+`review-assets/source-vertical.mp4`; prepared real preview/export/mixed outputs
+are in `round-2/real-verified`. Keep any human export in `round-2/rodada-humana`.
 
-| Existing IDs / grouped action | Expected result |
+| Existing IDs / one minimal grouped follow-up | Expected result |
 |---|---|
-| D14-T2, D23-T1/T2: import horizontal; mark IN at start and OUT at end, create the whole ten-second clip; inspect layout and move the timeline divider. | Preview remains usable above the larger, adjustable timeline. One Export appears at top right outside the inspector. Media names have no Fonte prefix. The frozen PR96 display uses HH:MM:SS; the approved follow-up uses MM:SS below one hour, HH:MM:SS for a longer owning sequence/file, and precise focused time drafts. Technical proxy/boundary copy is in collapsed help. |
-| D14-T2, X-T1/T2: add `Ação, café e conexão`, title IN00:00:03/OUT00:00:07 and16:9; select title on timeline, Delete, Undo. | Applying/changing selection never duplicates Export. The title appears at its inclusive IN/exclusive OUT; Delete removes the selected title once, and Undo restores it without changing clips/audio. Typing Delete edits text. |
-| D23-T1/T2, X-T1/T2: while title is paused inside its interval, select in preview, double-click/edit text, drag position, resize by the corner; Undo/Redo. Play, pause near the middle, then edit text again. | Selection is clear and gestures feel direct. Text/position/size restore together through History. Saving after playback keeps the paused frame; following clicks/transport remain usable. No Project IR or engine controls appear. |
-| D23-T1/T2, bounded K3-T2/K4-T2: export `horizontal-humano.mp4` from the top button and compare with the current preview. |1920×1080 final has the current title text, position, size and interval, with coherent cut/audio, accents and no freeze or inherited title. This comparison remains a bounded component check, not the complete K4 benchmark. |
-| X-T7, I17-T9: wait for Saved, close the isolated app normally and reopen. Then select its media card and Delete; read dependent-clip/title warning, cancel once, confirm, Undo. | The saved title/layout/range and timeline reopen. Cancel has no impact. Confirmation removes only the project source/dependent clips in one History step, with disclosed ripple/title impact; Undo restores them. The fixture file remains in Finder. |
-| D14-T2, D23-T1/T2, X-T1/T2 and bounded K3-T2/K4-T2: after the horizontal review, remove that source from this isolated project; import/select the vertical fixture, create its whole clip, choose9:16 and repeat direct title/preview/export as `vertical-humano.mp4`. |1080×1920 preview/final agree on current text, position, proportional size and timing; letterboxing does not distort placement, and accents/audio remain coherent. Report visual and UX judgment for both aspects together. |
+| D14-T2, X-T1/T2: inspect IN/OUT and preview counter, navigate one frame, focus/blur unchanged fields. | Always two centisecond digits (`MM:SS,cc`, owning duration adds hours); ruler stays whole seconds. Existing cuts remain exact. One Export remains at top right; accepted warnings/layout stay. |
+| D14-T2, D23-T1/T2, X-T1/T2: select title on timeline, drag both edges or edit contextual IN/OUT; type `Ação ↑ ❤️ 👩🏽‍⚕️ 🇧🇷 1️⃣`, move/resize in preview and Undo/Redo. | Duration respects sequence bounds, one History step per settled edit, text/layout/range restore together. Emoji presentation agrees between editor and current video; report perceived wait and gesture fluency together. Automation already checks stale/pending/cancel/focus guards. |
+| D23-T1/T2, bounded K3-T2/K4-T2, I17-T9: compare prepared H/V Unicode and V-H-V/H-V-H outputs; if needed export current title, then Saved/normal reopen. | Current preview/export title agrees in both aspects; mixed source is completely fitted with bars in a stable owning canvas. No automatic fill/crop or aspect switch. Canonical title/layout/range persists. Fit-versus-fill product changes need a separate decision. |
 
 Exact precision/fine navigation/conversion, stale snapshots, native closed
 payloads, physical History persistence, glyph/profile/overflow negatives,
@@ -984,3 +985,19 @@ remains and does not establish natural first paint or latency elimination.
 APP/OWNER verdicts remain pending; no blanket G1/K4/ADR0012/release acceptance.
 See [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--signed-candidate-clean-runtime-and-recoverable-closeout)
 for exact package, archive and evidence locations; no previous app is replaced.
+
+
+#### Second human correction gate record — 2026-10-11
+
+The second report asks for persistent centiseconds, general Unicode color/cluster
+presentation, direct timeline duration and measured refresh; previous Export
+and warning acceptance remains. All three reported PNGs were read as pixels.
+The screenshot and actual mixed renders establish existing fit/pad in the
+checked cases; no crop policy is silently substituted. Current automated
+evidence: UI341/one skip, retained drafts46, Host preview47, Python162, build
+and independent source review PASS, plus14 actual H/V/mixed renders. Complete offline test:ci and Tauri release build pass. Fresh
+exact-head CI and signed-package review are still required before the
+same single subjective follow-up above. Host admission2202–2363ms for new
+titles remains; cached Undo/Redo12–13ms causes no render. These measurements
+do not establish natural WK paint or subjective fluency. No new catalog ID,
+blanket acceptance, engine or Director permission is introduced.

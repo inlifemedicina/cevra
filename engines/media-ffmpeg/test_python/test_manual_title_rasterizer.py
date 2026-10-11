@@ -36,39 +36,29 @@ class ManualTitleRasterizerTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=15)
         return result, output
 
-    def test_covered_symbols_and_selectors_use_private_text_style(self):
+    def test_unicode_clusters_selectors_and_native_color_fonts_are_preserved(self):
         for width, height in [(1920, 1080), (1080, 1920)]:
-            for plain_text, selected_text in [("Ação ⬆ ↑", "Ação ⬆︎ ↑︎"), ("⬆ ↑", "⬆️ ↑️")]:
-                plain, plain_png = self.render(plain_text, width, height)
-                marked, marked_png = self.render(selected_text, width, height)
-                self.assertEqual(plain.returncode, 0, plain.stderr)
-                self.assertEqual(marked.returncode, 0, marked.stderr)
-                report = json.loads(marked.stdout)
-                self.assertEqual(report["text"], selected_text)
-                self.assertEqual(report["renderedText"], plain_text)
-                self.assertEqual(report["fontPostScriptName"], "Inter-Regular")
+            for text in ["Ação ↑ ❤️ 👩🏽‍⚕️", "😀 👨‍👩‍👧‍👦 🇧🇷 1️⃣ 漢", "⬆︎ ⬆️ ↑︎ ↑️"]:
+                result, output = self.render(text, width, height)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                report = json.loads(result.stdout)
+                self.assertEqual(report["text"], text)
+                self.assertEqual(report["renderedText"], text)
                 self.assertTrue(report["allGlyphsAvailable"])
                 self.assertFalse(report["globalFontRegistration"])
                 self.assertEqual(report["substitutedClusters"], 0)
-                self.assertEqual(report["presentationSelectorsRemoved"], 2)
-                self.assertEqual(marked_png.read_bytes(), plain_png.read_bytes())
-
-    def test_missing_clusters_preserve_text_and_render_one_private_marker_each(self):
-        # Characters, not UTF-16 units: skin tone/ZWJ, family, flag and keycap are one cluster each.
-        text = "😀 👩🏽‍⚕️ 👨‍👩‍👧‍👦 🇧🇷 1️⃣ 漢"
-        for width, height in [(1920, 1080), (1080, 1920)]:
-            result, output = self.render(text, width, height)
-            marker, marker_output = self.render("□ □ □ □ □ □", width, height)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(marker.returncode, 0, marker.stderr)
-            report = json.loads(result.stdout)
-            self.assertEqual(report["text"], text)
-            self.assertEqual(report["renderedText"], "□ □ □ □ □ □")
-            self.assertEqual(report["substitutedClusters"], 6)
-            self.assertFalse(report["allGlyphsAvailable"])
-            self.assertTrue(report["renderedGlyphsAvailable"])
-            self.assertEqual(report["fontPostScriptName"], "Inter-Regular")
-            self.assertEqual(output.read_bytes(), marker_output.read_bytes())
+                self.assertEqual(report["presentationSelectorsRemoved"], 0)
+                self.assertIn("AppleColorEmoji", report["usedFonts"])
+                self.assertTrue(output.is_file())
+                for path, digest in report["fontFiles"].items():
+                    self.assertTrue(path.startswith("/System/Library/Fonts/") or Path(path).resolve() == (self.component / "Inter.ttf").resolve())
+                    self.assertEqual(len(digest), 64)
+        text_style, text_png = self.render("♥︎ ⬆︎")
+        emoji_style, emoji_png = self.render("♥️ ⬆️")
+        self.assertEqual(text_style.returncode, 0, text_style.stderr)
+        self.assertEqual(emoji_style.returncode, 0, emoji_style.stderr)
+        self.assertNotEqual(text_png.read_bytes(), emoji_png.read_bytes())
+        self.assertNotIn("AppleColorEmoji", json.loads(text_style.stdout)["usedFonts"])
 
     def test_combining_accents_and_render_metacharacters_are_literal(self):
         decomposed = "Ação café: ' \" \\ % ; [ ] &"
@@ -87,7 +77,7 @@ class ManualTitleRasterizerTests(unittest.TestCase):
             self.assertEqual(literal.returncode, 0, literal.stderr)
 
     def test_isolated_and_repeated_selectors_remain_bounded(self):
-        for text, drawn in [("︎", "□"), ("️", "□"), ("⬆︎︎", "⬆"), ("⬆️️", "⬆")]:
+        for text, drawn in [("︎", "□"), ("️", "□"), ("⬆︎︎", "⬆︎︎"), ("⬆️️", "⬆️️")]:
             result, output = self.render(text)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(output.is_file())

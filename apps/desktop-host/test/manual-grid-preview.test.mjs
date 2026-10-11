@@ -5,7 +5,7 @@ import { link, lstat, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/
 import { dirname, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createEmptyProject, framesToMilliseconds, ProjectHistory } from '@cevra/project-ir';
-import { ManualVideoSequenceApplicationService, ManualSequencePreviewApplicationService } from '@cevra/application';
+import { ManualVideoSequenceApplicationService, ManualSequencePreviewApplicationService, ManualTitleApplicationService } from '@cevra/application';
 import { NodeMediaArtifactStore } from '@cevra/media-ffmpeg';
 import { DesktopSession, DesktopHostProtocolServer } from '../dist/index.js';
 import { DerivedVideoPreview } from '../dist/derived-video-preview.js';
@@ -51,7 +51,7 @@ async function fixture(t, options = {}) {
           outputSha256: sha(bytes), audio: { sampleRate, channels: 1, inputSamples: samples, decodedSamples: samples + 360 } } };
     }
     assert.equal(operation.type, 'render-manual-video-preview');
-    const items = operation.version === 2 ? operation.items : [operation.item];
+    const items = operation.version >= 2 ? operation.items : [operation.item];
     // Manual audio admission is deliberately unchanged: no fabricated samples
     // before this source's measured origin, even for preview.
     assert.ok(items[0].sourceStartFrame * sampleRate / 30 >= audioOriginSamples);
@@ -66,10 +66,10 @@ async function fixture(t, options = {}) {
     const result = { type: 'file', outputUri: output, durationMs: Math.round(durationMs), publication: await publication(output),
       probe: { uri: output, width: 720, height: 404, frameRate: 30, rotationDegrees: 0, hasVideo: true, videoCodec: 'h264', hasAudio: true, audioCodec: 'aac', sampleRate: 48000, channels: 1 },
       effectiveProfile: { container: 'mp4', videoCodec: 'h264', audioCodec: 'aac', videoEncoder: 'h264_videotoolbox', audioEncoder: 'aac' },
-      manualSequence: { version: 1, profile: 'manual-cfr30-preview-v1', samplingPolicy: 'source-pts-fps30-near-v1', frameRate: { numerator: 30, denominator: 1 },
+      manualSequence: { version: operation.composition ? 2 : 1, profile: 'manual-cfr30-preview-v1', samplingPolicy: 'source-pts-fps30-near-v1', frameRate: { numerator: 30, denominator: 1 },
         container: 'mp4', videoCodec: 'h264', audioCodec: 'aac', dynamicRange: 'sdr', width: 720, height: 404, targetVideoBitsPerSecond: 700000,
         totalFrames: frames, outputFrameCount: frames, totalPcmSamples: frames * 1600, outputAudioSampleCount: frames * 1600, audioSampleRate: 48000,
-        audioChannelLayout: 'mono', durationMs, muxVideoDurationMs: durationMs, muxAudioDurationMs: durationMs, outputSha256: sha(bytes), itemCount: items.length, uniqueSegmentCount: new Set(items.map(item => [item.sourceStartFrame,item.sourceEndFrame].join(":"))).size,
+        audioChannelLayout: 'mono', durationMs, muxVideoDurationMs: durationMs, muxAudioDurationMs: durationMs, outputSha256: sha(bytes), itemCount: items.length, ...(operation.composition ? {composition: operation.composition} : {}), uniqueSegmentCount: new Set(items.map(item => [item.sourceStartFrame,item.sourceEndFrame].join(":"))).size,
         sources: [{ inputUri: original, sha256: sha(input), sizeBytes: input.length, videoStreamIndex: 0, audioStreamIndex: 1, audioStreamCount: 1,
           sampleRate, channelLayout: 'mono', sourceVideoFrameCount: 180, sourceVideoEndMs: sourceDurationMs, sourceAudioFirstSample: audioOriginSamples,
           sourceAudioSampleCount: Math.floor(sourceDurationMs * sampleRate / 1000) - audioOriginSamples }] } };
@@ -177,4 +177,20 @@ test('reimported source IDs sharing one original retain separate montage occurre
   assert.equal(new Set(f.calls[0].items.map(item => item.inputUri)).size, 1);
   assert.equal(f.calls.length, 2);
   assert.deepEqual(f.history.toArchive(), before);
+});
+
+
+test('unchanged title pixels reuse admitted bytes across fresh metadata snapshots and Undo/Redo',async t=>{
+ const f=await fixture(t), titles=new ManualTitleApplicationService(f.history);
+ const title={version:1,componentId:'cevra.title.lower-third.inter.v1',text:'Ação ❤️ 👩🏽‍⚕️',startFrame:1,endFrame:29,aspect:'16:9'};
+ titles.edit({version:1,type:'set',expectedSnapshotId:f.history.current.history.headSnapshotId,title});
+ const request=id=>({sourceId:'source',sequence:true,operationId:id,expectedSnapshotId:f.history.current.history.headSnapshotId});
+ const first=await f.session.previewLocalVideo(request('title-first'));
+ f.history.commit({type:'project.rename',name:'only metadata'});
+ const fresh=await f.session.previewLocalVideo(request('title-metadata'));
+ assert.notEqual(first.snapshotId,fresh.snapshotId);assert.equal(first.base64,fresh.base64);assert.equal(f.calls.filter(op=>op.type==='render-manual-video-preview').length,1);
+ titles.edit({version:1,type:'set',expectedSnapshotId:f.history.current.history.headSnapshotId,title:{...title,text:'Outro 🇧🇷'}});
+ await f.session.previewLocalVideo(request('title-new'));assert.equal(f.calls.filter(op=>op.type==='render-manual-video-preview').length,2);
+ f.history.undo();assert.equal((await f.session.previewLocalVideo(request('title-undo'))).base64,first.base64);
+ f.history.redo();await f.session.previewLocalVideo(request('title-redo'));assert.equal(f.calls.filter(op=>op.type==='render-manual-video-preview').length,2);
 });

@@ -758,3 +758,70 @@ Documents File Provider compatibility is not claimed fixed; the app stays in
 Applications with a shortcut. No merge, broad G1/K4/ADR0012/release acceptance
 or new independent title-PNG architecture is implied. Director: compatible
 presentation/decoder extension; no new impact from runtime packaging hygiene.
+
+
+## PR98 second human correction — 2026-10-11
+
+The Owner's second report supersedes the previous pending compact-clock and
+monochrome assumptions. All three supplied PNGs were retrieved and inspected:
+editor color emoji differs from old rendered substitutes; the mixed image
+shows an intact horizontal picture fitted inside a vertical canvas with bars.
+
+IN/OUT and preview counters now always show centiseconds; the ruler keeps
+whole seconds. Display rounding never reparses unchanged CFR frames or legacy
+precision. The selected title has contextual timeline IN/OUT and frame-bounded
+edge gestures over the same typed title operation/ProjectHistory, with one
+commit, Undo/Redo, cancel and shared dirty-draft gates. Held asynchronous
+inspector transitions and a failed duration edit followed by real mouse focus
+on Export are tested without replaying a completed gesture.
+
+The existing Inter/CoreText helper preserves Unicode graphemes and presentation
+selectors, uses only sealed macOS native fallback/color fonts and fingerprints
+those files. No system font is redistributed. Native font/runtime/source guards
+remain fresh on byte-cache reuse; metadata-only snapshot changes and cached
+Undo/Redo issue current packets without recomposition. Untitled occurrences
+reuse bytes after unrelated title changes while retaining owning aspect.
+
+Current gates: UI341 PASS/one local real-packet skip; retained drafts46 PASS;
+Host preview47 PASS; media Python162 PASS; TypeScript/Vite build PASS; read-only
+independent source/evidence review found no concrete P1/P2. The first full
+offline run preserved two environment failures (system Python3.9); the isolated
+Python3.12 host rerun passes33/33. The complete compatible-environment test:ci and Tauri release build pass.
+Fresh source/package/CI receipt is pending final closeout.
+
+Fourteen actual render operations pass in
+`~/Documents/CEVRA/Vids/human-review-regressions-2026-10-11/round-2/real-verified`.
+H/V preview+export use `Ação ↑ ❤️ 👩🏽‍⚕️ 🇧🇷 1️⃣`, exact300CFR frames,
+480000 decoded stereo PCM samples, half-open31..269 title intervals and
+physical History checkpoint/reopen. Opaque title ROI MAE0.953/2.954 and
+PSNR40.177/35.731 meet the declared3/35 threshold. V-H-V/H-V-H each have
+450CFR frames/720000 PCM samples; whole middle-image fit oracles have
+MAE0.012/0.013. Owning sequence aspect remains stable; no crop/fill policy
+change. Original SHA256 pins remain unchanged. The complete receipt carries
+raw cluster/font identities, resource samples and fixture hashes.
+
+The isolated six-edit host benchmark in `round-2/latency-idle.json` measures
+new title admission2202–2363ms, cached Undo12–13ms and Redo12ms without a
+render. Native PNG generation88–96ms is measured separately. These gates
+prove backend admission, not new native WK paint or perceived fluency. The
+previous retained-frame behavior remains, but full video composition latency
+is not eliminated. A base-video/admitted-PNG overlay could avoid this encoding
+step; it is only a feasibility inference. It would require typed packet/asset
+admission, owning-aspect derivation, source/runtime/snapshot/ABA/geometry
+guards and decoder/paint/export equivalence checks in host/contracts/worker/UI.
+Rules3/14/35 require a material proposal/Owner approval before implementation.
+The simpler viable alternative is the current verified composition/cache path.
+
+File Provider generated copy conflicts in Documents; strict guards rejected
+that staging. The previously authorized exclusive `/private/tmp` harness is
+used for real execution, and verified deliverables are copied back to CEVRA.
+The Python environment retest generated extra bytecodes; they are recoverably
+archived in CEVRA/Apagar and the exact audited Python payload/tested runtime
+tree restored. No integrity guard or canonical manifest pin is weakened.
+
+The single minimal APP/OWNER follow-up stays in the existing acceptance catalog.
+Final fresh signing, byte inventories, cold release/Host smoke and exact-head
+CI are required before delivery. Original running app/project and frozen
+PR96/97 are preserved. Director: compatible UI/raster/cache extensions over
+existing typed operations, IR and History, with no provider, engine, security
+or persistence change. No merge, real AI call or broader release acceptance.

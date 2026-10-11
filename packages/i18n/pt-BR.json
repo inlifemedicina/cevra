@@ -497,7 +497,7 @@
   "timeline.cursor": "Cursor {time} · quadro {frame}",
   "timeline.cursorTime": "Cursor {time}",
   "title.controls": "Título",
-  "title.fixedStyle": "Selecione no preview. Arraste para mover, use o canto para ajustar o tamanho e clique duas vezes para editar o texto. Símbolos disponíveis usam a fonte deste estilo. Os demais aparecem como □; emoji usam apresentação de texto. O texto salvo é preservado. Títulos que não cabem precisam ser encurtados ou ter o tamanho ajustado.",
+  "title.fixedStyle": "Selecione no preview. Arraste para mover, use o canto para ajustar o tamanho e clique duas vezes para editar o texto. Emoji e símbolos usam a apresentação disponível no macOS. Símbolos não disponíveis aparecem como □; o texto salvo é preservado. Títulos que não cabem precisam ser encurtados ou ter o tamanho ajustado.",
   "title.unavailable": "Título indisponível neste ambiente.",
   "title.text": "Texto do título",
   "title.in": "IN",
@@ -512,7 +512,7 @@
   "title.invalid": "Confira o texto e o intervalo do título. IN é incluído; OUT é excluído.",
   "title.pending": "Adicione o título ou descarte as alterações antes de continuar.",
   "editing.help": "Ajuda",
-  "editing.fineTime": "Ao editar o tempo, os milissegundos ficam visíveis. ↑ e ↓ fazem ajuste fino; Shift ajusta um segundo. Os cortes existentes mantêm a precisão.",
+  "editing.fineTime": "IN/OUT e o preview mostram centésimos. ↑ e ↓ fazem ajuste fino; Shift ajusta um segundo. Os cortes existentes mantêm a precisão.",
   "media.remove": "Retirar mídia do projeto",
   "media.removeCancel": "Cancelar",
   "media.removeConfirm": "Retirar mídia e trechos",
@@ -528,5 +528,10 @@
   "sequence.boundaryUnchanged": "Sem alteração",
   "sequence.boundaryPrecision": "Original {original} ms; proposto {projected} ms; diferença {delta} ms.",
   "editing.helpTip": "Clique para ver dicas deste controle.",
-  "editing.mediaTitleCaption": "O nome da mídia identifica o arquivo original no projeto. O título é um texto sobreposto ao vídeo. Legendas são trechos de texto sincronizados à fala."
+  "editing.mediaTitleCaption": "O nome da mídia identifica o arquivo original no projeto. O título é um texto sobreposto ao vídeo. Legendas são trechos de texto sincronizados à fala.",
+  "title.timelineRange": "Duração do título",
+  "title.timelineIn": "IN do título na timeline",
+  "title.timelineOut": "OUT do título na timeline",
+  "title.timelineTrimIn": "Ajustar IN do título",
+  "title.timelineTrimOut": "Ajustar OUT do título"
 }

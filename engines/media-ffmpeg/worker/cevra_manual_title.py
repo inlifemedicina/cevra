@@ -2,6 +2,8 @@
 from __future__ import annotations
 import hashlib
 import math
+import os
+import platform
 import re
 import sys
 from pathlib import Path
@@ -51,10 +53,26 @@ def available():
     except (OSError, RuntimeError):
         return False
 
+def native_font_identity():
+    # macOS owns this sealed collection. Fresh dev/inode/size/mtime/ctime identities
+    # invalidate derived bytes on replacement/update; actual shaped faces are hashed
+    # by CoreText's raster report. Never scan user-installed fonts.
+    root = Path("/System/Library/Fonts")
+    digest = hashlib.sha256(repr((platform.mac_ver()[0], os.uname().version)).encode())
+    for path in sorted(root.rglob("*")):
+        if path.is_dir():
+            continue
+        resolved = path.resolve(strict=True)
+        if not resolved.is_relative_to(root):
+            raise RuntimeError("MANUAL_TITLE_FONT_INVALID")
+        stamp = resolved.stat()
+        digest.update(repr((str(path), str(resolved), stamp.st_dev, stamp.st_ino, stamp.st_size, stamp.st_mtime_ns, stamp.st_ctime_ns)).encode())
+    return digest.hexdigest()
+
 def identity():
     font, helper = assets()
     return {"font": FONT_SHA256, "helper": hashlib.sha256(helper.read_bytes()).hexdigest(),
-            "layout": COMPONENT, "rasterizer": "cevra.coretext.inter.v1"}
+            "nativeFonts": native_font_identity(), "layout": COMPONENT, "rasterizer": "cevra.coretext.inter.v1"}
 
 def local_interval(composition, offset, frames):
     title = composition["title"]

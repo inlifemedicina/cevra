@@ -8,7 +8,7 @@ import { App } from "./App";
 import { ManualVideoPreview, supportsManualClipPreview } from "./components/ManualVideoPreview";
 import { ManualSequenceVideoPreview } from "./components/ManualSequenceVideoPreview";
 import { Timeline } from "./components/Timeline";
-import { formatMilliseconds } from "./ui-model";
+import { formatMilliseconds, formatPreciseTime } from "./ui-model";
 it("mode round-trip retains a paused sequence position and the active Sequence button leaves playback unchanged", async () => {
   const f = sequenceFixture(), before = f.backend.history.toArchive();
   const { container } = render(f.view());
@@ -24,7 +24,7 @@ it("mode round-trip retains a paused sequence position and the active Sequence b
   const restored = await metadata(container, 1);
   expect(restored.currentTime).toBe(0.432);
   fireEvent.seeked(restored);
-  expect(screen.getByTestId("preview-timecode").textContent).toBe("Sequência 00:00 / 00:03");
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Sequência 00:00,43 / 00:03,00");
   expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
   expect(f.backend.history.toArchive()).toEqual(before);
 });
@@ -85,7 +85,7 @@ it("plays canonical sequence joins once, waits for each decoder and stops withou
   const last = await metadata(container, 0.5); fireEvent.play(last);
   last.currentTime = 0.5; fireEvent.timeUpdate(last); fireEvent.ended(last);
   expect(f.clock).toHaveBeenLastCalledWith(3000);
-  expect(screen.getByTestId("preview-timecode").textContent).toBe("Sequência 00:03 / 00:03");
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Sequência 00:03,00 / 00:03,00");
   expect(last.hidden).toBe(true);
   expect(f.requests).toHaveBeenCalledTimes(3);
   expect(screen.getByRole("button", { name: t("preview.playLocal") })).toBeTruthy();
@@ -335,8 +335,8 @@ for (const excerpt of [false, true]) {
     expect(play.disabled).toBe(false);
     expect(video.play).not.toHaveBeenCalled();
     expect(video.currentTime).toBe(0);
-    expect(screen.getByTestId("preview-timecode").textContent).toBe(excerpt ? "Original 00:01 / 00:04" : "Original 00:00 / 00:06");
-    if (excerpt) expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00 / 00:03");
+    expect(screen.getByTestId("preview-timecode").textContent).toBe(excerpt ? "Original 00:01,00 / 00:04,00" : "Original 00:00,00 / 00:06,00");
+    if (excerpt) expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00,00 / 00:03,00");
   });
 }
 
@@ -533,21 +533,21 @@ it("shows source milliseconds separately from excerpt elapsed/duration for the r
   const { container, rerender } = render(<ManualVideoPreview {...props} snapshotId="quantized" t={t} />);
   const video = await metadata(container, 2); fireEvent.seeked(video);
   expect(video.currentTime).toBe(0);
-  expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:02 / 00:03");
-  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00 / 00:01");
-  expect(screen.getByText("IN 00:02 · OUT 00:03")).toBeTruthy();
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:02,00 / 00:03,99");
+  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00,00 / 00:01,99");
+  expect(screen.getByText("IN 00:02,00 · OUT 00:03,99")).toBeTruthy();
   expect(screen.getByText(t("preview.boundedClip"))).toBeTruthy();
   video.currentTime = 0.034; fireEvent.timeUpdate(video);
-  expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:02 / 00:03");
-  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00 / 00:01");
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:02,03 / 00:03,99");
+  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:00,03 / 00:01,99");
   video.currentTime = 2.01; fireEvent.timeUpdate(video);
   expect(video.pause).toHaveBeenCalled(); expect(video.currentTime).toBe(2);
   expect(onPlayheadChange).toHaveBeenLastCalledWith(1990);
-  expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:03 / 00:03");
-  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:01 / 00:01");
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:03,99 / 00:03,99");
+  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Trecho 00:01,99 / 00:01,99");
   rerender(<ManualVideoPreview {...props} snapshotId="quantized" t={(key, parameters) => translate("en-US", key, parameters)} />);
-  expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:03 / 00:03");
-  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Excerpt 00:01 / 00:01");
+  expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:03,99 / 00:03,99");
+  expect(screen.getByTestId("preview-clip-timecode").textContent).toBe("Excerpt 00:01,99 / 00:01,99");
   expect(screen.getByText(translate("en-US", "preview.boundedClip"))).toBeTruthy();
 });
 
@@ -820,7 +820,7 @@ it("trim invalidates pending derived preparation, cancels its operation and igno
   await metadata(container, 1.49); const current = container.querySelector("video")!.getAttribute("src");
   expect(backend.cancelOperation).toHaveBeenCalledWith(requests[0]!.operationId); expect(requests[1]!.operationId).not.toBe(requests[0]!.operationId);
   finish(answer(requests[0]!, 2000)); await waitFor(() => expect(container.querySelector("video")!.getAttribute("src")).toBe(current));
-  expect(screen.getByText("IN 00:02 · OUT 00:03")).toBeTruthy();
+  expect(screen.getByText("IN 00:02,50 · OUT 00:03,99")).toBeTruthy();
 });
 
 it("selected clip never admits original bytes or a mismatched range as its derived preview", async () => {
@@ -912,8 +912,8 @@ it.each(["pt-BR", "en-US"] as const)("%s Original marks show nearest frames and 
   const video = await metadata(container, 6);
   video.currentTime = 1.251; fireEvent.click(screen.getByRole("button", { name: translated("preview.markIn") }));
   video.currentTime = 1.301; fireEvent.click(screen.getByRole("button", { name: translated("preview.markOut") }));
-  expect(screen.getByText("IN 00:01")).toBeTruthy();
-  expect(screen.getByText("OUT 00:01")).toBeTruthy();
+  expect(screen.getByText("IN 00:01,27")).toBeTruthy();
+  expect(screen.getByText("OUT 00:01,30")).toBeTruthy();
   expect(create).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: translated("preview.createClip") }));
   expect(create).toHaveBeenCalledExactlyOnceWith({ sourceId: source.id, expectedSnapshotId: "source-snap", sourceStartMs: framesToMilliseconds(38), sourceEndMs: framesToMilliseconds(39) });
@@ -943,8 +943,8 @@ it("CFR30 project Original admits the offset-audio source-clock Take packet and 
   expect(screen.getByTestId("preview-timecode").textContent).toContain("00:00");
   fireEvent.click(screen.getByRole("button", { name: t("preview.markIn") }));
   original.currentTime = 1.535; fireEvent.click(screen.getByRole("button", { name: t("preview.markOut") }));
-  expect(screen.getByText("IN 00:00")).toBeTruthy();
-  expect(screen.getByText("OUT 00:01")).toBeTruthy();
+  expect(screen.getByText("IN 00:00,50")).toBeTruthy();
+  expect(screen.getByText("OUT 00:01,53")).toBeTruthy();
   expect(f.create).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: t("sequence.append") }));
   expect(f.create).toHaveBeenCalledExactlyOnceWith({ sourceId: originalSource.id, expectedSnapshotId: f.backend.history.current.history.headSnapshotId!, sourceStartMs: framesToMilliseconds(15), sourceEndMs: framesToMilliseconds(46) });
@@ -1006,12 +1006,12 @@ it("Original scrub before the first Play updates the requested clock without dep
   const slider = screen.getByRole("slider", { name: t("preview.sourceSeek") });
   fireEvent.change(slider, { target: { value: "4321" } });
   expect(video.currentTime).toBe(4.321);
-  expect(screen.getByTestId("preview-timecode").textContent).toBe(`${t("preview.sourcePosition", { time: formatMilliseconds(4321) })} / ${formatMilliseconds(6000)}`);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe(`${t("preview.sourcePosition", { time: formatPreciseTime(4321) })} / ${formatPreciseTime(6000)}`);
   expect(video.play).not.toHaveBeenCalled();
   expect(clock).not.toHaveBeenCalled(); // Original transport cannot overwrite the sequence cursor.
   expect(backend.history.toArchive()).toEqual(before);
   fireEvent.seeked(video);
-  expect(screen.getByTestId("preview-timecode").textContent).toBe(`${t("preview.sourcePosition", { time: formatMilliseconds(4321) })} / ${formatMilliseconds(6000)}`);
+  expect(screen.getByTestId("preview-timecode").textContent).toBe(`${t("preview.sourcePosition", { time: formatPreciseTime(4321) })} / ${formatPreciseTime(6000)}`);
 });
 
 it("continuous playback and seek show the current original filename across sources without replacing the decoder",async()=>{

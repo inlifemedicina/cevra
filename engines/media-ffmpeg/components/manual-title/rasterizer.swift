@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import CoreGraphics
 import CoreText
 import ImageIO
@@ -22,27 +23,59 @@ let fontURL = URL(fileURLWithPath: args[1])
 guard let provider = CGDataProvider(url: fontURL as CFURL), let graphicsFont = CGFont(provider),
       (graphicsFont.fullName as String?)?.hasPrefix("Inter") == true else { throw RasterError.font }
 let baseFont = CTFontCreateWithGraphicsFont(graphicsFont, CGFloat(fontSize), nil, nil)
-let fontAttributes = [kCTFontCascadeListAttribute: []] as CFDictionary
-let font = CTFontCreateCopyWithAttributes(baseFont, CGFloat(fontSize), nil,
-    CTFontDescriptorCreateWithAttributes(fontAttributes))
-// Keep the canonical text intact. Drawing stays within the private Inter face:
-// normalize each grapheme, use its text presentation, and mark missing clusters visibly.
-func covered(_ value: String) -> Bool {
-    let chars = Array(value.utf16)
-    var glyphs = [CGGlyph](repeating: 0, count: chars.count)
-    return !chars.isEmpty && CTFontGetGlyphsForCharacters(font, chars, &glyphs, chars.count) && !glyphs.contains(0)
-}
+let unicodeFont = CTFontCreateWithName("ArialUnicodeMS" as CFString, CGFloat(fontSize), nil)
+let cascade = [CTFontCopyFontDescriptor(unicodeFont)] as CFArray
+let descriptor = CTFontDescriptorCreateWithAttributes([kCTFontCascadeListAttribute: cascade] as CFDictionary)
+let font = CTFontCreateCopyWithAttributes(baseFont, CGFloat(fontSize), nil, descriptor)
+// CoreText keeps whole grapheme clusters, including variation selectors, ZWJ and modifiers.
+// Inter remains the primary private font. Native fallback faces are OS-owned; never register
+// or redistribute them, and refuse fonts resolved from user-installed locations.
+let emojiFont = CTFontCreateWithName("AppleColorEmoji" as CFString, CGFloat(fontSize), nil)
+let color = CGColor(srgbRed: 0.96, green: 0.97, blue: 0.98, alpha: 1)
 let missingMarker = "□"
-guard covered(missingMarker) else { throw RasterError.font }
-var drawnText = "", substitutedClusters = 0, presentationSelectorsRemoved = 0
+func ownedFont(_ candidate: CTFont) -> Bool {
+    guard let url = CTFontCopyAttribute(candidate, kCTFontURLAttribute) as? URL else {
+        return CFEqual(CTFontCopyPostScriptName(candidate), CTFontCopyPostScriptName(font))
+    }
+    let path = url.resolvingSymlinksInPath().path
+    return path == fontURL.resolvingSymlinksInPath().path || path.hasPrefix("/System/Library/Fonts/")
+}
+func checkedRuns(_ line: CTLine) -> Bool {
+    for raw in CTLineGetGlyphRuns(line) as NSArray {
+        let run = raw as! CTRun
+        let attributes = CTRunGetAttributes(run) as NSDictionary
+        guard let rawFont = attributes[kCTFontAttributeName] else { return false }
+        let shapedFont = rawFont as! CTFont
+        guard ownedFont(shapedFont) else { return false }
+        var glyphs = [CGGlyph](repeating: 0, count: CTRunGetGlyphCount(run))
+        CTRunGetGlyphs(run, CFRange(location: 0, length: 0), &glyphs)
+        if glyphs.contains(0) { return false }
+    }
+    return true
+}
+func attributedCluster(_ cluster: String) -> NSAttributedString {
+    let scalars = cluster.unicodeScalars
+    let textPresentation = scalars.contains { $0.value == 0xFE0E }
+    let emojiPresentation = !textPresentation && (scalars.contains { $0.properties.isEmojiPresentation }
+        || scalars.contains { $0.value == 0xFE0F } && scalars.contains { $0.properties.isEmoji })
+    return NSAttributedString(string: cluster, attributes: [
+        NSAttributedString.Key(kCTFontAttributeName as String): emojiPresentation ? emojiFont : font,
+        NSAttributedString.Key(kCTForegroundColorAttributeName as String): color
+    ])
+}
+let attributed = NSMutableAttributedString(string: "")
+var drawnText = "", substitutedClusters = 0
 for character in text {
-    let cluster = String(character)
-    presentationSelectorsRemoved += cluster.unicodeScalars.filter { $0.value == 0xFE0E || $0.value == 0xFE0F }.count
-    let textStyle = String(String.UnicodeScalarView(cluster.unicodeScalars.filter {
-        $0.value != 0xFE0E && $0.value != 0xFE0F
-    })).precomposedStringWithCanonicalMapping
-    if covered(textStyle) { drawnText += textStyle }
-    else { drawnText += missingMarker; substitutedClusters += 1 }
+    let cluster = String(character).precomposedStringWithCanonicalMapping
+    let candidate = attributedCluster(cluster)
+    let selectorOnly = cluster.unicodeScalars.allSatisfy { $0.value == 0xFE0E || $0.value == 0xFE0F }
+    if !selectorOnly && checkedRuns(CTLineCreateWithAttributedString(candidate)) {
+        attributed.append(candidate); drawnText += cluster
+    } else {
+        let marker = attributedCluster(missingMarker)
+        guard checkedRuns(CTLineCreateWithAttributedString(marker)) else { throw RasterError.font }
+        attributed.append(marker); drawnText += missingMarker; substitutedClusters += 1
+    }
 }
 guard let space = CGColorSpace(name: CGColorSpace.sRGB), let context = CGContext(data: nil,
     width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
@@ -58,22 +91,21 @@ context.setFillColor(CGColor(srgbRed: 0.10, green: 0.12, blue: 0.16, alpha: 1))
 context.fill(bar)
 context.setFillColor(CGColor(srgbRed: 0.43, green: 0.62, blue: 0.72, alpha: 1))
 context.fill(CGRect(x: x, y: y, width: 6 * values[3], height: barHeight))
-let attributed = NSAttributedString(string: drawnText, attributes: [
-    NSAttributedString.Key(kCTFontAttributeName as String): font,
-    NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(srgbRed: 0.96, green: 0.97, blue: 0.98, alpha: 1)
-])
 let line = CTLineCreateWithAttributedString(attributed)
-// Shaping must still use the private Inter font, with every resulting glyph present.
-let runs = CTLineGetGlyphRuns(line) as NSArray
-for raw in runs {
-    let run = raw as! CTRun
-    let attributes = CTRunGetAttributes(run) as NSDictionary
-    guard let runFont = attributes[kCTFontAttributeName] else { throw RasterError.glyph }
-    let shapedFont = runFont as! CTFont
-    guard CFEqual(CTFontCopyPostScriptName(shapedFont), CTFontCopyPostScriptName(font)) else { throw RasterError.glyph }
-    var shapedGlyphs = [CGGlyph](repeating: 0, count: CTRunGetGlyphCount(run))
-    CTRunGetGlyphs(run, CFRange(location: 0, length: 0), &shapedGlyphs)
-    guard !shapedGlyphs.contains(0) else { throw RasterError.glyph }
+guard checkedRuns(line) else { throw RasterError.glyph }
+let usedFonts = (CTLineGetGlyphRuns(line) as NSArray).map { raw -> String in
+    let attributes = CTRunGetAttributes(raw as! CTRun) as NSDictionary
+    return CTFontCopyPostScriptName(attributes[kCTFontAttributeName] as! CTFont) as String
+}
+var fontFiles: [String: String] = [:]
+for raw in CTLineGetGlyphRuns(line) as NSArray {
+    let attributes = CTRunGetAttributes(raw as! CTRun) as NSDictionary
+    let shapedFont = attributes[kCTFontAttributeName] as! CTFont
+    let url = (CTFontCopyAttribute(shapedFont, kCTFontURLAttribute) as? URL) ?? fontURL
+    let path = url.resolvingSymlinksInPath().path
+    if fontFiles[path] == nil {
+        fontFiles[path] = SHA256.hash(data: try Data(contentsOf: url, options: .mappedIfSafe)).map { String(format: "%02x", $0) }.joined()
+    }
 }
 let bounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
 guard bounds.width <= barWidth - 2 * padding, bounds.height <= barHeight - 12 else { throw RasterError.overflow }
@@ -87,7 +119,7 @@ guard CGImageDestinationFinalize(destination) else { throw RasterError.output }
 let report: [String: Any] = ["width": width,"height":height,"text":text,"fontPostScriptName":CTFontCopyPostScriptName(font),
     "allGlyphsAvailable":substitutedClusters == 0,"renderedGlyphsAvailable":true,
     "renderedText":drawnText,"substitutedClusters":substitutedClusters,
-    "presentationSelectorsRemoved":presentationSelectorsRemoved,"missingGlyphMarker":missingMarker,
+    "presentationSelectorsRemoved":0,"usedFonts":Array(Set(usedFonts)).sorted(),"fontFiles":fontFiles,"osVersion":ProcessInfo.processInfo.operatingSystemVersionString,"missingGlyphMarker":missingMarker,
     "globalFontRegistration":false,"fontSize":fontSize,
     "barTopLeft":[Double(x),Double(CGFloat(height)-y-barHeight),Double(barWidth),Double(barHeight)],
     "glyphBounds":[Double(bounds.minX),Double(bounds.minY),Double(bounds.width),Double(bounds.height)]]

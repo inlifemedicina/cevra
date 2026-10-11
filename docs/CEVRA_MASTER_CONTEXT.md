@@ -4043,3 +4043,42 @@ natural first paint and human gesture fluency are not established, and Documents
 File Provider compatibility is not claimed fixed. No merge or broader release
 acceptance. Director: compatible presentation/decoder correction; packaging
 hygiene adds no new boundary or Director impact.
+
+
+### 2026-10-11 — PR98 second human correction round in progress
+
+**ACTIVE / NOT MERGED.** Owner clarified that centiseconds must remain visible
+in IN/OUT and the preview counter only; timeline ruler remains whole seconds.
+Display rounding never reparses an unchanged canonical frame or legacy cut.
+Selected title duration is now an ephemeral timeline draft over the existing
+typed title set/ProjectHistory operation, with edge gestures, IN/OUT, bounds,
+cancel and Undo/Redo. No source trim or sequence ripple is introduced.
+
+All three reported PNGs were materialized and inspected. The direct editor
+shows color emoji while the old raster stripped selectors and substituted
+combined emoji. The CoreText extension preserves whole clusters/selectors and
+uses OS-owned color/Unicode faces; none are redistributed. Actual H/V raster
+matrix passes. The mixed screenshot shows the complete H picture fitted inside
+V with bars, not visible crop; current fit/pad and owning sequence aspect stay.
+This finding does not establish the absence of any other framing defect.
+
+UI341/one local skip, Python162, Host preview47, retained drafts46 and build
+pass. Independent read-only review found no concrete P1/P2. Fourteen actual
+H/V/mixed renders preserve exact frames/PCM endpoints and original hashes;
+Unicode clusters/selectors retain native color and mixed fit/pad is verified.
+The complete compatible-environment offline test:ci and Tauri release build
+pass. Fresh exact-head CI and signed-package gates remain pending.
+Whole-preview
+identity now represents bytes rather than metadata snapshot; cache hits still
+recheck current sources, runtime, native-font identity and canonical request.
+Untitled segments retain aspect and may reuse bytes after unrelated title edits.
+A separate base-video/admitted-PNG fast path has not been implemented: it would
+require an execution-feasible material proposal under rules 3/14/35. Director:
+compatible UI/cache/raster extensions, unchanged IR/History/execution authority.
+
+The isolated admission measurement is2202–2363ms for six new title edits,
+12–13ms for cached Undo and12ms for cached Redo, with zero render on reuse.
+Native PNG generation is88–96ms. These are host admission/CLI measurements,
+not first WK paint or proof of an overlay fast path. New-title encoder latency
+remains; no instant-update claim or silent preview architecture change.
+[Current evidence and limits](CEVRA_MANUAL_TITLE_PROOF_V1.md#pr98-second-human-correction--2026-10-11).

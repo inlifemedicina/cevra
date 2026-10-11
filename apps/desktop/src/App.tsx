@@ -29,6 +29,7 @@ import { gestureEscape, timelineShortcutBlocked } from "./timeline-interactions"
 import { useRangeActivationGuard } from "./range-activation-guard";
 import { ManualTitleControls } from "./components/ManualTitleControls";
 import type { ManualTitleEdit } from "@cevra/application";
+import type { TitleTimelineRangeEdit } from "./components/ManualTitleTimeline";
 
 const defaultBackend = new DemoDesktopBackend();
 
@@ -59,6 +60,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const previewTitleDraft = useRef<ManualRangeDraftController | null>(null);
   const removalFocus = useRef<HTMLElement | null>(null);
   const titleDraft = useRef<ManualRangeDraftController | null>(null);
+  const timelineTitleDraft = useRef<ManualRangeDraftController | null>(null);
   const canonicalProject = useRef<Readonly<ProjectIR> | null>(null);
   const [previewCommitBusy, setPreviewCommitBusy] = useState(false);
   const [rangeCommitBusy, setRangeCommitBusy] = useState(false);
@@ -270,6 +272,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       if (previewSettlement) { waitingForRange.current = true; setTransitionBusy(true); await previewSettlement; waitingForRange.current = false; }
       const titleSettlement = titleDraft.current?.settle();
       if (titleSettlement) { waitingForRange.current = true; setTransitionBusy(true); await titleSettlement; waitingForRange.current = false; }
+      const timelineTitleSettlement = timelineTitleDraft.current?.settle();
+      if (timelineTitleSettlement) { waitingForRange.current = true; setTransitionBusy(true); await timelineTitleSettlement; waitingForRange.current = false; }
       const current = canonicalProject.current;
       if (current) { const operation = action(current); if (operation) await operation; }
     } finally { waitingForRange.current = false; transitionInFlight.current = false; setTransitionBusy(false); }
@@ -547,6 +551,21 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     } catch (cause) { handleRuntimeError(cause); throw cause; }
   }
 
+  async function editTimelineTitleRange(request: TitleTimelineRangeEdit) {
+    const visible = canonicalProject.current?.history.headSnapshotId;
+    try {
+      await rangeDraft.current?.settle();
+      await previewTitleDraft.current?.settle();
+      await titleDraft.current?.settle();
+      const current = canonicalProject.current;
+      const graphic = current?.graphics.find(item => item.id === request.graphicId);
+      if (!current || !graphic || request.expectedSnapshotId !== visible) throw { code: "MANUAL_TITLE_STALE" };
+      const title = resolveManualTitle(graphic);
+      await commitTitle({ version: 1, type: "set", expectedSnapshotId: current.history.headSnapshotId!,
+        title: { ...title, startFrame: request.startFrame, endFrame: request.endFrame } });
+    } catch (cause) { rangeActivation.failed(); handleRuntimeError(cause); throw cause; }
+  }
+
   async function commitRange(request: ManualVideoSequenceEdit) {
     setRangeCommitBusy(true);
     try { await editManualSequence(request); }
@@ -706,7 +725,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
           if (primary && primary !== selectedProjectItemId) selectSettledProjectItem(current, primary, ids);
           else { selectionEpoch.current++; setSelectedTimelineClipIds(ids); setSelectedProjectItemId(primary); }
         }, true).catch(() => {});
-      }} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} onResizeCancel={event => { if (event.pointerId === timelineResize.current?.id) endTimelineResize(true); }} onResizeKey={timelineResizeKey} height={Math.min(timelineHeight, timelineMaximum)} maximumHeight={timelineMaximum} trimAvailable={realPreview} trimBusy={manualActionBusy} onTrim={trimManualClip} sequenceClips={sequenceClips} onSequenceEdit={editSequenceAfterRange} onRemoveTitle={backendState.capabilities["title.edit"]?.available && backend.editManualTitle ? editTitleAfterClipDraft : undefined} onCommitRange={commitRange} rangeDraft={rangeDraft} onRangeAction={action => afterRangeDraft(action)} />
+      }} playheadMs={playheadMs} zoom={timelineZoom} t={t} onSelect={selectProjectItem} onPlayheadChange={seekTimeline} onZoomChange={setTimelineZoom} onResizeStart={startTimelineResize} onResizeCancel={event => { if (event.pointerId === timelineResize.current?.id) endTimelineResize(true); }} onResizeKey={timelineResizeKey} height={Math.min(timelineHeight, timelineMaximum)} maximumHeight={timelineMaximum} trimAvailable={realPreview} trimBusy={manualActionBusy} onTrim={trimManualClip} sequenceClips={sequenceClips} onSequenceEdit={editSequenceAfterRange} onRemoveTitle={backendState.capabilities["title.edit"]?.available && backend.editManualTitle ? editTitleAfterClipDraft : undefined} onTitleRangeEdit={backendState.capabilities["title.edit"]?.available && backend.editManualTitle ? editTimelineTitleRange : undefined} titleRangeDraft={timelineTitleDraft} onCommitRange={commitRange} rangeDraft={rangeDraft} onRangeAction={action => afterRangeDraft(action)} />
     </main>
   );
 }

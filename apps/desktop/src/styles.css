@@ -514,3 +514,12 @@ h1, h2, h3, p { margin: 0; }
 .title-text-input { outline: 1px solid var(--cevra-accent); border-left: .11em solid #6e9eb8; border-radius: 0; }
 .title-resize { position: absolute; width: 13px; height: 13px; right: -6px; bottom: -6px; padding: 0; border: 1px solid #fff; background: var(--cevra-accent); cursor: nwse-resize; touch-action: none; }
 .title-direct-error { position: absolute; bottom: 0; background: var(--cevra-surface-1); color: var(--cevra-warning); font-size: 11px; }
+
+.title-timeline-controls { display: flex; align-items: center; gap: 10px; padding: 6px 12px; }
+.title-timeline-controls label { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.title-timeline-controls input { width: 100px; min-width: 0; }
+.timeline-title-range .timeline-trim-select { min-width: 0; }
+.timeline-title-range .timeline-trim-handle { border-color: var(--cevra-accent); }
+
+.timeline-title-range { min-width: 0; }
+.timeline-title-range .timeline-trim-handle { width: min(16px, 50%); min-width: 4px; }
