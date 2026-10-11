@@ -265,3 +265,153 @@ Provider; a cópia anterior ao selo foi conferida byte a byte, e o runtime não
 foi modificado pela assinatura. É teste local ad hoc, sem notarização. O app
 anterior não foi encerrado/substituído, e o agente não abriu projetos humanos.
 Obsoletos próprios ficam recuperáveis em `~/Documents/CEVRA/Apagar`.
+
+
+## Isolated offline hardening — 2026-10-11
+
+The Owner requested further overnight offline checks while preserving the exact
+app and fixtures already delivered. This follow-up uses
+`fix/vids-ux-hardening-2026-10-11`, based on delivered head `45131a9`, in
+`~/Documents/CEVRA/Vids/ux-hardening-2026-10-11/checkout`. It does not replace the
+app, update PR96 or open another human round. The original checkout stays clean.
+
+Two concrete P2 cases were reproduced and fixed here: keyboard proportional
+resize rejected valid titles when its next step crossed a size/canvas limit;
+Escape after rejected text left a stale invalid-title alert. Pointer and
+keyboard now use the same closed bounds, with strict numeric endpoint
+normalization and no new command at an unchanged limit. Independent review
+identified a one-ULP minimum-scale failure (`0.501169` →
+`0.49999999999999994`), reproduced in both aspects and both input paths before
+normalizing the products to the domain's existing bounds. Draft cancellation
+clears its error while retaining the saved title. No domain, schema, engine,
+provider, dependency or security change is introduced.
+
+Additional coverage, distinct from the sealed delivery totals:
+
+- 151 relevant UI tests PASS, including 12 new title boundary/rejection tests;
+  existing text/IME, gesture cancellation, selection/Delete, precise time,
+  source-removal review and export tests remain passing.
+- 53 Application/Host tests PASS. One new deterministic test covers 48 varied
+  CFR30 sequences, all source occurrences, survivor source intervals, three
+  Undo/Redo cycles per source, archive-cursor restores, rejected stale/repeated
+  requests and complete restoration. Physical Host checkpoint/reopen and
+  export cancellation tests use exclusively owned synthetic stores.
+- Final TypeScript/Vite build and diff whitespace check PASS. Existing
+  BigInt target warnings remain outside this UI-only change.
+
+**Initial supplemental real-render gate (at `2da579d`) BLOCKED:** the new canvas-edge/title/removal/
+reopen harness reached the release worker, but its preview file failed the
+existing identity guard (`preview file identity changed`) under Documents.
+A separate `.nosync` directory within CEVRA failed with the same symptom.
+No integrity guard was relaxed, no Filesystem/iCloud/security setting was
+changed, and no PASS is claimed for those attempts. The previous sealed
+17 renders / 27 jobs remain unchanged and are not rerun or added to this count.
+The metadata cause remains an inference consistent with the earlier recorded
+File Provider interference, not a new isolated causal proof.
+
+External evidence is under the hardening base: `evidence/title-boundary-red.log`,
+`title-rounding-red.log`, `title-manual-final.log`, `manual-history-host-tests.log`,
+`desktop-build-final.log`, the two failed render receipts/stderr logs, and
+`delivery-preservation-after.json`. Preservation checks matched all 1,024 app
+files, both fixture pins, the shortcut target, original clean head and sealed
+delivery receipt; deep/strict signature verification outside the restricted
+executor also passed. No new app was packaged or signed.
+
+Director impact: no new impact found within this delta in either direction.
+It changes only UI draft arithmetic/error presentation and regression coverage;
+typed operations, permissions, Project IR and ProjectHistory are unchanged.
+The current [grouped acceptance round](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#integrated-manual-title-app-round--2026-10-11)
+remains **APP/OWNER PENDING** on the frozen delivered package.
+
+The canonical ordering in the Master Context is a gate, not implementation
+authority for the next block: finish this grouped acceptance, then delimit
+audiovisual finishing, then AI strategy/selection/cut planning. Audio-plan and
+caption IR primitives do not establish an accepted finishing workflow.
+MR-V02/K2 color/HDR gates and the bounded execution-feasibility/product decision
+remain prerequisites for affected finishing work. F-A02 stays exhausted1/1;
+no real AI or provider execution is authorized. No later feature was invented
+or started to fill the waiting period.
+
+
+## Supplemental render gate resolved — 2026-10-11
+
+The Owner authorized diagnosis of the PR97 supplemental render failure,
+verified new copies and stable same-host local paths, with the index/receipts
+kept in CEVRA if Documents could not host the working files. The delivered
+PR96 app, fixtures and receipt remain frozen; no engine, runtime, guard,
+security setting or application code was changed for this follow-up.
+
+An exception-only observer outside the pinned runtime tree captured the exact
+release guard failure in `_hash_stable`: the newly sealed private
+`source-0.mp4` changed only `st_ctime_ns` between `lstat` and `fstat`
+(113,259,724 ns). Device, inode, size and mtime were identical. The worker's
+`_seal` code closes its copy before that check and performs no intervening
+write/chmod/utime. The strict guard rejected the changed identity as intended.
+Observer setup failures are retained separately and are not product/render
+results; the positive render proof uses the original worker without an observer.
+
+A copy-only control using the same release seal function reproduced later
+ctime-only changes in all three Documents copies and none of three copies in
+local temporary storage. All six SHA256 values matched the immutable synthetic
+input. `com.apple.provenance` existed in both locations; its presence does not
+identify the writer. Path-specific macOS metadata interference is verified;
+File Provider attribution remains an inference, not a process-level proof.
+This is not evidence of changed fixture bytes or a PR97 layout/render defect.
+
+The supplemental harness also had a distinct assertion error: it counted
+future Redo entries before an export after Undo. ProjectHistory correctly
+prunes that tail and appends one audited `export.add`. The external harness now
+checks retained entries at the active revision plus one, revision/parent-entry
+links, unchanged sources/timeline/title, and exact Undo/Redo of the export.
+Production History/export code is unchanged.
+
+New runtime, fixtures and baseline copies were verified byte for byte.
+An exclusively owned `/private/tmp/cevra-pr97-evidence-*` directory on the
+same Mac hosted the working files; this uses the same execution environment
+and release verification, with no disabled guard or bypassed denial.
+The normal derived-preview consumer already defaults to the system temporary
+root. This choice closes the bounded supplemental proof, not general
+Documents/File Provider destination compatibility. Native final export
+currently creates its private workspace in the picked destination parent;
+that route's exposure to volatile metadata remains a separate operational
+constraint, with no storage-policy change or broad compatibility PASS here.
+
+**PASS: four real renders / six measured jobs.** Both aspects preserve the
+closed V2 picture edge (`x=.08`, `width=.92`, `fontScale=.92/.84`, bottom
+edge), frames 91..209 across the frame 150 cut, 300 decoded CFR 30 frames and
+480,000 decoded PCM samples per artifact. AAC payload matches the existing
+baseline for each profile. Three media-removal/Undo/Redo cycles and two
+physical reopens per aspect preserve the original-source pins, title and
+exact ranges. Reference ROI remains MAE≤3 / PSNR≥35 dB: horizontal
+0.959949 / 40.392894 dB, vertical 2.815941 / 37.858998 dB. Sampled peak
+renderer RSS 195,739,648 bytes and owned logical files 5,090,330 bytes stay
+within the existing budgets; sampled observations are not rigid guarantees.
+
+External evidence in the hardening base:
+`identity-diagnostic/hash-identity-exceptions.jsonl`,
+`evidence/metadata-copy-comparison.json`, `stable-render-index.json`,
+`real-edge-recovery-stable.json`, `supplemental-render-transfer.json` and
+`supplemental-render-closeout.json`. All eight output/reference/archive files
+were transferred into `renders-edge-validated` with matching SHA256. Their
+portable evidence copies do not rewrite IR URIs or publication identities.
+Prior failed attempts and the frozen delivery's 17/27 proof remain separate.
+
+Director impact: no new impact in either direction within this evidence-only
+follow-up; typed operations, permissions, Project IR and History are unchanged.
+The app was not replaced or opened, no human project was inspected and no
+new human round was added. **APP/OWNER PENDING** and later product gates remain.
+
+
+### Final CI exposed an existing test race
+
+The first fresh-head CI at `cd08f98` failed one existing overlay test: its
+next double-click raced the async layout commit's pending state. A held
+commit reproduced the identical missing-text-input failure locally. The
+test now asserts that editing stays blocked while that commit is pending,
+settles the controlled promise inside React `act`, and verifies a fresh
+edit and invalid-text rejection afterward. All 23 overlay tests pass.
+No implementation, runtime, identity policy or rendered input changed;
+the four/six supplemental proof remains applicable. The first CI failure
+and deterministic red/green logs are retained in the hardening evidence.
+Final head checks must pass before closeout; this is a test synchronization
+fix, not a retry used to conceal a defect or a new human acceptance round.

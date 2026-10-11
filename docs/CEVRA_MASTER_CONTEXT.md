@@ -3778,3 +3778,78 @@ Director impact: compatible extension in both directions; proposed validated
 V1/V2 titles and reviewed removal execute through existing IR/History commands.
 Progress55% and F-A02 exhausted1/1 remain; later audiovisual/AI blocks are not
 started by this extension.
+
+
+### 2026-10-11 — Frozen delivery and isolated overnight hardening
+
+**IN DEVELOPMENT / NOT MERGED.** The Owner requested further offline checks
+while preserving the exact next-day UX app/fixtures. Delivered Draft #96 stays
+at `45131a9`, open/unmerged, with successful fresh-head CI740 (5/5) and Audio
+Sequence Exact Runtime103 (1/1). All 1,024 app files, synthetic fixture pins,
+shortcut and sealed receipt matched the before inventory; deep/strict signature
+verification passed outside the restricted executor. Original checkout remains
+clean. No app replacement, second human round or merge occurred.
+
+An isolated `fix/vids-ux-hardening-2026-10-11` delta fixes valid title resizing at
+strict bounds and a stale alert after Escape cancels rejected text. The review's
+one-ULP minimum-scale finding was reproduced before correction. UI151,
+Application/Host53 and final desktop build passed; the new removal matrix covers
+48 sequences with repeated Undo/Redo and archive restoration. These scoped
+totals overlap previous gates and are not added to the delivery's totals.
+At this head, supplemental edge/reopen real renders were **BLOCKED** by preview-file
+identity changes in Documents, including `.nosync`; guards were not relaxed.
+See the [canonical follow-up proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#isolated-offline-hardening--2026-10-11)
+for reproduced cases, external evidence and gate limits.
+
+The approved sequence still requires the one grouped **APP/OWNER PENDING**
+round before delimiting audiovisual finishing; it does not authorize the next
+implementation now. Existing audio/caption primitives need a bounded workflow
+proposal and feasibility check; affected color/HDR remains behind MR-V02/K2.
+Later AI strategy/selection/cut planning is also not started, and F-A02 remains
+exhausted1/1. No new scope, provider, engine, schema, dependency or security
+change was introduced. Director impact: no new impact found within this delta;
+UI arithmetic/error handling preserves the typed execution and IR/History
+boundaries in both directions. Progress55% remains unchanged.
+
+
+### 2026-10-11 — PR97 supplemental real renders closed without weakening identity
+
+**IN DEVELOPMENT / NOT MERGED.** The Owner authorized bounded diagnosis and
+verified stable local scratch if Documents changed working-file identity.
+The release guard captured a ctime-only change on a newly sealed private
+source copy. A copy-only control reproduced later ctime changes 3/3 under
+Documents and 0/3 in local scratch with all bytes/SHA256 unchanged. The exact
+metadata writer is unproven; File Provider attribution remains an inference.
+The strict guard was correct and was not relaxed. A separate external-harness
+assertion wrongly counted a Redo tail; it now verifies one export entry from
+the active cursor. No product History/export/runtime code changed.
+
+Verified new runtime/fixture/baseline copies in exclusively owned same-Mac
+`/private/tmp` scratch passed four supplemental H/V preview/export renders
+and six measured jobs: exact 300 frames/480,000 PCM samples, frames 91..209
+across cut 150, AAC identity by profile, three source-removal/Undo/Redo cycles
+and two physical reopens per aspect. Both reference ROI quality gates passed.
+All eight output/reference/archive files were transferred by matching SHA256
+into the CEVRA hardening base. See the [canonical proof and evidence limits](CEVRA_MANUAL_TITLE_PROOF_V1.md#supplemental-render-gate-resolved--2026-10-11).
+
+This resolves the supplemental proof block recorded at 2da579d; it does not
+claim general File Provider destination support. Derived preview already
+uses system temporary storage by default; Native final export uses the
+picked destination parent and may encounter volatile metadata there. That
+operational constraint was not changed or hidden. PR96, its signed app,
+fixtures, shortcut and sealed receipt remain frozen at 45131a9; previous
+17 renders/27 jobs are not combined with the new totals. No merge, app
+replacement, provider/AI execution, security change or second human round.
+Director impact: no new impact found in either direction; this is evidence/
+harness correction only. **APP/OWNER PENDING**, Progress 55% and later gates
+remain unchanged.
+
+
+The first post-proof CI at `cd08f98` exposed one existing overlay-test race:
+commit invocation was mistaken for async settlement before the next edit.
+A held-promise reproducer failed identically. The test now verifies pending
+editing is blocked, awaits settlement with React `act`, and then verifies
+the subsequent edit/rejection; all 23 overlay tests pass. Production code,
+rendered inputs and guards are unchanged, so the supplemental render proof
+remains applicable. Final-head CI is required before closeout. Director:
+no new impact found from this deterministic test correction.
