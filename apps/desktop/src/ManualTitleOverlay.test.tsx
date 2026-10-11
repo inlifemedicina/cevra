@@ -62,9 +62,15 @@ it("edits text with IME/Delete ownership, Escape cancellation, and settles once 
 });
 it("blocks following actions on invalid text and clamps gestures to the final picture", async () => {
   const f = fixture(), hit = screen.getByRole("button", { name: t("title.selectPreview") });
+  let finishCommit!: () => void;
+  f.commit.mockImplementationOnce(() => new Promise<void>(resolve => { finishCommit = resolve; }));
   pointer(hit, "pointerdown", 100); pointer(hit, "pointerup", 4000, -4000);
   await waitFor(() => expect(f.commit).toHaveBeenCalledOnce()); const l = (f.commit.mock.calls[0]![0] as any).title.layout;
   expect(l.x).toBeCloseTo(.16); expect(l.y).toBe(0); expect(l.y + manualTitleHeight("16:9", l.fontScale)).toBeLessThanOrEqual(1);
+  expect((hit as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.doubleClick(hit); expect(screen.queryByLabelText(t("title.editPreview"))).toBeNull();
+  await act(async () => { finishCommit(); await f.draftRef.current!.settle(); });
+  expect((hit as HTMLButtonElement).disabled).toBe(false);
   fireEvent.doubleClick(hit); fireEvent.change(screen.getByLabelText(t("title.editPreview")), { target: { value: "" } });
   await act(async () => { await expect(f.draftRef.current!.settle()).rejects.toEqual({ code: "MANUAL_TITLE_INVALID" }); });
   expect(f.commit).toHaveBeenCalledOnce(); expect(screen.getByRole("alert")).toBeTruthy();
