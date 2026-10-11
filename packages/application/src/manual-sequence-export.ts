@@ -2,10 +2,11 @@ import type { ProjectHistory } from "@cevra/project-ir";
 import { resolveManualVideoSequence } from "./manual-video-sequence.js";
 import { ManualSequencePreviewApplicationService, type ManualSequencePreviewPlan } from "./manual-sequence-preview.js";
 import type { SourceContentIdentityPort } from "./source-technical-descriptor.js";
-import type { MediaPublicationEvidenceV1 } from "@cevra/contracts";
+import { FixedManualTitleCompositionAdapter, type MediaPublicationEvidenceV1 } from "@cevra/contracts";
 import { MediaApplicationService } from "./media-service.js";
 import type { MediaExecutionOutcome } from "./types.js";
 import { localSourceProbeInput } from "./local-source-uri.js";
+import { resolveProjectManualTitle } from "./manual-title.js";
 
 /** Initial approved validation budgets. RSS is sampled; these are not proved commercial ceilings. */
 export const MANUAL_EXPORT_LIMITS = Object.freeze({
@@ -59,7 +60,11 @@ export function validateManualExportPreparationRequest(value: unknown): ManualEx
 }
 
 /** Preflight estimate, not a VBR upper bound, disk reservation or render admission. */
-export function estimateManualExportOwnedBytes(plan: Pick<ManualSequencePreviewPlan, "sources" | "durationMs" | "clips">) {
+export const MANUAL_TITLE_RASTER_RESERVE_BYTES = 1920 * 1080 * 4 + 65536;
+function mandatoryWorkspaceBytes(plan: Pick<ManualSequencePreviewPlan, "title">, originalCopyBytes: number) {
+  return originalCopyBytes + (plan.title ? MANUAL_TITLE_RASTER_RESERVE_BYTES : 0);
+}
+export function estimateManualExportOwnedBytes(plan: Pick<ManualSequencePreviewPlan, "sources" | "durationMs" | "clips" | "title">) {
   let copies = 0n;
   const originals = new Set<string>();
   for (const source of plan.sources) {
@@ -77,8 +82,9 @@ export function estimateManualExportOwnedBytes(plan: Pick<ManualSequencePreviewP
   // The encoder target is not a maximum; a live owned-file guard is still required.
   const targetVideo = (duration * BigInt(MANUAL_EXPORT_PROFILE.targetVideoBitsPerSecond) + 7999n) / 8000n;
   const metadataAllowance = BigInt(plan.clips.length) * 4096n + 1024n * 1024n;
-  const estimate = copies + pcm + targetVideo * 2n + metadataAllowance;
-  if (copies > BigInt(MANUAL_EXPORT_LIMITS.ownedJobBytes)) throw manualExportError("MANUAL_EXPORT_DISK_LIMIT");
+  const raster = plan.title ? BigInt(MANUAL_TITLE_RASTER_RESERVE_BYTES) : 0n;
+  const estimate = copies + raster + pcm + targetVideo * 2n + metadataAllowance;
+  if (copies + raster > BigInt(MANUAL_EXPORT_LIMITS.ownedJobBytes)) throw manualExportError("MANUAL_EXPORT_DISK_LIMIT");
   return Object.freeze({ originalCopyBytes: Number(copies),
     estimatedOwnedBytes: Number(estimate > BigInt(Number.MAX_SAFE_INTEGER) ? BigInt(Number.MAX_SAFE_INTEGER) : estimate) });
 }
@@ -102,7 +108,8 @@ export class ManualSequenceExportApplicationService {
     if (!destination.resolveOutputUri || !destination.revalidatePublication) throw manualExportError("MANUAL_EXPORT_UNAVAILABLE");
     const plan = await this.sequence.prepare({ version: 1, expectedSnapshotId: stable.expectedSnapshotId }, signal);
     const estimate = estimateManualExportOwnedBytes(plan);
-    const target = await destination.prepare(estimate.originalCopyBytes, signal);
+    const requiredBytes = mandatoryWorkspaceBytes(plan, estimate.originalCopyBytes);
+    const target = await destination.prepare(requiredBytes, signal);
     await this.sequence.revalidate(plan, signal);
     const outputUri = destination.resolveOutputUri(target);
     const sourceById = new Map(plan.sources.map(source => [source.id, source]));
@@ -122,14 +129,16 @@ export class ManualSequenceExportApplicationService {
     };
     return this.options.media.execute({
       id: executionId, locale: stable.locale,
-      operation: { type: "render-manual-video-sequence", version: 1, items, outputUri, ownedWorkspaceUri },
+      operation: plan.title
+        ? { type: "render-manual-video-sequence", version: 2, composition: new FixedManualTitleCompositionAdapter().compile(plan.title), items, outputUri, ownedWorkspaceUri }
+        : { type: "render-manual-video-sequence", version: 1, items, outputUri, ownedWorkspaceUri },
       mutation: { type: "export.add", exportId: executionId, presetId: "cevra.manual.cfr30.sdr1080.h264-aac.v1" },
       actor: { type: "user" },
       projectBinding: { projectId: project.project.id, projectRevision: project.history.revision,
         projectSnapshotId: stable.expectedSnapshotId, projectJournalEntryCount: this.options.history.entries.length }
     }, signal, {
       beforeEngine: { verify: async guardSignal => {
-        await destination.revalidate(target, estimate.originalCopyBytes, guardSignal);
+        await destination.revalidate(target, requiredBytes, guardSignal);
         await verify(guardSignal);
       } },
       beforeCommit: { verify: async guardSignal => {
@@ -174,14 +183,16 @@ export class ManualSequenceExportPreparationApplicationService {
     if (!clips.length) throw manualExportError("MANUAL_EXPORT_UNSUPPORTED");
     const ids = new Set(clips.map(clip => clip.sourceId));
     const sources = project.sources.filter(source => ids.has(source.id));
-    const estimate = estimateManualExportOwnedBytes({ sources, clips, durationMs: project.timeline.durationMs });
+    const title = resolveProjectManualTitle(project);
+    const estimate = estimateManualExportOwnedBytes({ sources, clips, durationMs: project.timeline.durationMs, ...(title ? { title } : {}) });
+    const requiredBytes = mandatoryWorkspaceBytes({ ...(title ? { title } : {}) }, estimate.originalCopyBytes);
     // Reject only a known impossibility here. The bitrate estimate is not a
     // maximum, minimum, duration cap or proof that the future pipeline fits.
-    const target = await destination.prepare(estimate.originalCopyBytes, signal);
+    const target = await destination.prepare(requiredBytes, signal);
     signal?.throwIfAborted();
     if (journal !== this.options.history.journalIdentity) throw manualExportError("MANUAL_EXPORT_STALE");
     const plan = await this.sequence.prepare({ version: 1, expectedSnapshotId: stable.expectedSnapshotId }, signal);
-    await destination.revalidate(target, estimate.originalCopyBytes, signal);
+    await destination.revalidate(target, requiredBytes, signal);
     await this.sequence.revalidate(plan, signal);
     signal?.throwIfAborted();
     if (journal !== this.options.history.journalIdentity) throw manualExportError("MANUAL_EXPORT_STALE");
@@ -198,7 +209,7 @@ export class ManualSequenceExportPreparationApplicationService {
   async revalidate(preparation: ManualExportPreparation, signal?: AbortSignal): Promise<void> {
     const issued = this.issued.get(preparation);
     if (!issued) throw manualExportError("MANUAL_EXPORT_STALE");
-    await issued.port.revalidate(issued.destination, preparation.originalCopyBytes, signal);
+    await issued.port.revalidate(issued.destination, mandatoryWorkspaceBytes(issued.plan, preparation.originalCopyBytes), signal);
     await this.sequence.revalidate(issued.plan, signal);
     signal?.throwIfAborted();
   }

@@ -383,5 +383,7 @@ export type EditCommand =
   | { type: "track.remove"; trackId: Id }
   | { type: "caption.upsert"; caption: CaptionCue }
   | { type: "caption.remove"; captionId: Id }
+  | { type: "graphic.manualTitle.set"; graphic: GraphicItem }
+  | { type: "graphic.manualTitle.remove"; graphicId: Id }
   | { type: "style.patch"; patch: Partial<StyleState> }
   | { type: "export.add"; export: ExportRecord };

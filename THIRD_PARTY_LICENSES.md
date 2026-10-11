@@ -90,3 +90,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Apache-2.0, MIT and BSD dependencies are preferred. LGPL components may be distributed only with an explicit compliance plan and reproducible provenance. GPL/AGPL, `--enable-nonfree` FFmpeg builds and non-permissive components require explicit architecture/licensing review before incorporation into release artifacts. Model licenses are audited independently from runtime-library licenses.
 
 The release pipeline must fail closed when a runtime manifest, required notice, source artifact/hash, component inventory, source version, license classification or configure-flags provenance is missing. The manifest proves internal consistency of a bundle authenticated by the signed application/installer/update artifact; it is not an independent authenticity signature.
+## Inter — manual title V1
+
+Unmodified Inter variable font, google/fonts revision
+`0b58fb370093f9a9f4ff785d94405710b79de67c`; SIL Open Font License 1.1.
+SHA256 `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031`.
+Full license and exact provenance are in
+`engines/media-ffmpeg/components/manual-title/OFL.txt` and its README.md.
+Loaded privately by the first-party macOS CoreText component, without global
+installation or font modification. Commercial bundling and redistribution are
+covered by the retained OFL; the font is not sold by itself.

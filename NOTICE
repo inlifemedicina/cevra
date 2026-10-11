@@ -32,3 +32,6 @@ Current third-party attribution:
 - WhisperX 3.8.6 / commit 3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0 — Copyright (c) 2024 Max Bain — BSD 2-Clause License. CEVRA adapts only the CTC trellis, backtracking and word-boundary alignment behavior; the full WhisperX package is not installed or redistributed.
 - PyTorch 2.8.0 — Copyright PyTorch contributors — BSD 3-Clause License; Transformers 4.57.6 — Copyright Hugging Face and contributors — Apache License 2.0; NumPy 2.2.6 — BSD 3-Clause License with bundled component notices. Direct dependencies of the isolated CEVRA Alignment Runtime; platform artifacts are not bundled by this slice.
 - jonatasgrosman/wav2vec2-large-xlsr-53-portuguese revision 634ac655299bcdc46c83bc01da9bab52d2987e4f and facebook/wav2vec2-base-960h revision 22aad52d435eb6dbaf354bdad9b0da84ce7d6156 — Apache License 2.0. Pinned PT/EN CTC alignment models; weights are not committed or bundled by this slice.
+Inter font: Copyright 2020 The Inter Project Authors
+(https://github.com/rsms/inter), SIL Open Font License 1.1.
+Unmodified font and full license: engines/media-ffmpeg/components/manual-title.

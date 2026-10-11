@@ -817,3 +817,52 @@ Exact final CI and package identity belong in the technical receipt and Draft #8
 failed harness attempts remain failed evidence. No automatic Play or product
 brightness gate, no original change, private human-store read/copy, media
 publication or actual AI. [Current bounds and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-preview-fluency-and-admitted-png--2026-10-05).
+
+
+## Offline manual-title visual round — 2026-10-10
+
+The Owner confirmed both exact synthetic title videos and replied **“Sim”** that
+the title appeared correctly at the expected times and margins. **OWNER VISUAL
+PASS applies only to this offline 16:9/9:16 fixture round**, now closed.
+
+Four preview/final outputs, 13 contract tests and independent review PASS cover
+the fixed title, 300 frames/10 seconds, frame90–209 timing across the frame150
+cut, source/audio identity, seeks, cancellation and bounded observed resources.
+[Exact artifact hashes, retained failures and method](CEVRA_MANUAL_TITLE_PROOF_V1.md)
+keep this evidence attached to its actual scope.
+
+Reuse D14-T2/D23-T1/T2 for the proposed integrated title behavior and
+X-T1/T2/T7/I17-T9 for History/persistence. Their complete app scenarios remain
+**BLOCKED where unimplemented**; editing/persistence, live preview K4-T1,
+original-source integrated export K4-T2 and the complete composition benchmark
+are not inferred from these MP4s. No new scenario ID or blanket D23/K4/G1 PASS
+is introduced. Next app acceptance follows automated integration checks and one
+grouped subjective round; do not repeat this approved offline visual test.
+
+## Integrated manual-title app round — 2026-10-11
+
+**AUTO/UNIT PASS; APP/OWNER PENDING.** The limited integration was authorized
+after the historical proof acceptance. Reuse the stable IDs below; no blanket
+catalog PASS or new scenario ID. Local build/CI, exact-runtime original-source
+render, no-title regression, persistence/History and real-packet UI delivery
+passed. DOM/Blob evidence does not replace native playback or subjective UX.
+[Contracts, receipt hashes and bounds](CEVRA_MANUAL_TITLE_PROOF_V1.md#integração-limitada-autorizada--2026-10-11).
+
+One grouped round uses the isolated `CEVRA Vids Manual Title.app` (0.1.0,
+runtime0.3.5) and the two synthetic inputs in its delivery folder. Test the app,
+not the previously accepted offline MP4s. The fixture lasts ten seconds at
+30fps, with a visible cut at five seconds and an audio tone/pulse.
+
+| Existing IDs / action | Expected result |
+|---|---|
+| D14-T2, D23-T1/T2: import horizontal input; create V1 from the whole ten-second Original using Mark IN at start / OUT at end and Create clip from excerpt; add title `Ação, café e conexão`, IN90, OUT210, 16:9. | One title is visible on the timeline and in V1 from 3s inclusive until 7s exclusive, crossing the 5s cut. Accents and safe margins appear correctly; the Original remains unchanged. |
+| D14-T2, D23-T1/T2, X-T1/T2: change text and range to IN120/OUT240, Apply; Undo, Redo; Remove and Undo. | Each applied edit/removal is one History step. Text/range and title restore coherently; montage/audio stay intact. An unadded draft requires Add or Discard before leaving. |
+| X-T7, I17-T9: wait for the top bar to show Saved, close the isolated app normally and reopen it. | The same saved title/text/range/aspect and montage reopen; no draft is silently promoted to a saved title. |
+| D23-T1/T2, bounded K3-T2/K4-T2: export horizontal with the matching 16:9 target and compare to the current V1. | Final 1920×1080 title, timing, margins, montage and audio match the selected plan; no unexpected silence, freeze, missing accents or inherited title from a prior snapshot. This does not close the broader K4 benchmark. |
+| D14-T2, D23-T1/T2 and bounded K3-T2/K4-T2: after the horizontal save/reopen/export, remove its title and timeline clip in this isolated test project; import/select the vertical input and repeat creation/preview/export with 9:16 title/target. | Preview and final1080×1920 preserve the selected text/timing, readable accents and safe margins; audio stays coherent. Imported sources remain intact and History retains the horizontal edits. Report visual/UX judgment for both aspects together. |
+
+No new real media, AI, login, Xcode/iPhone operation or active human project-store
+inspection is necessary. Profile/glyph/overflow/snapshot negatives, cancellation,
+deadline, sampled budgets and original hash checks are automated; do not burden
+the Owner with a second technical negative-test round. The historical offline
+OWNER VISUAL PASS, progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.

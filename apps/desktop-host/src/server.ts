@@ -16,6 +16,7 @@ import {
   validateVideoPreviewParams, validateVideoThumbnailParams,
   validateManualClipParams, validateManualTrimParams,
   validateManualSequenceParams,
+  validateManualTitleParams,
   validateManualExportParams,
   validateConformPreviewParams,
   type HostErrorPayload,
@@ -139,6 +140,8 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       return { result: requireSession(session).previewManualSequenceConform(validateConformPreviewParams(request.params, request.id)) };
     case "video.editManualSequence":
       return { result: await requireSession(session).editManualVideoSequence(validateManualSequenceParams(request.params, request.id)) };
+    case "video.editManualTitle":
+      return { result: await requireSession(session).editManualTitle(validateManualTitleParams(request.params, request.id)) };
     case "video.createManualClip":
       return { result: await requireSession(session).createManualVideoClip(validateManualClipParams(request.params, request.id)) };
     case "video.trimManualClip":

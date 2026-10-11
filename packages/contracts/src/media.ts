@@ -1,6 +1,6 @@
 import type { EngineAdapter, ExecutionContext } from "./base.js";
 import type { MeasureAudioOperationV1, AudioMeasurementReportV1 } from "./audio-measurement.js";
-import { validateManualVideoOperation, type RenderManualVideoSequenceOperationV1, type RenderManualVideoPreviewOperationV1, type RenderManualVideoPreviewOperationV2, type ManualSequenceExecutionEvidenceV1 } from "./manual-video-sequence.js";
+import { validateManualVideoOperation, type RenderManualVideoOperation, type ManualSequenceExecutionEvidenceV1 } from "./manual-video-sequence.js";
 
 export type FitMode = "contain" | "cover" | "stretch";
 export type MediaContainer = "mp4" | "mov" | "mkv" | "wav" | "m4a";
@@ -299,9 +299,7 @@ export interface EffectiveMediaProfile {
 }
 
 export type MediaOperation =
-  | RenderManualVideoSequenceOperationV1
-  | RenderManualVideoPreviewOperationV1
-  | RenderManualVideoPreviewOperationV2
+  | RenderManualVideoOperation
   | MeasureAudioOperationV1
   | { type: "probe"; inputUri: string }
   | { type: "trim"; inputUri: string; outputUri: string; startMs: number; endMs: number; boundedPreview?: true; previewProfile?: "take-v1" }
@@ -335,8 +333,8 @@ const MEDIA_CONTAINERS = new Set(["mp4", "mov", "mkv", "wav", "m4a"]);
 const VIDEO_CODECS = new Set(["h264", "h265", "av1", "copy"]);
 const AUDIO_CODECS = new Set(["aac", "opus", "pcm", "copy"]);
 const OPERATION_FIELDS: Readonly<Record<MediaOperation["type"], ReadonlySet<string>>> = {
-  "render-manual-video-sequence": new Set(["type", "version", "items", "outputUri", "ownedWorkspaceUri"]),
-  "render-manual-video-preview": new Set(["type", "version", "item", "items", "outputUri", "ownedWorkspaceUri"]),
+  "render-manual-video-sequence": new Set(["type", "version", "items", "outputUri", "ownedWorkspaceUri", "composition"]),
+  "render-manual-video-preview": new Set(["type", "version", "item", "items", "outputUri", "ownedWorkspaceUri", "composition"]),
   "measure-audio": new Set(["type", "version", "inputUri", "streamIndex", "startMs", "endMs"]),
   probe: new Set(["type", "inputUri"]),
   trim: new Set(["type", "inputUri", "outputUri", "startMs", "endMs", "boundedPreview", "previewProfile"]),

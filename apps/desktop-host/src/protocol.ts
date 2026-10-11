@@ -2,6 +2,7 @@ import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
 import type { LocalVideoPreviewRequest, SourceThumbnailRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
 import { validateManualVideoSequenceEdit, type ManualVideoSequenceEdit } from "@cevra/application";
+import { validateManualTitleEdit } from "@cevra/application";
 import { validateManualExportPreparationRequest, type ManualExportPreparationRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
@@ -30,6 +31,7 @@ export type HostMethod =
   | "video.trimManualClip"
   | "video.createManualClip"
   | "video.editManualSequence"
+  | "video.editManualTitle"
   | "transcription.transcribeSource"
   | "history.undo"
   | "history.redo"
@@ -65,6 +67,7 @@ export interface DesktopHostState {
     mediaImport: CapabilityState;
     transcription: CapabilityState;
     manualExport?: CapabilityState;
+    manualTitle?: CapabilityState;
   };
 }
 
@@ -104,6 +107,7 @@ const METHODS = new Set<HostMethod>([
   "video.createManualClip",
   "video.trimManualClip",
   "video.editManualSequence",
+  "video.editManualTitle",
   "transcription.transcribeSource",
   "history.undo",
   "history.redo",
@@ -258,6 +262,9 @@ export function validateManualSequenceParams(params: Record<string, unknown>, id
     if (key === "clipIds") for (const clipId of value as string[]) boundedString(clipId, 128, "clipId", id);
   }
   return stable;
+}
+export function validateManualTitleParams(params: Record<string, unknown>, _id: string) {
+  return validateManualTitleEdit(params);
 }
 
 function videoBinding(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {

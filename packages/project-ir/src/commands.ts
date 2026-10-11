@@ -1,5 +1,6 @@
 import type { CaptionCue, EditCommand, ProjectIR, SourceTechnicalDescriptorV1, SourceTranscript, StyleState, TimelineClip, TimelineEditOperationV2, TranscriptProvenanceStage } from "./types.js";
 import { frameTimingMilliseconds } from "./frame-time.js";
+import { resolveManualTitle } from "./manual-title.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
 import { assertValidProjectIR, validateProjectIR, validateTimelineEditOperation } from "./validation.js";
 
@@ -92,6 +93,25 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
     case "caption.remove":
       next.captions = next.captions.filter((caption) => caption.id !== command.captionId);
       break;
+    case "graphic.manualTitle.set": {
+      if (Object.keys(command).some(k => !["type", "graphic"].includes(k))) throw Error("MANUAL_TITLE_INVALID");
+      const title = resolveManualTitle(command.graphic);
+      if (next.timeline.timingPolicy !== "cfr30" || title.endFrame > next.timeline.durationMs * 30 / 1000 + 1e-7
+        || next.graphics.some(g => g.id !== command.graphic.id)) throw Error("MANUAL_TITLE_UNSUPPORTED");
+      const previous = next.graphics.find(g => g.id === command.graphic.id);
+      if (previous) resolveManualTitle(previous);
+      if (JSON.stringify(previous) === JSON.stringify(command.graphic)) throw Error("MANUAL_TITLE_NO_OP");
+      next.graphics = [clone(command.graphic)];
+      break;
+    }
+    case "graphic.manualTitle.remove": {
+      if (Object.keys(command).some(k => !["type", "graphicId"].includes(k))) throw Error("MANUAL_TITLE_INVALID");
+      const graphic = next.graphics.find(g => g.id === command.graphicId);
+      if (!graphic) throw Error("MANUAL_TITLE_UNKNOWN");
+      resolveManualTitle(graphic);
+      next.graphics = next.graphics.filter(g => g.id !== command.graphicId);
+      break;
+    }
     case "style.patch":
       next.style = mergeDefined(next.style, command.patch);
       break;

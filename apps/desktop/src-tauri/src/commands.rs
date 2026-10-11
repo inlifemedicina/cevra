@@ -391,6 +391,51 @@ pub struct EditorialRevisionArgs {
     block_edits: Option<Vec<EditorialBlockEdit>>,
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualTitleValue {
+    version: u8,
+    component_id: String,
+    text: String,
+    start_frame: u64,
+    end_frame: u64,
+    aspect: String,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
+pub enum ManualTitleAction { Set { title: ManualTitleValue }, Remove {} }
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualTitleArgs {
+    version: u8,
+    expected_snapshot_id: String,
+    action: Value,
+}
+fn manual_title_params(args: ManualTitleArgs) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    if args.version != 1 { return Err(DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title version.")); }
+    let action = serde_json::from_value::<ManualTitleAction>(args.action).map_err(|_| DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title action."))?;
+    if let ManualTitleAction::Set { ref title } = action {
+        if title.version != 1 || title.component_id != "cevra.title.lower-third.inter.v1"
+            || !["16:9", "9:16"].contains(&title.aspect.as_str()) || title.text.trim().is_empty()
+            || title.text.encode_utf16().count() > 80 || title.text.chars().any(|c| c.is_control() || c == '\u{2028}' || c == '\u{2029}')
+            || title.start_frame >= title.end_frame || title.end_frame > 18_144_000 {
+            return Err(DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title component."));
+        }
+    }
+    let mut params = serde_json::to_value(action).map_err(|_| DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title request."))?;
+    params["version"] = json!(args.version); params["expectedSnapshotId"] = json!(args.expected_snapshot_id);
+    Ok(params)
+}
+#[tauri::command]
+pub async fn desktop_edit_manual_title(app: AppHandle, supervisor: State<'_, Arc<DesktopHostSupervisor>>, args: ManualTitleArgs) -> Result<Value, DesktopCommandError> {
+    let params = manual_title_params(args)?;
+    supervisor.ensure_started(&app).await?;
+    match supervisor.request_immediate_mutation("video.editManualTitle", params).await {
+        Ok(result) => Ok(result), Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
+}
+
 #[tauri::command]
 pub async fn desktop_get_editorial_draft(
     app: AppHandle,
@@ -680,6 +725,31 @@ fn file_name(path: &Path) -> Result<String, DesktopCommandError> {
 #[cfg(test)]
 mod video_boundary_tests {
     use super::*;
+
+    #[test]
+    fn manual_title_boundary_roundtrips_closed_actions_and_rejects_injection() {
+        let title = json!({"version":1,"componentId":"cevra.title.lower-third.inter.v1",
+            "text":"Ação, café e conexão","startFrame":90,"endFrame":210,"aspect":"9:16"});
+        for action in [json!({"type":"set","title":title.clone()}), json!({"type":"remove"})] {
+            let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":action});
+            let params = manual_title_params(serde_json::from_value(request.clone()).unwrap()).unwrap();
+            assert_eq!(params["type"], action["type"]);
+            assert_eq!(params["expectedSnapshotId"], "snapshot");
+            for extra in ["fontPath","filter","outputUri","commands"] {
+                let mut injected = request.clone(); injected[extra] = json!("injected");
+                assert!(serde_json::from_value::<ManualTitleArgs>(injected).is_err());
+                let mut injected = request.clone(); injected["action"][extra] = json!("injected");
+                assert!(manual_title_params(serde_json::from_value(injected).unwrap()).is_err());
+            }
+        }
+        for (field, value) in [("startFrame",json!(0.5)),("endFrame",json!(90)),
+            ("aspect",json!("1:1")),("componentId",json!("caller-code")),("text",json!("a\nline")),
+            ("fontPath",json!("/private/font")),("version",json!(2))] {
+            let mut injected = title.clone(); injected[field] = value;
+            let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":{"type":"set","title":injected}});
+            assert!(manual_title_params(serde_json::from_value(request).unwrap()).is_err());
+        }
+    }
 
     #[test]
     fn thumbnail_boundary_requires_ids_and_rejects_paths_and_render_controls() {

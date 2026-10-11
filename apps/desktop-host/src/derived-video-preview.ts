@@ -1,5 +1,6 @@
 import { MANUAL_VIDEO_MAX_BYTES, MANUAL_VIDEO_FRAME_MAX_BYTES, localSourceProbeInput, manualVideoError, resolveManualVideo, resolveManualVideoSequence, type LocalVideoPreview, type LocalVideoPreviewRequest } from "@cevra/application";
-import { validateManualSequenceExecutionEvidence, type MediaEngineAdapter } from "@cevra/contracts";
+import { FixedManualTitleCompositionAdapter, validateManualSequenceExecutionEvidence, type MediaEngineAdapter } from "@cevra/contracts";
+import { resolveProjectManualTitle } from "@cevra/application";
 import { framesToMilliseconds, type ProjectHistory, type SourceAsset } from "@cevra/project-ir";
 import { constants, type BigIntStats } from "node:fs";
 import { createHash } from "node:crypto";
@@ -38,12 +39,14 @@ export function resolvePreviewRange(history: ProjectHistory, request: LocalVideo
     const sources = history.current.sources.filter(source => sourceIds.has(source.id));
     const source = resolveManualVideo(history.current, request);
     if (sources.some(item => !item.durationMs || item.durationMs > 60_000)) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
+    const title = resolveProjectManualTitle(history.current);
     return { source, sources, sequenceClips: clips, clip: undefined, startMs: 0, endMs: history.current.timeline.durationMs,
+      composition: title ? new FixedManualTitleCompositionAdapter().compile(title) : undefined,
       frameRange: { sourceStartFrame: 0, sourceEndFrame: clips.at(-1)!.frameTiming!.timelineEndFrame } };
   }
   if (request.clipId !== undefined) {
     const { source, clip } = resolvePreviewClip(history, request);
-    return { source, sources: [source], sequenceClips: undefined, clip, startMs: clip.sourceStartMs, endMs: clip.sourceEndMs,
+    return { source, sources: [source], sequenceClips: undefined, composition: undefined, clip, startMs: clip.sourceStartMs, endMs: clip.sourceEndMs,
       frameRange: clip.frameTiming ? { sourceStartFrame: clip.frameTiming.sourceStartFrame, sourceEndFrame: clip.frameTiming.sourceEndFrame } : undefined };
   }
   const source = resolveManualVideo(history.current, request);
@@ -51,7 +54,7 @@ export function resolvePreviewRange(history: ProjectHistory, request: LocalVideo
   // Original remains a source-clock viewer. The manual CFR30 sampler is
   // admitted only for a canonical clip, whose audio window is independently
   // covered; Take's approved padding policy handles a source's initial gap.
-  return { source, sources: [source], sequenceClips: undefined, clip: undefined, startMs: 0, endMs: source.durationMs, frameRange: undefined };
+  return { source, sources: [source], sequenceClips: undefined, composition: undefined, clip: undefined, startMs: 0, endMs: source.durationMs, frameRange: undefined };
 }
 
 /** Read-only preparation: no Project IR, execution ledger or checkpoint writes. */
@@ -83,7 +86,7 @@ export class DerivedVideoPreview {
   private key(range: ReturnType<typeof resolvePreviewRange>): string {
     const s = range.source;
     return createHash("sha256").update(JSON.stringify([s.id, s.uri, s.durationMs, s.width, s.height, s.frameRate, s.sampleRate, s.channels,
-      s.technicalDescriptor, range.sources.map(item => [item.id, item.uri, item.technicalDescriptor, item.durationMs, item.sampleRate, item.channels]), range.sequenceClips, range.startMs, range.endMs, range.frameRange, range.frameRange ? "manual-cfr30-preview-v1" : "take-v1", this.options.runtimeIdentity?.() ?? "session-bound-engine"])).digest("hex");
+      s.technicalDescriptor, range.sources.map(item => [item.id, item.uri, item.technicalDescriptor, item.durationMs, item.sampleRate, item.channels]), range.sequenceClips, range.composition, range.composition ? this.options.history.current.history.headSnapshotId : undefined, range.startMs, range.endMs, range.frameRange, range.frameRange ? "manual-cfr30-preview-v1" : "take-v1", this.options.runtimeIdentity?.() ?? "session-bound-engine"])).digest("hex");
   }
 
   private packet(entry: PreparedPreview, request: LocalVideoPreviewRequest, range: ReturnType<typeof resolvePreviewRange>): LocalVideoPreview {
@@ -162,7 +165,9 @@ export class DerivedVideoPreview {
         return { inputUri: localSourceProbeInput(original.uri)!, sourceStartFrame: clip.frameTiming!.sourceStartFrame,
           sourceEndFrame: clip.frameTiming!.sourceEndFrame, sourceContent: { ...original.technicalDescriptor!.content }, audioSelection: "single-source-stream" as const };
       });
-      const result = await this.options.engine.execute(programItems ? {
+      const result = await this.options.engine.execute(programItems && range.composition ? {
+        type: "render-manual-video-preview", version: 3, composition: range.composition, items: programItems, outputUri: output, ownedWorkspaceUri: jobRoot!
+      } : programItems ? {
         type: "render-manual-video-preview", version: 2, items: programItems, outputUri: output, ownedWorkspaceUri: jobRoot!
       } : range.frameRange ? {
         type: "render-manual-video-preview", version: 1, item: { inputUri: input, ...range.frameRange,
@@ -178,10 +183,12 @@ export class DerivedVideoPreview {
         try { grid = validateManualSequenceExecutionEvidence(result.manualSequence); } catch { throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED"); }
         const frames = range.frameRange.sourceEndFrame - range.frameRange.sourceStartFrame;
         const original = grid.sources[0];
+        const portrait = range.composition?.title.aspect === "9:16";
+        if (JSON.stringify(grid.composition) !== JSON.stringify(range.composition)) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
         if (grid.profile !== "manual-cfr30-preview-v1" || grid.totalFrames !== frames || grid.itemCount !== (programItems?.length ?? 1) || grid.sources.length !== new Set(range.sources.map(source => localSourceProbeInput(source.uri))).size
           || (!programItems && (!original || original.inputUri !== input || original.sha256 !== source.technicalDescriptor!.content.sha256 || original.sizeBytes !== source.technicalDescriptor!.content.sizeBytes
           || original.sampleRate !== source.sampleRate || original.channelLayout !== (source.channels === 2 ? "stereo" : "mono")))
-          || result.probe.width !== 720 || result.probe.height !== 404 || result.probe.frameRate !== 30 || result.probe.rotationDegrees !== 0
+          || result.probe.width !== (portrait ? 404 : 720) || result.probe.height !== (portrait ? 720 : 404) || result.probe.frameRate !== 30 || result.probe.rotationDegrees !== 0
           || result.probe.videoCodec !== "h264"
           || !result.probe.hasAudio || result.probe.audioCodec !== "aac" || result.probe.sampleRate !== 48000
           || result.probe.channels !== (grid.audioChannelLayout === "stereo" ? 2 : 1) || result.probe.hdr === true
@@ -199,7 +206,7 @@ export class DerivedVideoPreview {
             || range.frameRange.sourceStartFrame * original!.sampleRate / 30 < original!.sourceAudioFirstSample
             || range.frameRange.sourceEndFrame * original!.sampleRate / 30 > original!.sourceAudioFirstSample + original!.sourceAudioSampleCount)) throw manualVideoError("MANUAL_VIDEO_UNSUPPORTED");
         duration = framesToMilliseconds(frames);
-        evidence = { width: 720, height: 404, firstFrameMs: startMs,
+        evidence = { width: grid.width, height: grid.height, firstFrameMs: startMs,
           lastFrameMs: framesToMilliseconds(range.frameRange.sourceEndFrame - 1), frameCount: frames, outputSha256: grid.outputSha256 };
       } else {
         const take = result.boundedPreview;

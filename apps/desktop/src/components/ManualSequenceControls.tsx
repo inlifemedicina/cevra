@@ -1,4 +1,4 @@
-import { supportsManualClipExtensions, type ManualVideoSequenceEdit } from "@cevra/application";
+import { resolveProjectManualTitle, supportsManualClipExtensions, type ManualVideoSequenceEdit } from "@cevra/application";
 import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
 import { useEffect, useLayoutEffect, useId, useRef, useState, type RefObject, type KeyboardEvent } from "react";
 import type { SourcePresentation } from "../source-presentation";
@@ -180,7 +180,8 @@ export function manualSequenceSources(project: Readonly<ProjectIR>): SourceAsset
 }
 
 export function manualSequenceClips(project: Readonly<ProjectIR>): TimelineClip[] | undefined {
-  if (!project.history.headSnapshotId || project.captions.length || project.graphics.length) return undefined;
+  if (!project.history.headSnapshotId || project.captions.length) return undefined;
+  try { resolveProjectManualTitle(project); } catch { return undefined; }
   const clips = [...project.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs);
   const sources = new Map(manualSequenceSources(project).map(source => [source.id, source]));
   const track = project.timeline.tracks.find(item => item.id === clips[0]?.trackId);

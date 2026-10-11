@@ -90,11 +90,13 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
         const items = operation.type === "render-manual-video-preview" && operation.version === 1 ? [operation.item] : operation.items;
         const result = fileResult(await call(operation.type === "render-manual-video-preview" ? "cevra-render-manual-video-preview" : "cevra-render-manual-video-sequence", {
           version: operation.version, output: operation.outputUri, owned_workspace: operation.ownedWorkspaceUri,
+          ...("composition" in operation ? { composition: operation.composition } : {}),
           items: items.map(item => ({ input: item.inputUri, source_start_frame: item.sourceStartFrame,
             source_end_frame: item.sourceEndFrame, source_content: { sha256: item.sourceContent.sha256, size_bytes: item.sourceContent.sizeBytes }, audio_selection: item.audioSelection }))
         }), operation.outputUri);
         if (result.type !== "file" || !result.manualSequence || !result.publication) throw Error("Manual sequence result lacks measured sequence/publication evidence.");
         const evidence = result.manualSequence, expectedFrames = items.reduce((total, item) => total + item.sourceEndFrame - item.sourceStartFrame, 0);
+        if (JSON.stringify(evidence.composition) !== JSON.stringify("composition" in operation ? operation.composition : undefined)) throw Error("Manual title composition evidence disagrees with the request.");
         if (evidence.totalFrames !== expectedFrames || evidence.itemCount !== items.length
           || evidence.profile !== (operation.type === "render-manual-video-preview" ? "manual-cfr30-preview-v1" : "manual-cfr30-export-v1")) throw Error("Manual sequence result disagrees with the requested occurrences.");
         const identities = new Map(items.map(item => [item.inputUri, item.sourceContent]));

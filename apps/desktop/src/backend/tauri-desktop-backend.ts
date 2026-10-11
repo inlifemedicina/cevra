@@ -28,6 +28,7 @@ interface HostState {
     mediaImport: { available: boolean; reason: DesktopCapabilityReason };
     transcription: { available: boolean; reason: DesktopCapabilityReason };
     manualExport?: { available: boolean; reason: DesktopCapabilityReason };
+    manualTitle?: { available: boolean; reason: DesktopCapabilityReason };
   };
 }
 
@@ -43,6 +44,11 @@ export class TauriDesktopBackend implements DesktopBackend {
 
   async loadEditorialDraft(): Promise<EditorialDraftState> {
     return this.call("desktop_get_editorial_draft");
+  }
+  async editManualTitle(request: ManualTitleEdit): Promise<{ state: DesktopBackendState; graphicId?: string }> {
+    const { version, expectedSnapshotId, ...action } = request;
+    const result = await this.call<{ state: HostState; graphicId?: string }>("desktop_edit_manual_title", { args: { version, expectedSnapshotId, action } });
+    return { ...result, state: fromHostState(result.state) };
   }
 
   async thumbnailLocalVideo(request: SourceThumbnailRequest): Promise<SourceThumbnail> {
@@ -181,6 +187,7 @@ function fromHostState(state: HostState): DesktopBackendState {
     ...(state.checkpoint ? { checkpoint: { ...state.checkpoint } } : {}),
     ...(state.closePending !== undefined ? { closePending: state.closePending } : {}),
     capabilities: {
+      ...(state.capabilities.manualTitle ? { "title.edit": { ...state.capabilities.manualTitle } } : {}),
       "media.import": { ...state.capabilities.mediaImport },
       "transcription.transcribe": { ...state.capabilities.transcription },
       "director.execute": { available: false, reason: "desktop-runtime-deferred" },
@@ -189,3 +196,4 @@ function fromHostState(state: HostState): DesktopBackendState {
     }
   };
 }
+import type { ManualTitleEdit } from "@cevra/application";

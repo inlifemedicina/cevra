@@ -7,6 +7,7 @@ import {
   SourceTechnicalDescriptorResolver,
   ManualVideoClipApplicationService,
   ManualVideoSequenceApplicationService,
+  ManualTitleApplicationService,
   ManualSequencePreviewApplicationService,
   ManualSequenceExportPreparationApplicationService,
   ManualSequenceExportApplicationService,
@@ -26,7 +27,7 @@ import type {
 } from "@cevra/application";
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview, SourceThumbnail, SourceThumbnailRequest } from "@cevra/application";
-import type { ManualVideoSequenceEdit } from "@cevra/application";
+import type { ManualVideoSequenceEdit, ManualTitleEdit } from "@cevra/application";
 import { validateManualExportPreparationRequest, type ManualExportPreparationRequest, type ManualExportPreparation } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
@@ -88,6 +89,7 @@ export interface DesktopSessionServices {
   manualExportPreparation?: Pick<ManualSequenceExportPreparationApplicationService, "prepare">;
   manualExport?: Pick<ManualSequenceExportApplicationService, "execute">;
   manualExportCapability?: CapabilityState;
+  manualTitleCapability?: CapabilityState;
   manualExportSettle?: () => Promise<void>;
   sourceThumbnail?: Pick<SourceThumbnailService, "prepare" | "close">;
   derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare"> & Partial<Pick<DerivedVideoPreview, "close">>;
@@ -161,6 +163,7 @@ export class DesktopSession {
       } } : {}),
       closePending: this.closeAttempt !== null,
       capabilities: {
+        manualTitle: this.services.temporaryEditorialReview ? unavailable("review-session") : this.services.manualTitleCapability ?? unavailable("runtime-not-configured"),
         mediaImport: { ...this.services.mediaCapability },
         transcription: { ...this.services.transcriptionCapability },
         manualExport: this.services.manualExport && this.services.manualExportSettle && !this.services.temporaryEditorialReview
@@ -502,6 +505,16 @@ export class DesktopSession {
     });
   }
 
+  async editManualTitle(request: ManualTitleEdit): Promise<{ state: DesktopHostState; graphicId?: string }> {
+    return this.runMutation(async () => {
+      if (!this.services.manualTitleCapability?.available) throw safeError("MANUAL_TITLE_UNAVAILABLE");
+      const before = this.services.history.journalIdentity;
+      const result = new ManualTitleApplicationService(this.services.history).edit(request);
+      if (before !== this.services.history.journalIdentity) await this.persistMutation();
+      return { state: this.state(), ...(result.graphicId ? { graphicId: result.graphicId } : {}) };
+    });
+  }
+
   async editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopHostState; changedClipIds: string[] }> {
     return this.runMutation(async () => {
       if (!this.services.manualVideoSequence) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
@@ -649,6 +662,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       history,
       manualVideoClip: new ManualVideoClipApplicationService({ history, identity: sourceIdentity }),
       manualVideoSequence: new ManualVideoSequenceApplicationService({ history, identity: sourceIdentity }),
+      ...(media?.manualTitleCapability ? { manualTitleCapability: media.manualTitleCapability } : {}),
       manualSequencePreview: new ManualSequencePreviewApplicationService({ history, identity: sourceIdentity }),
       manualExportPreparation: new ManualSequenceExportPreparationApplicationService({ history, identity: sourceIdentity }),
       ...(media?.manualExportCapability?.available && media.settle ? {
@@ -684,6 +698,7 @@ async function createMediaServices(
 ): Promise<{
   capability: CapabilityState;
   manualExportCapability?: CapabilityState;
+  manualTitleCapability?: CapabilityState;
   engine?: MediaEngineAdapter;
   settle?: () => Promise<void>;
   ingest?: LocalSourceIngestService;
@@ -719,6 +734,8 @@ async function createMediaServices(
     const services = composeMediaApplicationServices(history, executions, engine, sourceIdentity);
     return {
       capability: available(),
+      manualTitleCapability: (await engine.capabilities()).some(capability => capability.id === "media.cevra-manual-title-inter-v1" && capability.available)
+        ? available() : unavailable("runtime-invalid"),
       manualExportCapability: (await engine.capabilities()).some(capability => capability.id === "media.cevra-render-manual-video-sequence" && capability.available)
         ? available() : unavailable("runtime-invalid"),
       engine,

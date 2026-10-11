@@ -16,6 +16,7 @@ HERE = Path(__file__).resolve().parent
 ENGINE = HERE.parent
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ENGINE / "worker"))
+sys.path.insert(0, str(HERE))
 from runtime_integrity import CRITICAL_WORKER_FILES, RuntimeIntegrityError, required_notice_paths, sha256, tree_sha256
 from schema_validator import SchemaValidationError, validate as validate_schema
 

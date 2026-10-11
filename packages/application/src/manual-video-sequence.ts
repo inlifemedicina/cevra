@@ -4,6 +4,7 @@ import { type SourceContentIdentityPort } from "./source-technical-descriptor.js
 import { manualVideoError, resolveManualVideo, verifyManualVideoSource } from "./manual-video-clip.js";
 
 import { copyManualClip, supportsManualClipExtensions } from "./manual-clip-presentation.js";
+import { resolveProjectManualTitle } from "./manual-title.js";
 
 interface Binding { version: 1; expectedSnapshotId: string }
 interface SourceRange { sourceId: string; sourceStartMs: number; sourceEndMs: number }
@@ -88,7 +89,8 @@ export function validateManualVideoSequenceEdit(request: unknown): ManualVideoSe
 /** G1 intent scope only; general Project IR continues to permit other compositions. */
 export function resolveManualVideoSequence(project: Readonly<ProjectIR>, expectedSnapshotId: string): TimelineClip[] {
   if (project.history.headSnapshotId !== expectedSnapshotId) fail("STALE");
-  if (project.captions.length || project.graphics.length) fail("UNSUPPORTED");
+  if (project.captions.length) fail("UNSUPPORTED");
+  resolveProjectManualTitle(project);
   const ordered = [...project.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs);
   const trackId = ordered[0]?.trackId;
   const track = project.timeline.tracks.find(item => item.id === trackId);

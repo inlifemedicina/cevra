@@ -26,6 +26,8 @@ import { nearestMsToFrames, floorMsToFrames, framesToMilliseconds } from "./fram
 import { shortcutAction, activateShortcut } from "./keyboard-shortcuts";
 import { gestureEscape, timelineShortcutBlocked } from "./timeline-interactions";
 import { useRangeActivationGuard } from "./range-activation-guard";
+import { ManualTitleControls } from "./components/ManualTitleControls";
+import type { ManualTitleEdit } from "@cevra/application";
 
 const defaultBackend = new DemoDesktopBackend();
 
@@ -51,6 +53,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const closePending = nativeClosePending || backendState?.closePending === true;
   const manualMutationInFlight = useRef(false);
   const rangeDraft = useRef<ManualRangeDraftController | null>(null);
+  const titleDraft = useRef<ManualRangeDraftController | null>(null);
   const canonicalProject = useRef<Readonly<ProjectIR> | null>(null);
   const [rangeCommitBusy, setRangeCommitBusy] = useState(false);
   const transitionInFlight = useRef(false);
@@ -248,6 +251,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     try {
       const settlement = rangeDraft.current?.settle();
       if (settlement) { waitingForRange.current = true; setTransitionBusy(true); await settlement; waitingForRange.current = false; }
+      const titleSettlement = titleDraft.current?.settle();
+      if (titleSettlement) { waitingForRange.current = true; setTransitionBusy(true); await titleSettlement; waitingForRange.current = false; }
       const current = canonicalProject.current;
       if (current) { const operation = action(current); if (operation) await operation; }
     } finally { waitingForRange.current = false; transitionInFlight.current = false; setTransitionBusy(false); }
@@ -480,6 +485,24 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     }
   }
 
+  async function commitTitle(request: ManualTitleEdit) {
+    if (!backend.editManualTitle || manualMutationInFlight.current || checkpointPending || closePending || importBusy || transcriptionOperationId || editorialBusy) throw { code: "MANUAL_TITLE_UNAVAILABLE" };
+    manualMutationInFlight.current = true; setManualMutationBusy(true); setRuntimeError(null);
+    try {
+      const result = await backend.editManualTitle(request);
+      applyBackendState(result.state, undefined, true);
+      if (result.graphicId) { setSelectedProjectItemId(result.graphicId); setSelectedTimelineClipIds([]); setPreviewModeRequest("sequence"); }
+    } catch (cause) { handleRuntimeError(cause); throw cause; }
+    finally { manualMutationInFlight.current = false; setManualMutationBusy(false); }
+  }
+  async function editTitleAfterClipDraft(request: ManualTitleEdit) {
+    const visible = canonicalProject.current?.history.headSnapshotId;
+    try {
+      await rangeDraft.current?.settle();
+      await commitTitle({ ...request, expectedSnapshotId: request.expectedSnapshotId === visible ? canonicalProject.current!.history.headSnapshotId! : request.expectedSnapshotId });
+    } catch (cause) { handleRuntimeError(cause); throw cause; }
+  }
+
   async function commitRange(request: ManualVideoSequenceEdit) {
     setRangeCommitBusy(true);
     try { await editManualSequence(request); }
@@ -575,7 +598,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const realPreview = !backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" && workspace === "edit";
   const sequenceClips = realPreview ? manualSequence(project) : undefined;
   const exportClips = !backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? manualSequence(project) : undefined;
-  const exportAvailable = Boolean(exportClips?.length && project.timeline.timingPolicy === "cfr30" && backendState.capabilities["project.export"].available && backend.exportManualSequence);
+  const exportAvailable = Boolean(exportClips?.length && project.timeline.timingPolicy === "cfr30" && backendState.capabilities["project.export"].available && backend.exportManualSequence
+    && (!project.graphics.length || backendState.capabilities["title.edit"]?.available));
   const selectedPreviewClip = project.timeline.clips.find((clip) => clip.id === selectedProjectItemId);
   const previewClip = selectedPreviewClip && supportsManualClipPreview(project, selectedPreviewClip) ? selectedPreviewClip : undefined;
   return (
@@ -602,6 +626,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       <EditingSidebar compact={sidebarCompact} width={sidebarWidth} editorialVisible={workspace === "edit"} controlsRequest={exportRequest} t={t} onAction={action => afterRangeDraft(action)} onWidthChange={setSidebarWidth} onModeToggle={() => setSidebarCompact((value) => !value)}
         directorPanel={<DirectorPanel editorialPanel={<EditorialDraftPanel state={editorialState} presentations={sourcePresentations} busy={editorialBusy || manualActionBusy} error={editorialError} t={t} onAction={action => afterRangeDraft(action)} onRefresh={() => requestAction(refreshEditorial)} onRevise={request => afterRangeDraft(() => reviseEditorial(request))} onSourceSelect={selectProjectItem} />} draft={directorDraft} preset={preset} directorAvailable={backendState.capabilities["director.execute"].available} t={t} onDraftChange={setDirectorDraft} onPresetChange={setPreset} />}
         contextualPanel={<Inspector presentations={sourcePresentations} project={project} selectedProjectItemId={selectedProjectItemId} workspace={workspace} t={t}
+          titleControls={workspace === "edit" && !backend.presentationOnly && exportClips !== undefined && backend.editManualTitle && <ManualTitleControls key={project.project.id} project={project} busy={manualActionBusy} available={backendState.capabilities["title.edit"]?.available === true} t={t} draft={titleDraft} onCommit={commitTitle} onEdit={editTitleAfterClipDraft} />}
           exportPreparation={exportClips && exportClips.length > 0 && <ManualExportPreparationPanel key={project.project.id} backend={backend} snapshotId={project.history.headSnapshotId!} locale={locale} busy={editingBusy} actionBusy={manualActionBusy && !exportBusy} onConfirmAction={confirmActionSnapshot} available={exportAvailable} exportRequest={exportRequest} t={t} onBusyChange={value => { manualMutationInFlight.current = value; setExportBusy(value); }} onExported={result => applyBackendState(result.state, undefined, true)} onReconciled={(state, code) => handleRuntimeError({ code, reconciledState: state }, true)} />} />} />
       <Timeline backend={backend} presentations={sourcePresentations} project={project} selectedId={selectedProjectItemId} selectedClipIds={selectedTimelineClipIds} getSelectionEpoch={() => selectionEpoch.current} onSelectClips={(ids, primary) => {
         void afterRangeDraft(current => {
@@ -655,6 +680,8 @@ function isTerminalHostCode(code: string): boolean {
 }
 
 function runtimeErrorKey(code: string): TranslationKey {
+  if (code === "MANUAL_TITLE_UNAVAILABLE" || code === "MANUAL_TITLE_UNSUPPORTED") return "title.unavailable";
+  if (code.startsWith("MANUAL_TITLE_")) return "title.invalid";
   if (code === "MANUAL_EXPORT_COMMITTED_ERROR") return "export.committedError";
   if (code === "MANUAL_EXPORT_PUBLICATION_UNVERIFIED") return "export.publicationUnverified";
   if (code === "MANUAL_EXPORT_CLEANUP_FAILED") return "export.cleanupFailed";

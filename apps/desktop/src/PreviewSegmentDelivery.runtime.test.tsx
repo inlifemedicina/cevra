@@ -52,7 +52,15 @@ it.skipIf(!input)("delivers actual Host preview bytes to the current React/Blob/
         videoBytes: blob.size, pngBytes: atob(delivery.packet.initialFrame!.base64).length });
       unmount(); expect(revoke).toHaveBeenCalledWith(video.getAttribute("src") ?? createUrl.mock.results.at(-1)!.value);
     }
-    const previous = deliveries.find(d => d.name === "cold")!, current = deliveries.find(d => d.name === "reorder")!;
+    const snapshotPairs = [["cold", "reorder"], ["landscape-preview-baseline", "landscape-preview"],
+      ["portrait-preview-baseline", "portrait-preview"]].flatMap(([previousName, currentName]) => {
+      const previous = deliveries.find(d => d.name === previousName), current = deliveries.find(d => d.name === currentName);
+      if (!previous && !current) return [];
+      expect(previous).toBeDefined(); expect(current).toBeDefined();
+      return [{ previous: previous!, current: current! }];
+    });
+    expect(snapshotPairs.length).toBeGreaterThan(0);
+    for (const { previous, current } of snapshotPairs) {
     expect(previous.packet.snapshotId).not.toBe(current.packet.snapshotId);
     const pending = new Map<string, (packet: LocalVideoPreview) => void>();
     const backend = { previewLocalVideo: vi.fn((request: { expectedSnapshotId: string }) => new Promise<LocalVideoPreview>(resolve => pending.set(request.expectedSnapshotId, resolve))),
@@ -66,8 +74,10 @@ it.skipIf(!input)("delivers actual Host preview bytes to the current React/Blob/
     expect(createUrl.mock.calls).toHaveLength(count + 1);
     expect(container.querySelector("img")!.getAttribute("src")).toContain(current.packet.initialFrame!.base64);
     unmount();
+    }
     const receipt = { status: "PASS", scope: "actual Host packet to React/Blob/PNG DOM attributes",
-      rows, currentSnapshotOnly: true, staleResponseDiscarded: true, nativeReadinessRemainedDisabled: true,
+      rows, staleSnapshotPairs: snapshotPairs.map(({ previous, current }) => [previous.name, current.name]),
+      currentSnapshotOnly: true, staleResponseDiscarded: true, nativeReadinessRemainedDisabled: true,
       nativeDecodeOrPaintProved: false, perceivedLatencyProved: false };
     if (process.env.CEVRA_PREVIEW_SEGMENT_UI_RESULT) writeFileSync(process.env.CEVRA_PREVIEW_SEGMENT_UI_RESULT, JSON.stringify(receipt, null, 2) + "\n");
     console.log(JSON.stringify(receipt));

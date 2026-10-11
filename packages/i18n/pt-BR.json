@@ -494,5 +494,20 @@
   "timeline.dropBefore": "Inserir antes de {name}",
   "timeline.dropEnd": "Inserir no final",
   "timeline.cursor": "Cursor {time} · quadro {frame}",
-  "timeline.cursorTime": "Cursor {time}"
+  "timeline.cursorTime": "Cursor {time}",
+  "title.controls": "Título",
+  "title.fixedStyle": "Estilo Inter fixo · uma linha · 30 quadros/s",
+  "title.unavailable": "Título indisponível neste ambiente.",
+  "title.text": "Texto do título",
+  "title.in": "IN do título (quadro)",
+  "title.out": "OUT do título (quadro)",
+  "title.aspect": "Formato do vídeo",
+  "title.landscape": "Horizontal 16:9",
+  "title.portrait": "Vertical 9:16",
+  "title.add": "Adicionar título",
+  "title.apply": "Aplicar título",
+  "title.cancel": "Descartar alterações do título",
+  "title.remove": "Remover título",
+  "title.invalid": "Confira o texto e o intervalo do título. IN é incluído; OUT é excluído.",
+  "title.pending": "Adicione o título ou descarte as alterações antes de continuar."
 }

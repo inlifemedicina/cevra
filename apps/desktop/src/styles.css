@@ -470,3 +470,7 @@ h1, h2, h3, p { margin: 0; }
 @media (max-height: 800px) {
   .editing-sidebar.compact .editorial-heading { position: static; }
 }
+.manual-title-controls { display: grid; gap: 10px; margin: 12px 0; padding: 12px; border: 1px solid var(--border, #333); border-radius: 8px; }
+.manual-title-controls fieldset { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.manual-title-controls label { display: grid; gap: 6px; }
+.manual-title-controls input, .manual-title-controls select { min-width: 0; width: 100%; }

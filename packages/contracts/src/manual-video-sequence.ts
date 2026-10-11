@@ -48,9 +48,20 @@ export interface ManualSequenceSourceEvidenceV1 {
   sourceAudioFirstSample: number;
   sourceAudioSampleCount: number;
 }
+export interface RenderManualVideoSequenceOperationV2 extends Omit<RenderManualVideoSequenceOperationV1, "version"> {
+  version: 2;
+  composition: ManualTitleCompositionPlanV1;
+}
+export interface RenderManualVideoPreviewOperationV3 extends Omit<RenderManualVideoPreviewOperationV2, "version"> {
+  version: 3;
+  composition: ManualTitleCompositionPlanV1;
+}
+export type RenderManualVideoOperation = RenderManualVideoSequenceOperationV1 | RenderManualVideoSequenceOperationV2
+  | RenderManualVideoPreviewOperationV1 | RenderManualVideoPreviewOperationV2 | RenderManualVideoPreviewOperationV3;
 export interface ManualSequenceExecutionEvidenceV1 {
-  version: 1;
+  version: 1 | 2;
   outputSha256: string;
+  composition?: ManualTitleCompositionPlanV1;
   profile: "manual-cfr30-export-v1" | "manual-cfr30-preview-v1";
   samplingPolicy: typeof MANUAL_SEQUENCE_SAMPLING_POLICY;
   frameRate: { numerator: 30; denominator: 1 };
@@ -58,8 +69,8 @@ export interface ManualSequenceExecutionEvidenceV1 {
   videoCodec: "h264";
   audioCodec: "aac";
   dynamicRange: "sdr";
-  width: 1920 | 720;
-  height: 1080 | 404;
+  width: 1920 | 1080 | 720 | 404;
+  height: 1920 | 1080 | 720 | 404;
   targetVideoBitsPerSecond: number;
   totalFrames: number;
   outputFrameCount: number;
@@ -102,12 +113,14 @@ export function validateManualVideoSequenceItem(value: unknown): ManualVideoSequ
   if (value.audioSelection !== "single-source-stream") throw Error("Manual sequence audio requires explicit single-source-stream admission.");
   return value as unknown as ManualVideoSequenceItem;
 }
-export function validateManualVideoOperation(value: unknown): RenderManualVideoSequenceOperationV1 | RenderManualVideoPreviewOperationV1 | RenderManualVideoPreviewOperationV2 {
+export function validateManualVideoOperation(value: unknown): RenderManualVideoOperation {
   if (!record(value)) throw Error("Manual video operation is invalid.");
   const preview = value.type === "render-manual-video-preview";
   const single = preview && value.version === 1;
-  closed(value, ["type", "version", single ? "item" : "items", "outputUri", "ownedWorkspaceUri"], "Manual video operation");
-  if ((!preview && value.type !== "render-manual-video-sequence") || (preview ? ![1, 2].includes(value.version as number) : value.version !== 1)) throw Error("Manual video operation version/type is invalid.");
+  const composed = value.version === (preview ? 3 : 2);
+  closed(value, ["type", "version", single ? "item" : "items", "outputUri", "ownedWorkspaceUri", ...(composed ? ["composition"] : [])], "Manual video operation");
+  if ((!preview && value.type !== "render-manual-video-sequence") || (preview ? ![1, 2, 3].includes(value.version as number) : ![1, 2].includes(value.version as number))) throw Error("Manual video operation version/type is invalid.");
+  if (composed) validateManualTitleComposition(value.composition);
   path(value.outputUri); path(value.ownedWorkspaceUri);
   if (!value.outputUri.toLowerCase().endsWith(".mp4") || value.outputUri === value.ownedWorkspaceUri) throw Error("Manual output must be a distinct MP4 path.");
   const items = single ? [value.item] : value.items;
@@ -122,11 +135,13 @@ export function validateManualVideoOperation(value: unknown): RenderManualVideoS
   }
   integer(frames, 1, MAX_MANUAL_SEQUENCE_FRAMES, "Program frames");
   if (identities.size > 128) throw Error("Manual sequence has too many originals.");
-  return value as unknown as RenderManualVideoSequenceOperationV1 | RenderManualVideoPreviewOperationV1 | RenderManualVideoPreviewOperationV2;
+  return value as unknown as RenderManualVideoOperation;
 }
 export function validateManualSequenceExecutionEvidence(value: unknown): ManualSequenceExecutionEvidenceV1 {
   const hasBudget = record(value) && Object.hasOwn(value, "logicalBudget");
-  closed(value, ["version", "outputSha256", "profile", "samplingPolicy", "frameRate", "container", "videoCodec", "audioCodec", "dynamicRange", "width", "height", "targetVideoBitsPerSecond", "totalFrames", "outputFrameCount", "totalPcmSamples", "outputAudioSampleCount", "audioSampleRate", "audioChannelLayout", "durationMs", "muxVideoDurationMs", "muxAudioDurationMs", "itemCount", "uniqueSegmentCount", "sources", ...(hasBudget ? ["logicalBudget"] : [])], "Manual sequence evidence");
+  const composed = record(value) && value.version === 2;
+  closed(value, ["version", "outputSha256", "profile", "samplingPolicy", "frameRate", "container", "videoCodec", "audioCodec", "dynamicRange", "width", "height", "targetVideoBitsPerSecond", "totalFrames", "outputFrameCount", "totalPcmSamples", "outputAudioSampleCount", "audioSampleRate", "audioChannelLayout", "durationMs", "muxVideoDurationMs", "muxAudioDurationMs", "itemCount", "uniqueSegmentCount", "sources", ...(hasBudget ? ["logicalBudget"] : []), ...(composed ? ["composition"] : [])], "Manual sequence evidence");
+  const portrait = composed && validateManualTitleComposition(value.composition).title.aspect === "9:16";
   if (hasBudget) {
     const budget = value.logicalBudget;
     closed(budget, ["version", "enforcement", "budgetBytes", "peakReservedBytes", "producerCount", "accountingOverlapReserved", "allocatedBlockQuota"], "Manual logical budget evidence");
@@ -137,9 +152,9 @@ export function validateManualSequenceExecutionEvidence(value: unknown): ManualS
   }
   if (typeof value.outputSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.outputSha256)) throw Error("Manual output SHA-256 is invalid.");
   const preview = value.profile === "manual-cfr30-preview-v1";
-  if (value.version !== 1 || (!preview && value.profile !== "manual-cfr30-export-v1") || value.samplingPolicy !== MANUAL_SEQUENCE_SAMPLING_POLICY
+  if (![1, 2].includes(value.version as number) || (!preview && value.profile !== "manual-cfr30-export-v1") || value.samplingPolicy !== MANUAL_SEQUENCE_SAMPLING_POLICY
     || value.container !== "mp4" || value.videoCodec !== "h264" || value.audioCodec !== "aac" || value.dynamicRange !== "sdr"
-    || value.width !== (preview ? 720 : 1920) || value.height !== (preview ? 404 : 1080) || value.targetVideoBitsPerSecond !== (preview ? 700_000 : 20_000_000)
+    || value.width !== (preview ? portrait ? 404 : 720 : portrait ? 1080 : 1920) || value.height !== (preview ? portrait ? 720 : 404 : portrait ? 1920 : 1080) || value.targetVideoBitsPerSecond !== (preview ? 700_000 : 20_000_000)
     || value.audioSampleRate !== 48_000 || !["mono", "stereo"].includes(value.audioChannelLayout as string)) throw Error("Manual sequence profile evidence is invalid.");
   closed(value.frameRate, ["numerator", "denominator"], "Manual frame rate");
   if (value.frameRate.numerator !== 30 || value.frameRate.denominator !== 1) throw Error("Manual frame rate must be 30/1.");
@@ -166,3 +181,4 @@ export function validateManualSequenceExecutionEvidence(value: unknown): ManualS
   if (value.audioChannelLayout !== (value.sources.some(source => source.channelLayout === "stereo") ? "stereo" : "mono")) throw Error("Manual output channel mapping disagrees with the measured sources.");
   return value as unknown as ManualSequenceExecutionEvidenceV1;
 }
+import { validateManualTitleComposition, type ManualTitleCompositionPlanV1 } from "./manual-title-composition.js";

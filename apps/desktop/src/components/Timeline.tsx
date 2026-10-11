@@ -103,7 +103,10 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
   const geometry = sequenceClips ? timelineGeometry(canonicalDuration, viewport, pixelsPerSecond) : { width: viewport * zoom / 100, duration: legacyGeometry };
   const geometryDuration = geometry.duration;
   const geometryKey = `${geometry.width}:${geometry.duration}:${viewport}:${pixelsPerSecond}`;
-  const tracks = project.timeline.tracks.length > 0 ? project.timeline.tracks : EMPTY_TRACK_SCAFFOLD;
+  const baseTracks = project.timeline.tracks.length > 0 ? project.timeline.tracks : EMPTY_TRACK_SCAFFOLD;
+  // Graphics own no video/audio track mutation; show the existing overlay lane as a presentation scaffold.
+  const tracks = project.graphics.length && !baseTracks.some(track => track.id === "track-v4")
+    ? [...baseTracks, EMPTY_TRACK_SCAFFOLD.find(track => track.id === "track-v4")!] : baseTracks;
   const playheadPercent = canonicalDuration === 0 ? 0 : (playheadMs / geometryDuration) * 100;
   const ticks = timelineRulerTicks(geometryDuration, geometry.width / geometryDuration * 1000, scroll, viewport);
   useLayoutEffect(() => {

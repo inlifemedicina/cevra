@@ -350,6 +350,8 @@ function transcriptMutationSource(command: EditCommand): Id | undefined {
     case "timeline.edit":
     case "caption.upsert":
     case "caption.remove":
+    case "graphic.manualTitle.set":
+    case "graphic.manualTitle.remove":
     case "style.patch":
     case "export.add":
       return undefined;

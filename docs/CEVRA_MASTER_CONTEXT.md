@@ -3652,3 +3652,64 @@ and dependency-gate confirmation remain required before taking that step.
 [Current evidence and limits](CEVRA_VIDS_USABILITY_AUDIT.md#current-owner-test-report-and-bounded-closeout--2026-10-09).
 Director: no new impact found within the checked scope. Progress55%, F-A02
 exhausted1/1 and full G1 unaccepted remain.
+
+
+### 2026-10-10 — Offline manual-title proof accepted
+
+The Owner confirmed the two horizontal/vertical title-proof videos and replied
+**“Sim”** that titles appeared correctly at the expected times and margins.
+Close this bounded offline visual round. Four preview/final synthetic outputs,
+13 contract tests and independent code review passed; the exact approved MP4
+hashes and evidence are recorded in
+[Manual Title Proof V1](CEVRA_MANUAL_TITLE_PROOF_V1.md).
+
+This is an accepted offline component fixture, not title integration in the app,
+a default-engine decision or completion of ADR 0012/K4. No full acceptance ID,
+production platform or broader G1 is promoted. Technical failures and original
+receipts remain preserved outside Git. Progress stays 55%, F-A02 exhausted 1/1.
+
+Offline baseline inspection at `48353df62901aed7f102fc7e186a7c64c92949e3`
+found GraphicItem and presentation primitives, but no graphic edit commands;
+manual sequence planning/UI reject graphics, and composition is a contract
+without an integrated implementation. The next proposed bounded slice is one
+manual title with text/range, History/persistence and shared preview/export,
+after its typed component/plan/font/adapter gates. Existing overlay-media is a
+primitive, not proof of an integrated or loss-free composition path. The proposal
+remains pending implementation authorization; no feature or engine was changed.
+Director: no new impact from closeout; proposed typed extension preserves
+Project IR/History, permission and provider boundaries.
+
+### 2026-10-11 — Approved bounded manual-title integration
+
+The Owner subsequently authorized code, offline tests, independent review,
+commit/push and a Draft PR for the proposed one-title slice, with no real AI.
+At baseline `48353df62901aed7f102fc7e186a7c64c92949e3`, branch
+`feat/manual-title-v1` implements Normal text/frame-IN/OUT/aspect controls,
+add/apply/discard/remove, timeline presentation, typed IR edits, History,
+save/reopen and shared bounded preview/export in 16:9 and 9:16.
+
+`FixedManualTitleCompositionAdapter` resolves one closed first-party component
+through the existing Media boundary. Runtime 0.3.5 bundles pinned Inter/OFL and
+a supervised macOS CoreText helper; no default/general composition engine or
+ADR 0012/K4 benchmark selection follows. With title, only explicit BT709/TV
+sources are admitted; missing/ambiguous/HDR profiles fail closed. No color
+transform or automatic production retag was added; MR-V02/K2 remain open.
+
+Local CI/build passed: 1,265 Node tests, 263 UI tests including actual Host
+MP4/PNG delivery and both-aspect stale-response rejection, 54 native tests and
+177 Python tests. Thirteen real renders/21 measured jobs and the unchanged
+no-title runtime regression passed. Original-source per-occurrence encode,
+half-open title timing across a cut/repeated source, audio identity within
+each profile, resource reserves, specific negatives and process retirement
+are evidenced. DOM receipt does not claim native decoding/painting or perceived
+latency. [Exact evidence and limits](CEVRA_MANUAL_TITLE_PROOF_V1.md#evidência-integrada-e-seus-limites).
+
+The isolated local app is version 0.1.0, identifier
+`com.cevra.vids.manualtitle.test`, runtime 0.3.5, ad-hoc signed for this macOS
+test. Final package/review hashes are attached to the external receipt and Draft.
+**APP/OWNER PENDING:** one grouped app round follows technical closure; the
+accepted offline proof is not repeated. No full G1, Windows/release or broader
+composition acceptance; progress55%, F-A02 exhausted1/1 remain.
+Director impact is a compatible typed extension within the checked scope;
+IR/History and Application authority remain, with no provider/network/AI-quota
+expansion or arbitrary execution surface.

@@ -24,7 +24,7 @@ if str(WORKER_DIRECTORY) not in sys.path:
 
 from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
-WORKER_VERSION = "0.3.4"
+WORKER_VERSION = "0.3.5"
 PROTOCOL_VERSION = 1
 UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
@@ -482,6 +482,10 @@ def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ff
         missing_manual.append("private POSIX publication ownership")
     for name in ("cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"):
         tools[name] = {"usable": "no" if missing_manual else "yes", **({"missing": sorted(set(missing_manual))} if missing_manual else {"detail": "closed original-derived CFR30 H264/AAC; explicit source admission and sampled owned-job guards required"})}
+    import cevra_manual_title
+    title_usable = not missing_manual and "overlay" in available_filters and cevra_manual_title.available()
+    tools["cevra-manual-title-inter-v1"] = {"usable": "yes" if title_usable else "no",
+        **({"detail": "bounded first-party CoreText/Inter component; macOS only"} if title_usable else {"missing": ["verified macOS title component/overlay capability"]})}
     required_measurement = {"astats", "ebur128", "aeval", "aresample", "aformat", "asplit", "asettb", "atrim", "asetpts", "ametadata", "anullsink"}
     missing_measurement = sorted(required_measurement - available_filters)
     if "pcm_f64le" not in available_encoders:
@@ -764,7 +768,8 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
                 "required": ["sha256", "size_bytes"]}},
         "required": ["input", "source_start_frame", "source_end_frame", "audio_selection", "source_content"]}
     def manual_schema(preview: bool) -> Dict[str, Any]:
-        return {"properties": {"version": {"type": "integer", "enum": [1, 2] if preview else [1]}, "output": path, "owned_workspace": path,
+        return {"properties": {"version": {"type": "integer", "enum": [1, 2, 3] if preview else [1, 2]}, "output": path, "owned_workspace": path,
+            "composition": {"type": "object"},
             "items": {"type": "array", "minItems": 1, "maxItems": 2048, "items": manual_item}},
             "required": ["version", "output", "owned_workspace", "items"]}
     audio_source = {

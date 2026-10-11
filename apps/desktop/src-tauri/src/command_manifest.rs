@@ -1,5 +1,6 @@
 #[allow(dead_code)]
 pub const APPLICATION_COMMANDS: &[&str] = &[
+    "desktop_edit_manual_title",
     "desktop_edit_manual_video_sequence",
     "desktop_get_close_state",
     "desktop_get_media_drop_state",

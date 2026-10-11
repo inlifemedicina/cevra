@@ -2,6 +2,8 @@ import { floorMsToFrames, framesToMilliseconds, type ProjectHistory, type Source
 import { manualVideoError, verifyManualVideoSources } from "./manual-video-clip.js";
 import { resolveManualVideoSequence } from "./manual-video-sequence.js";
 import type { SourceContentIdentityPort } from "./source-technical-descriptor.js";
+import { resolveProjectManualTitle } from "./manual-title.js";
+import type { ManualTitleV1 } from "@cevra/project-ir";
 
 export interface ManualSequencePreviewRequest { version: 1; expectedSnapshotId: string }
 
@@ -14,6 +16,7 @@ export interface ManualSequencePreviewPlan {
   readonly timingPolicy: TimelineTimingPolicy;
   readonly sources: readonly Readonly<SourceAsset>[];
   readonly clips: readonly Readonly<TimelineClip>[];
+  readonly title?: Readonly<ManualTitleV1>;
 }
 
 export interface ManualSequencePreviewPosition {
@@ -47,8 +50,10 @@ export class ManualSequencePreviewApplicationService {
     signal?.throwIfAborted();
     if (journal !== this.options.history.journalIdentity) throw manualVideoError("MANUAL_SEQUENCE_STALE");
     resolveManualVideoSequence(this.options.history.current, stable.expectedSnapshotId);
+    const title = resolveProjectManualTitle(project);
     const plan: ManualSequencePreviewPlan = freeze(structuredClone({ version: 1 as const, projectId: project.project.id,
-      snapshotId: stable.expectedSnapshotId, durationMs: project.timeline.durationMs, timingPolicy: project.timeline.timingPolicy, sources, clips }));
+      snapshotId: stable.expectedSnapshotId, durationMs: project.timeline.durationMs, timingPolicy: project.timeline.timingPolicy, sources, clips,
+      ...(title ? { title } : {}) }));
     this.prepared.set(plan, journal);
     return plan;
   }

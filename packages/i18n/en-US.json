@@ -494,5 +494,20 @@
   "timeline.dropBefore": "Insert before {name}",
   "timeline.dropEnd": "Insert at the end",
   "timeline.cursor": "Cursor {time} · frame {frame}",
-  "timeline.cursorTime": "Cursor {time}"
+  "timeline.cursorTime": "Cursor {time}",
+  "title.controls": "Title",
+  "title.fixedStyle": "Fixed Inter style · one line · 30 frames/s",
+  "title.unavailable": "Title unavailable in this environment.",
+  "title.text": "Title text",
+  "title.in": "Title IN (frame)",
+  "title.out": "Title OUT (frame)",
+  "title.aspect": "Video format",
+  "title.landscape": "Landscape 16:9",
+  "title.portrait": "Portrait 9:16",
+  "title.add": "Add title",
+  "title.apply": "Apply title",
+  "title.cancel": "Discard title changes",
+  "title.remove": "Remove title",
+  "title.invalid": "Check the title text and range. IN is included; OUT is excluded.",
+  "title.pending": "Add the title or discard its changes before continuing."
 }

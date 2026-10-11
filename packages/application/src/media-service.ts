@@ -821,12 +821,15 @@ function validateDeliveryPostcondition(operation: MediaOperation, result: Extrac
     const expectedSources = new Map(operation.items.map(item => [item.inputUri, item.sourceContent]));
     const actualSources = new Map(evidence.sources.map(source => [source.inputUri, source]));
     const channels = evidence.audioChannelLayout === "stereo" ? 2 : 1;
+    const composition = "composition" in operation ? operation.composition : undefined;
+    const portrait = composition?.title.aspect === "9:16";
+    if (JSON.stringify(evidence.composition) !== JSON.stringify(composition)) throw new AttemptFailure("MEDIA_OPERATION_FAILED", "Manual title composition evidence disagrees with the request.");
     if (evidence.profile !== "manual-cfr30-export-v1" || evidence.totalFrames !== frames || evidence.itemCount !== operation.items.length
       || evidence.sources.length !== expectedSources.size || evidence.totalPcmSamples !== frames * 1600
       || evidence.audioChannelLayout !== (evidence.sources.some(source => source.channelLayout === "stereo") ? "stereo" : "mono")
       || !result.publication || !result.probe.hasVideo || !result.probe.hasAudio
       || normalizeVideoCodec(result.probe.videoCodec) !== "h264" || normalizeAudioCodec(result.probe.audioCodec) !== "aac"
-      || result.probe.width !== 1920 || result.probe.height !== 1080 || result.probe.frameRate !== 30
+      || result.probe.width !== (portrait ? 1080 : 1920) || result.probe.height !== (portrait ? 1920 : 1080) || result.probe.frameRate !== 30
       || result.probe.sampleRate !== 48000 || result.probe.channels !== channels || result.probe.hdr === true
       || result.durationMs === undefined || Math.abs(result.durationMs - frames * 1000 / 30) > 1
       || result.effectiveProfile.container !== "mp4" || result.effectiveProfile.videoCodec !== "h264" || result.effectiveProfile.audioCodec !== "aac") {
