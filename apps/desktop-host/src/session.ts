@@ -1,3 +1,4 @@
+import { removeManualProjectSource } from "@cevra/application";
 import {
   LocalSourceIngestService,
   EditorialDraftService,
@@ -517,6 +518,11 @@ export class DesktopSession {
 
   async editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopHostState; changedClipIds: string[] }> {
     return this.runMutation(async () => {
+      if (request.type === "remove-source") {
+        const result = removeManualProjectSource(this.services.history, request);
+        await this.persistMutation();
+        return { state: this.state(), changedClipIds: result.changedClipIds };
+      }
       if (!this.services.manualVideoSequence) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
       const before = this.services.history.journalIdentity;
       const result = await this.services.manualVideoSequence.edit(structuredClone(request));

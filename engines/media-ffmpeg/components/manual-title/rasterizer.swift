@@ -7,10 +7,14 @@ import UniformTypeIdentifiers
 // First-party fixed title component; private font loading, no global registration.
 enum RasterError: Error { case invalidArguments, font, glyph, overflow, output }
 let args = CommandLine.arguments
-guard args.count == 6, let width = Int(args[2]), let height = Int(args[3]),
+guard (args.count == 6 || args.count == 10), let width = Int(args[2]), let height = Int(args[3]),
       [(1920,1080),(1080,1920)].contains(where: { $0.0 == width && $0.1 == height }),
-      !FileManager.default.fileExists(atPath: args[5]) else { throw RasterError.invalidArguments }
-let fontSize: Double = width == 1920 ? 56 : 48
+      !FileManager.default.fileExists(atPath: args.last!) else { throw RasterError.invalidArguments }
+let values = args.count == 10 ? Array(args[5...8]).compactMap(Double.init) : [0.08, 0, 0.84, 1]
+guard values.count == 4, values.allSatisfy({ $0.isFinite }), values[0] >= 0, values[1] >= 0,
+      values[2] >= 0.2, values[2] <= 1, values[3] >= 0.5, values[3] <= 2,
+      values[0] + values[2] <= 1 + 1e-9 else { throw RasterError.invalidArguments }
+let fontSize: Double = (width == 1920 ? 56 : 48) * values[3]
 let text = args[4]
 guard !text.isEmpty && text.utf16.count <= 80 else { throw RasterError.invalidArguments }
 let fontURL = URL(fileURLWithPath: args[1])
@@ -27,14 +31,16 @@ guard let space = CGColorSpace(name: CGColorSpace.sRGB), let context = CGContext
     width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
     space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw RasterError.output }
 context.clear(CGRect(x: 0, y: 0, width: width, height: height))
-let x = CGFloat(width) * 0.08, y = CGFloat(height) * 0.10
-let barWidth = CGFloat(width) * 0.84, padding = CGFloat(fontSize) * 0.7
 let barHeight = CGFloat(fontSize) * 1.9
+let x = CGFloat(width) * values[0]
+let y = args.count == 10 ? CGFloat(height) * (1 - values[1]) - barHeight : CGFloat(height) * 0.10
+guard y >= -1e-6 else { throw RasterError.invalidArguments }
+let barWidth = CGFloat(width) * values[2], padding = CGFloat(fontSize) * 0.7
 let bar = CGRect(x: x, y: y, width: barWidth, height: barHeight)
 context.setFillColor(CGColor(srgbRed: 0.10, green: 0.12, blue: 0.16, alpha: 1))
 context.fill(bar)
 context.setFillColor(CGColor(srgbRed: 0.43, green: 0.62, blue: 0.72, alpha: 1))
-context.fill(CGRect(x: x, y: y, width: 6, height: barHeight))
+context.fill(CGRect(x: x, y: y, width: 6 * values[3], height: barHeight))
 let attributed = NSAttributedString(string: text, attributes: [
     NSAttributedString.Key(kCTFontAttributeName as String): font,
     NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(srgbRed: 0.96, green: 0.97, blue: 0.98, alpha: 1)
@@ -46,7 +52,7 @@ let origin = CGPoint(x: x + padding - bounds.minX, y: y + (barHeight - bounds.he
 context.textPosition = origin
 CTLineDraw(line, context)
 guard let image = context.makeImage(), let destination = CGImageDestinationCreateWithURL(
-    URL(fileURLWithPath: args[5]) as CFURL, UTType.png.identifier as CFString, 1, nil) else { throw RasterError.output }
+    URL(fileURLWithPath: args.last!) as CFURL, UTType.png.identifier as CFString, 1, nil) else { throw RasterError.output }
 CGImageDestinationAddImage(destination, image, nil)
 guard CGImageDestinationFinalize(destination) else { throw RasterError.output }
 let report: [String: Any] = ["width": width,"height":height,"text":text,"fontPostScriptName":CTFontCopyPostScriptName(font),

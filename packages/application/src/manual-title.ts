@@ -1,10 +1,10 @@
 import { MANUAL_TITLE_COMPONENT, manualTitleGraphic, resolveManualTitle, validateManualTitle,
-  type ManualTitleV1, type ProjectHistory, type ProjectIR } from "@cevra/project-ir";
+  type ManualTitle, type ProjectHistory, type ProjectIR } from "@cevra/project-ir";
 import { resolveManualVideoSequence } from "./manual-video-sequence.js";
 import { manualVideoError } from "./manual-video-clip.js";
 
 export type ManualTitleEdit = { version: 1; expectedSnapshotId: string } & (
-  | { type: "set"; title: ManualTitleV1 }
+  | { type: "set"; title: ManualTitle }
   | { type: "remove" }
 );
 export function validateManualTitleEdit(value: unknown): ManualTitleEdit {
@@ -19,7 +19,7 @@ export function validateManualTitleEdit(value: unknown): ManualTitleEdit {
   }
   return v as unknown as ManualTitleEdit;
 }
-export function resolveProjectManualTitle(project: Readonly<ProjectIR>): ManualTitleV1 | undefined {
+export function resolveProjectManualTitle(project: Readonly<ProjectIR>): ManualTitle | undefined {
   if (!project.graphics.length) return undefined;
   if (project.graphics.length !== 1 || project.timeline.timingPolicy !== "cfr30") throw manualVideoError("MANUAL_SEQUENCE_UNSUPPORTED");
   try {

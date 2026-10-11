@@ -3,7 +3,7 @@ import { manualVideoError, verifyManualVideoSources } from "./manual-video-clip.
 import { resolveManualVideoSequence } from "./manual-video-sequence.js";
 import type { SourceContentIdentityPort } from "./source-technical-descriptor.js";
 import { resolveProjectManualTitle } from "./manual-title.js";
-import type { ManualTitleV1 } from "@cevra/project-ir";
+import type { ManualTitle } from "@cevra/project-ir";
 
 export interface ManualSequencePreviewRequest { version: 1; expectedSnapshotId: string }
 
@@ -16,7 +16,7 @@ export interface ManualSequencePreviewPlan {
   readonly timingPolicy: TimelineTimingPolicy;
   readonly sources: readonly Readonly<SourceAsset>[];
   readonly clips: readonly Readonly<TimelineClip>[];
-  readonly title?: Readonly<ManualTitleV1>;
+  readonly title?: Readonly<ManualTitle>;
 }
 
 export interface ManualSequencePreviewPosition {

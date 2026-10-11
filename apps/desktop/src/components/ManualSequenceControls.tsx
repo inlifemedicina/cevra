@@ -5,6 +5,7 @@ import type { SourcePresentation } from "../source-presentation";
 import type { Translate } from "../ui-model";
 import type { DesktopBackend } from "../backend/desktop-backend";
 import { maximumSourceFrame, floorMsToFrames, frameInput, framesToMilliseconds, isCfr30Frame } from "../frame-timing";
+import { TimeInput } from "./TimeInput";
 import { ManualSequenceConformReview } from "./ManualSequenceConformReview";
 import { shortcutProps } from "../keyboard-shortcuts";
 import { reorderedTimeline } from "../timeline-interactions";
@@ -39,8 +40,8 @@ export function ManualSequenceControls({ project, clips, presentations, selected
   const sources = manualSequenceSources(project);
   const initialSource = sources.find(source => source.id === (selected?.sourceId ?? selectedId)) ?? sources[0];
   const [sourceId, setSourceId] = useState(initialSource?.id ?? "");
-  const initialStart = () => String(grid ? selected?.frameTiming?.sourceStartFrame ?? 0 : (selected?.sourceStartMs ?? 0) / 1000);
-  const initialEnd = () => String(grid ? selected?.frameTiming?.sourceEndFrame ?? maximumSourceFrame(initialSource?.durationMs ?? 0) : (selected?.sourceEndMs ?? initialSource?.durationMs ?? 0) / 1000);
+  const initialStart = () => String(grid ? selected?.frameTiming?.sourceStartFrame ?? 0 : (selected?.sourceStartMs ?? 0));
+  const initialEnd = () => String(grid ? selected?.frameTiming?.sourceEndFrame ?? maximumSourceFrame(initialSource?.durationMs ?? 0) : (selected?.sourceEndMs ?? initialSource?.durationMs ?? 0));
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(initialEnd);
   const [pending, setPending] = useState(false);
@@ -63,7 +64,8 @@ export function ManualSequenceControls({ project, clips, presentations, selected
   useLayoutEffect(() => { rangeDraft.current = { settle: settleDraft }; });
   useLayoutEffect(() => () => { rangeDraft.current = null; }, [rangeDraft]);
 
-  const begin = grid ? frameInput(start) : milliseconds(start), finish = grid ? frameInput(end) : milliseconds(end);
+  const read = (value: string) => grid ? frameInput(value) : value.trim() && Number.isSafeInteger(Number(value)) ? Number(value) : null;
+  const begin = read(start), finish = read(end);
   const maximum = source ? grid ? maximumSourceFrame(source.durationMs!) : source.durationMs! : 0;
   const valid = Boolean(source) && begin !== null && finish !== null && begin >= 0 && begin < finish && finish <= maximum;
   const sourceStartMs = grid && begin !== null ? framesToMilliseconds(begin) : begin;
@@ -112,8 +114,8 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     if (event.key === "Escape") {
       event.preventDefault(); event.stopPropagation(); skipBlur.current = true;
       setDraftPhase("clean");
-      setStart(String(grid ? selected?.sourceId === sourceId ? selected.frameTiming?.sourceStartFrame ?? 0 : 0 : selected?.sourceId === sourceId ? selected.sourceStartMs / 1000 : 0));
-      setEnd(String(grid ? selected?.sourceId === sourceId ? selected.frameTiming?.sourceEndFrame ?? maximum : maximum : selected?.sourceId === sourceId ? selected.sourceEndMs / 1000 : maximum / 1000));
+      setStart(String(grid ? selected?.sourceId === sourceId ? selected.frameTiming?.sourceStartFrame ?? 0 : 0 : selected?.sourceId === sourceId ? selected.sourceStartMs : 0));
+      setEnd(String(grid ? selected?.sourceId === sourceId ? selected.frameTiming?.sourceEndFrame ?? maximum : maximum : selected?.sourceId === sourceId ? selected.sourceEndMs : maximum));
     }
   }
   function move(delta: -1 | 1) {
@@ -122,18 +124,18 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     void edit({ type: "reorder", clipIds: reorderedTimeline(clips.map(clip => clip.id), chosen, clips[next]!.id, delta > 0) });
   }
   return <section className="manual-sequence-controls" aria-label={t("sequence.controls")} data-draft-phase={draftPhase}>
-    <p>{t(grid ? "sequence.frameGrid" : "sequence.legacyTiming")}</p>
+    <details className="editing-help"><summary>{t("editing.help")}</summary><p>{t(grid ? "sequence.frameGrid" : "sequence.legacyTiming")}</p><p>{t("editing.fineTime")}</p></details>
     <fieldset>
       <legend>{t("sequence.sourceRange")}</legend>
       <label>{t("sequence.source")}<select disabled={disabled} aria-label={t("sequence.source")} value={sourceId} onChange={event => {
         const next = sources.find(item => item.id === event.target.value);
         void onAction(() => {
           skipBlur.current = false; setDraftPhase("editing");
-          setSourceId(next?.id ?? ""); setStart("0"); setEnd(String(grid ? maximumSourceFrame(next?.durationMs ?? 0) : (next?.durationMs ?? 0) / 1000));
+          setSourceId(next?.id ?? ""); setStart("0"); setEnd(String(grid ? maximumSourceFrame(next?.durationMs ?? 0) : (next?.durationMs ?? 0)));
         }).catch(() => {});
       }}>{sources.map(item => <option key={item.id} value={item.id}>{presentations.get(item.id)?.label ?? item.displayName}</option>)}</select></label>
-      <label>{t(grid ? "sequence.inFrames" : "sequence.inSeconds")}<input disabled={fieldsDisabled} data-manual-range type="number" step={grid ? "1" : "0.001"} min="0" value={start} aria-invalid={!valid} aria-describedby={rangeHintId} onChange={event => { skipBlur.current = false; setDraftPhase("editing"); setStart(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
-      <label>{t(grid ? "sequence.outFrames" : "sequence.outSeconds")}<input disabled={fieldsDisabled} data-manual-range type="number" step={grid ? "1" : "0.001"} min="0" max={grid ? maximum : maximum / 1000} value={end} aria-invalid={!valid} aria-describedby={rangeHintId} onChange={event => { skipBlur.current = false; setDraftPhase("editing"); setEnd(event.target.value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
+      <label>{t("title.in")}<TimeInput grid={grid} disabled={fieldsDisabled} data-manual-range value={start} aria-invalid={!valid} aria-describedby={rangeHintId} onValue={value => { skipBlur.current = false; setDraftPhase("editing"); setStart(value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
+      <label>{t("title.out")}<TimeInput grid={grid} maximum={maximum} disabled={fieldsDisabled} data-manual-range value={end} aria-invalid={!valid} aria-describedby={rangeHintId} onValue={value => { skipBlur.current = false; setDraftPhase("editing"); setEnd(value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
       <button type="button" className="secondary-button" disabled={disabled || !valid} onClick={() => range("append")}>{t("sequence.append")}</button>
       <button type="button" className="secondary-button" disabled={disabled || !valid || !selected} onClick={() => range("insert")}>{t("sequence.insert")}</button>
       <button type="button" className="secondary-button" disabled={disabled || !valid || !selected || sourceId !== selected.sourceId || sourceStartMs === selected.sourceStartMs && sourceEndMs === selected.sourceEndMs} onClick={() => range("trim")}>{t("sequence.trim")}</button>
@@ -155,13 +157,6 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     </div>
     {!grid && <ManualSequenceConformReview backend={backend} project={project} busy={disabled} t={t} onEdit={onEdit} onAction={onAction} />}
   </section>;
-}
-
-function milliseconds(value: string): number | null {
-  if (!value.trim()) return null;
-  const number = Number(value) * 1000;
-  const rounded = Math.round(number);
-  return Number.isSafeInteger(rounded) && Math.abs(number - rounded) < 0.000001 ? rounded : null;
 }
 
 /** Browser-only affordance checks. Host/Application validate every real request. */

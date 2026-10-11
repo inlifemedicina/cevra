@@ -1,8 +1,9 @@
-import { MANUAL_TITLE_COMPONENT, resolveManualTitle, validateManualTitle, type ProjectIR } from "@cevra/project-ir";
+import { MANUAL_TITLE_COMPONENT, manualTitleHeight, resolveManualTitle, validateManualTitle, type ProjectIR } from "@cevra/project-ir";
 import type { ManualTitleEdit } from "@cevra/application";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { ManualRangeDraftController } from "./ManualSequenceControls";
 import type { Translate } from "../ui-model";
+import { TimeInput } from "./TimeInput";
 import { nearestMsToFrames } from "../frame-timing";
 
 export function ManualTitleControls({ project, busy, available, t, draft, onCommit, onEdit }: {
@@ -33,8 +34,8 @@ export function ManualTitleControls({ project, busy, available, t, draft, onComm
   let candidate: ReturnType<typeof validateManualTitle> | undefined;
   try {
     if (!/^\d+$/u.test(start) || !/^\d+$/u.test(end)) throw Error();
-    candidate = validateManualTitle({ version: 1, componentId: MANUAL_TITLE_COMPONENT, text,
-      startFrame: Number(start), endFrame: Number(end), aspect });
+    candidate = validateManualTitle({ ...(title ?? { version: 1, componentId: MANUAL_TITLE_COMPONENT }), text,
+      startFrame: Number(start), endFrame: Number(end), aspect, ...(title?.version === 2 ? { layout: { ...title.layout, y: Math.min(title.layout.y, 1 - manualTitleHeight(aspect, title.layout.fontScale)) } } : {}) });
     if (candidate.endFrame > nearestMsToFrames(project.timeline.durationMs)) throw Error();
   } catch { candidate = undefined; }
   const editable = available && project.timeline.timingPolicy === "cfr30" && project.timeline.clips.length > 0;
@@ -72,8 +73,8 @@ export function ManualTitleControls({ project, busy, available, t, draft, onComm
         onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
         onChange={event => { touch(); setText(event.target.value); }} /></label>
       <div className="property-grid">
-        <label>{t("title.in")}<input type="number" min="0" step="1" value={start} aria-label={t("title.in")} onChange={event => { touch(); setStart(event.target.value); }} /></label>
-        <label>{t("title.out")}<input type="number" min="1" step="1" value={end} aria-label={t("title.out")} onChange={event => { touch(); setEnd(event.target.value); }} /></label>
+        <label>{t("title.in")}<TimeInput grid value={start} aria-label={t("title.in")} onValue={value => { touch(); setStart(value); }} /></label>
+        <label>{t("title.out")}<TimeInput grid maximum={nearestMsToFrames(project.timeline.durationMs)} value={end} aria-label={t("title.out")} onValue={value => { touch(); setEnd(value); }} /></label>
       </div>
       <label>{t("title.aspect")}<select value={aspect} aria-label={t("title.aspect")} onChange={event => { touch(); setAspect(event.target.value as "16:9" | "9:16"); }}>
         <option value="16:9">{t("title.landscape")}</option><option value="9:16">{t("title.portrait")}</option>

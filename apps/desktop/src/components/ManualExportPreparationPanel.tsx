@@ -8,9 +8,9 @@ type Exported = Extract<ManualSequenceExportResult, { outcome: "exported" }>;
 type Status = "idle" | "exporting" | "cancelling" | "cancelled" | "exported" | "error";
 
 /** A closed native Save picker and one Host operation own publication/history. */
-export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy, actionBusy = busy, onConfirmAction, available = false, exportRequest = 0, t, onBusyChange, onExported, onReconciled }: {
+export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy, actionBusy = busy, onConfirmAction, available = false, exportRequest = 0, headerOnly = false, t, onBusyChange, onExported, onReconciled }: {
   backend: DesktopBackend; snapshotId: string; locale: CevraLocale; busy: boolean; available?: boolean; t: Translate;
-  exportRequest?: number;
+  exportRequest?: number; headerOnly?: boolean;
   actionBusy?: boolean; onConfirmAction?(): Promise<string | null>;
   onBusyChange?(value: boolean): void; onExported?(result: Exported): void; onReconciled?(state: DesktopBackendState, code: string): void;
 }) {
@@ -103,10 +103,12 @@ export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy
     : errorCode === "MANUAL_EXPORT_FRAME_GRID_REQUIRED" || errorCode === "MANUAL_EXPORT_CONFORM_REQUIRED" ? "export.gridRequired"
     : errorCode === "MANUAL_EXPORT_ADMISSION_FAILED" || errorCode === "MANUAL_EXPORT_CLOCK_INVALID" ? "export.admissionFailed" : "export.failed";
   const resourceMessage = resourceCause === "MANUAL_EXPORT_MEMORY_LIMIT" ? "export.memoryLimit" : resourceCause === "MANUAL_EXPORT_DISK_LIMIT" ? "export.diskLimit" : "export.resourceUnavailable";
+  if (headerOnly && status === "idle") return null;
   return <section className="manual-export-preparation" aria-label={t("export.title")}>
     <h3>{t("export.title")}</h3>
     <p>{t(available && backend.exportManualSequence ? "export.profile" : "export.unavailable")}</p>
-    <button type="button" disabled={actionBusy || pending || !available || !backend.exportManualSequence} onClick={() => void exportSequence()}>{t("export.choose")}</button>
+
+    {!headerOnly && <button type="button" disabled={actionBusy || pending || !available || !backend.exportManualSequence} onClick={() => void exportSequence()}>{t("export.choose")}</button>}
     {pending && <button type="button" disabled={status === "cancelling"} onClick={cancel}>{t("export.cancel")}</button>}
     {(status === "exporting" || status === "cancelling") && <progress aria-label={t("export.running")} />}
     <div role="status" aria-live="polite">

@@ -1,6 +1,7 @@
 """Closed first-party title component. Runtime-owned font/helper only; no caller paths."""
 from __future__ import annotations
 import hashlib
+import math
 import re
 import sys
 from pathlib import Path
@@ -14,15 +15,24 @@ def validate(value):
     if value["version"] != 1 or isinstance(value["version"], bool) or value["fontSha256"] != FONT_SHA256 or value["rasterizerId"] != "cevra.coretext.inter.v1":
         raise ValueError("MANUAL_TITLE_INVALID")
     title = value["title"]
-    if not isinstance(title, dict) or set(title) != {"version", "componentId", "text", "startFrame", "endFrame", "aspect"}:
+    if not isinstance(title, dict) or set(title) != ({"version", "componentId", "text", "startFrame", "endFrame", "aspect"} | ({"layout"} if title.get("version") == 2 else set())):
         raise ValueError("MANUAL_TITLE_INVALID")
     text = title["text"]
-    if title["version"] != 1 or isinstance(title["version"], bool) or title["componentId"] != COMPONENT or title["aspect"] not in ("16:9", "9:16"):
+    if title["version"] not in (1, 2) or isinstance(title["version"], bool) or title["componentId"] != COMPONENT or title["aspect"] not in ("16:9", "9:16"):
         raise ValueError("MANUAL_TITLE_INVALID")
     if not isinstance(text, str) or not text.strip() or re.search(r"[\x00-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]", text) or len(text.encode("utf-16-le")) > 160:
         raise ValueError("MANUAL_TITLE_INVALID")
     if any(not isinstance(title[k], int) or isinstance(title[k], bool) or not 0 <= title[k] <= 18144000 for k in ("startFrame", "endFrame")) or title["startFrame"] >= title["endFrame"]:
         raise ValueError("MANUAL_TITLE_INVALID")
+    if title["version"] == 2:
+        layout = title["layout"]
+        if not isinstance(layout, dict) or set(layout) != {"version", "x", "y", "width", "fontScale"} or type(layout["version"]) is not int or layout["version"] != 1:
+            raise ValueError("MANUAL_TITLE_INVALID")
+        if any(type(layout[k]) not in (int, float) or not math.isfinite(layout[k]) for k in ("x", "y", "width", "fontScale")):
+            raise ValueError("MANUAL_TITLE_INVALID")
+        height = (56 / 1080 if title["aspect"] == "16:9" else 48 / 1920) * 1.9 * layout["fontScale"]
+        if not 0.2 <= layout["width"] <= 1 or not 0.5 <= layout["fontScale"] <= 2 or layout["x"] < 0 or layout["y"] < 0 or layout["x"] + layout["width"] > 1 + 1e-9 or layout["y"] + height > 1 + 1e-9:
+            raise ValueError("MANUAL_TITLE_INVALID")
     return value
 
 def assets():
@@ -57,5 +67,10 @@ def rasterize(common, budget, composition, destination):
     portrait = composition["title"]["aspect"] == "9:16"
     width, height = (1080, 1920) if portrait else (1920, 1080)
     budget.reserve(destination, width * height * 4 + 65536)
-    budget.run_native(common, [str(helper), str(font), str(width), str(height), composition["title"]["text"], str(destination)])
+    args = [str(helper), str(font), str(width), str(height), composition["title"]["text"]]
+    if composition["title"]["version"] == 2:
+        layout = composition["title"]["layout"]
+        args += [str(layout[k]) for k in ("x", "y", "width", "fontScale")]
+    args.append(str(destination))
+    budget.run_native(common, args)
     return width, height

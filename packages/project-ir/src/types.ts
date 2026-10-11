@@ -366,6 +366,7 @@ export type EditCommand =
   | { type: "project.rename"; name: string }
   | { type: "source.add"; source: SourceAsset }
   | { type: "source.remove"; sourceId: Id }
+  | { type: "source.removeFromProject"; version: 1; sourceId: Id; dependentClipIds: readonly Id[] }
   | {
       type: "source.technicalDescriptor.set";
       sourceId: Id;

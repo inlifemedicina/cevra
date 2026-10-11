@@ -79,3 +79,18 @@ test("title preflight accounts for the mandatory raster and refuses an impossibl
   assert.doesNotThrow(() => estimateManualExportOwnedBytes({ ...plan, sources }));
   assert.throws(() => estimateManualExportOwnedBytes({ ...plan, sources, title: title() }), { code: "MANUAL_EXPORT_DISK_LIMIT" });
 });
+
+test("V1 stays lossless; normalized V2 layout is bounded, journaled and recoverable without changing timing/originals", () => {
+  const f = fixture(); f.service.edit(f.request("set", title()));
+  const before = f.history.current, count = f.history.entries.length;
+  const transformed = title({ version: 2, aspect: "9:16", text: "Título direto", layout: { version: 1, x: .12, y: .25, width: .72, fontScale: .8 } });
+  f.service.edit(f.request("set", transformed)); const after = f.history.current;
+  assert.equal(f.history.entries.length, count+1); assert.deepEqual(resolveManualTitle(after.graphics[0]), transformed);
+  assert.deepEqual(after.timeline, before.timeline); assert.deepEqual(after.sources, before.sources);
+  f.history.undo(); assert.deepEqual(f.history.current, before);
+  const reopened = ProjectHistory.fromArchive(f.history.toArchive()); reopened.redo(); assert.deepEqual(reopened.current, after);
+  for (const layout of [{...transformed.layout,x:NaN}, {...transformed.layout,width:.1}, {...transformed.layout,x:.9}, {...transformed.layout,y:1}, {...transformed.layout,fontScale:3}, {...transformed.layout,filter:"arbitrary"}]) {
+    assert.throws(() => validateManualTitle({...transformed,layout}));
+  }
+  assert.throws(() => validateManualTitle({...title(),layout:transformed.layout}));
+});

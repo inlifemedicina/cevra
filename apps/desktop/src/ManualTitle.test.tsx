@@ -2,7 +2,7 @@ import { createRef } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { translate } from "@cevra/i18n";
-import { createEmptyProject, ProjectHistory, frameTimingMilliseconds } from "@cevra/project-ir";
+import { createEmptyProject, ProjectHistory, frameTimingMilliseconds, manualTitleHeight, MANUAL_TITLE_COMPONENT } from "@cevra/project-ir";
 import { ManualTitleApplicationService, type ManualTitleEdit } from "@cevra/application";
 import { ManualTitleControls } from "./components/ManualTitleControls";
 import type { ManualRangeDraftController } from "./components/ManualSequenceControls";
@@ -31,8 +31,8 @@ function fixture(locale: "pt-BR" | "en-US" = "pt-BR", available = true) {
 it.each(["pt-BR", "en-US"] as const)("%s title edits preserve History and drafts until an explicit Add", async locale => {
   const f = fixture(locale), before = f.history.entries.length;
   fireEvent.change(screen.getByLabelText(f.t("title.text")), { target: { value: "Ação, café e conexão" } });
-  fireEvent.change(screen.getByLabelText(f.t("title.in")), { target: { value: "90" } });
-  fireEvent.change(screen.getByLabelText(f.t("title.out")), { target: { value: "210" } });
+  fireEvent.change(screen.getByLabelText(f.t("title.in")), { target: { value: "00:00:03" } });
+  fireEvent.change(screen.getByLabelText(f.t("title.out")), { target: { value: "00:00:07" } });
   await act(async () => { await expect(f.draft.current!.settle()).rejects.toMatchObject({ code: "MANUAL_TITLE_PENDING" }); });
   expect(f.history.entries.length).toBe(before);
   expect(screen.getByRole("alert").textContent).toBe(f.t("title.pending"));
@@ -58,7 +58,7 @@ it("invalid ranges and IME block settlement without dispatching an edit; Escape 
   fireEvent.change(screen.getByLabelText(f.t("title.out")), { target: { value: "301" } });
   await act(async () => { await expect(f.draft.current!.settle()).rejects.toMatchObject({ code: "MANUAL_TITLE_INVALID" }); });
   expect(f.commit).toHaveBeenCalledTimes(1);
-  fireEvent.change(screen.getByLabelText(f.t("title.out")), { target: { value: "210" } });
+  fireEvent.change(screen.getByLabelText(f.t("title.out")), { target: { value: "00:00:07" } });
   fireEvent.compositionStart(screen.getByLabelText(f.t("title.text")));
   await act(async () => { await expect(f.draft.current!.settle()).rejects.toMatchObject({ code: "MANUAL_TITLE_INVALID" }); });
   fireEvent.compositionEnd(screen.getByLabelText(f.t("title.text")));
@@ -72,4 +72,15 @@ it("unavailable platform cannot add a title", () => {
   expect(screen.getByLabelText(f.t("title.text")).matches(":disabled")).toBe(true);
   expect(screen.getByText(f.t("title.unavailable"))).toBeTruthy();
   expect(f.commit).not.toHaveBeenCalled();
+});
+
+
+it("V2 at the portrait bottom changes to landscape explicitly with one Undo and no change on open", async () => {
+ const f=fixture(); const title={version:2 as const,componentId:MANUAL_TITLE_COMPONENT,text:"Ação",startFrame:0,endFrame:300,aspect:"9:16" as const,layout:{version:1 as const,x:.08,y:1-manualTitleHeight("9:16"),width:.84,fontScale:1}};
+ new ManualTitleApplicationService(f.history).edit({version:1,type:"set",expectedSnapshotId:f.history.current.history.headSnapshotId!,title});
+ await act(async()=>f.rerender());const before=f.history.current, count=f.history.entries.length;expect(f.history.current).toEqual(before);
+ fireEvent.change(screen.getByLabelText(f.t("title.aspect")),{target:{value:"16:9"}});
+ await act(async()=>f.draft.current!.settle());expect(f.history.entries.length).toBe(count+1);
+ const extension=f.history.current.graphics[0]!.extensions!["cevra.manual-title"] as any;expect(extension.aspect).toBe("16:9");expect(extension.layout.y).toBeCloseTo(1-manualTitleHeight("16:9"));
+ f.history.undo();expect(f.history.current).toEqual(before);
 });

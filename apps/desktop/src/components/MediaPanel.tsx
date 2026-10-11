@@ -1,3 +1,4 @@
+import { formatTime } from "../ui-model";
 import type { SourceAsset } from "@cevra/project-ir";
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { capabilityReasonKey, workspaceKeys, type Translate, type Workspace } from "../ui-model";
@@ -19,7 +20,7 @@ const filters = [
   ["image", "media.filter.image"]
 ] as const;
 
-export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, nativeDropHovering = false, thumbnailBusy = false, actionBusy = thumbnailBusy, onAction, backend, snapshotId, t, onSelect, onImport }: { sources: readonly SourceAsset[]; backend?: DesktopBackend; snapshotId?: string; thumbnailBusy?: boolean; actionBusy?: boolean; onAction?: RangeActionGate; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; nativeDropHovering?: boolean; t: Translate; onSelect(id: string): void; onImport(): void }) {
+export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, nativeDropHovering = false, thumbnailBusy = false, actionBusy = thumbnailBusy, onAction, backend, snapshotId, t, onSelect, onImport, onRemove }: { sources: readonly SourceAsset[]; backend?: DesktopBackend; snapshotId?: string; thumbnailBusy?: boolean; actionBusy?: boolean; onAction?: RangeActionGate; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; nativeDropHovering?: boolean; t: Translate; onSelect(id: string): void; onImport(): void; onRemove?(id: string): void }) {
   const thumbnails = useSourceThumbnails(sources, backend, snapshotId, thumbnailBusy || importBusy);
   const [filter, setFilter] = useState<MediaFilter>("all");
   const [query, setQuery] = useState("");
@@ -59,7 +60,7 @@ export function MediaPanel({ sources, presentations, selectedId, workspace, impo
       <div className="media-grid">
         {visibleSources.map((source) => (
           <div key={source.id} className="media-card-group">
-          <button type="button" className={selectedId === source.id ? "media-card selected" : "media-card"} onClick={() => onSelect(source.id)} aria-pressed={selectedId === source.id} aria-label={`${presentations.get(source.id)!.label} · ${source.displayName}`} title={source.displayName}>
+          <button type="button" className={selectedId === source.id ? "media-card selected" : "media-card"} onClick={event => { event.currentTarget.focus({ preventScroll: true }); onSelect(source.id); }} aria-pressed={selectedId === source.id} aria-label={`${presentations.get(source.id)!.label} · ${source.displayName}`} title={source.displayName}>
             <span className={`media-thumb media-thumb-${source.kind}`}>
               {thumbnails.get(source) ? <img key={thumbnails.get(source)!.url} src={thumbnails.get(source)!.url} alt="" onLoad={event => {
                 const frame = thumbnails.get(source);
@@ -71,13 +72,14 @@ export function MediaPanel({ sources, presentations, selectedId, workspace, impo
                 {source.kind === "video" && backend?.thumbnailLocalVideo && <small>{t(thumbnails.failed(source) ? "media.thumbnailUnavailable" : "media.thumbnailLoading")}</small>}
               </>}
             </span>
-            <span className="media-card-copy"><strong>{t("clipPresentation.source", { name: presentations.get(source.id)!.label })}</strong><small className="media-source-name">{source.displayName}</small><small>{metadata(source)}</small></span>
+            <span className="media-card-copy"><strong>{presentations.get(source.id)!.label}</strong><small className="media-source-name">{source.displayName}</small><small>{metadata(source)}</small></span>
           </button>
           {thumbnails.failed(source) && backend?.thumbnailLocalVideo && <button type="button" className="text-button" disabled={actionBusy || importBusy} onClick={() => action(() => thumbnails.retry(source))} aria-label={`${t("media.thumbnailRetry")} · ${presentations.get(source.id)!.label}`}>{t("media.thumbnailRetry")}</button>}
           </div>
         ))}
         {visibleSources.length === 0 && <p className="empty-state">{t("media.empty")}</p>}
       </div>
+      {onRemove && sources.some(source => source.id === selectedId) && <button type="button" className="secondary-button" disabled={actionBusy || importBusy} onClick={() => onRemove(selectedId!)}>{t("media.remove")}</button>}
       {(!importAvailable || importBusy || actionBusy) && <p className="unavailable-note" role="status"><span aria-hidden="true">●</span>{t(importBusy || actionBusy ? "status.busy" : importReason === "desktop-runtime-deferred" ? "media.importUnavailable" : capabilityReasonKey(importReason))}</p>}
     </aside>
   );
@@ -85,7 +87,7 @@ export function MediaPanel({ sources, presentations, selectedId, workspace, impo
 
 function metadata(source: SourceAsset): string {
   if (source.kind === "image") return `${source.width ?? 0} × ${source.height ?? 0}`;
-  const seconds = Math.round((source.durationMs ?? 0) / 1000);
-  if (source.kind === "audio") return `${seconds}s · ${(source.sampleRate ?? 0) / 1000} kHz`;
-  return `${seconds}s · ${source.width ?? 0} × ${source.height ?? 0}`;
+  const seconds = formatTime(source.durationMs ?? 0);
+  if (source.kind === "audio") return `${seconds} · ${(source.sampleRate ?? 0) / 1000} kHz`;
+  return `${seconds} · ${source.width ?? 0} × ${source.height ?? 0}`;
 }

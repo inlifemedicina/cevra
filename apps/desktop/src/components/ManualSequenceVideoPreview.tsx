@@ -1,3 +1,4 @@
+import type { TitlePreviewEditing } from "./ManualTitleOverlay";
 import type { CreateManualVideoClipRequest } from "@cevra/application";
 import type { ProjectIR, TimelineClip } from "@cevra/project-ir";
 import { useEffect, useRef, useState } from "react";
@@ -9,6 +10,8 @@ import { floorMsToFrames, framesToMilliseconds } from "../frame-timing";
 import type { TimelineSeekPhase } from "../timeline-interactions";
 
 interface Props {
+  onAction?(action: () => void | Promise<void>): Promise<void>;
+  titleEditing?: TitlePreviewEditing;
   backend: DesktopBackend;
   project: Readonly<ProjectIR>;
   clips: readonly TimelineClip[];
@@ -28,7 +31,7 @@ interface Props {
 }
 
 /** CFR30 montage uses one admitted derivative/decoder; Original keeps its source clock. */
-export function ManualSequenceVideoPreview({ backend, project, clips, presentations, originalSourceId, originalSelected = false, busy, actionBusy = busy, requestedMode, requestedLoop, onModeChange, onLoopChange, seek, t, onPlayheadChange, onCreate }: Props) {
+export function ManualSequenceVideoPreview({ onAction, backend, project, clips, presentations, originalSourceId, originalSelected = false, busy, actionBusy = busy, requestedMode, requestedLoop, onModeChange, onLoopChange, seek, t, onPlayheadChange, onCreate, titleEditing }: Props) {
   const durationMs = project.timeline.durationMs;
   const [mode, setMode] = useState<"sequence" | "original">(requestedMode ?? (originalSelected ? "original" : "sequence"));
   const [loop, setLoop] = useState(requestedLoop ?? false);
@@ -63,9 +66,9 @@ export function ManualSequenceVideoPreview({ backend, project, clips, presentati
     external.current = { sequence: seek.sequence, sourceId: originalSourceId };
     if (old.sequence === seek.sequence && old.sourceId === originalSourceId) return;
     if (seek.sequence > 0) {
-      setMode("sequence");
+      setMode(requestedMode ?? "sequence");
       scrubProgram(seek.timelineMs, seek.phase ?? "single");
-    } else { scrubIntent.current = null; setMode("original"); setTransport(value => ({ ...value, resume: false })); }
+    } else { scrubIntent.current = null; setMode(requestedMode ?? "original"); setTransport(value => ({ ...value, resume: false })); }
   }, [seek.sequence, originalSourceId]);
   const continuous = mode === "sequence" && project.timeline.timingPolicy === "cfr30";
   const programClip: TimelineClip = continuous ? { ...clips[0]!, id: "continuous-program-preview", sourceStartMs: 0, sourceEndMs: durationMs,
@@ -85,13 +88,13 @@ export function ManualSequenceVideoPreview({ backend, project, clips, presentati
       <button type="button" className="secondary-button" aria-pressed={mode === "original"} disabled={actionBusy} onClick={() => onModeChange ? onModeChange("original") : changeMode("original")}>{t("preview.originalMode")}</button>
       {mode === "sequence" && <label><input type="checkbox" checked={loop} disabled={actionBusy} onChange={event => onLoopChange ? onLoopChange(event.target.checked) : setLoop(event.target.checked)} />{t("sequence.repeat")}</label>}
     </div>
-    <ManualVideoPreview key={`${mode}:${sourceId}:${mode === "sequence" ? continuous ? "continuous" : clip.id : "original"}`} backend={backend}
+    <ManualVideoPreview onAction={onAction} actionBusy={actionBusy} key={`${mode}:${sourceId}:${mode === "sequence" ? continuous ? "continuous" : clip.id : "original"}`} backend={backend}
       source={project.sources.find(source => source.id === sourceId)} sourceLabel={currentSourceId ? presentations.get(currentSourceId)?.label : undefined}
-      snapshotId={project.history.headSnapshotId!} clip={mode === "sequence" ? programClip : undefined} sequencePreview={continuous ? clips : undefined}
+      titleEditing={continuous ? titleEditing : undefined} titleEditingBlocked={actionBusy} snapshotId={project.history.headSnapshotId!} clip={mode === "sequence" ? programClip : undefined} sequencePreview={continuous ? clips : undefined}
       timelineOccupied sequenceEditing frameEditing={project.timeline.timingPolicy === "cfr30"} busy={busy} seek={mode === "sequence" ? transport : { sequence: 0, timelineMs: 0 }} t={t}
       onPlayheadChange={value => { if (mode === "sequence") position.current = value; onPlayheadChange(value); }} onCreate={onCreate}
       program={mode === "sequence" ? { durationMs, resume: transport.resume,
-        onPlaybackIntent: resume => setTransport(value => ({ ...value, resume })), onSeek: go, onScrub: scrubProgram,
+        onPlaybackIntent: resume => setTransport(value => ({ ...value, timelineMs: position.current, resume })), onSeek: go, onScrub: scrubProgram,
         onClipEnd: () => {
           if (programClip.timelineEndMs < durationMs) go(programClip.timelineEndMs, true);
           else if (loop) go(0, true);

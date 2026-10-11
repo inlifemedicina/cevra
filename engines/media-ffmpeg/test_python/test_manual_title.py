@@ -26,6 +26,25 @@ class ManualTitleTests(unittest.TestCase):
             bad = copy.deepcopy(valid); bad[field] = "injected"
             with self.assertRaises(ValueError): title.validate(bad)
 
+    def test_versioned_normalized_layout_and_closed_bounds(self):
+        plan = composition()
+        plan["title"].update(version=2, layout={"version": 1, "x": .1, "y": .2, "width": .72, "fontScale": .8})
+        self.assertEqual(title.validate(plan), plan)
+        for field, value in (("x", float("nan")), ("y", 1), ("width", .1), ("fontScale", 3), ("version", True), ("filter", "arbitrary")):
+            bad = copy.deepcopy(plan); bad["title"]["layout"][field] = value
+            with self.assertRaises(ValueError): title.validate(bad)
+
+    def test_layout_producer_keeps_owned_destination_last_for_native_budget(self):
+        plan = composition(); plan["title"].update(version=2, layout={"version":1,"x":.1,"y":.2,"width":.7,"fontScale":.8})
+        events = []
+        class Budget:
+            def reserve(self, destination, size): events.append(("reserve", destination, size))
+            def run_native(self, common, argv): events.append(("native", argv))
+        with patch.object(title, "assets", return_value=(Path("/font"),Path("/helper"))):
+            title.rasterize(object(), Budget(), plan, Path("/owned/title.png"))
+        self.assertEqual(events[0][0],"reserve"); self.assertEqual(events[1][1][-1],"/owned/title.png")
+        self.assertEqual(events[1][1][5:9],["0.1","0.2","0.7","0.8"])
+
     def test_half_open_intersection_depends_on_occurrence_offset(self):
         plan = composition()
         self.assertEqual(title.local_interval(plan, 0, 150), (90, 150))

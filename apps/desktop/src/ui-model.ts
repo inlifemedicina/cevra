@@ -27,18 +27,12 @@ export type Translate = (key: TranslationKey, parameters?: Readonly<Record<strin
 
 /** Source/clip milliseconds, independent of a presumed source frame rate. */
 export function formatMilliseconds(milliseconds: number): string {
-  const value = Math.max(0, Math.round(milliseconds));
-  const minutes = Math.floor(value / 60_000);
-  const seconds = Math.floor(value / 1000) % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(value % 1000).padStart(3, "0")}`;
+  return formatTime(milliseconds);
 }
 
 export function formatTime(milliseconds: number): string {
-  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  const frames = Math.floor((milliseconds % 1000) / (1000 / 30));
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}:${String(frames).padStart(2, "0")}`;
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000 + 1e-9));
+  return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 export function capabilityReasonKey(reason: DesktopCapabilityReason): TranslationKey {

@@ -2,6 +2,8 @@ import type { ManualVideoSequenceConformPreview, ManualVideoSequenceEdit } from 
 import type { ProjectIR } from "@cevra/project-ir";
 import { useEffect, useRef, useState } from "react";
 import type { DesktopBackend } from "../backend/desktop-backend";
+import { TimeInput } from "./TimeInput";
+import { formatTime } from "../ui-model";
 import { maximumSourceFrame, frameInput, framesToMilliseconds, isCfr30Frame } from "../frame-timing";
 import type { Translate } from "../ui-model";
 import type { RangeActionGate } from "../range-activation-guard";
@@ -89,15 +91,15 @@ export function ManualSequenceConformReview({ backend, project, busy, t, onEdit,
       <p>{t("sequence.conformHint")}</p>
       {rows!.map(({ clip, draft, valid, timing }, index) => <fieldset key={clip.clipId} disabled={busy || pending}>
         <legend>{project.sources.find(source => source.id === clip.sourceId)?.displayName} · {clip.clipId}</legend>
-        <label>{t("sequence.inFrames")}<input type="number" step="1" min="0" value={draft.sourceStartFrame} onChange={event => setDrafts(values => values.map((value, i) => i === index ? { ...value, sourceStartFrame: event.target.value } : value))} /></label>
-        <label>{t("sequence.outFrames")}<input type="number" step="1" min="1" value={draft.sourceEndFrame} onChange={event => setDrafts(values => values.map((value, i) => i === index ? { ...value, sourceEndFrame: event.target.value } : value))} /></label>
+        <label>{t("title.in")}<TimeInput grid value={draft.sourceStartFrame} onValue={next => setDrafts(values => values.map((value, i) => i === index ? { ...value, sourceStartFrame: next } : value))} /></label>
+        <label>{t("title.out")}<TimeInput grid value={draft.sourceEndFrame} onValue={next => setDrafts(values => values.map((value, i) => i === index ? { ...value, sourceEndFrame: next } : value))} /></label>
         {(["timelineStart", "timelineEnd", "sourceStart", "sourceEnd"] as const).map(boundary => {
           const frame = timing[boundary];
           if (frame === null || !isCfr30Frame(frame)) return null;
           const projectedMs = framesToMilliseconds(frame);
           const originalMs = clip.boundaries[boundary].originalMs;
           const label = { timelineStart: "sequence.boundaryTimelineStart", timelineEnd: "sequence.boundaryTimelineEnd", sourceStart: "sequence.boundarySourceStart", sourceEnd: "sequence.boundarySourceEnd" } as const;
-          return <output key={boundary}>{t("sequence.boundaryDelta", { boundary: t(label[boundary]), original: originalMs.toFixed(3), frame, projected: projectedMs.toFixed(3), delta: (projectedMs - originalMs).toFixed(3) })}</output>;
+          return <output data-boundary-changed={Math.abs(projectedMs - originalMs) > 1e-9} key={boundary}>{t("sequence.boundaryTime", { boundary: t(label[boundary]), original: formatTime(originalMs), projected: formatTime(projectedMs) })} · {t(Math.abs(projectedMs - originalMs) > 1e-9 ? "sequence.boundaryChanged" : "sequence.boundaryUnchanged")}<details className="editing-help"><summary>{t("editing.help")}</summary>{t("sequence.boundaryPrecision", { original: originalMs, projected: projectedMs.toFixed(3), delta: (projectedMs - originalMs).toFixed(3) })}</details></output>;
         })}
         {!valid && <p role="alert">{t("sequence.conformCollapsed")}</p>}
       </fieldset>)}

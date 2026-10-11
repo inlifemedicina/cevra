@@ -2,9 +2,10 @@ import { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, isCfr30Frame,
 
 export { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, isCfr30Frame };
 
+import { formatTime } from "./ui-model";
+
 export function formatFrames(frame: number): string {
-  const seconds = Math.floor(frame / 30);
-  return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}:${(frame % 30).toString().padStart(2, "0")}`;
+  return formatTime(framesToMilliseconds(frame));
 }
 
 export function frameInput(value: string): number | null {

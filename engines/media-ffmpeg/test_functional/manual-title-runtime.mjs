@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { createEmptyProject, ProjectHistory, MANUAL_TITLE_COMPONENT } from "@cevra/project-ir";
+import { createEmptyProject, ProjectHistory, MANUAL_TITLE_COMPONENT, manualTitleLayout, manualTitleHeight } from "@cevra/project-ir";
 import { FixedManualTitleCompositionAdapter } from "@cevra/contracts";
 import { InMemoryMediaExecutionRepository, LocalSourceIngestService, ManualSequenceExportApplicationService,
   ManualTitleApplicationService, ManualVideoSequenceApplicationService, MediaApplicationService } from "@cevra/application";
@@ -85,8 +85,8 @@ function clock(file, portrait, preview, frames = 300) {
 }
 function intervalOracle(file, value, grid) {
   const cw = value.aspect === "9:16" ? 1080 : 1920, ch = value.aspect === "9:16" ? 1920 : 1080;
-  const font = cw === 1920 ? 56 : 48, sx = grid.width/cw, sy = grid.height/ch;
-  const x = Math.ceil((cw*.08+12)*sx), y = Math.ceil((ch*.9-font*1.9+16)*sy);
+  const layout = manualTitleLayout(value), sx = grid.width/cw, sy = grid.height/ch;
+  const x = Math.ceil((cw*layout.x+12)*sx), y = Math.ceil((ch*layout.y+16)*sy);
   const bytes = run(["-i",file,"-map","0:v:0","-an","-vf",`crop=4:4:${x}:${y},format=rgb24`,"-fps_mode","passthrough","-f","rawvideo","pipe:1"]);
   assert.equal(bytes.length,300*48);
   for (let n=0;n<300;n++) {
@@ -98,15 +98,16 @@ function intervalOracle(file, value, grid) {
 }
 function qualityOracle(file, value) {
   const portrait = value.aspect === "9:16", width = portrait ? 1080 : 1920, height = portrait ? 1920 : 1080, size = portrait ? 48 : 56;
-  const png = path.join(outputRoot, `reference-${portrait ? "portrait" : "landscape"}.png`);
-  execFileSync(path.join(runtime,"components/manual-title/rasterizer"), [path.join(runtime,"components/manual-title/Inter.ttf"),String(width),String(height),value.text,png]);
-  const crop = `${Math.floor(width*.84)}:${Math.floor(size*1.9)}:${Math.round(width*.08)}:${Math.round(height*.9-size*1.9)}`;
+  const png = path.join(outputRoot, `reference-${portrait ? "portrait" : "landscape"}-v${value.version}.png`);
+  const layout = manualTitleLayout(value);
+  execFileSync(path.join(runtime,"components/manual-title/rasterizer"), [path.join(runtime,"components/manual-title/Inter.ttf"),String(width),String(height),value.text,...(value.version===2 ? [layout.x,layout.y,layout.width,layout.fontScale].map(String) : []),png]);
+  const crop = `${Math.floor(width*layout.width)}:${Math.floor(height*manualTitleHeight(value.aspect,layout.fontScale))}:${Math.round(width*layout.x)}:${Math.round(height*layout.y)}`;
   const actual = run(["-i",file,"-vf",`select=eq(n\\,120),scale=in_color_matrix=bt709:in_range=tv:out_range=pc,crop=${crop},format=rgb24`,"-frames:v","1","-an","-f","rawvideo","pipe:1"]);
   const reference = run(["-i",png,"-vf",`crop=${crop},format=rgb24`,"-frames:v","1","-f","rawvideo","pipe:1"]);
   assert.equal(actual.length,reference.length);
   let absolute=0,squared=0; for(let i=0;i<actual.length;i++){ const d=actual[i]-reference[i];absolute+=Math.abs(d);squared+=d*d; }
   const mae=absolute/actual.length,psnr=10*Math.log10(255**2/(squared/actual.length));
-  assert.ok(mae<=3 && psnr>=35, `Opaque title ROI MAE=${mae}, PSNR=${psnr}`); quality.push({aspect:value.aspect,mae,psnr});
+  assert.ok(mae<=3 && psnr>=35, `Opaque title ROI MAE=${mae}, PSNR=${psnr}`); quality.push({aspect:value.aspect,version:value.version,layout,mae,psnr});
 }
 async function projectFor(name, sourceName, repeated = false) {
   const history = new ProjectHistory(createEmptyProject({id:name})), executions = new InMemoryMediaExecutionRepository();
@@ -161,6 +162,14 @@ try {
     await preview.derived.prepare(preview.request(),new AbortController().signal);assert.equal(renders,count+1,"Changed title invalidates preview cache.");
     fixture.history.undo();await preview.derived.prepare(preview.request(),new AbortController().signal);assert.equal(renders,count+2,"Snapshot-bound cache invalidates after returning to a distinct export snapshot.");
     preview.derived.close();
+    const moved=title(aspect,{version:2,text:"Título direto",startFrame:91,endFrame:209,layout:{version:1,x:.12,y:.25,width:.72,fontScale:.8}});
+    service.edit({version:1,type:"set",expectedSnapshotId:fixture.history.current.history.headSnapshotId,title:moved});
+    const movedPreview=await previewProject(fixture,`${name}-direct-preview`),movedGrid=clock(movedPreview.file,aspect==="9:16",true);
+    intervalOracle(movedPreview.file,moved,movedGrid);assert.equal(movedGrid.aacSha256,previewAudio);
+    const movedFinal=await exportProject(fixture,`${name}-direct-final`),movedFinalGrid=clock(movedFinal,aspect==="9:16",false);
+    intervalOracle(movedFinal,moved,movedFinalGrid);qualityOracle(movedFinal,moved);assert.equal(movedFinalGrid.aacSha256,audio);
+    assert.deepEqual(fixture.history.current.timeline,before.timeline);assert.deepEqual(fixture.history.current.sources,before.sources);
+    movedPreview.derived.close();
   }
   const repeated=await projectFor("repeated","landscape",true),value=title("16:9",{startFrame:150,endFrame:300});
   new ManualTitleApplicationService(repeated.history).edit({version:1,type:"set",expectedSnapshotId:repeated.history.current.history.headSnapshotId,title:value});

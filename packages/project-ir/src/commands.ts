@@ -1,6 +1,6 @@
 import type { CaptionCue, EditCommand, ProjectIR, SourceTechnicalDescriptorV1, SourceTranscript, StyleState, TimelineClip, TimelineEditOperationV2, TranscriptProvenanceStage } from "./types.js";
-import { frameTimingMilliseconds } from "./frame-time.js";
-import { resolveManualTitle } from "./manual-title.js";
+import { framesToMilliseconds, frameTimingMilliseconds } from "./frame-time.js";
+import { manualTitleGraphic, resolveManualTitle } from "./manual-title.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
 import { assertValidProjectIR, validateProjectIR, validateTimelineEditOperation } from "./validation.js";
 
@@ -46,6 +46,43 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
       rejectDuplicate(next.sources, command.source.id, "source");
       next.sources.push(clone(command.source));
       break;
+    case "source.removeFromProject": {
+      const dependencies = next.timeline.clips.filter(clip => clip.sourceId === command.sourceId).map(clip => clip.id).sort();
+      if (command.version !== 1 || JSON.stringify(dependencies) !== JSON.stringify([...command.dependentClipIds].sort())) throw new Error("Source dependencies changed.");
+      if (!next.sources.some(source => source.id === command.sourceId)) throw new Error("Unknown source.");
+      if (next.graphics.some(graphic => graphic.sourceId === command.sourceId) || next.generation.some(record => record.outputSourceIds.includes(command.sourceId))) throw new Error("Unsupported source dependencies.");
+      if (dependencies.length) {
+        if (next.captions.length || next.graphics.length > 1) throw new Error("Unsupported timeline dependencies.");
+        let oldEnd = 0, cursor = 0;
+        const ordered = [...next.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs);
+        const track = next.timeline.tracks.find(track => track.id === ordered[0]?.trackId);
+        if (!track || track.kind !== "video" || track.locked || track.hidden || track.muted) throw new Error("Unsupported timeline.");
+        for (const clip of ordered) {
+          if (clip.trackId !== track.id || clip.timelineStartMs !== oldEnd || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1) throw new Error("Unsupported timeline.");
+          oldEnd = clip.timelineEndMs;
+          if (clip.sourceId === command.sourceId) continue;
+          if (next.timeline.timingPolicy === "cfr30") {
+            if (!clip.frameTiming) throw new Error("Missing frame timing.");
+            const count = clip.frameTiming.sourceEndFrame - clip.frameTiming.sourceStartFrame;
+            clip.frameTiming.timelineStartFrame = cursor; clip.frameTiming.timelineEndFrame = cursor + count; cursor += count;
+            Object.assign(clip, frameTimingMilliseconds(clip.frameTiming));
+          } else {
+            const count = clip.timelineEndMs - clip.timelineStartMs;
+            clip.timelineStartMs = cursor; clip.timelineEndMs = cursor + count; cursor += count;
+          }
+        }
+        next.timeline.clips = ordered.filter(clip => clip.sourceId !== command.sourceId);
+        const duration = next.timeline.timingPolicy === "cfr30" ? framesToMilliseconds(cursor) : cursor;
+        next.graphics = next.graphics.flatMap(graphic => {
+          const title = resolveManualTitle(graphic);
+          const endFrame = Math.min(title.endFrame, Math.round(duration * 30 / 1000));
+          return title.startFrame >= endFrame ? [] : [manualTitleGraphic(graphic.id, { ...title, endFrame })];
+        });
+      }
+      next.sources = next.sources.filter(source => source.id !== command.sourceId);
+      next.sourceTranscripts = next.sourceTranscripts.filter(transcript => transcript.sourceId !== command.sourceId);
+      break;
+    }
     case "source.remove": {
       if (!next.sources.some((source) => source.id === command.sourceId)) throw new Error(`Unknown source ${command.sourceId}.`);
       if (next.timeline.clips.some((clip) => clip.sourceId === command.sourceId)) throw new Error("Cannot remove a source used by timeline clips.");

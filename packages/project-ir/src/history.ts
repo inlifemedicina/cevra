@@ -335,6 +335,7 @@ function defaultId(): string {
 function transcriptMutationSource(command: EditCommand): Id | undefined {
   switch (command.type) {
     case "source.remove":
+    case "source.removeFromProject":
     case "transcript.remove":
       return command.sourceId;
     case "transcript.set":
