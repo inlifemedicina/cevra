@@ -841,7 +841,7 @@ grouped subjective round; do not repeat this approved offline visual test.
 
 ## Integrated manual-title app round — 2026-10-11
 
-**SECOND OWNER REPORT RECORDED; CURRENT TECHNICAL GATES IN CLOSEOUT.** This single grouped app round includes
+**SECOND OWNER REPORT RECORDED; NEW PACKAGE VERIFIED / FINAL CI PENDING.** This single grouped app round includes
 both Owner-approved UX scopes: organization/time/removal, then direct title
 manipulation. It supersedes the earlier pending app instructions at this same
 anchor; the accepted offline fixed-title visual proof remains closed. Reuse the
@@ -996,8 +996,18 @@ The screenshot and actual mixed renders establish existing fit/pad in the
 checked cases; no crop policy is silently substituted. Current automated
 evidence: UI341/one skip, retained drafts46, Host preview47, Python162, build
 and independent source review PASS, plus14 actual H/V/mixed renders. Complete offline test:ci and Tauri release build pass. Fresh
-exact-head CI and signed-package review are still required before the
+final-documentation-head CI is still required before the
 same single subjective follow-up above. Host admission2202–2363ms for new
 titles remains; cached Undo/Redo12–13ms causes no render. These measurements
 do not establish natural WK paint or subjective fluency. No new catalog ID,
 blanket acceptance, engine or Director permission is introduced.
+
+The new039 candidate uses executable21c3b67. Full offline test:ci, local
+real renders, ad-hoc deep/strict signing, independent1024file rehash, cold
+release metadata, three-RPC Host smoke and independent source/package/archive
+review pass. CI760 passes5/5 and Runtime113 passes1/1.
+Only final-documentation-head checks precede the shortcut and grouped follow-up.
+The complete2692entry scratch archive is recoverable and independently verified
+before exclusive cleanup. This is the current candidate; the prior038 closeout
+is retained as history. No app is opened by the agent or prior acceptance
+repeated. [Current package/evidence](CEVRA_MANUAL_TITLE_PROOF_V1.md#signed039-package-and-recoverable-closeout).

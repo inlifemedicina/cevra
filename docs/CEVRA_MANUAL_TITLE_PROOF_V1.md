@@ -825,3 +825,43 @@ CI are required before delivery. Original running app/project and frozen
 PR96/97 are preserved. Director: compatible UI/raster/cache extensions over
 existing typed operations, IR and History, with no provider, engine, security
 or persistence change. No merge, real AI call or broader release acceptance.
+
+### Signed039 package and recoverable closeout
+
+The executable source is `21c3b67d6dab18deb7ffc29eb3bd0d3a47d01973`; its CI760
+passes5/5 and Runtime113 passes1/1.
+Fresh final-documentation-head CI remains required before human handoff; no
+previous-head checks substitute for that gate. Product code is unchanged by
+this dedicated closeout documentation delta.
+
+App: `~/Applications/CEVRA Vids Revisao 2 2026-10-11/CEVRA Vids Revisao.app`.
+The ad-hoc deep/strict signature is independently verified; all1024files
+match treeSHA256 `360b4d46bb10ff69a3c7b662f418838e91d0f1d5f10e85072878add122ca617e`.
+Runtime039 matches the tested payload, manifestSHA256
+`b6f809108d79ba05d1cc79d91c8454f8ea2acafa083fc873d2d19ddf4b71cfc6`;
+the private Node pin is unchanged. Cold release metadata and empty-owned-store
+Host smoke (three RPCs, no GUI/provider) pass. First smoke harness attempts
+used an incorrect bundle filename and remain failed instrumentation logs; the
+correct `desktop-host.cjs` path passed without product change. Independent
+source/app/archive review found no concrete P1/P2. Build retains the earlier
+nonfatal rust-objcopy/libLLVM warning; release bundling succeeds.
+
+Recoverable archive:
+`~/Documents/CEVRA/Apagar/cevra-pr98-round2-20261011.tar.gz`,119456659bytes,
+SHA256 `c2e0d5eb9a365b7bea16b306c723934bb60821eb38135ba7083fe8ed01db2042`.
+All2692entries/2321file payloads, modes and symlinks were verified in full
+independently. The source root remained unchanged; immediately before cleanup
+the archive was rehashed, root re-inventoried and lsof was empty. Only the
+exclusive `/private/tmp/cevra-pr98-round2-20261011` root was removed. Restore
+the archive into a new owned directory and map historic absolute runtime/output
+paths to that root. Current outputs remain in `round-2/real-verified`. Obsolete
+Documents staging moved intact to
+`~/Documents/CEVRA/Apagar/PR98-round2-runtime039-Documents-staging`; no required
+reference, original app/project or frozen checkout was removed.
+
+Receipts are `round-2/app-signature039.json`, `package-smoke039.json`,
+`packaged-runtime-info039.json`, `latency-idle.json`,
+`scratch-recoverable-archive039.json`, `scratch-full-manifest039.json` and
+`scratch-verified-cleanup039.json`. Final checks precede creating the new
+CEVRA shortcut and the same grouped subjective follow-up. No merge, latency
+elimination, native first-paint or general release acceptance is claimed.

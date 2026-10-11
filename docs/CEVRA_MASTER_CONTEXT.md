@@ -4045,9 +4045,10 @@ acceptance. Director: compatible presentation/decoder correction; packaging
 hygiene adds no new boundary or Director impact.
 
 
-### 2026-10-11 — PR98 second human correction round in progress
+### 2026-10-11 — PR98 second human correction packaged / final checks pending
 
-**ACTIVE / NOT MERGED.** Owner clarified that centiseconds must remain visible
+**PACKAGED / FINAL CHECKS PENDING / NOT MERGED.** Owner clarified that
+centiseconds must remain visible
 in IN/OUT and the preview counter only; timeline ruler remains whole seconds.
 Display rounding never reparses an unchanged canonical frame or legacy cut.
 Selected title duration is now an ephemeral timeline draft over the existing
@@ -4067,7 +4068,10 @@ pass. Independent read-only review found no concrete P1/P2. Fourteen actual
 H/V/mixed renders preserve exact frames/PCM endpoints and original hashes;
 Unicode clusters/selectors retain native color and mixed fit/pad is verified.
 The complete compatible-environment offline test:ci and Tauri release build
-pass. Fresh exact-head CI and signed-package gates remain pending.
+pass. Fresh final-documentation-head checks remain pending. The executable21c3b67
+passes CI760 (5/5) and Runtime113 (1/1).
+The new ad-hoc signed app and independent package review pass; its1024 files
+match the sealed receipt. Cold039 release and three-RPC Host smoke pass.
 Whole-preview
 identity now represents bytes rather than metadata snapshot; cache hits still
 recheck current sources, runtime, native-font identity and canonical request.
@@ -4082,3 +4086,12 @@ Native PNG generation is88–96ms. These are host admission/CLI measurements,
 not first WK paint or proof of an overlay fast path. New-title encoder latency
 remains; no instant-update claim or silent preview architecture change.
 [Current evidence and limits](CEVRA_MANUAL_TITLE_PROOF_V1.md#pr98-second-human-correction--2026-10-11).
+
+The fresh app stays in `~/Applications/CEVRA Vids Revisao 2 2026-10-11`; the
+round-2 shortcut is delivered only after final checks. The complete exclusive
+scratch archive in CEVRA/Apagar passes independent full payload/mode/link
+verification (2692 entries,2321files) before cleanup; the TMP root is absent.
+Obsolete Documents staging is retained recoverably in Apagar. The running old
+app/project and frozen PR96/97 are preserved. No new engine, security, paid
+provider or persistence boundary; Director extension remains compatible.
+Only the same minimal subjective follow-up remains after fresh final-head CI.
