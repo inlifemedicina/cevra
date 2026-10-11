@@ -5,6 +5,7 @@ import type { SourcePresentation } from "../source-presentation";
 import type { Translate } from "../ui-model";
 import type { DesktopBackend } from "../backend/desktop-backend";
 import { maximumSourceFrame, floorMsToFrames, frameInput, framesToMilliseconds, isCfr30Frame } from "../frame-timing";
+import { EditingHelp } from "./EditingHelp";
 import { TimeInput } from "./TimeInput";
 import { ManualSequenceConformReview } from "./ManualSequenceConformReview";
 import { shortcutProps } from "../keyboard-shortcuts";
@@ -124,7 +125,7 @@ export function ManualSequenceControls({ project, clips, presentations, selected
     void edit({ type: "reorder", clipIds: reorderedTimeline(clips.map(clip => clip.id), chosen, clips[next]!.id, delta > 0) });
   }
   return <section className="manual-sequence-controls" aria-label={t("sequence.controls")} data-draft-phase={draftPhase}>
-    <details className="editing-help"><summary>{t("editing.help")}</summary><p>{t(grid ? "sequence.frameGrid" : "sequence.legacyTiming")}</p><p>{t("editing.fineTime")}</p></details>
+    <EditingHelp t={t}><p>{t(grid ? "sequence.frameGrid" : "sequence.legacyTiming")}</p><p>{t("editing.fineTime")}</p><p>{t("sequence.rangeAutoCommit")}</p><p>{t("sequence.rangeDraft")}</p></EditingHelp>
     <fieldset>
       <legend>{t("sequence.sourceRange")}</legend>
       <label>{t("sequence.source")}<select disabled={disabled} aria-label={t("sequence.source")} value={sourceId} onChange={event => {
@@ -134,12 +135,12 @@ export function ManualSequenceControls({ project, clips, presentations, selected
           setSourceId(next?.id ?? ""); setStart("0"); setEnd(String(grid ? maximumSourceFrame(next?.durationMs ?? 0) : (next?.durationMs ?? 0)));
         }).catch(() => {});
       }}>{sources.map(item => <option key={item.id} value={item.id}>{presentations.get(item.id)?.label ?? item.displayName}</option>)}</select></label>
-      <label>{t("title.in")}<TimeInput grid={grid} disabled={fieldsDisabled} data-manual-range value={start} aria-invalid={!valid} aria-describedby={rangeHintId} onValue={value => { skipBlur.current = false; setDraftPhase("editing"); setStart(value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
-      <label>{t("title.out")}<TimeInput grid={grid} maximum={maximum} disabled={fieldsDisabled} data-manual-range value={end} aria-invalid={!valid} aria-describedby={rangeHintId} onValue={value => { skipBlur.current = false; setDraftPhase("editing"); setEnd(value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
+      <label>{t("title.in")}<TimeInput durationMs={source?.durationMs} grid={grid} disabled={fieldsDisabled} data-manual-range value={start} aria-invalid={!valid} aria-describedby={rangeHintId} onValue={value => { skipBlur.current = false; setDraftPhase("editing"); setStart(value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
+      <label>{t("title.out")}<TimeInput durationMs={source?.durationMs} grid={grid} maximum={maximum} disabled={fieldsDisabled} data-manual-range value={end} aria-invalid={!valid} aria-describedby={rangeHintId} onValue={value => { skipBlur.current = false; setDraftPhase("editing"); setEnd(value); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={draftKey} onBlur={confirmDraft} /></label>
       <button type="button" className="secondary-button" disabled={disabled || !valid} onClick={() => range("append")}>{t("sequence.append")}</button>
       <button type="button" className="secondary-button" disabled={disabled || !valid || !selected} onClick={() => range("insert")}>{t("sequence.insert")}</button>
       <button type="button" className="secondary-button" disabled={disabled || !valid || !selected || sourceId !== selected.sourceId || sourceStartMs === selected.sourceStartMs && sourceEndMs === selected.sourceEndMs} onClick={() => range("trim")}>{t("sequence.trim")}</button>
-      <span id={rangeHintId} role="status">{t(!valid ? "preview.rangeInvalid" : selected?.sourceId === sourceId ? "sequence.rangeAutoCommit" : "sequence.rangeDraft")}</span>
+      <span id={rangeHintId} role="status">{!valid ? t("preview.rangeInvalid") : ""}</span>
     </fieldset>
     <div className="manual-sequence-actions">
       <button {...shortcutProps("duplicate", t)} type="button" className="secondary-button" disabled={disabled || !chosen.length} onClick={() => {

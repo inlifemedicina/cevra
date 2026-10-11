@@ -48,7 +48,7 @@ function TranscriptionWorkspace({ project, presentations, activeSourceId, playhe
         <div className="transcript-segments">
           {transcript?.segments.map((segment) => {
             const active = playheadMs >= segment.startMs && playheadMs <= segment.endMs;
-            return <button key={segment.id} type="button" className={`${focusedSegmentId === segment.id ? "selected " : ""}${active ? "active" : ""}`} onClick={() => setFocusedSegmentId(segment.id)}><time>{formatTime(segment.startMs).slice(0, 5)}</time><span><small>{t("transcription.speaker")}</small>{segment.text}</span></button>;
+            return <button key={segment.id} type="button" className={`${focusedSegmentId === segment.id ? "selected " : ""}${active ? "active" : ""}`} onClick={() => setFocusedSegmentId(segment.id)}><time>{formatTime(segment.startMs, source?.durationMs)}</time><span><small>{t("transcription.speaker")}</small>{segment.text}</span></button>;
           })}
           {!source && <p className="workspace-empty-state" role="status">{t("transcription.noSource")}</p>}
           {source && !transcript && <p className="workspace-empty-state" role="status">{t("transcription.emptyForSource")}</p>}
@@ -82,7 +82,7 @@ function CaptionsWorkspace({ project, selectedProjectItemId, playheadMs, playing
     <div className="specialized-workspace captions-workspace" data-testid="workspace-captions">
       <section className="dominant-list-panel caption-list-panel">
         <div className="specialized-heading"><div><span className="eyebrow">{t("workspace.captions")}</span><h2>{t("captions.title")}</h2><p>{t("captions.description")}</p></div></div>
-        <div className="caption-cues">{project.captions.map((caption, index) => { const active = playheadMs >= caption.startMs && playheadMs <= caption.endMs; return <button type="button" key={caption.id} className={`${selectedProjectItemId === caption.id ? "selected " : ""}${active ? "active" : ""}`} onClick={() => onProjectSelect(caption.id)}><span className="cue-number">{String(index + 1).padStart(2, "0")}</span><span><time>{formatTime(caption.startMs).slice(0, 5)} — {formatTime(caption.endMs).slice(0, 5)}</time><strong>{caption.text}</strong></span></button>; })}</div>
+        <div className="caption-cues">{project.captions.map((caption, index) => { const active = playheadMs >= caption.startMs && playheadMs <= caption.endMs; return <button type="button" key={caption.id} className={`${selectedProjectItemId === caption.id ? "selected " : ""}${active ? "active" : ""}`} onClick={() => onProjectSelect(caption.id)}><span className="cue-number">{String(index + 1).padStart(2, "0")}</span><span><time>{formatTime(caption.startMs, project.timeline.durationMs)} — {formatTime(caption.endMs, project.timeline.durationMs)}</time><strong>{caption.text}</strong></span></button>; })}</div>
         <div className="caption-style-strip"><label>{t("captions.style")}<select disabled title={t("inspector.demoControl")}><option>{t("captions.styleClean")}</option></select></label><label>{t("captions.font")}<input disabled value="Inter" readOnly /></label><label>{t("captions.size")}<input disabled value="48 px" readOnly /></label></div>
       </section>
       <Preview compact empty={project.sources.length === 0} interactive={previewInteractive} playing={playing} playheadMs={playheadMs} durationMs={project.timeline.durationMs} t={t} onPlayingChange={onPlayingChange} />

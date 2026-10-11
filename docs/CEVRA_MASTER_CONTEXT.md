@@ -3853,3 +3853,245 @@ the subsequent edit/rejection; all 23 overlay tests pass. Production code,
 rendered inputs and guards are unchanged, so the supplemental render proof
 remains applicable. Final-head CI is required before closeout. Director:
 no new impact found from this deterministic test correction.
+
+
+### 2026-10-11 — Human review regressions and approved contextual cleanup
+
+**ACTIVE / NOT MERGED.** PR96 remains frozen at 45131a9 and PR97 at 329aef6.
+The Owner reported the first grouped app round: layout, direct title edits,
+export and vertical composition usable; Original pre-Play scrub counter,
+up-arrow text-selector preview, vertical filename visibility and removal-dialog
+spacing require correction. Delete/Undo and removal warning/Cancel/Undo were
+reported working; physical reopen and complete G1 are not inferred.
+
+The approved follow-up uses a separate branch/checkout, preserves the running
+app/project, and changes normal time to MM:SS below one hour, retaining hours
+for longer owning sequences/files. Focused drafts expose millisecond precision;
+focus/blur never reparses stored frame ranges. Long explanations move into
+clickable/focusable contextual Help, with short hover/focus hints. One layout
+control remains at the top; the main button says Exportar/Export, while the
+implemented MP4 profile stays in the export flow. No new formats, multiproject
+policy, real AI, engine or security work is authorized by this delta.
+
+FIX NOW: these reproduced UI/glyph defects are bounded in the current component
+and are cheaper to correct before dependent finishing work. Original counter
+now publishes the requested local position without waiting for decoder events;
+play admission still requires a decoded frame. CoreText accepts U+FE0E only
+with covered private-Inter base glyphs and verifies all shaped runs; missing
+bases, emoji and U+FE0F remain rejected. Source identity/model and the declared
+font/fallback policy remain unchanged. Runtime0.3.7 carries that bounded fix.
+
+Offscreen owned WK geometry shows the corrected vertical thumbnail at61px,
+full open/compact sidebar body height and spaced bounded removal dialog.
+A native Blob fixture seek completed before Play with seeking=false and no
+play event. These are objective component measurements, not perceived app
+fluency. The current full-render gate is **BLOCKED** by preview-file identity
+changes in Documents; guards remain intact and a stable-scratch exception is
+pending. Existing prior scratch authorization/evidence is not silently reused.
+
+The delivered app has one active-v1 autosaved project per installation. Its
+exclusive writer lock and durable current/previous/history recovery exist;
+project new/open/switch/save-as and a recent-project browser do not. MP4 exports
+are not reopenable project packages. Future project management requires its
+own proposal/approval and is not implemented here.
+
+Acceptance uses the existing non-duplicated catalog IDs. A distinct signed app
+and one bounded grouped visual follow-up are delivered only after technical
+gates. Director impact: compatible extension in both directions; existing
+typed operations, Project IR, ProjectHistory and permissions retain execution
+and state authority. Progress55%, F-A02 exhausted1/1 and later gates remain.
+
+
+Current isolated verification: UI324 PASS/1 real runtime-packet case skipped;
+Media Python159 PASS with pinned Python3.12.14; Node core692 PASS; Rust55 PASS.
+Two of three initial Host failures were resolved by using that supported
+interpreter in synthetic managed-runtime fixtures (33-case retest PASS); the
+remaining private-copy identity case is blocked under Documents. The first
+Python3.9 failure is retained and is not a product defect. CI748 and exact
+Runtime107 passed on10202ba, including the packaged Inter selector test and
+actual Host/UI packet test. The final UI-only formatting follow-up needs its
+own exact-head CI confirmation; no older-head result is substituted.
+
+The final candidate was rebuilt for source-owned trim/ARIA clock width and
+clip-owned elapsed clock width, without changing cuts or History. It passed
+ad-hoc deep/strict signature verification and the packaged Host three-RPC smoke
+against an empty owned store, with no GUI, worker or provider execution. Its
+runtime manifest SHA256 is4299ee1a5352ef08e93cb24a169401725f131915be9292d1d62e4eb281303bc6.
+The original running app's1024-file inventory and signature were preserved.
+Our superseded10202ba candidate is recoverable in CEVRA/Apagar. The final
+candidate remains undelivered/unopened; the current Unicode H/V full-render
+gate stays BLOCKED pending the explicitly requested stable-scratch exception.
+
+PR98 is a distinct stacked draft over the frozen PR97; PR96/PR97 are unmerged
+and unchanged. Read-only independent review approved the final time/ARIA delta
+and found no remaining concrete defect within its static/component scope.
+At the d3f755f checkpoint the approximately two-second title reload had not
+arrived as executable scope. A subsequent delegation supplied the original
+15:18:57 report and the later 15:50:24 continuation, confirming correction is
+within the active approved scope. The bounded follow-up and its unresolved
+latency/paint gates are recorded below. Director: compatible presentation
+extension; no new impact from the earlier formatting delta.
+
+
+### 2026-10-11 — Title-refresh continuity, with latency distinguished
+
+**ACTIVE / NOT MERGED**, PR98. The clarified Owner report includes the image
+reload after direct title changes/release. The request effect released the old
+decoder/Blob and cleared its PNG before the current composition arrived; H/V
+held-response tests reproduced that gap. The bounded UI fix retains a labelled,
+inert picture with an opaque center sample only across compatible paused title refreshes, until the
+current packet and requested frame are admitted. Errors, incompatible changes
+and unmount discard it. Typed History, runtime/cache identity, IR, original
+sources and export remain authoritative and unchanged.
+
+UI 331 PASS/1 real-packet case skipped locally; title workflow 23 PASS;
+TypeScript/Vite and i18n pass. Read-only independent review found no concrete
+code finding. Native H/V frame-zero continuity passes with replay and an
+explicit controlled 2000 ms delay; this does not measure encoder acceleration.
+Native frame 151 returned transparent video pixels offscreen and remains
+unproven. Actual current Unicode H/V render and latency measurements remain
+**BLOCKED** by file identity changes in Documents, pending the explicit stable
+scratch exception. The delivered app remains untouched; no human round starts
+before technical gates close. CI750/Runtime108 passed d3f755f; the new delta
+requires fresh checks and a rebuilt signed candidate.
+
+See [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--title-refresh-continuity-with-latency-distinguished)
+for timings, capture limits and the feasibility of a separately approved faster
+preview path. Retaining a picture does **not** eliminate the roughly two-second
+render wait. Director: compatible presentation extension; no new permission,
+provider, command or IR/History boundary. G1/K4, ADR 0012, release and subjective
+acceptance remain open.
+
+
+### 2026-10-11 — General Unicode correction and render-gate progress
+
+**ACTIVE / NOT MERGED**, PR98. This supersedes the pending scratch/FE0E-only
+checkpoint above. The Owner approved exclusive stable scratch when needed and
+clarified that all symbols were intended. Runtime0.3.8 uses the existing private
+Inter/CoreText path: NFC and presentation-selector removal affect display only;
+uncovered graphemes use one `□`, with original text preserved in IR/History.
+No new font/engine/provider/dependency or security change. PT/EN Help states
+monochrome/private-font limits and the separate fitting constraint.
+
+Real H/V Unicode matrix33 renders/51 jobs/12 ROI PASS; recovery4 renders/6 jobs
+with three removal/UndoRedo cycles and two physical reopens per aspect PASS.
+Cold Host preview1742.393ms H/1859.718ms V excludes decoder/UI and does not
+establish latency elimination. Media Python162, UI331/one local real-packet
+skip, i18n2 and build pass; independent review checked the actual receipts.
+CI752/Runtime109 succeeded on8d541ad, before this Unicode delta; fresh checks
+are required. Native intermediate-frame continuity is still open: ready/seek
+state alone is not paint proof, and a focus-changing accessory probe was
+aborted. The0.3.8 candidate is built but not yet signed or delivered. No new
+human round before gates; the original app and PR96/97 stay preserved.
+
+See [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--general-unicode-and-approved-stable-scratch)
+for source/runtime/receipt hashes, font limits, negative cases and archive-before-
+cleanup requirements. Documents file identity compatibility is not claimed
+fixed. Director: compatible display extension with unchanged typed operations,
+History, IR, permission and provider boundaries. G1/K4, ADR0012, release and
+subjective acceptance remain open.
+
+
+### 2026-10-11 — Native continuity gate and CFR boundary FIX NOW
+
+**ACTIVE / NOT MERGED**, PR98. This supersedes the native intermediate-frame
+pending checkpoint. A native fixture marker proved an exact seek to91 displayed
+90; a bounded decoder-only quarter-frame interior target corrects it. Shared
+seek/admission targeting keeps0/OUT exact, clocks/IR/ranges/History canonical,
+and Original/legacy unchanged. No engine/cache or dependency change.
+
+UI332/one local real-packet skip and build pass. Actual H/V guarded previews
+pass typed text/position/size changes at91/151/208, opaque held/immediately
+admitted/current markers, matching snapshots, one History revision per commit,
+and navigation0/1/29/30/91/151/208/299/OUT without extra render or History change.
+Native title ROI MAE≤0.432/PSNR≥46.154 against an aligned encoded-pixel sRGB
+oracle. The input-free probe prohibits activation, warms Play/Pause, invokes
+programmatic typed commits and forces owned snapshot paint; physical gestures
+and first natural paint remain subjective. Observed current admission1719–
+1865ms preserves the image while the existing render completes; latency is not
+eliminated. Real Unicode/backend export gates from the previous checkpoint stand.
+
+[Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--native-intermediate-frames-and-decoder-boundary-correction)
+records receipt hashes, timings and failed instrumentation attempts. CI754/
+Runtime110 passed949338b; this UI delta still requires fresh exact-head checks,
+final signed package review and archive-before-cleanup. No merge or broad
+acceptance; original app/project and frozen PR96/97 stay preserved. Director:
+compatible display/decoder correction with unchanged canonical boundaries.
+
+
+### 2026-10-11 — PR98 technical closeout / grouped subjective follow-up
+
+**READY FOR SUBJECTIVE FOLLOW-UP / NOT MERGED.** Product snapshot7a59baf passes
+CI7565/5 and Runtime1111/1, UI332/one local skip, build, real H/V Unicode/export,
+intermediate-frame continuity/navigation, signed-package and independent review
+gates. The app is ad-hoc signed/deep-strict verified in Applications, with a
+CEVRA shortcut; its1024 files remain sealed. Original app/project and frozen
+PR96/97 stay preserved. This closeout is documentation only; the packaged
+executable source remains7a59baf.
+
+The clean038 runtime removes exactly13 generated test bytecodes, re-generates
+two manifest tree fields, and preserves all executable/source/license payloads.
+Cold release verification,5raster tests and4new H/V renders/6jobs pass. The full
+owned scratch archive is payload/mode/link verified and independently reviewed
+before cleanup. [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--signed-candidate-clean-runtime-and-recoverable-closeout)
+records app/runtime/archive pins and receipts. New documentation-head checks
+must finish before handoff; prior-head checks are not substituted.
+
+Remaining: the same single subjective APP/OWNER follow-up under existing IDs.
+Title admission1719–1865ms is measured; encoder latency is not eliminated,
+natural first paint and human gesture fluency are not established, and Documents
+File Provider compatibility is not claimed fixed. No merge or broader release
+acceptance. Director: compatible presentation/decoder correction; packaging
+hygiene adds no new boundary or Director impact.
+
+
+### 2026-10-11 — PR98 second human correction packaged / final checks pending
+
+**PACKAGED / FINAL CHECKS PENDING / NOT MERGED.** Owner clarified that
+centiseconds must remain visible
+in IN/OUT and the preview counter only; timeline ruler remains whole seconds.
+Display rounding never reparses an unchanged canonical frame or legacy cut.
+Selected title duration is now an ephemeral timeline draft over the existing
+typed title set/ProjectHistory operation, with edge gestures, IN/OUT, bounds,
+cancel and Undo/Redo. No source trim or sequence ripple is introduced.
+
+All three reported PNGs were materialized and inspected. The direct editor
+shows color emoji while the old raster stripped selectors and substituted
+combined emoji. The CoreText extension preserves whole clusters/selectors and
+uses OS-owned color/Unicode faces; none are redistributed. Actual H/V raster
+matrix passes. The mixed screenshot shows the complete H picture fitted inside
+V with bars, not visible crop; current fit/pad and owning sequence aspect stay.
+This finding does not establish the absence of any other framing defect.
+
+UI341/one local skip, Python162, Host preview47, retained drafts46 and build
+pass. Independent read-only review found no concrete P1/P2. Fourteen actual
+H/V/mixed renders preserve exact frames/PCM endpoints and original hashes;
+Unicode clusters/selectors retain native color and mixed fit/pad is verified.
+The complete compatible-environment offline test:ci and Tauri release build
+pass. Fresh final-documentation-head checks remain pending. The executable21c3b67
+passes CI760 (5/5) and Runtime113 (1/1).
+The new ad-hoc signed app and independent package review pass; its1024 files
+match the sealed receipt. Cold039 release and three-RPC Host smoke pass.
+Whole-preview
+identity now represents bytes rather than metadata snapshot; cache hits still
+recheck current sources, runtime, native-font identity and canonical request.
+Untitled segments retain aspect and may reuse bytes after unrelated title edits.
+A separate base-video/admitted-PNG fast path has not been implemented: it would
+require an execution-feasible material proposal under rules 3/14/35. Director:
+compatible UI/cache/raster extensions, unchanged IR/History/execution authority.
+
+The isolated admission measurement is2202–2363ms for six new title edits,
+12–13ms for cached Undo and12ms for cached Redo, with zero render on reuse.
+Native PNG generation is88–96ms. These are host admission/CLI measurements,
+not first WK paint or proof of an overlay fast path. New-title encoder latency
+remains; no instant-update claim or silent preview architecture change.
+[Current evidence and limits](CEVRA_MANUAL_TITLE_PROOF_V1.md#pr98-second-human-correction--2026-10-11).
+
+The fresh app stays in `~/Applications/CEVRA Vids Revisao 2 2026-10-11`; the
+round-2 shortcut is delivered only after final checks. The complete exclusive
+scratch archive in CEVRA/Apagar passes independent full payload/mode/link
+verification (2692 entries,2321files) before cleanup; the TMP root is absent.
+Obsolete Documents staging is retained recoverably in Apagar. The running old
+app/project and frozen PR96/97 are preserved. No new engine, security, paid
+provider or persistence boundary; Director extension remains compatible.
+Only the same minimal subjective follow-up remains after fresh final-head CI.

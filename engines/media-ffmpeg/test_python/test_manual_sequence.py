@@ -86,6 +86,18 @@ class Runtime:
 
 
 class ManualSequenceTests(unittest.TestCase):
+    def test_unaffected_title_occurrences_reuse_pixels_but_aspect_and_visible_text_invalidate(self):
+        from copy import deepcopy
+        plan = {"title": {"aspect": "9:16", "text": "Ação ❤️", "startFrame": 90, "endFrame": 120}}
+        changed = deepcopy(plan); changed["title"]["text"] = "Novo 👩🏽‍⚕️"
+        self.assertEqual(manual._occurrence_composition(plan, {"font": "a"}, None),
+                         manual._occurrence_composition(changed, {"font": "b"}, None))
+        self.assertNotEqual(manual._occurrence_composition(plan, {"font": "a"}, (0, 30)),
+                            manual._occurrence_composition(changed, {"font": "a"}, (0, 30)))
+        changed["title"]["aspect"] = "16:9"
+        self.assertNotEqual(manual._occurrence_composition(plan, {"font": "a"}, None),
+                            manual._occurrence_composition(changed, {"font": "a"}, None))
+
     def test_mux_encoder_inventory_is_a_reader_and_native_router_preserves_budget_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve(); root.chmod(0o700)

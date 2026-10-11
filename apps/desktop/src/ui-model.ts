@@ -26,13 +26,20 @@ export const presetOptions = [
 export type Translate = (key: TranslationKey, parameters?: Readonly<Record<string, string | number>>) => string;
 
 /** Source/clip milliseconds, independent of a presumed source frame rate. */
-export function formatMilliseconds(milliseconds: number): string {
-  return formatTime(milliseconds);
+export function formatMilliseconds(milliseconds: number, durationMs = milliseconds): string {
+  return formatTime(milliseconds, durationMs);
 }
 
-export function formatTime(milliseconds: number): string {
+/** Duration controls the clock width; displayed precision never changes stored time. */
+export function formatTime(milliseconds: number, durationMs = milliseconds): string {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000 + 1e-9));
-  return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const short = `${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  return Math.max(milliseconds, durationMs) >= 3600000 ? `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${short}` : short;
+}
+
+export function formatPreciseTime(milliseconds: number, durationMs = milliseconds): string {
+  const centiseconds = Math.max(0, Math.round(milliseconds / 10));
+  return `${formatTime(centiseconds * 10, durationMs)},${String(centiseconds % 100).padStart(2, "0")}`;
 }
 
 export function capabilityReasonKey(reason: DesktopCapabilityReason): TranslationKey {

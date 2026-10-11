@@ -98,7 +98,7 @@ function intervalOracle(file, value, grid) {
 }
 function qualityOracle(file, value) {
   const portrait = value.aspect === "9:16", width = portrait ? 1080 : 1920, height = portrait ? 1920 : 1080, size = portrait ? 48 : 56;
-  const png = path.join(outputRoot, `reference-${portrait ? "portrait" : "landscape"}-v${value.version}.png`);
+  const png = path.join(outputRoot, `reference-${portrait ? "portrait" : "landscape"}-v${value.version}-${quality.length}.png`);
   const layout = manualTitleLayout(value);
   execFileSync(path.join(runtime,"components/manual-title/rasterizer"), [path.join(runtime,"components/manual-title/Inter.ttf"),String(width),String(height),value.text,...(value.version===2 ? [layout.x,layout.y,layout.width,layout.fontScale].map(String) : []),png]);
   const crop = `${Math.floor(width*layout.width)}:${Math.floor(height*manualTitleHeight(value.aspect,layout.fontScale))}:${Math.round(width*layout.x)}:${Math.round(height*layout.y)}`;
@@ -170,6 +170,28 @@ try {
     intervalOracle(movedFinal,moved,movedFinalGrid);qualityOracle(movedFinal,moved);assert.equal(movedFinalGrid.aacSha256,audio);
     assert.deepEqual(fixture.history.current.timeline,before.timeline);assert.deepEqual(fixture.history.current.sources,before.sources);
     movedPreview.derived.close();
+    // Literal title data is rasterized by the same closed helper in preview and export.
+    const unicodeCases = [
+      ["symbols", "© € ± ≤ ≥ ∞ ✓ ★"],
+      ["combining-escapes", "Ação café: ' \" \\ % ; [ ] &"],
+      ["selectors", "⬆︎ ⬆️ ♥︎ ♥️"],
+      ["composed-missing", "😀 👩🏽‍⚕️ 🇧🇷 1️⃣ 漢"]
+    ];
+    for (const [caseName, text] of unicodeCases) {
+      const unicode = { ...moved, text };
+      service.edit({ version: 1, type: "set", expectedSnapshotId: fixture.history.current.history.headSnapshotId, title: unicode });
+      assert.equal(fixture.history.current.graphics[0].text, text, "Drawing substitution never rewrites IR text.");
+      const unicodePreview = await previewProject(fixture, `${name}-unicode-${caseName}-preview`);
+      const unicodeGrid = clock(unicodePreview.file, aspect === "9:16", true);
+      intervalOracle(unicodePreview.file, unicode, unicodeGrid); assert.equal(unicodeGrid.aacSha256, previewAudio);
+      const unicodeFinal = await exportProject(fixture, `${name}-unicode-${caseName}-final`);
+      const unicodeFinalGrid = clock(unicodeFinal, aspect === "9:16", false);
+      intervalOracle(unicodeFinal, unicode, unicodeFinalGrid); qualityOracle(unicodeFinal, unicode);
+      assert.equal(unicodeFinalGrid.aacSha256, audio);
+      assert.equal(fixture.history.current.graphics[0].text, text);
+      assert.deepEqual(fixture.history.current.timeline, before.timeline); assert.deepEqual(fixture.history.current.sources, before.sources);
+      unicodePreview.derived.close();
+    }
   }
   const repeated=await projectFor("repeated","landscape",true),value=title("16:9",{startFrame:150,endFrame:300});
   new ManualTitleApplicationService(repeated.history).edit({version:1,type:"set",expectedSnapshotId:repeated.history.current.history.headSnapshotId,title:value});
@@ -177,8 +199,7 @@ try {
   const original=preparedOriginals.landscape,item={inputUri:original,sourceStartFrame:0,sourceEndFrame:300,sourceContent:{sha256:sha(original),sizeBytes:statSync(original).size},audioSelection:"single-source-stream"};
   for(const [name,value,source,reason] of [
     ["uncertain-colour",title("16:9"),path.join(fixtures,"landscape.mp4"),/MANUAL_TITLE_UNSUPPORTED_COLOUR/u],
-    ["missing-glyph",title("16:9",{text:"😀"}),original,/RasterError\.glyph/u],
-    ["text-overflow",title("9:16",{text:"W".repeat(80)}),original,/RasterError\.overflow/u]
+    ["text-overflow",title("9:16",{text:"W".repeat(80)}),original,/MANUAL_TITLE_RASTER_FAILED: (?:RasterError\.)?overflow/u]
   ]) {
     const child=transportFor(),childEngine=new FfmpegMediaEngine(new PersistentMediaWorkerClient(child));await childEngine.healthcheck();
     const dir=owned(name),file=path.join(outputRoot,`${name}.mp4`);let failure;

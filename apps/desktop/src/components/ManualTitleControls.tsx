@@ -3,6 +3,7 @@ import type { ManualTitleEdit } from "@cevra/application";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { ManualRangeDraftController } from "./ManualSequenceControls";
 import type { Translate } from "../ui-model";
+import { EditingHelp } from "./EditingHelp";
 import { TimeInput } from "./TimeInput";
 import { nearestMsToFrames } from "../frame-timing";
 
@@ -63,7 +64,7 @@ export function ManualTitleControls({ project, busy, available, t, draft, onComm
   const disabled = busy || pending || !editable;
   return <section className="manual-title-controls" aria-label={t("title.controls")}>
     <h3>{t("title.controls")}</h3>
-    <p>{t(available ? "title.fixedStyle" : "title.unavailable")}</p>
+    {available ? <EditingHelp t={t}><p>{t("title.fixedStyle")}</p><p>{t("editing.fineTime")}</p><p>{t("editing.mediaTitleCaption")}</p></EditingHelp> : <p role="status">{t("title.unavailable")}</p>}
     <fieldset disabled={disabled} onKeyDown={event => {
       if (event.nativeEvent.isComposing || composing.current || event.repeat) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); reset(); }
@@ -73,8 +74,8 @@ export function ManualTitleControls({ project, busy, available, t, draft, onComm
         onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
         onChange={event => { touch(); setText(event.target.value); }} /></label>
       <div className="property-grid">
-        <label>{t("title.in")}<TimeInput grid value={start} aria-label={t("title.in")} onValue={value => { touch(); setStart(value); }} /></label>
-        <label>{t("title.out")}<TimeInput grid maximum={nearestMsToFrames(project.timeline.durationMs)} value={end} aria-label={t("title.out")} onValue={value => { touch(); setEnd(value); }} /></label>
+        <label>{t("title.in")}<TimeInput durationMs={project.timeline.durationMs} grid value={start} aria-label={t("title.in")} onValue={value => { touch(); setStart(value); }} /></label>
+        <label>{t("title.out")}<TimeInput durationMs={project.timeline.durationMs} grid maximum={nearestMsToFrames(project.timeline.durationMs)} value={end} aria-label={t("title.out")} onValue={value => { touch(); setEnd(value); }} /></label>
       </div>
       <label>{t("title.aspect")}<select value={aspect} aria-label={t("title.aspect")} onChange={event => { touch(); setAspect(event.target.value as "16:9" | "9:16"); }}>
         <option value="16:9">{t("title.landscape")}</option><option value="9:16">{t("title.portrait")}</option>

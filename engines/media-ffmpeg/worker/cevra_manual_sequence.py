@@ -497,6 +497,15 @@ def _segment_key(item: dict, video: dict, stream_index: int, encoder_args: list[
         "composition": composition_identity})
 
 
+def _occurrence_composition(composition, component_identity, interval):
+    if not composition:
+        return None
+    # A title outside this occurrence cannot affect its bytes. Keep the owning
+    # sequence aspect, which still controls fit/pad geometry, in that identity.
+    return ({"component": component_identity, "plan": composition, "interval": interval}
+            if interval else {"aspect": composition["title"]["aspect"]})
+
+
 def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_segments: bool = False) -> dict:
     import cevra_native_tools as tools
     items, total = validate(args, preview)
@@ -588,7 +597,7 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                 raise ValueError("manual requested frame range exceeds measured video/audio clock coverage")
             pcm_items.append({"source_id": source_id, "source_start_sample": start * 1600, "source_end_sample": end * 1600})
             interval = title_component.local_interval(composition, offset, end - start) if composition else None
-            occurrence_composition = {"component": component_identity, "plan": composition, "interval": interval} if composition else None
+            occurrence_composition = _occurrence_composition(composition, component_identity, interval)
             key = (source_id, start, end, json.dumps(occurrence_composition, sort_keys=True))
             offset += end - start
             if key not in segments:
