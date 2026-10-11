@@ -4017,3 +4017,29 @@ Runtime110 passed949338b; this UI delta still requires fresh exact-head checks,
 final signed package review and archive-before-cleanup. No merge or broad
 acceptance; original app/project and frozen PR96/97 stay preserved. Director:
 compatible display/decoder correction with unchanged canonical boundaries.
+
+
+### 2026-10-11 — PR98 technical closeout / grouped subjective follow-up
+
+**READY FOR SUBJECTIVE FOLLOW-UP / NOT MERGED.** Product snapshot7a59baf passes
+CI7565/5 and Runtime1111/1, UI332/one local skip, build, real H/V Unicode/export,
+intermediate-frame continuity/navigation, signed-package and independent review
+gates. The app is ad-hoc signed/deep-strict verified in Applications, with a
+CEVRA shortcut; its1024 files remain sealed. Original app/project and frozen
+PR96/97 stay preserved. This closeout is documentation only; the packaged
+executable source remains7a59baf.
+
+The clean038 runtime removes exactly13 generated test bytecodes, re-generates
+two manifest tree fields, and preserves all executable/source/license payloads.
+Cold release verification,5raster tests and4new H/V renders/6jobs pass. The full
+owned scratch archive is payload/mode/link verified and independently reviewed
+before cleanup. [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--signed-candidate-clean-runtime-and-recoverable-closeout)
+records app/runtime/archive pins and receipts. New documentation-head checks
+must finish before handoff; prior-head checks are not substituted.
+
+Remaining: the same single subjective APP/OWNER follow-up under existing IDs.
+Title admission1719–1865ms is measured; encoder latency is not eliminated,
+natural first paint and human gesture fluency are not established, and Documents
+File Provider compatibility is not claimed fixed. No merge or broader release
+acceptance. Director: compatible presentation/decoder correction; packaging
+hygiene adds no new boundary or Director impact.

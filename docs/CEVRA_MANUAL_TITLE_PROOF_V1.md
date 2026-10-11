@@ -696,3 +696,65 @@ Archival verification and that package precede the single subjective follow-up.
 Director: compatible presentation/decoder correction, with no new command,
 History/IR, permission, provider or engine boundary. G1/K4, ADR0012, release and
 subjective acceptance are not broadened by these gates.
+
+
+### 2026-10-11 — Signed candidate, clean runtime and recoverable closeout
+
+The executable/product snapshot is `7a59bafc5e158a427207c982a373f7b5d5f6c5c8`.
+[CI756](https://github.com/inlifemedicina/cevra/actions/runs/38163870419)
+completed5/5 jobs and [Runtime111](https://github.com/inlifemedicina/cevra/actions/runs/38163870410)
+completed1/1 macOS arm64 job, both successfully on that exact snapshot. UI332
+PASS/one local real-packet skip, build, native H/V intermediate frames and
+navigation remain the previously recorded proof. This closeout changes only
+canonical documentation; it does not change the executable source snapshot.
+
+Packaging exposed13 generated stdlib test `.pyc` caches in the assembled038
+bundle. The raw tested bundle remains in the recoverable archive. A separate
+clean copy omits exactly those13; the canonical manifest generator changes only
+`python.treeSha256` and `bundleTreeSha256`. Every other retained file, executable,
+worker, rasterizer, Inter font, notice, license and symlink is byte identical.
+The strict cold release verifier passes. Five packaged raster tests pass; four
+new H/V preview/export renders with six guarded jobs pass three source-removal/
+UndoRedo cycles and two physical reopens per aspect. Frame/AAC/PCM/ROI gates and
+runtime immutability are preserved. Clean manifest SHA256:
+`0e42a53a5ca8e529ce2988cc546dc37881f50f0a60430c5d09ef63ce5c83cc09`.
+Raw matrix33/51 and native H15/V14 receipts retain their original manifest
+binding; the clean equivalence and new renders are separate evidence.
+
+Final app: `~/Applications/CEVRA Vids Unicode 2026-10-11/CEVRA Vids Revisao.app`.
+Shortcut: `~/Documents/CEVRA/Vids/human-review-regressions-2026-10-11/CEVRA Vids Revisao.app`.
+The raw copy matches staged bytes/modes/symlinks before ad-hoc signing; private
+Node remains pinned. Host3-RPC smoke, packaged release worker metadata and
+post-smoke rehash pass. All1024 files and links remain unchanged. Independent
+read-only review repeated the complete rehash and host deep/strict signature,
+found no P1/P2, and checked source/receipt binding. Signed tree SHA256:
+`d565c703e87cc019731bda13e53dba6079a2fbf69c76cf233c365073a0a5269e`.
+The candidate GUI has not been launched. The original running app's1024 sealed
+hashes, signature, processes and frozen clean PR96/97 heads remain preserved.
+Superseded own candidates are recoverable in CEVRA/Apagar.
+
+All owned scratch, including unsuccessful probes and reproduction inputs, was
+archived as `~/Documents/CEVRA/Apagar/cevra-pr98-render-20261011.tar.gz`:
+SHA256 `0a50f6af95f0f67aabb6cc6693290043654d1fb2e2a4fe419ce0717cc3b5f79e`,
+5448 entries/4996 file payloads. Every payload/mode/link was checked against the
+frozen manifest and independently reviewed. A fresh archive hash and complete
+scratch comparison preceded removal of only the exclusive temporary root.
+Its absence is verified; no original source or other temporary directory was
+removed. Six synthetic source/preview/export review assets were copied by SHA
+to the external `review-assets` directory. These remain usable without scratch.
+
+External receipts: `runtime038-clean-preparation.json`, `runtime038-clean-gates.json`,
+`app-signature-unicode-native.json`, `packaged-host-smoke-unicode-native.json`,
+`packaged-worker-release-info-unicode-native.json`, `app-post-smoke-unicode-native.json`,
+`independent-package-review-unicode-native.json`, `github-unicode-native-terminal.json`,
+`scratch-recoverable-archive.json`, `scratch-verified-cleanup.json` and
+`app-shortcut-final.json`. Historical failed attempts are retained and not PASS.
+
+Only the existing grouped subjective APP/OWNER follow-up remains: requested-
+clock response, title image/gesture fluency, compact time/help, filenames and
+removal-dialog spacing. Observed title-update admission1719–1865ms remains;
+no latency elimination, physical gesture proof or first natural paint is claimed.
+Documents File Provider compatibility is not claimed fixed; the app stays in
+Applications with a shortcut. No merge, broad G1/K4/ADR0012/release acceptance
+or new independent title-PNG architecture is implied. Director: compatible
+presentation/decoder extension; no new impact from runtime packaging hygiene.

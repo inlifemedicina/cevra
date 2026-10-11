@@ -965,3 +965,22 @@ filename readability and removal-dialog spacing. No previous acceptance is
 reopened and no latency elimination or full G1/ADR0012 claim is made. Detailed
 receipts and limits stay in the
 [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--native-intermediate-frames-and-decoder-boundary-correction).
+
+
+#### Technical closeout and single subjective follow-up — 2026-10-11
+
+The signed7a59baf candidate, CI756/Runtime111, independent source/package review
+and fully verified recoverable archive close the prior technical pendings for
+this same D14-T2, D23-T1/T2 and X follow-up. The clean038 package preserves
+executed code and passes fresh H/V/raster/recovery/immutability gates after
+removing only13 generated test caches. Objective fixtures/results are already
+prepared; the existing IDs are reused without a second acceptance catalog.
+
+The candidate is available through its CEVRA shortcut. After documentation-head
+checks finish, use one grouped subjective APP/OWNER follow-up for requested-
+clock response, title image/gesture fluency, compact time/help, media filenames
+and removal-dialog spacing. The measured1719–1865ms title-update admission
+remains and does not establish natural first paint or latency elimination.
+APP/OWNER verdicts remain pending; no blanket G1/K4/ADR0012/release acceptance.
+See [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--signed-candidate-clean-runtime-and-recoverable-closeout)
+for exact package, archive and evidence locations; no previous app is replaced.
