@@ -25,15 +25,25 @@ let baseFont = CTFontCreateWithGraphicsFont(graphicsFont, CGFloat(fontSize), nil
 let fontAttributes = [kCTFontCascadeListAttribute: []] as CFDictionary
 let font = CTFontCreateCopyWithAttributes(baseFont, CGFloat(fontSize), nil,
     CTFontDescriptorCreateWithAttributes(fontAttributes))
-let units = Array(text.utf16)
-// Text-presentation selectors shape with their base; they have no standalone glyph.
-// Only FE0E is admitted, after a covered base, without changing the stored text.
-guard units.enumerated().allSatisfy({ index, value in
-    value != 0xFE0E || index > 0 && units[index - 1] != 0xFE0E
-}) else { throw RasterError.glyph }
-let chars = units.filter { $0 != 0xFE0E }
-var glyphs = [CGGlyph](repeating: 0, count: chars.count)
-guard !chars.isEmpty, CTFontGetGlyphsForCharacters(font, chars, &glyphs, chars.count), !glyphs.contains(0) else { throw RasterError.glyph }
+// Keep the canonical text intact. Drawing stays within the private Inter face:
+// normalize each grapheme, use its text presentation, and mark missing clusters visibly.
+func covered(_ value: String) -> Bool {
+    let chars = Array(value.utf16)
+    var glyphs = [CGGlyph](repeating: 0, count: chars.count)
+    return !chars.isEmpty && CTFontGetGlyphsForCharacters(font, chars, &glyphs, chars.count) && !glyphs.contains(0)
+}
+let missingMarker = "□"
+guard covered(missingMarker) else { throw RasterError.font }
+var drawnText = "", substitutedClusters = 0, presentationSelectorsRemoved = 0
+for character in text {
+    let cluster = String(character)
+    presentationSelectorsRemoved += cluster.unicodeScalars.filter { $0.value == 0xFE0E || $0.value == 0xFE0F }.count
+    let textStyle = String(String.UnicodeScalarView(cluster.unicodeScalars.filter {
+        $0.value != 0xFE0E && $0.value != 0xFE0F
+    })).precomposedStringWithCanonicalMapping
+    if covered(textStyle) { drawnText += textStyle }
+    else { drawnText += missingMarker; substitutedClusters += 1 }
+}
 guard let space = CGColorSpace(name: CGColorSpace.sRGB), let context = CGContext(data: nil,
     width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
     space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw RasterError.output }
@@ -48,7 +58,7 @@ context.setFillColor(CGColor(srgbRed: 0.10, green: 0.12, blue: 0.16, alpha: 1))
 context.fill(bar)
 context.setFillColor(CGColor(srgbRed: 0.43, green: 0.62, blue: 0.72, alpha: 1))
 context.fill(CGRect(x: x, y: y, width: 6 * values[3], height: barHeight))
-let attributed = NSAttributedString(string: text, attributes: [
+let attributed = NSAttributedString(string: drawnText, attributes: [
     NSAttributedString.Key(kCTFontAttributeName as String): font,
     NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(srgbRed: 0.96, green: 0.97, blue: 0.98, alpha: 1)
 ])
@@ -75,7 +85,10 @@ guard let image = context.makeImage(), let destination = CGImageDestinationCreat
 CGImageDestinationAddImage(destination, image, nil)
 guard CGImageDestinationFinalize(destination) else { throw RasterError.output }
 let report: [String: Any] = ["width": width,"height":height,"text":text,"fontPostScriptName":CTFontCopyPostScriptName(font),
-    "allGlyphsAvailable":true,"globalFontRegistration":false,"fontSize":fontSize,
+    "allGlyphsAvailable":substitutedClusters == 0,"renderedGlyphsAvailable":true,
+    "renderedText":drawnText,"substitutedClusters":substitutedClusters,
+    "presentationSelectorsRemoved":presentationSelectorsRemoved,"missingGlyphMarker":missingMarker,
+    "globalFontRegistration":false,"fontSize":fontSize,
     "barTopLeft":[Double(x),Double(CGFloat(height)-y-barHeight),Double(barWidth),Double(barHeight)],
     "glyphBounds":[Double(bounds.minX),Double(bounds.minY),Double(bounds.width),Double(bounds.height)]]
 let json = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])

@@ -78,7 +78,7 @@ jobs:
           --python-root "${RUNNER_TEMP}/cevra-python"
           --ffmpeg-prefix "${RUNNER_TEMP}/cevra-ffmpeg"
           --vendor-source "${RUNNER_TEMP}/ffmpeg-skill"
-      - name: Verify private Inter text-selector rasterization and closed rejection
+      - name: Verify private Inter Unicode graphemes and closed raster guards
         env:
           CEVRA_TEST_ARTIFACTS: ${{ runner.temp }}
           CEVRA_TITLE_RASTERIZER_ROOT: ${{ runner.temp }}/cevra-media-runtime/components/manual-title

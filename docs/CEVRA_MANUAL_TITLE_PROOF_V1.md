@@ -559,3 +559,74 @@ Any new presentation/composition pattern requires separate Owner approval.
 Director: compatible presentation extension within the current correction;
 no new command, IR/History, permission or provider boundary. Broader G1/K4,
 ADR 0012, release and subjective acceptance remain open.
+
+
+### 2026-10-11 — General Unicode and approved stable scratch
+
+**ACTIVE / NOT MERGED**, PR98. This checkpoint supersedes the FE0E-only
+coverage policy and pending-scratch statements above. The Owner clarified
+that the symbol report applies to arbitrary symbols, and explicitly approved
+other temporary directories when required (Sentinel_7f3c1cb40b1c8191a74708f507dba1bf:
+“sim. sempre que precisar pode usar outras pastas.”). The current exclusive
+0700 root is `/private/tmp/cevra-pr98-render-20261011`; strict source identity,
+publication, resource, deadline and private-process guards remain intact.
+Results are copied with SHA256 into the CEVRA evidence directory. Complete
+recoverable archival and archive verification must precede scratch cleanup.
+The Documents File Provider identity incompatibility is not claimed fixed.
+
+Runtime0.3.8 keeps the existing CoreText/private Inter implementation and
+closed adapter. For display only, it removes text/emoji presentation selectors
+and normalizes each grapheme to NFC. Covered glyphs remain monochrome Inter;
+a grapheme not covered by the private font becomes one visible `□`. Compound
+emoji, flags, keycaps and CJK examples therefore no longer fail the whole
+preview/export merely because Inter lacks their glyphs. The original text,
+including selectors and combining marks, remains exactly stored in IR and
+History. Every final shaped run is still checked against Inter, with no system
+font fallback, global font registration, new dependency or engine. The helper
+reports substitutions; the application does not yet surface an automatic
+per-title warning. PT/EN contextual Help explains this display limitation.
+This is not universal font coverage or color-emoji support. Oversized text
+still fails the closed fitting constraint and must be shortened or resized.
+
+The private native helper tests pass 5 cases in H/V: covered symbols and
+selector equivalence, NFC/NFD plus literal escapes, missing compound graphemes,
+isolated/repeated selectors, and dimension/overflow rejection. Media Python
+162 PASS, UI331 PASS/one real-packet test skipped locally, i18n2 PASS and
+TypeScript/Vite PASS. The real runtime matrix passes 33 renders / 51 measured
+jobs with 12 title-ROI measurements (MAE≤3, PSNR≥35). Uncertain color and
+text-overflow cases fail without publication and clean owned intermediates;
+cancellation/deadline retire the private group after the title producer is
+observed. The initial functional attempt passed its positive matrix but
+failed the test's Swift overflow-error spelling matcher; the corrected matcher
+keeps the exact product error prefix. Both attempts remain recoverable.
+
+A distinct real recovery test passes 4 renders / 6 measured jobs, with three
+source-removal/Undo/Redo cycles and two physical reopens per aspect. It verifies
+original Unicode text, immutable source SHA, typed History, half-open title
+frames91..209, all300 CFR frames,480,000 stereo samples and AAC payload identity.
+Title ROI: H MAE0.964/PSNR40.443; V MAE2.792/PSNR37.981. Cold Host preview wall
+time is1742.393ms H and1859.718ms V, excluding decoder/UI. The raw recovery
+receipt retains its harness's earlier FE0E scope label; its separate scope
+metadata and actual project/packets record the generalized combining/emoji
+text. Runtime manifest SHA256:
+`8bc2726f3db9faa76b971b8f5fbfe90497bdddbbf2a50a06cbcf8f82bb9f8789`.
+
+Evidence: `evidence/unicode-functional-runtime038-r2.json` (SHA256
+`ab5bdd7ddb124c19cbfe556df40d9f724d2b1783d571288a4e69700cf76a3751`),
+`evidence/unicode-recovery-general-runtime038-r2.json` (SHA256
+`9146501be84acbab764c4a87b9ceacc57ae112c40c0577b3fbe57080a145326f`),
+`evidence/unicode-recovery-general-scope.json`, and their logs. Read-only
+independent review checked the runtime, font/source pins, matcher and those
+receipts; no new product defect was found in the Unicode delta.
+
+Intermediate-frame native continuity remains a separate open gate. Own passive
+WK probes have not yet established matching held/current painted frames; ready
+state, metadata, currentTime and seeked alone are not pixel proof. The AppKit
+accessory attempt triggered the foreground guard and was terminated, without
+claiming PASS. The owned prohibited-activation probe and its synthetic pixel
+oracles are still being checked. No reduction/elimination of render latency or
+subjective gesture fluency is inferred. The rebuilt0.3.8 candidate is not yet
+signed/delivered and this delta needs fresh exact-head CI. The original running
+app, project and frozen PR96/97 remain preserved; no human round starts before
+technical gates close. Director: compatible display extension; command,
+IR/History, permissions and provider boundaries are unchanged.

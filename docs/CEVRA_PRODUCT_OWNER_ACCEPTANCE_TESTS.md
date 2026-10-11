@@ -917,3 +917,29 @@ controlled packet delay. Native frame 151 retention is unproven in the
 transparent offscreen context; actual render/latency remains BLOCKED under
 Documents pending the explicit scratch exception. Keep the app follow-up
 pending until technical gates close; no frozen app is replaced here.
+
+
+#### General-symbol clarification and objective progress — 2026-10-11
+
+This checkpoint supersedes the pending-scratch/FE0E-only statements above under
+the same D23-T1/T2 and X-T1/T2 IDs. The Owner approved stable temporary folders
+and clarified the report applies to arbitrary symbols. Runtime0.3.8 renders
+covered private-Inter graphemes, displays `□` for uncovered clusters, and keeps
+original Unicode text in IR/History. PT/EN Help explains monochrome/font and
+fitting limits; no universal glyph or color-emoji promise.
+
+Objective real H/V matrix33 renders/51 jobs/12 ROI and recovery4 renders/6 jobs
+pass, including selectors, combining accents, literal escapes, compound emoji,
+three source-removal/UndoRedo cycles and two physical reopens per aspect.
+Negative overflow/color, cancellation, deadline, immutable sources and frame/
+AAC/PCM clocks are verified automatically. The cold Host1742.393/1859.718ms
+measurements exclude decoder/UI. Do not ask the Owner to repeat these cases.
+
+Intermediate-frame native pixel continuity remains **BLOCKED/PENDING** while
+own WK probes are diagnosed; metadata/currentTime/seeked is not paint evidence.
+One accessory probe changed focus and was stopped by its guard. The0.3.8 signed
+package, fresh exact-head CI and final independent documentation/package review
+remain pending; retain the single grouped subjective follow-up until those
+gates close. No previous app/project is replaced and no broad acceptance or
+latency reduction is inferred. Detailed proof/hashes stay in the
+[Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--general-unicode-and-approved-stable-scratch).

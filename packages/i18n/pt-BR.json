@@ -497,7 +497,7 @@
   "timeline.cursor": "Cursor {time} · quadro {frame}",
   "timeline.cursorTime": "Cursor {time}",
   "title.controls": "Título",
-  "title.fixedStyle": "Selecione no preview. Arraste para mover, use o canto para ajustar o tamanho e clique duas vezes para editar o texto.",
+  "title.fixedStyle": "Selecione no preview. Arraste para mover, use o canto para ajustar o tamanho e clique duas vezes para editar o texto. Símbolos disponíveis usam a fonte deste estilo. Os demais aparecem como □; emoji usam apresentação de texto. O texto salvo é preservado. Títulos que não cabem precisam ser encurtados ou ter o tamanho ajustado.",
   "title.unavailable": "Título indisponível neste ambiente.",
   "title.text": "Texto do título",
   "title.in": "IN",

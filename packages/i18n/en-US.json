@@ -497,7 +497,7 @@
   "timeline.cursor": "Cursor {time} · frame {frame}",
   "timeline.cursorTime": "Cursor {time}",
   "title.controls": "Title",
-  "title.fixedStyle": "Select in the preview. Drag to move, use the corner to resize, and double-click to edit the text.",
+  "title.fixedStyle": "Select in the preview. Drag to move, use the corner to resize, and double-click to edit the text. Available symbols use this style’s font. Others appear as □; emoji use text presentation. Saved text is preserved. Titles that do not fit need shorter text or a size adjustment.",
   "title.unavailable": "Title unavailable in this environment.",
   "title.text": "Title text",
   "title.in": "IN",

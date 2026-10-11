@@ -37,7 +37,7 @@ export function validateManualTitleLayout(value: unknown, aspect: ManualTitle["a
     || (v.y as number) + manualTitleHeight(aspect, v.fontScale as number) > 1 + 1e-9) throw Error("MANUAL_TITLE_INVALID");
   return { version: 1, x: v.x as number, y: v.y as number, width: v.width as number, fontScale: v.fontScale as number };
 }
-/** A single line, explicitly bounded; unsupported glyphs/overflow are rejected by the renderer. */
+/** A single line, explicitly bounded; missing graphemes have a visible private-font marker; overflow is rejected by the renderer. */
 export function validateManualTitle(value: unknown): ManualTitle {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("MANUAL_TITLE_INVALID");
   const v = value as Record<string, unknown>;

@@ -3961,3 +3961,32 @@ preview path. Retaining a picture does **not** eliminate the roughly two-second
 render wait. Director: compatible presentation extension; no new permission,
 provider, command or IR/History boundary. G1/K4, ADR 0012, release and subjective
 acceptance remain open.
+
+
+### 2026-10-11 — General Unicode correction and render-gate progress
+
+**ACTIVE / NOT MERGED**, PR98. This supersedes the pending scratch/FE0E-only
+checkpoint above. The Owner approved exclusive stable scratch when needed and
+clarified that all symbols were intended. Runtime0.3.8 uses the existing private
+Inter/CoreText path: NFC and presentation-selector removal affect display only;
+uncovered graphemes use one `□`, with original text preserved in IR/History.
+No new font/engine/provider/dependency or security change. PT/EN Help states
+monochrome/private-font limits and the separate fitting constraint.
+
+Real H/V Unicode matrix33 renders/51 jobs/12 ROI PASS; recovery4 renders/6 jobs
+with three removal/UndoRedo cycles and two physical reopens per aspect PASS.
+Cold Host preview1742.393ms H/1859.718ms V excludes decoder/UI and does not
+establish latency elimination. Media Python162, UI331/one local real-packet
+skip, i18n2 and build pass; independent review checked the actual receipts.
+CI752/Runtime109 succeeded on8d541ad, before this Unicode delta; fresh checks
+are required. Native intermediate-frame continuity is still open: ready/seek
+state alone is not paint proof, and a focus-changing accessory probe was
+aborted. The0.3.8 candidate is built but not yet signed or delivered. No new
+human round before gates; the original app and PR96/97 stay preserved.
+
+See [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--general-unicode-and-approved-stable-scratch)
+for source/runtime/receipt hashes, font limits, negative cases and archive-before-
+cleanup requirements. Documents file identity compatibility is not claimed
+fixed. Director: compatible display extension with unchanged typed operations,
+History, IR, permission and provider boundaries. G1/K4, ADR0012, release and
+subjective acceptance remain open.
