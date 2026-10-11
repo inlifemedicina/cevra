@@ -10,6 +10,15 @@ export interface TitlePreviewEditing {
   title: ManualTitle; graphicId: string; snapshotId: string; selected: boolean;
   onSelect(): void; onCommit(request: ManualTitleEdit): Promise<void>;
 }
+/** Pointer and keyboard resizing share closed bounds; floating residue at a limit is not an edit. */
+function scaleLayout(layout: ManualTitleLayoutV1, requestedFactor: number, aspect: ManualTitle["aspect"]): ManualTitleLayoutV1 {
+  const factor = Math.max(0.5 / layout.fontScale, 0.2 / layout.width, Math.min(2 / layout.fontScale,
+    (1 - layout.x) / layout.width, (1 - layout.y) / manualTitleHeight(aspect, layout.fontScale), requestedFactor));
+  if (Math.abs(factor - 1) < 1e-12) return layout;
+  // Division followed by multiplication can cross a strict bound by one ULP.
+  return { ...layout, width: Math.max(0.2, Math.min(1, layout.width * factor)),
+    fontScale: Math.max(0.5, Math.min(2, layout.fontScale * factor)) };
+}
 /** Selection/gesture drafts are UI-only; one validated History operation owns the result. */
 export function ManualTitleOverlay({ editing, videoRef, active, blocked = false, t }: {
   editing: TitlePreviewEditing; videoRef: RefObject<HTMLVideoElement | null>; active: boolean; blocked?: boolean; t: Translate;
@@ -81,9 +90,7 @@ export function ManualTitleOverlay({ editing, videoRef, active, blocked = false,
     let next = { ...g.original };
     if (g.resize) {
       // Proportional corner resize: width, type and bar scale together.
-      const factor = Math.max(0.5 / next.fontScale, 0.2 / next.width, Math.min(2 / next.fontScale,
-        (1 - next.x) / next.width, (1 - next.y) / manualTitleHeight(title.aspect, next.fontScale), 1 + dx / next.width));
-      next = { ...next, width: next.width * factor, fontScale: next.fontScale * factor };
+      next = scaleLayout(next, 1 + dx / next.width, title.aspect);
     } else next = { ...next, x: Math.min(1 - next.width, Math.max(0, next.x + dx)), y: Math.min(1 - manualTitleHeight(title.aspect, next.fontScale), Math.max(0, next.y + dy)) };
     currentDraft.current = next; setDraft(next);
   }
@@ -113,7 +120,7 @@ export function ManualTitleOverlay({ editing, videoRef, active, blocked = false,
           onBlur={() => { if (!composing.current && text !== null) void publish({ ...title, text }).catch(() => {}); }}
           onKeyDown={event => {
             event.stopPropagation(); if (composing.current || event.nativeEvent.isComposing || event.keyCode === 229 || event.repeat || event.metaKey || event.ctrlKey || event.altKey || document.querySelector('[role="dialog"][aria-modal="true"]')) return;
-            if (event.key === "Escape") { event.preventDefault(); setText(null); }
+            if (event.key === "Escape") { event.preventDefault(); setText(null); setFailed(false); }
             if (event.key === "Enter") { event.preventDefault(); void publish({ ...title, text }).catch(() => {}); }
           }} />}
       {editing.selected && text === null && <button type="button" className="title-resize" aria-label={t("title.resizePreview")} disabled={pending || blocked}
@@ -121,7 +128,7 @@ export function ManualTitleOverlay({ editing, videoRef, active, blocked = false,
         onKeyDown={event => {
           if (timelineShortcutBlocked(event) || event.repeat || event.metaKey || event.ctrlKey || event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key)) return;
           event.preventDefault(); event.stopPropagation(); const factor = event.key === "ArrowUp" ? 1.01 : 0.99;
-          void publish({ ...title, version: 2, layout: { ...layout, width: layout.width * factor, fontScale: layout.fontScale * factor } }).catch(() => {});
+          void publish({ ...title, version: 2, layout: scaleLayout(layout, factor, title.aspect) }).catch(() => {});
         }} />}
     </div>
     {failed && <p className="title-direct-error" role="alert">{t("title.invalid")}</p>}

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, act } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { translate } from "@cevra/i18n";
-import { manualTitleLayout, manualTitleHeight, type ManualTitle } from "@cevra/project-ir";
+import { manualTitleLayout, manualTitleHeight, validateManualTitle, type ManualTitle } from "@cevra/project-ir";
 import { ManualTitleOverlay, type TitlePreviewEditing } from "./components/ManualTitleOverlay";
 import type { ManualRangeDraftController } from "./components/ManualSequenceControls";
 const t = (key: Parameters<typeof translate>[1]) => translate("pt-BR", key);
@@ -77,4 +77,75 @@ it("retains text on window blur and refuses modified/composing Enter; resize can
  fireEvent(window,new Event("blur"));expect((screen.getByLabelText(t("title.editPreview")) as HTMLInputElement).value).toBe("Preservado");
  fireEvent.keyDown(input,{key:"Escape"});hit=screen.getByRole("button",{name:t("title.selectPreview")});pointer(hit,"pointerdown",100);pointer(hit,"pointermove",130,-20);
  fireEvent(window,new Event("resize"));pointer(hit,"pointerup",130,-20);expect(f.commit).not.toHaveBeenCalled();
+});
+
+
+it.each(["16:9", "9:16"] as const)("keyboard resizing clamps at %s bounds without rejecting a valid title", async aspect => {
+ const f=fixture(aspect);
+ f.editing.title=validateManualTitle({...f.title,version:2,layout:{version:1,x:.08,y:.05,width:.74,fontScale:1.99}});
+ f.rerender(f.view());
+ const resize=screen.getByRole("button",{name:t("title.resizePreview")});
+ fireEvent.keyDown(resize,{key:"ArrowUp"});
+ await waitFor(()=>expect(f.commit).toHaveBeenCalledOnce());
+ const next=(f.commit.mock.calls[0]![0] as any).title.layout;
+ expect(next.fontScale).toBeCloseTo(2);expect(next.width).toBeCloseTo(.74*(2/1.99));
+ expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it.each(["16:9", "9:16"] as const)("repeated keyboard resizing at %s limits is a no-op without errors or History", async aspect => {
+ const f=fixture(aspect);
+ for(const [fontScale,width,key] of [[.92/.84,.92,"ArrowUp"],[.5,.42,"ArrowDown"]] as const){
+  f.editing.title=validateManualTitle({...f.title,version:2,layout:{version:1,x:.08,y:1-manualTitleHeight(aspect,fontScale),width,fontScale}});
+  f.editing.snapshotId=`limit-${fontScale}`;f.rerender(f.view());
+  const resize=screen.getByRole("button",{name:t("title.resizePreview")});
+  for(let i=0;i<5;i++)fireEvent.keyDown(resize,{key});
+  await act(async()=>{});
+  expect(f.commit).not.toHaveBeenCalled();expect(screen.queryByRole("alert")).toBeNull();
+ }
+});
+
+it("Escape after rejected text discards both the draft and its stale error without a command", async()=>{
+ const f=fixture();fireEvent.doubleClick(screen.getByRole("button",{name:t("title.selectPreview")}));
+ const input=screen.getByLabelText(t("title.editPreview"));fireEvent.change(input,{target:{value:""}});
+ await act(async()=>{await expect(f.draftRef.current!.settle()).rejects.toEqual({code:"MANUAL_TITLE_INVALID"});});
+ expect(screen.getByRole("alert")).toBeTruthy();fireEvent.keyDown(input,{key:"Escape"});
+ expect(screen.queryByLabelText(t("title.editPreview"))).toBeNull();expect(screen.queryByRole("alert")).toBeNull();
+ expect(f.commit).not.toHaveBeenCalled();await act(async()=>{await f.draftRef.current!.settle();});
+ expect(f.commit).not.toHaveBeenCalled();
+});
+
+
+it.each(["16:9", "9:16"] as const)("keyboard resizing reaches the %s picture edge in one valid step and then stops", async aspect=>{
+ const f=fixture(aspect);f.editing.title=validateManualTitle({...f.title,version:2,layout:{version:1,x:.08,y:.05,width:.915,fontScale:.915/.84}});f.rerender(f.view());
+ fireEvent.keyDown(screen.getByRole("button",{name:t("title.resizePreview")}),{key:"ArrowUp"});
+ await waitFor(()=>expect(f.commit).toHaveBeenCalledOnce());const candidate=(f.commit.mock.calls[0]![0] as any).title;
+ expect(candidate.layout.width).toBeCloseTo(.92);expect(candidate.layout.fontScale).toBeCloseTo(.92/.84);
+ f.editing.title=validateManualTitle(candidate);f.editing.snapshotId="edge";f.rerender(f.view());f.commit.mockClear();
+ fireEvent.keyDown(screen.getByRole("button",{name:t("title.resizePreview")}),{key:"ArrowUp"});
+ await act(async()=>{});expect(f.commit).not.toHaveBeenCalled();expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("Escape after a rejected async text commit retains the saved title and permits a fresh edit", async()=>{
+ const f=fixture();f.commit.mockRejectedValueOnce({code:"MANUAL_TITLE_UNAVAILABLE"});
+ fireEvent.doubleClick(screen.getByRole("button",{name:t("title.selectPreview")}));let input=screen.getByLabelText(t("title.editPreview"));
+ fireEvent.change(input,{target:{value:"Novo texto"}});
+ await act(async()=>{await expect(f.draftRef.current!.settle()).rejects.toEqual({code:"MANUAL_TITLE_UNAVAILABLE"});});
+ expect(screen.getByRole("alert")).toBeTruthy();fireEvent.keyDown(input,{key:"Escape"});expect(screen.queryByRole("alert")).toBeNull();
+ fireEvent.doubleClick(screen.getByRole("button",{name:t("title.selectPreview")}));input=screen.getByLabelText(t("title.editPreview"));
+ expect((input as HTMLInputElement).value).toBe(f.title.text);fireEvent.change(input,{target:{value:"Edição seguinte"}});
+ await act(async()=>{await f.draftRef.current!.settle();});expect(f.commit).toHaveBeenCalledTimes(2);
+ expect((f.commit.mock.calls[1]![0] as any).title.text).toBe("Edição seguinte");
+});
+
+it.each(["16:9", "9:16"] as const)("keyboard shrinking reaches the strict %s minimum despite division rounding", async aspect=>{
+ const f=fixture(aspect);f.editing.title=validateManualTitle({...f.title,version:2,layout:{version:1,x:.08,y:.05,width:.42,fontScale:.501169}});f.rerender(f.view());
+ fireEvent.keyDown(screen.getByRole("button",{name:t("title.resizePreview")}),{key:"ArrowDown"});
+ await waitFor(()=>expect(f.commit).toHaveBeenCalledOnce());const candidate=(f.commit.mock.calls[0]![0] as any).title;
+ expect(candidate.layout.fontScale).toBe(.5);expect(()=>validateManualTitle(candidate)).not.toThrow();expect(screen.queryByRole("alert")).toBeNull();
+});
+it.each(["16:9", "9:16"] as const)("pointer shrinking reaches the strict %s minimum despite division rounding", async aspect=>{
+ const f=fixture(aspect);f.editing.title=validateManualTitle({...f.title,version:2,layout:{version:1,x:.08,y:.05,width:.84,fontScale:1.999}});f.rerender(f.view());
+ const resize=screen.getByRole("button",{name:t("title.resizePreview")});pointer(resize,"pointerdown",500);pointer(resize,"pointermove",-500);pointer(resize,"pointerup",-500);
+ await waitFor(()=>expect(f.commit).toHaveBeenCalledOnce());const candidate=(f.commit.mock.calls[0]![0] as any).title;
+ expect(candidate.layout.fontScale).toBe(.5);expect(()=>validateManualTitle(candidate)).not.toThrow();expect(screen.queryByRole("alert")).toBeNull();
 });
