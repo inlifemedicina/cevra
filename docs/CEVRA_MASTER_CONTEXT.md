@@ -3713,3 +3713,29 @@ composition acceptance; progress55%, F-A02 exhausted1/1 remain.
 Director impact is a compatible typed extension within the checked scope;
 IR/History and Application authority remain, with no provider/network/AI-quota
 expansion or arbitrary execution surface.
+
+### 2026-10-11 — Owner-approved order after the title slice
+
+After the proposed order was presented, the Owner confirmed:
+**“Ok. Faremos assim. Vamos seguir”.** Record this as an approved sequencing
+decision, without authorizing or starting the later implementations here:
+
+1. Finish the current manual-title block: technical closure, independent final
+   review, Draft and one grouped visual/UX app round. Integrated APP/OWNER
+   acceptance remains pending until that round.
+2. Then delimit audiovisual finishing: text, audio, captions and color with
+   coherent preview/export. Existing color/HDR dependency, profile and human
+   gates remain applicable; this decision does not close MR-V02/K2.
+3. Then delimit AI strategy, selection and cut planning, including visual
+   evidence. Keep editorial authority, typed execution and Project IR/History
+   boundaries; no real AI call or new provider/model execution is authorized
+   by this documentation-only transition.
+
+Keep the existing approved engine path and compare components before selecting
+an alternative; existing adapter, feasibility, license and benchmark gates
+remain. Integrate Take through an explicit contract after the independent Take
+and Vids flows are stable. This record introduces no implementation, engine
+replacement, account/authentication operation or global configuration change.
+Director impact is planning-only at this transition; future visual-evidence
+and cut-plan consumers must delimit their compatible typed contracts before
+implementation. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.
