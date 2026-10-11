@@ -226,7 +226,7 @@ it.each(["play", "next-frame", "slider"] as const)("settles direct title text be
  await act(async()=>release());await waitFor(()=>expect(f.history.current.graphics[0]!.text).toBe("Transporte preservado"));
  await waitFor(()=>expect(container.querySelector("video")?.getAttribute("src")).toMatch(/^blob:/));fireEvent.loadedMetadata(video);fireEvent.loadedData(video);fireEvent.load(container.querySelector(".manual-initial-frame")!);fireEvent.seeked(video);
  if(action==="play") {expect(screen.queryByRole("button",{name:t("preview.pauseLocal")})).toBeTruthy();await waitFor(()=>expect(vi.mocked(video.play)).toHaveBeenCalled());await act(async()=>releaseRead());}
- else expect(video.currentTime).toBe(action==="slider"?2:1/30);
+ else expect(video.currentTime).toBe(action==="slider"?2+1/120:1/30+1/120);
  expect(commit).toHaveBeenCalledTimes(1);
 });
 
@@ -241,7 +241,7 @@ it("preserves the canonical playback frame after pausing and editing a title, ra
  const oldUrl=video.getAttribute("src");await user.keyboard("{Enter}");await waitFor(()=>expect(f.history.current.graphics[0]!.text).toBe("Quadro preservado"));
  await waitFor(()=>expect(video.getAttribute("src")).not.toBe(oldUrl));
  fireEvent.loadedMetadata(video);fireEvent.loadedData(video);fireEvent.load(container.querySelector(".manual-initial-frame")!);fireEvent.seeked(video);
- expect(video.currentTime).toBeCloseTo(151/30,9);
+ expect(video.currentTime).toBeCloseTo(151/30+1/120,9);
  expect((screen.getByRole("slider",{name:t("sequence.seek")}) as HTMLInputElement).value).toBe("151");
  expect(screen.getByRole("button",{name:t("preview.playLocal")})).toBeTruthy();
 });
@@ -276,7 +276,7 @@ it.each(["16:9", "9:16"] as const)("keeps a bounded admitted frame visible while
   expect(held!.hidden).toBe(false);
   fireEvent.seeked(video);
   await waitFor(() => expect(held!.hidden).toBe(true));
-  expect(video.currentTime).toBeCloseTo(151 / 30, 9);
+  expect(video.currentTime).toBeCloseTo(151 / 30 + 1 / 120, 9);
   expect(f.history.current.timeline).toEqual(before.timeline);
 });
 
@@ -311,7 +311,7 @@ it("restores the latest ruler frame while a title render is pending, without mov
   fireEvent.loadedMetadata(video); fireEvent.loadedData(video); fireEvent.load(container.querySelector(".manual-initial-frame")!);
   expect(canvas.hidden).toBe(false); fireEvent.seeked(video);
   await waitFor(() => expect(canvas.hidden).toBe(true));
-  expect(video.currentTime).toBeCloseTo(161 / 30, 9);
+  expect(video.currentTime).toBeCloseTo(161 / 30 + 1 / 120, 9);
   expect((screen.getByRole("slider", { name: t("sequence.seek") }) as HTMLInputElement).value).toBe("161");
   expect(f.history.toArchive()).toEqual(before);
 });

@@ -1126,6 +1126,6 @@ it.each(["duplicate", "append"] as const)("seeks the new selected occurrence aft
   const next = clips(backend).find(clip => clip.id === screen.getByTestId("app-shell").dataset.selectedProjectItemId)!;
   expect(next.timelineStartMs).toBeGreaterThan(0);
   const updated = await decode(); expect(updated).toBe(video);
-  expect(updated.currentTime).toBe(next.timelineStartMs / 1000);
+  expect(updated.currentTime).toBe(next.timelineStartMs / 1000 + 1 / 120);
   expect((screen.getByRole("slider", { name: translate("pt-BR", "sequence.seek") }) as HTMLInputElement).value).toBe(String(next.frameTiming!.timelineStartFrame));
 });

@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as Rea
 import type { DesktopBackend } from "../backend/desktop-backend";
 import { EditingHelp } from "./EditingHelp";
 import { formatMilliseconds, type Translate } from "../ui-model";
-import { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, formatFrames, snapSourceMark } from "../frame-timing";
+import { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, cfr30DecoderSeekSeconds, formatFrames, snapSourceMark } from "../frame-timing";
 
 import { gestureEscape, type TimelineSeekPhase } from "../timeline-interactions";
 import { activateShortcut, shortcutAction, shortcutProps } from "../keyboard-shortcuts";
@@ -190,6 +190,11 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
     };
   }, [backend, source?.id, snapshotId, clip?.id, clip?.sourceStartMs, clip?.sourceEndMs, Boolean(sequencePreview), retry]);
 
+  function decoderSeekSeconds(localMs: number) {
+    return timing ? cfr30DecoderSeekSeconds(floorMsToFrames(localMs), timing.sourceEndFrame - timing.sourceStartFrame)
+      : Math.min(mediaEndMs, localMs) / 1000;
+  }
+
   function cancelSliderScrub(restore = true) {
     const active = sliderScrub.current; sliderScrub.current = null;
     if (!active) return;
@@ -213,7 +218,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
     videoRef.current.pause();
     atProgramOut.current = Boolean(program && seek.timelineMs >= clip.timelineEndMs);
     const localMs = timing ? framesToMilliseconds(Math.max(0, Math.min(timing.timelineEndFrame, floorMsToFrames(seek.timelineMs)) - timing.timelineStartFrame)) : Math.max(0, seek.timelineMs - clip.timelineStartMs);
-    const target = Math.min(mediaEndMs, localMs) / 1000;
+    const target = decoderSeekSeconds(localMs);
     if (atProgramOut.current) { setCurrentMs(endMs); onPlayheadChange(clip.timelineEndMs); }
     if (Math.abs(videoRef.current.currentTime - target) < 0.001) { updateClock(); return; }
     pendingSeek.current = true; setSeeking(true);
@@ -228,7 +233,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
       || initialFrame && imageVerified.current !== url
       || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking) return;
     const localMs = timing ? framesToMilliseconds(Math.max(0, Math.min(timing.timelineEndFrame, floorMsToFrames(seek.timelineMs)) - timing.timelineStartFrame)) : Math.max(0, seek.timelineMs - (clip?.timelineStartMs ?? 0));
-    if (Math.abs(video.currentTime - Math.min(mediaEndMs, localMs) / 1000) >= 0.001) return;
+    if (Math.abs(video.currentTime - decoderSeekSeconds(localMs)) >= 0.001) return;
     discardHeldFrame();
     setCurrentMs(timing ? framesToMilliseconds(timing.sourceStartFrame + floorMsToFrames(localMs)) : startMs + localMs);
   }, [holdingFrame, ready, seeking, url, snapshotId, seek.sequence]);

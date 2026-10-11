@@ -3990,3 +3990,30 @@ cleanup requirements. Documents file identity compatibility is not claimed
 fixed. Director: compatible display extension with unchanged typed operations,
 History, IR, permission and provider boundaries. G1/K4, ADR0012, release and
 subjective acceptance remain open.
+
+
+### 2026-10-11 — Native continuity gate and CFR boundary FIX NOW
+
+**ACTIVE / NOT MERGED**, PR98. This supersedes the native intermediate-frame
+pending checkpoint. A native fixture marker proved an exact seek to91 displayed
+90; a bounded decoder-only quarter-frame interior target corrects it. Shared
+seek/admission targeting keeps0/OUT exact, clocks/IR/ranges/History canonical,
+and Original/legacy unchanged. No engine/cache or dependency change.
+
+UI332/one local real-packet skip and build pass. Actual H/V guarded previews
+pass typed text/position/size changes at91/151/208, opaque held/immediately
+admitted/current markers, matching snapshots, one History revision per commit,
+and navigation0/1/29/30/91/151/208/299/OUT without extra render or History change.
+Native title ROI MAE≤0.432/PSNR≥46.154 against an aligned encoded-pixel sRGB
+oracle. The input-free probe prohibits activation, warms Play/Pause, invokes
+programmatic typed commits and forces owned snapshot paint; physical gestures
+and first natural paint remain subjective. Observed current admission1719–
+1865ms preserves the image while the existing render completes; latency is not
+eliminated. Real Unicode/backend export gates from the previous checkpoint stand.
+
+[Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--native-intermediate-frames-and-decoder-boundary-correction)
+records receipt hashes, timings and failed instrumentation attempts. CI754/
+Runtime110 passed949338b; this UI delta still requires fresh exact-head checks,
+final signed package review and archive-before-cleanup. No merge or broad
+acceptance; original app/project and frozen PR96/97 stay preserved. Director:
+compatible display/decoder correction with unchanged canonical boundaries.

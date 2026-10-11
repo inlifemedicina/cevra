@@ -630,3 +630,69 @@ signed/delivered and this delta needs fresh exact-head CI. The original running
 app, project and frozen PR96/97 remain preserved; no human round starts before
 technical gates close. Director: compatible display extension; command,
 IR/History, permissions and provider boundaries are unchanged.
+
+
+### 2026-10-11 — Native intermediate frames and decoder-boundary correction
+
+This supersedes the native-paint pending checkpoint above. The owned prohibited-
+activation AppKit/WK probe established a concrete CFR boundary bug: requesting
+frame91 at its exact timestamp produced visible marker90 and no title, despite
+currentTime/ready/seek state appearing valid. An isolated diagnostic seek inside
+the frame produced marker91 and its title. FIX NOW changes only the consumer's
+CFR decoder target to a quarter-frame interior offset (1/120s). Frame0 and OUT
+remain exact; the same target helper is used by seek and held-picture admission.
+Canonical clocks still publish integer CFR frames; IR/ranges/History and
+Original/legacy timing are unchanged. This does not change an engine or cache.
+
+UI332 PASS/one real-packet test skipped locally, including canonical clocks,
+last frame, exact OUT/Home, fine navigation, pause/resume, latest ruler target,
+History invariance and title refresh. TypeScript/Vite PASS. The previous13 test
+failures were old exact-decoder-timestamp expectations; those failures and the
+native boundary diagnosis are retained as evidence rather than reported as
+passing. The public frame↔millisecond conversion is unchanged.
+
+Real native H/V proofs pass with the current runtime0.3.8 worker and guarded
+Host renders, with no artificial packet delay. Each aspect executes four real
+preview renders: initial, then typed text/position/size commits at frames91,
+151 and208. Old, held, immediate-admission and sampled-current images identify
+those exact frames by the fixture's16-bit marker and are fully opaque. Viewer
+controls stay blocked during refresh, current snapshot matches, each commit
+adds one History revision, and the inert canvas is released. Final H/V retained
+pixel hashes are identical and invariant throughout each update. A preceding
+H run differed by at most one RGB level, which was independently measured;
+no changed-frame result was accepted on that basis.
+
+Both aspects also seek0/1/29/30/91/151/208/299/300 before editing, with one
+initial render, unchanged History, exact canonical frame markers, and exact10s
+OUT hiding the video. The separately decoded current-title ROI uses an external
+AVFoundation oracle with encoded-pixel aperture and explicit sRGB conversion,
+then the same natural WK dimensions. This avoids confusing Rec709 transfer or
+natural-aperture re-sampling differences with a title mismatch; the earlier
+misaligned-oracle failures remain retained. No product conversion or quality
+gate was weakened. Native H ROI MAE0.236–0.272/PSNR48.271–49.644; V
+MAE0.345–0.432/PSNR46.154–47.185. Backend preview/export raster comparisons
+remain the independent33-render matrix with MAE≤3/PSNR≥35.
+
+Final timing: first held visibility H16–18ms/V16–18ms; guarded Host title-update
+wall time H1635.735–1641.672ms/V1756.547–1774.059ms; UI polling-observed current
+packet/seek admission H1719–1740ms/V1845–1865ms. Later sampled painted ROI is
+H1839–1900ms/V1970–2007ms, including an explicit100ms wait and owned WK snapshot.
+The probe warms Play/Pause and invokes typed commits programmatically; it does
+not measure physical gestures, first natural paint, cold user-app fluency or
+render acceleration. The approximately two-second render remains; continuity
+and correct frame selection are what this evidence establishes.
+
+Final native receipts in the external evidence directory:
+`live-landscape-r15.json` SHA256
+`6e5c6436111007a94548e407d8c080830ddeffa5d38faab80111c2577445e1fe`,
+`live-portrait-r14.json` SHA256
+`2e1f5975258a19481d51d8d0543249a456fe688e5c4c51b99df4a643637928a9`.
+Matching Host receipts confirm resource sampling, immutable fixtures and worker
+retirement. Foreground guards passed with activation prohibited; the prior
+focus-changing accessory attempt remains a failed attempt, not acceptance.
+CI754/Runtime110 passed949338b's Unicode delta; this final UI correction needs
+its own exact-head checks and final rebuilt/signature/independent package review.
+Archival verification and that package precede the single subjective follow-up.
+Director: compatible presentation/decoder correction, with no new command,
+History/IR, permission, provider or engine boundary. G1/K4, ADR0012, release and
+subjective acceptance are not broadened by these gates.

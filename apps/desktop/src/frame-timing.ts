@@ -25,3 +25,9 @@ export function snapSourceMark(milliseconds: number, durationMs: number) {
   const projectedMs = framesToMilliseconds(frame);
   return { frame, projectedMs, deltaMs: projectedMs - milliseconds };
 }
+
+/** WK may display the preceding frame at its exact boundary. Seek inside the
+ * requested CFR frame; canonical clocks and terminal/initial positions stay exact. */
+export function cfr30DecoderSeekSeconds(frame: number, frameCount: number): number {
+  return framesToMilliseconds(frame) / 1000 + (frame > 0 && frame < frameCount ? 1 / 120 : 0);
+}

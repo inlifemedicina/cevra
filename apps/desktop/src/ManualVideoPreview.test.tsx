@@ -869,10 +869,10 @@ it("CFR30 seeks cross joins with one decoder and exact canonical OUT", async () 
   const slider = screen.getByRole("slider", { name: t("sequence.seek") });
   expect(slider.getAttribute("max")).toBe("4");
   fireEvent.change(slider, { target: { value: "1" } });
-  expect(video.currentTime).toBe(1 / 30); fireEvent.seeked(video);
+  expect(video.currentTime).toBe(1 / 30 + 1 / 120); fireEvent.seeked(video);
   expect(container.querySelector("video")).toBe(video);
   fireEvent.click(screen.getByRole("button", { name: t("preview.nextFrame") }));
-  expect(video.currentTime).toBe(2 / 30); fireEvent.seeked(video);
+  expect(video.currentTime).toBe(2 / 30 + 1 / 120); fireEvent.seeked(video);
   expect(f.clock).toHaveBeenLastCalledWith(framesToMilliseconds(2));
   fireEvent.change(slider, { target: { value: "4" } });
   video.currentTime = 0.133333; fireEvent.seeked(video);
@@ -956,10 +956,10 @@ it("playing click seek continues and paused click seek stays paused on the same 
   const f=gridPreviewFixture(),{container,rerender}=render(f.view());const video=await metadata(container,4/30);
   fireEvent.click(screen.getByRole("button",{name:t("preview.playLocal")}));fireEvent.play(video);vi.mocked(video.play).mockClear();
   rerender(f.view({sequence:1,timelineMs:framesToMilliseconds(2),phase:"single"}));fireEvent.seeked(video);
-  await waitFor(()=>expect(video.play).toHaveBeenCalled());expect(video.currentTime).toBe(2/30);expect(f.requests).toHaveBeenCalledTimes(1);
+  await waitFor(()=>expect(video.play).toHaveBeenCalled());expect(video.currentTime).toBe(2/30 + 1/120);expect(f.requests).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole("button",{name:t("preview.pauseLocal")}));vi.mocked(video.play).mockClear();
   rerender(f.view({sequence:2,timelineMs:framesToMilliseconds(1),phase:"single"}));fireEvent.seeked(video);
-  expect(video.play).not.toHaveBeenCalled();expect(video.currentTime).toBe(1/30);
+  expect(video.play).not.toHaveBeenCalled();expect(video.currentTime).toBe(1/30 + 1/120);
 });
 
 it.each(["end","cancel"] as const)("timeline drag pauses, rapid moves show canonical frames, and %s restores prior playback intent", async phase => {
@@ -967,19 +967,19 @@ it.each(["end","cancel"] as const)("timeline drag pauses, rapid moves show canon
   fireEvent.click(screen.getByRole("button",{name:t("preview.playLocal")}));fireEvent.play(video);vi.mocked(video.play).mockClear();
   rerender(f.view({sequence:1,timelineMs:framesToMilliseconds(1),phase:"start"}));fireEvent.seeked(video);
   expect(video.play).not.toHaveBeenCalled();expect(screen.getByRole("button",{name:t("preview.playLocal")})).toBeTruthy();
-  rerender(f.view({sequence:2,timelineMs:framesToMilliseconds(3),phase:"move"}));fireEvent.seeked(video);expect(video.currentTime).toBe(0.1);expect(video.play).not.toHaveBeenCalled();
+  rerender(f.view({sequence:2,timelineMs:framesToMilliseconds(3),phase:"move"}));fireEvent.seeked(video);expect(video.currentTime).toBe(0.1 + 1/120);expect(video.play).not.toHaveBeenCalled();
   rerender(f.view({sequence:3,timelineMs:phase==="cancel"?0:framesToMilliseconds(2),phase}));fireEvent.seeked(video);
-  await waitFor(()=>expect(video.play).toHaveBeenCalled());expect(video.currentTime).toBe(phase==="cancel"?0:2/30);expect(f.requests).toHaveBeenCalledTimes(1);
+  await waitFor(()=>expect(video.play).toHaveBeenCalled());expect(video.currentTime).toBe(phase==="cancel"?0:2/30 + 1/120);expect(f.requests).toHaveBeenCalledTimes(1);
 });
 it("focused viewer shortcuts share transport actions; buttons, sliders, IME and consumed events retain their own keys", async () => {
   const f = gridPreviewFixture(); const { container } = render(f.view());
   const video = await metadata(container, 4 / 30);
   const viewer = screen.getByRole("region", { name: t("preview.localVideo") });
   viewer.focus(); fireEvent.keyDown(viewer, { key: "ArrowRight" }); fireEvent.seeked(video);
-  expect(video.currentTime).toBe(1 / 30);
+  expect(video.currentTime).toBe(1 / 30 + 1 / 120);
   const slider = screen.getByRole("slider", { name: t("sequence.seek") });
-  fireEvent.keyDown(slider, { key: "ArrowRight" }); expect(video.currentTime).toBe(1 / 30);
-  fireEvent.keyDown(viewer, { key: "End", isComposing: true }); expect(video.currentTime).toBe(1 / 30);
+  fireEvent.keyDown(slider, { key: "ArrowRight" }); expect(video.currentTime).toBe(1 / 30 + 1 / 120);
+  fireEvent.keyDown(viewer, { key: "End", isComposing: true }); expect(video.currentTime).toBe(1 / 30 + 1 / 120);
   fireEvent.keyDown(viewer, { key: "End" }); fireEvent.seeked(video); expect(video.currentTime).toBe(4 / 30);
   fireEvent.keyDown(viewer, { key: "Home" }); fireEvent.seeked(video); expect(video.currentTime).toBe(0);
   fireEvent.keyDown(screen.getByRole("button", { name: t("preview.playLocal") }), { key: " " });
@@ -1040,4 +1040,29 @@ it.each([6000,7200000])("trim handles and visible source bounds use the owning f
  expect(screen.getByLabelText(t("timeline.trimRange")).textContent).toBe(durationMs>=3600000?"IN 00:00:01 · OUT 00:00:04":"IN 00:01 · OUT 00:04");
  expect(screen.getByRole("slider",{name:"Ajustar OUT do clip"}).getAttribute("aria-valuetext")).toBe(durationMs>=3600000?"00:00:04":"00:04");
  expect(backend.history.toArchive()).toEqual(before);
+});
+
+
+it("decoder seeks inside each CFR frame while the visible clock, last frame and History remain canonical", async () => {
+  const f = gridPreviewFixture(), before = f.backend.history.toArchive();
+  const { container } = render(f.view());
+  const video = await metadata(container, 4 / 30);
+  const slider = screen.getByRole("slider", { name: t("sequence.seek") });
+  for (const frame of [1, 2, 3, 2, 1]) {
+    fireEvent.change(slider, { target: { value: String(frame) } });
+    expect(video.currentTime).toBeGreaterThan(frame / 30);
+    expect(video.currentTime).toBeLessThan((frame + 1) / 30);
+    fireEvent.seeked(video);
+    expect(f.clock).toHaveBeenLastCalledWith(framesToMilliseconds(frame));
+    expect((slider as HTMLInputElement).value).toBe(String(frame));
+    expect(f.backend.history.toArchive()).toEqual(before);
+  }
+  fireEvent.change(slider, { target: { value: "4" } });
+  expect(video.currentTime).toBe(4 / 30); fireEvent.seeked(video);
+  expect(f.clock).toHaveBeenLastCalledWith(framesToMilliseconds(4));
+  fireEvent.change(slider, { target: { value: "0" } });
+  expect(video.currentTime).toBe(0); fireEvent.seeked(video);
+  expect(f.clock).toHaveBeenLastCalledWith(0);
+  expect(f.requests).toHaveBeenCalledTimes(1);
+  expect(f.backend.history.toArchive()).toEqual(before);
 });

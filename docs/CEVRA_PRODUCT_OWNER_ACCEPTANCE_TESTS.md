@@ -943,3 +943,25 @@ remain pending; retain the single grouped subjective follow-up until those
 gates close. No previous app/project is replaced and no broad acceptance or
 latency reduction is inferred. Detailed proof/hashes stay in the
 [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--general-unicode-and-approved-stable-scratch).
+
+
+#### Native intermediate-frame gates — 2026-10-11
+
+The earlier native-paint BLOCKED state is superseded for this same D23/X
+follow-up. Real H/V previews pass text/position/size at91/151/208 and native
+navigation0/1/29/30/91/151/208/299/OUT. The fixture marker exposed and verified
+a decoder-boundary correction; clocks, cuts, History and Original remain
+canonical. Held/current pixels are opaque, snapshot matched and controls
+blocked until current packet/seek admission; aligned native title ROI passes.
+UI332/one local real-packet skip and build pass. Current admission1719–1865ms
+is measured in an owned warmed probe with programmatic typed commits and
+forced snapshot paint, not physical gesture fluency or first natural paint.
+Do not ask the Owner to repeat these objective frame/resource/font negatives.
+
+The single grouped subjective follow-up remains pending final signed-package,
+independent package review, archive verification and fresh exact-head CI. Its
+scope stays requested-clock response, image/gesture fluency, compact time/help,
+filename readability and removal-dialog spacing. No previous acceptance is
+reopened and no latency elimination or full G1/ADR0012 claim is made. Detailed
+receipts and limits stay in the
+[Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--native-intermediate-frames-and-decoder-boundary-correction).
