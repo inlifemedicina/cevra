@@ -359,6 +359,7 @@
   "preview.localHint": "Marque IN e OUT durante a reprodução para criar um clip do vídeo original.",
   "preview.localEmpty": "Selecione um vídeo importado para reproduzir e marcar um trecho.",
   "preview.localLoading": "Carregando vídeo local…",
+  "preview.refreshing": "Atualizando preview…",
   "preview.localUnavailable": "Não foi possível reproduzir este vídeo local. Selecione um vídeo compatível ou tente novamente.",
   "preview.localSettling": "A prévia anterior ainda está encerrando. Seu projeto permanece aberto; tente novamente após o encerramento.",
   "preview.retryLocal": "Tentar prévia novamente",

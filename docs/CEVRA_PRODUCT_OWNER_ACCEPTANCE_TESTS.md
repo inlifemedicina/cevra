@@ -904,3 +904,16 @@ filename readability, dialog spacing and help/compact-time comprehension.
 The technical render gate is currently **BLOCKED** by working-file identity
 changes in Documents; an explicitly approved stable scratch exception is
 pending. No new human review request or blanket acceptance is issued now.
+
+
+The clarified approximately two-second reload report is included in the same
+D23-T1/T2 and X-T1/T2 follow-up; no duplicate ID or new broad round is created.
+Judge image continuity and measured time to the current title separately.
+The bounded implementation labels a retained inert picture while updating;
+this does not itself remove render latency or establish subjective fluency.
+Objective gates currently cover 331 UI tests, History/latest-target/error
+contracts and actual WK frame-zero PNG continuity in both aspects with a
+controlled packet delay. Native frame 151 retention is unproven in the
+transparent offscreen context; actual render/latency remains BLOCKED under
+Documents pending the explicit scratch exception. Keep the app follow-up
+pending until technical gates close; no frozen app is replaced here.

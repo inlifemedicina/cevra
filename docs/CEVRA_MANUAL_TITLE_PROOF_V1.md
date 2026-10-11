@@ -467,7 +467,7 @@ full render and the bounded human follow-up remain pending.
 
 Director impact: compatible presentation/glyph extension; typed IR/History
 operations and permissions stay unchanged in both directions. No full G1/K4,
-ADR0012, HDR/color or release acceptance is implied.
+ADR 0012, HDR/color or release acceptance is implied.
 
 
 Current isolated verification: UI324 PASS/1 real runtime-packet case skipped;
@@ -493,6 +493,69 @@ gate stays BLOCKED pending the explicitly requested stable-scratch exception.
 PR98 is a distinct stacked draft over the frozen PR97; PR96/PR97 are unmerged
 and unchanged. Read-only independent review approved the final time/ARIA delta
 and found no remaining concrete defect within its static/component scope.
-The reported approximately two-second title reload was not delivered as an
-executable approved scope and is not claimed fixed. Director: compatible
-presentation extension; no new impact from the final formatting delta.
+At the d3f755f checkpoint the approximately two-second title reload had not
+arrived as executable scope. A subsequent delegation supplied the original
+15:18:57 report and the later 15:50:24 continuation, confirming correction is
+within the active approved scope. The bounded follow-up and its unresolved
+latency/paint gates are recorded below. Director: compatible presentation
+extension; no new impact from the earlier formatting delta.
+
+
+### 2026-10-11 — Title-refresh continuity, with latency distinguished
+
+**ACTIVE / NOT MERGED**, PR98. The clarified Owner report says the image
+reloads and takes about two seconds after direct title changes/release. The
+existing acquisition effect releases decoder/Blob, clears the PNG and resets
+readiness on every snapshot before requesting the current composition. H/V
+held-response tests reproduced that empty interval. The current segment cache
+includes composition identity; bypassing it for a different title would be
+incorrect. No cache key, engine, adapter, runtime or identity guard is changed.
+
+FIX NOW: a bounded UI transition retains an inert picture from the last paused,
+admitted view only when full sources/timeline, project, graphic ID and aspect
+are compatible. The picture is capped at 720px per side, explicitly labelled
+“Atualizando preview”/“Updating preview”, and cannot become IR, persistence,
+preview input or export source. Frame zero copies the admitted PNG actually
+visible; other frames copy the video only if the sampled center pixel is fully opaque.
+Transparent/unavailable capture fails back to the existing loading behavior.
+Viewer/direct editing were already disabled during load/seek; this guard also
+prevents early enablement between new frame-zero readiness and the requested
+seek. Ruler, Undo and mode changes retain canonical execution and the latest
+target wins. Errors, incompatible changes and unmount clear the picture.
+The current packet, PNG, decoder and latest requested frame must be admitted
+before release. Typed History, Undo/Redo and render/export authority remain.
+
+UI 331 PASS/1 real packet case skipped locally; the title workflow has 23 cases,
+and TypeScript/Vite passes. Independent read-only review found no remaining
+concrete finding in this bounded code. Native owned offscreen WK replay of
+historical actual MP4/PNG packets retained matching non-black frame-zero
+pixel hashes in H 720×404 and V 404×720. First retained visibility was 22/23 ms; with an
+explicitly controlled 2000 ms packet delay, current admission took 2139/2518 ms.
+No encoder ran in that experiment. At frame 151 the offscreen context returned
+transparent video pixels; that failed attempt is retained, and the new guard
+rejects it. There is no positive native retention proof away from frame zero
+or subjective fluency acceptance from this experiment.
+
+This fixes the reproduced empty transition when an admitted painted picture
+is available; it does **not** establish that the approximately two-second
+render latency is eliminated. Historical PR96 direct-preview Host calls were
+1585 ms H and 1722 ms V, excluding decoder/UI time. Current real Unicode H/V render
+and end-to-end latency measurement stay **BLOCKED** by file identity changes
+under Documents pending the separately requested scratch exception. CI750 and
+Runtime108 passed d3f755f; this new continuity delta needs its own exact-head
+checks and rebuilt/signed candidate. The delivered app is not replaced and
+no new human round is requested before the remaining gates.
+
+A faster response would need a separately reviewed proposal, not a hidden
+optimization here. Existing primitives are the title-free sequence derivative,
+closed private-Inter PNG rasterizer and typed title component. A prospective
+base-video plus current title-PNG preview would still need a typed/validated
+artifact contract, atomic snapshot/frame admission, bounded lifetime/cancel,
+and actual H/V pixel/timing/color and export-equivalence measurements. It is
+not an existing end-to-end path or an approved implementation; no dependency,
+license or provider change is proposed. The simpler current alternative is
+the labelled inert-picture transition while the unchanged render completes.
+Any new presentation/composition pattern requires separate Owner approval.
+Director: compatible presentation extension within the current correction;
+no new command, IR/History, permission or provider boundary. Broader G1/K4,
+ADR 0012, release and subjective acceptance remain open.

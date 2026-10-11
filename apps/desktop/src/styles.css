@@ -347,6 +347,9 @@ h1, h2, h3, p { margin: 0; }
 .manual-video-stage video { width: 100%; height: 100%; position: absolute; object-fit: contain; }
 .manual-initial-frame { position: absolute; width: 100%; height: 100%; object-fit: contain; z-index: 1; pointer-events: none; }
 .manual-initial-frame[hidden] { display: none; }
+.manual-held-frame { position: absolute; width: 100%; height: 100%; object-fit: contain; z-index: 2; pointer-events: none; }
+.manual-held-frame[hidden] { display: none; }
+.manual-video-stage .manual-preview-refreshing { position: absolute; bottom: 8px; z-index: 3; margin: 0; padding: 6px 10px; border-radius: 6px; background: #050609e6; color: #e3e9f2; }
 .manual-video-stage p { z-index: 1; margin: 20px; text-align: center; color: #9daabd; font-size: 12px; }
 .manual-preview-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .manual-preview-controls input { flex: 1; min-width: 50px; accent-color: #a994ee; }

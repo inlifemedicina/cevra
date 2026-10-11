@@ -2,7 +2,7 @@ import { ManualTitleOverlay, type TitlePreviewEditing } from "./ManualTitleOverl
 import { supportsManualClipExtensions } from "@cevra/application";
 import type { CreateManualVideoClipRequest, LocalVideoPreview } from "@cevra/application";
 import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { DesktopBackend } from "../backend/desktop-backend";
 import { EditingHelp } from "./EditingHelp";
 import { formatMilliseconds, type Translate } from "../ui-model";
@@ -16,6 +16,7 @@ interface Props {
   actionBusy?: boolean;
   titleEditing?: TitlePreviewEditing;
   titleEditingBlocked?: boolean;
+  titleContinuityKey?: string;
   backend: DesktopBackend;
   source?: SourceAsset;
   sourceLabel?: string;
@@ -43,13 +44,17 @@ interface Props {
 }
 
 /** Original bytes or a bounded, ephemeral derivative of the canonical clip. */
-export function ManualVideoPreview({ onAction, actionBusy, backend, source, sourceLabel, sourceFileName, snapshotId, clip, sequencePreview, unsupportedClip, timelineOccupied, sequenceEditing, frameEditing, busy, seek, t, onPlayheadChange, onCreate, program, titleEditing, titleEditingBlocked }: Props) {
+export function ManualVideoPreview({ onAction, actionBusy, backend, source, sourceLabel, sourceFileName, snapshotId, clip, sequencePreview, unsupportedClip, timelineOccupied, sequenceEditing, frameEditing, busy, seek, t, onPlayheadChange, onCreate, program, titleEditing, titleEditingBlocked, titleContinuityKey }: Props) {
   const controlBusy = actionBusy ?? busy;
   function runAction(action: () => void | Promise<void>) {
     if (onAction) void onAction(action).catch(() => {});
     else void action();
   }
   const videoRef = useRef<HTMLVideoElement>(null);
+  const heldCanvasRef = useRef<HTMLCanvasElement>(null);
+  const heldFrame = useRef<{ identity: string; timeMs: number } | null>(null);
+  const [holdingFrame, setHoldingFrame] = useState(false);
+  const previousView = useRef({ snapshotId, titleContinuityKey });
   const imageRef = useRef<HTMLImageElement>(null);
   const metadataVerified = useRef(false);
   const imageVerified = useRef<string | null>(null);
@@ -77,6 +82,53 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
   const mediaEndMs = preview?.durationMs ?? 0;
   const timing = clip?.frameTiming;
 
+  function discardHeldFrame() {
+    heldFrame.current = null;
+    const canvas = heldCanvasRef.current;
+    if (canvas) { canvas.width = 0; canvas.height = 0; }
+    setHoldingFrame(false);
+  }
+
+  // A labelled, inert picture bridges a title-only refresh; it never admits stale media.
+  // Layout effects run before the previous request releases its decoder and Blob.
+  useLayoutEffect(() => {
+    const previous = previousView.current;
+    previousView.current = { snapshotId, titleContinuityKey };
+    if (!titleContinuityKey || titleContinuityKey !== previous.titleContinuityKey) { discardHeldFrame(); return; }
+    if (snapshotId === previous.snapshotId) return;
+    if (heldFrame.current?.identity === titleContinuityKey) return;
+    const video = videoRef.current, canvas = heldCanvasRef.current;
+    if (!ready || playing || program?.resume || seeking || pendingSeek.current || !video || !canvas
+      || preview?.snapshotId !== previous.snapshotId || !metadataVerified.current || !url
+      || activePreviewUrl.current !== url || video.getAttribute("src") !== url
+      || !video.paused || video.seeking || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+      || initialFrame && imageVerified.current !== url || currentMs >= endMs
+      || !Number.isSafeInteger(video.videoWidth) || !Number.isSafeInteger(video.videoHeight)
+      || video.videoWidth < 1 || video.videoHeight < 1) { discardHeldFrame(); return; }
+    try {
+      // At frame zero the admitted PNG is the visible picture, including before Play.
+      const image = imageRef.current;
+      const picture = currentMs === startMs && image && !image.hidden && imageVerified.current === url ? image : video;
+      const width = picture === image ? image.naturalWidth : video.videoWidth;
+      const height = picture === image ? image.naturalHeight : video.videoHeight;
+      const ratio = Math.min(1, 720 / Math.max(width, height));
+      canvas.width = Math.max(1, Math.round(width * ratio));
+      canvas.height = Math.max(1, Math.round(height * ratio));
+      const context = canvas.getContext("2d");
+      if (!context) { discardHeldFrame(); return; }
+      context.drawImage(picture, 0, 0, canvas.width, canvas.height);
+      // A decoded-but-unpainted WK video can yield transparent pixels. Never retain that as a frame.
+      if (context.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data[3] !== 255) { discardHeldFrame(); return; }
+      heldFrame.current = { identity: titleContinuityKey, timeMs: currentMs };
+      setHoldingFrame(true);
+    } catch { discardHeldFrame(); }
+  }, [snapshotId, titleContinuityKey]);
+  useLayoutEffect(() => () => {
+    heldFrame.current = null;
+    const canvas = heldCanvasRef.current;
+    if (canvas) { canvas.width = 0; canvas.height = 0; }
+  }, []);
+
   useEffect(() => {
     let active = true;
     let settled = false;
@@ -89,7 +141,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
     metadataVerified.current = false;
     imageVerified.current = null;
     setInitialFrame(null);
-    setPreview(null); setUrl(null); setReady(false); setError(null); setPlaying(false); setSeeking(false); setInMs(null); setOutMs(null); setMarkDeltas({}); setCurrentMs(startMs);
+    setPreview(null); setUrl(null); setReady(false); setError(null); setPlaying(false); setSeeking(false); setInMs(null); setOutMs(null); setMarkDeltas({}); setCurrentMs(heldFrame.current?.timeMs ?? startMs);
     if (source?.kind === "video") {
       void backend.previewLocalVideo({ sourceId: source.id, expectedSnapshotId: snapshotId, operationId, ...(sequencePreview ? { sequence: true } : clip ? { clipId: clip.id } : {}) }).then((result) => {
         settled = true;
@@ -125,7 +177,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
         setInitialFrame(frame ? { url: objectUrl, image: `data:image/png;base64,${frame.base64}`, width: frame.width, height: frame.height } : null);
         // Metadata remains in React; transport bytes belong only to the Blob/image.
         setPreview({ ...result, base64: "", ...(frame ? { initialFrame: { ...frame, base64: "" } } : {}) }); setUrl(objectUrl);
-      }).catch((cause: unknown) => { settled = true; if (active) { setError(errorCode(cause)); programRef.current?.onPlaybackIntent(false); } });
+      }).catch((cause: unknown) => { settled = true; if (active) { discardHeldFrame(); setError(errorCode(cause)); programRef.current?.onPlaybackIntent(false); } });
     }
     const video = videoRef.current;
     return () => {
@@ -170,12 +222,25 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
 
   useEffect(() => {
     const video = videoRef.current;
+    if (!holdingFrame || !ready || seeking || pendingSeek.current || !video || !url
+      || preview?.snapshotId !== snapshotId || activePreviewUrl.current !== url
+      || video.getAttribute("src") !== url || !metadataVerified.current
+      || initialFrame && imageVerified.current !== url
+      || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking) return;
+    const localMs = timing ? framesToMilliseconds(Math.max(0, Math.min(timing.timelineEndFrame, floorMsToFrames(seek.timelineMs)) - timing.timelineStartFrame)) : Math.max(0, seek.timelineMs - (clip?.timelineStartMs ?? 0));
+    if (Math.abs(video.currentTime - Math.min(mediaEndMs, localMs) / 1000) >= 0.001) return;
+    discardHeldFrame();
+    setCurrentMs(timing ? framesToMilliseconds(timing.sourceStartFrame + floorMsToFrames(localMs)) : startMs + localMs);
+  }, [holdingFrame, ready, seeking, url, snapshotId, seek.sequence]);
+
+  useEffect(() => {
+    const video = videoRef.current;
     if (program && !program.resume) { video?.pause(); return; }
-    if (!program?.resume || !ready || seeking || pendingSeek.current || busy || !video || !url || activePreviewUrl.current !== url) return;
+    if (!program?.resume || !ready || holdingFrame || seeking || pendingSeek.current || busy || !video || !url || activePreviewUrl.current !== url) return;
     let active = true;
     void video.play().catch(() => { if (active && activePreviewUrl.current === url) fail("MANUAL_VIDEO_UNSUPPORTED"); });
     return () => { active = false; };
-  }, [program?.resume, ready, seeking, busy, url, seek.sequence]);
+  }, [program?.resume, ready, holdingFrame, seeking, busy, url, seek.sequence]);
 
   useEffect(() => {
     if (!playing || !ready || !clip) return;
@@ -186,6 +251,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
   }, [playing, ready, clip?.id]);
 
   function fail(code: string) {
+    discardHeldFrame();
     programRef.current?.onPlaybackIntent(false);
     activePreviewUrl.current = null;
     metadataVerified.current = false;
@@ -205,7 +271,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
       fail("MANUAL_VIDEO_UNSUPPORTED"); return;
     }
     metadataVerified.current = true;
-    setCurrentMs(startMs);
+    setCurrentMs(heldFrame.current?.timeMs ?? startMs);
     if (video.currentTime !== 0) video.currentTime = 0;
     frameReady();
   }
@@ -252,7 +318,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
 
   function currentMedia() {
     const video = videoRef.current;
-    return Boolean(video && ready && !busy && url && activePreviewUrl.current === url && video.getAttribute("src") === url);
+    return Boolean(video && ready && !holdingFrame && !busy && url && activePreviewUrl.current === url && video.getAttribute("src") === url);
   }
 
   function finishClip() {
@@ -294,7 +360,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
     const action = shortcutAction(event, "preview");
     if (!action) return;
     if (action === "start" || action === "end") {
-      if (!ready || seeking || busy) return;
+      if (!ready || holdingFrame || seeking || busy) return;
       event.preventDefault(); event.stopPropagation();
       if (program) runAction(() => programRef.current?.onSeek(action === "start" ? 0 : programRef.current.durationMs));
       else seekOriginal(action === "start" ? startMs : endMs);
@@ -315,15 +381,16 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
           imageVerified.current = initialFrame.url; frameReady();
         }}
         onError={event => { if (event.currentTarget === imageRef.current) fail("MANUAL_VIDEO_UNSUPPORTED"); }} />}
-      {titleEditing && <ManualTitleOverlay editing={titleEditing} videoRef={videoRef} t={t} blocked={busy || titleEditingBlocked === true} active={ready && !seeking && !playing && !program?.resume && programFrame !== undefined && programFrame >= titleEditing.title.startFrame && programFrame < titleEditing.title.endFrame} />}
-      {!ready && <p role="status">{error ? t(errorKey) : source?.kind === "video" ? t("preview.localLoading") : t("preview.localEmpty")}</p>}
+      <canvas ref={heldCanvasRef} className="manual-held-frame" aria-hidden="true" hidden={!holdingFrame} />
+      {titleEditing && <ManualTitleOverlay editing={titleEditing} videoRef={videoRef} t={t} blocked={busy || titleEditingBlocked === true} active={ready && !holdingFrame && !seeking && !playing && !program?.resume && programFrame !== undefined && programFrame >= titleEditing.title.startFrame && programFrame < titleEditing.title.endFrame} />}
+      {(!ready || holdingFrame) && <p className={holdingFrame ? "manual-preview-refreshing" : undefined} role="status">{error ? t(errorKey) : holdingFrame ? t("preview.refreshing") : source?.kind === "video" ? t("preview.localLoading") : t("preview.localEmpty")}</p>}
     </div>
     <div className="manual-preview-controls" onPointerDownCapture={event => {
       // Keep the text draft focused until a button captures its following intent.
       if ((event.target as Element).closest("button") && document.activeElement?.classList.contains("title-text-input")) event.preventDefault();
     }}>
       {error && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setError(null); setRetry(value => value + 1); }}>{t("preview.retryLocal")}</button>}
-      <button {...shortcutProps("play", t)} type="button" className="secondary-button" disabled={controlBusy || !program?.resume && (!ready || seeking)} onClick={() => {
+      <button {...shortcutProps("play", t)} type="button" className="secondary-button" disabled={controlBusy || holdingFrame || !program?.resume && (!ready || seeking)} onClick={() => {
         if (program && onAction) {
           const resume = !program.resume, restart = currentMs >= endMs;
           runAction(() => { const current = programRef.current; if (!current) return;
@@ -333,10 +400,10 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
         } else runAction(togglePlayback);
       }}>{t((program ? program.resume : playing) ? "preview.pauseLocal" : "preview.playLocal")}</button>
       {timing && program && <>
-        <button {...shortcutProps("previous-frame", t)} type="button" className="secondary-button" disabled={!ready || seeking || controlBusy || programFrame === 0} onClick={() => { const value = framesToMilliseconds(Math.max(0, programFrame! - 1)); runAction(() => programRef.current?.onSeek(value)); }}>{t("preview.previousFrame")}</button>
-        <button {...shortcutProps("next-frame", t)} type="button" className="secondary-button" disabled={!ready || seeking || controlBusy || programFrame === floorMsToFrames(program.durationMs)} onClick={() => { const value = framesToMilliseconds(Math.min(floorMsToFrames(program.durationMs), programFrame! + 1)); runAction(() => programRef.current?.onSeek(value)); }}>{t("preview.nextFrame")}</button>
+        <button {...shortcutProps("previous-frame", t)} type="button" className="secondary-button" disabled={!ready || holdingFrame || seeking || controlBusy || programFrame === 0} onClick={() => { const value = framesToMilliseconds(Math.max(0, programFrame! - 1)); runAction(() => programRef.current?.onSeek(value)); }}>{t("preview.previousFrame")}</button>
+        <button {...shortcutProps("next-frame", t)} type="button" className="secondary-button" disabled={!ready || holdingFrame || seeking || controlBusy || programFrame === floorMsToFrames(program.durationMs)} onClick={() => { const value = framesToMilliseconds(Math.min(floorMsToFrames(program.durationMs), programFrame! + 1)); runAction(() => programRef.current?.onSeek(value)); }}>{t("preview.nextFrame")}</button>
       </>}
-      <input type="range" aria-label={t(program ? "sequence.seek" : clip ? "preview.clipSeek" : "preview.sourceSeek")} min={program ? 0 : startMs} max={program ? timing ? floorMsToFrames(program.durationMs) : program.durationMs : Math.max(startMs + 1, endMs)} step="1" value={program ? timing ? programFrame : programMs : Math.min(endMs, Math.max(startMs, currentMs))} disabled={!ready || controlBusy}
+      <input type="range" aria-label={t(program ? "sequence.seek" : clip ? "preview.clipSeek" : "preview.sourceSeek")} min={program ? 0 : startMs} max={program ? timing ? floorMsToFrames(program.durationMs) : program.durationMs : Math.max(startMs + 1, endMs)} step="1" value={program ? timing ? programFrame : programMs : Math.min(endMs, Math.max(startMs, currentMs))} disabled={!ready || holdingFrame || controlBusy}
       onPointerDown={event => {
         if (event.button !== 0 || !ready || controlBusy || !program?.onScrub || sliderScrub.current) return;
         sliderScrub.current = { pointerId: event.pointerId, originalMs: programMs, element: event.currentTarget };

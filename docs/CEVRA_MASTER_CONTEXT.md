@@ -3925,6 +3925,39 @@ gate stays BLOCKED pending the explicitly requested stable-scratch exception.
 PR98 is a distinct stacked draft over the frozen PR97; PR96/PR97 are unmerged
 and unchanged. Read-only independent review approved the final time/ARIA delta
 and found no remaining concrete defect within its static/component scope.
-The reported approximately two-second title reload was not delivered as an
-executable approved scope and is not claimed fixed. Director: compatible
-presentation extension; no new impact from the final formatting delta.
+At the d3f755f checkpoint the approximately two-second title reload had not
+arrived as executable scope. A subsequent delegation supplied the original
+15:18:57 report and the later 15:50:24 continuation, confirming correction is
+within the active approved scope. The bounded follow-up and its unresolved
+latency/paint gates are recorded below. Director: compatible presentation
+extension; no new impact from the earlier formatting delta.
+
+
+### 2026-10-11 — Title-refresh continuity, with latency distinguished
+
+**ACTIVE / NOT MERGED**, PR98. The clarified Owner report includes the image
+reload after direct title changes/release. The request effect released the old
+decoder/Blob and cleared its PNG before the current composition arrived; H/V
+held-response tests reproduced that gap. The bounded UI fix retains a labelled,
+inert picture with an opaque center sample only across compatible paused title refreshes, until the
+current packet and requested frame are admitted. Errors, incompatible changes
+and unmount discard it. Typed History, runtime/cache identity, IR, original
+sources and export remain authoritative and unchanged.
+
+UI 331 PASS/1 real-packet case skipped locally; title workflow 23 PASS;
+TypeScript/Vite and i18n pass. Read-only independent review found no concrete
+code finding. Native H/V frame-zero continuity passes with replay and an
+explicit controlled 2000 ms delay; this does not measure encoder acceleration.
+Native frame 151 returned transparent video pixels offscreen and remains
+unproven. Actual current Unicode H/V render and latency measurements remain
+**BLOCKED** by file identity changes in Documents, pending the explicit stable
+scratch exception. The delivered app remains untouched; no human round starts
+before technical gates close. CI750/Runtime108 passed d3f755f; the new delta
+requires fresh checks and a rebuilt signed candidate.
+
+See [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--title-refresh-continuity-with-latency-distinguished)
+for timings, capture limits and the feasibility of a separately approved faster
+preview path. Retaining a picture does **not** eliminate the roughly two-second
+render wait. Director: compatible presentation extension; no new permission,
+provider, command or IR/History boundary. G1/K4, ADR 0012, release and subjective
+acceptance remain open.

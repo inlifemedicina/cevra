@@ -45,6 +45,7 @@ function backendFixture() {
 }
 
 beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
@@ -131,14 +132,14 @@ it("Delete on a media card reviews impact before one project-only removal and Un
 });
 
 
-async function mountPreviewTitle(f=backendFixture()) {
+async function mountPreviewTitle(f=backendFixture(), aspect: "16:9" | "9:16" = "16:9") {
  const t=(key:Parameters<typeof translate>[1])=>translate("pt-BR",key);
- new ManualTitleApplicationService(f.history).edit({version:1,type:"set",expectedSnapshotId:f.history.current.history.headSnapshotId!,title:{version:1,componentId:"cevra.title.lower-third.inter.v1",text:"Título",startFrame:0,endFrame:300,aspect:"16:9"}});
+ new ManualTitleApplicationService(f.history).edit({version:1,type:"set",expectedSnapshotId:f.history.current.history.headSnapshotId!,title:{version:1,componentId:"cevra.title.lower-third.inter.v1",text:"Título",startFrame:0,endFrame:300,aspect}});
  const png="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
  f.backend.previewLocalVideo=async request=>({sourceId:"source",snapshotId:request.expectedSnapshotId,durationMs:10000,mimeType:"video/mp4",base64:btoa("offline"),proxy:{profile:"manual-cfr30-preview-v1",sourceDurationMs:10000},sequence:{timingPolicy:"cfr30",totalFrames:300,clipIds:["clip"]},initialFrame:{mimeType:"image/png",base64:png,width:1,height:1,sourceTimeMs:0}});
  const {container}=render(<App backend={f.backend}/>);const sequenceButton=await screen.findByRole("button",{name:t("sequence.preview")});await act(async()=>fireEvent.click(sequenceButton));await waitFor(()=>expect(container.querySelector("video")?.getAttribute("src")).toMatch(/^blob:/));
  const video=container.querySelector("video")!;
- Object.defineProperties(video,{duration:{configurable:true,value:10},readyState:{configurable:true,value:HTMLMediaElement.HAVE_CURRENT_DATA},videoWidth:{configurable:true,value:1920},videoHeight:{configurable:true,value:1080}});
+ Object.defineProperties(video,{duration:{configurable:true,value:10},readyState:{configurable:true,value:HTMLMediaElement.HAVE_CURRENT_DATA},videoWidth:{configurable:true,value:aspect === "16:9" ? 1920 : 1080},videoHeight:{configurable:true,value:aspect === "16:9" ? 1080 : 1920}});
  video.getBoundingClientRect=()=>({x:0,y:0,left:0,top:0,right:800,bottom:600,width:800,height:600,toJSON(){}});
  fireEvent.loadedMetadata(video);fireEvent.loadedData(video);fireEvent.load(container.querySelector(".manual-initial-frame")!);fireEvent.seeked(video);
  return {f,container,video,t};
@@ -243,4 +244,110 @@ it("preserves the canonical playback frame after pausing and editing a title, ra
  expect(video.currentTime).toBeCloseTo(151/30,9);
  expect((screen.getByRole("slider",{name:t("sequence.seek")}) as HTMLInputElement).value).toBe("151");
  expect(screen.getByRole("button",{name:t("preview.playLocal")})).toBeTruthy();
+});
+
+
+it.each(["16:9", "9:16"] as const)("keeps a bounded admitted frame visible while a committed %s title preview refreshes", async aspect => {
+  const draw = vi.fn();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: draw, getImageData: () => ({ data: Uint8ClampedArray.from([0, 0, 0, 255]) }) } as unknown as CanvasRenderingContext2D);
+  const { f, t, container, video } = await mountPreviewTitle(backendFixture(), aspect);
+  video.currentTime = 151 / 30; fireEvent.timeUpdate(video);
+  const before = f.history.current, entries = f.history.entries.length, oldUrl = video.getAttribute("src");
+  const originalPreview = f.backend.previewLocalVideo;
+  let releasePreview!: () => void;
+  f.backend.previewLocalVideo = vi.fn((request: Parameters<DesktopBackend["previewLocalVideo"]>[0]) => new Promise<Awaited<ReturnType<DesktopBackend["previewLocalVideo"]>>>(resolve => {
+    releasePreview = () => { void originalPreview(request).then(resolve); };
+  }));
+  fireEvent.doubleClick(await screen.findByRole("button", { name: t("title.selectPreview") }));
+  fireEvent.change(screen.getByLabelText(t("title.editPreview")), { target: { value: "Quadro contínuo" } });
+  await act(async () => { fireEvent.keyDown(screen.getByLabelText(t("title.editPreview")), { key: "Enter" }); });
+  await waitFor(() => expect(f.history.current.graphics[0]!.text).toBe("Quadro contínuo"));
+  const held = container.querySelector<HTMLCanvasElement>(".manual-held-frame");
+  expect(held).not.toBeNull(); expect(held!.hidden).toBe(false);
+  expect(draw).toHaveBeenCalledOnce(); expect(Math.max(held!.width, held!.height)).toBe(720);
+  expect(video.getAttribute("src")).toBeNull(); expect(URL.revokeObjectURL).toHaveBeenCalledWith(oldUrl);
+  expect(screen.getByRole("button", { name: t("preview.playLocal") }).matches(":disabled")).toBe(true);
+  expect(screen.queryByRole("button", { name: t("title.selectPreview") })).toBeNull();
+  expect(f.history.current.timeline).toEqual(before.timeline); expect(f.history.entries.length).toBe(entries + 1);
+  await act(async () => { releasePreview(); });
+  await waitFor(() => expect(video.getAttribute("src")).toMatch(/^blob:/));
+  expect(held!.hidden).toBe(false);
+  fireEvent.loadedMetadata(video); fireEvent.loadedData(video); fireEvent.load(container.querySelector(".manual-initial-frame")!);
+  expect(held!.hidden).toBe(false);
+  fireEvent.seeked(video);
+  await waitFor(() => expect(held!.hidden).toBe(true));
+  expect(video.currentTime).toBeCloseTo(151 / 30, 9);
+  expect(f.history.current.timeline).toEqual(before.timeline);
+});
+
+
+async function pendingTitleRefresh() {
+  const draw = vi.fn();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: draw, getImageData: () => ({ data: Uint8ClampedArray.from([0, 0, 0, 255]) }) } as unknown as CanvasRenderingContext2D);
+  const mounted = await mountPreviewTitle();
+  const { f, t, container, video } = mounted;
+  video.currentTime = 151 / 30; fireEvent.timeUpdate(video);
+  const original = f.backend.previewLocalVideo;
+  let release!: () => void, reject!: (cause: unknown) => void;
+  f.backend.previewLocalVideo = vi.fn((request: Parameters<DesktopBackend["previewLocalVideo"]>[0]) => new Promise<Awaited<ReturnType<DesktopBackend["previewLocalVideo"]>>>((resolve, fail) => {
+    release = () => { void original(request).then(resolve); }; reject = fail;
+  }));
+  fireEvent.doubleClick(await screen.findByRole("button", { name: t("title.selectPreview") }));
+  fireEvent.change(screen.getByLabelText(t("title.editPreview")), { target: { value: "Transição retida" } });
+  await act(async () => { fireEvent.keyDown(screen.getByLabelText(t("title.editPreview")), { key: "Enter" }); });
+  await waitFor(() => expect(f.backend.previewLocalVideo).toHaveBeenCalledOnce());
+  const canvas = container.querySelector<HTMLCanvasElement>(".manual-held-frame")!;
+  expect(canvas.hidden).toBe(false);
+  return { ...mounted, canvas, draw, release: () => release(), reject: (cause: unknown) => reject(cause) };
+}
+
+it("restores the latest ruler frame while a title render is pending, without moving cuts or History", async () => {
+  const { f, t, container, video, canvas, release } = await pendingTitleRefresh();
+  const before = f.history.toArchive();
+  await act(async () => { fireEvent.keyDown(screen.getByRole("slider", { name: t("timeline.ruler") }), { key: "ArrowRight", shiftKey: true }); });
+  expect(canvas.hidden).toBe(false);
+  await act(async () => { release(); });
+  await waitFor(() => expect(video.getAttribute("src")).toMatch(/^blob:/));
+  fireEvent.loadedMetadata(video); fireEvent.loadedData(video); fireEvent.load(container.querySelector(".manual-initial-frame")!);
+  expect(canvas.hidden).toBe(false); fireEvent.seeked(video);
+  await waitFor(() => expect(canvas.hidden).toBe(true));
+  expect(video.currentTime).toBeCloseTo(161 / 30, 9);
+  expect((screen.getByRole("slider", { name: t("sequence.seek") }) as HTMLInputElement).value).toBe("161");
+  expect(f.history.toArchive()).toEqual(before);
+});
+
+it.each(["MANUAL_VIDEO_UNSUPPORTED", "MANUAL_VIDEO_STALE"])("clears the held picture on %s and exposes the current render failure", async code => {
+  const { f, t, container, canvas, reject } = await pendingTitleRefresh();
+  const before = f.history.toArchive();
+  await act(async () => { reject({ code }); });
+  await waitFor(() => expect(canvas.hidden).toBe(true));
+  expect(canvas.width).toBe(0); expect(canvas.height).toBe(0);
+  expect(container.querySelector(".manual-preview-refreshing")).toBeNull();
+  expect(screen.getByRole("button", { name: t("preview.retryLocal") })).toBeTruthy();
+  expect(f.history.toArchive()).toEqual(before);
+});
+
+it("clears the inert picture and cancels its owned pending request when leaving Sequence", async () => {
+  const { f, t, canvas, release } = await pendingTitleRefresh();
+  const cancel = vi.spyOn(f.backend, "cancelOperation"), before = f.history.toArchive();
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: t("preview.originalMode") })); });
+  expect(canvas.isConnected).toBe(false); expect(canvas.width).toBe(0); expect(canvas.height).toBe(0);
+  expect(cancel).toHaveBeenCalledOnce();
+  await act(async () => { release(); });
+  expect(f.history.toArchive()).toEqual(before);
+});
+
+
+it("rejects a transparent decoded-video capture instead of retaining a blank frame", async () => {
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(),
+    getImageData: () => ({ data: Uint8ClampedArray.from([0, 0, 0, 0]) }) } as unknown as CanvasRenderingContext2D);
+  const { f, t, container, video } = await mountPreviewTitle();
+  video.currentTime = 151 / 30; fireEvent.timeUpdate(video);
+  f.backend.previewLocalVideo = vi.fn(() => new Promise<Awaited<ReturnType<DesktopBackend["previewLocalVideo"]>>>(() => {}));
+  fireEvent.doubleClick(await screen.findByRole("button", { name: t("title.selectPreview") }));
+  fireEvent.change(screen.getByLabelText(t("title.editPreview")), { target: { value: "Quadro sem pintura" } });
+  await act(async () => { fireEvent.keyDown(screen.getByLabelText(t("title.editPreview")), { key: "Enter" }); });
+  const canvas = container.querySelector<HTMLCanvasElement>(".manual-held-frame")!;
+  expect(canvas.hidden).toBe(true); expect(canvas.width).toBe(0);
+  expect(container.querySelector(".manual-preview-refreshing")).toBeNull();
 });

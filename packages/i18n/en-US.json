@@ -359,6 +359,7 @@
   "preview.localHint": "Mark IN and OUT during playback to create one clip from the original video.",
   "preview.localEmpty": "Select an imported video to play and mark an excerpt.",
   "preview.localLoading": "Loading local video…",
+  "preview.refreshing": "Updating preview…",
   "preview.localUnavailable": "This local video could not be played. Select a compatible video or try again.",
   "preview.localSettling": "The previous preview is still settling. Your project remains open; try again after it finishes.",
   "preview.retryLocal": "Retry preview",
