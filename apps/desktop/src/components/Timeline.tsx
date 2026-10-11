@@ -453,10 +453,10 @@ function TrimTimelineClip({ clip, label, fileName, duration, geometryKey, source
     {editable && (["in", "out"] as const).map((edge) => <button key={edge} type="button" role="slider" className={`timeline-trim-handle trim-${edge}`} aria-disabled={busy || pending} tabIndex={busy || pending ? -1 : 0}
       aria-label={t(edge === "in" ? "timeline.trimIn" : "timeline.trimOut")} aria-orientation="horizontal"
       aria-valuemin={edge === "in" ? 0 : clip.frameTiming ? nearestMsToFrames(range.sourceStartMs) + 1 : range.sourceStartMs + 1} aria-valuemax={edge === "in" ? clip.frameTiming ? nearestMsToFrames(range.sourceEndMs) - 1 : range.sourceEndMs - 1 : clip.frameTiming ? maximumSourceFrame(sourceDuration) : sourceDuration}
-      aria-valuenow={clip.frameTiming ? nearestMsToFrames(edge === "in" ? range.sourceStartMs : range.sourceEndMs) : edge === "in" ? range.sourceStartMs : range.sourceEndMs} aria-valuetext={clip.frameTiming ? formatTime(edge === "in" ? range.sourceStartMs : range.sourceEndMs) : `${(edge === "in" ? range.sourceStartMs : range.sourceEndMs) / 1000} s`}
+      aria-valuenow={clip.frameTiming ? nearestMsToFrames(edge === "in" ? range.sourceStartMs : range.sourceEndMs) : edge === "in" ? range.sourceStartMs : range.sourceEndMs} aria-valuetext={formatTime(edge === "in" ? range.sourceStartMs : range.sourceEndMs, sourceDuration)}
       title={t(clip.frameTiming ? "timeline.frameTrimHint" : "timeline.trimHint")} onPointerDown={(event) => start(event, edge)} onPointerMove={(event) => { const next = rangeAt(event); if (next && !busy) setDraft(next); }}
       onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel} onKeyDown={(event) => key(event, edge)}><span aria-hidden="true" /></button>)}
-    {editable && <output className="timeline-trim-range" aria-label={t("timeline.trimRange")}>{clip.frameTiming ? <>IN {formatFrames(nearestMsToFrames(range.sourceStartMs))} · OUT {formatFrames(nearestMsToFrames(range.sourceEndMs))}</> : <>IN {formatTime(range.sourceStartMs)} · OUT {formatTime(range.sourceEndMs)}</>}</output>}
+    {editable && <output className="timeline-trim-range" aria-label={t("timeline.trimRange")}>{clip.frameTiming ? <>IN {formatFrames(nearestMsToFrames(range.sourceStartMs), sourceDuration)} · OUT {formatFrames(nearestMsToFrames(range.sourceEndMs), sourceDuration)}</> : <>IN {formatTime(range.sourceStartMs, sourceDuration)} · OUT {formatTime(range.sourceEndMs, sourceDuration)}</>}</output>}
   </div>;
 }
 

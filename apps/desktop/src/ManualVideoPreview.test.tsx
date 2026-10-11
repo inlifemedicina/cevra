@@ -1031,3 +1031,13 @@ it("continuous playback and seek show the current original filename across sourc
  expect(container.querySelector(".manual-preview-heading strong")?.textContent).toBe("Vertical.mp4");
  expect(f.requests).toHaveBeenCalledTimes(1);expect(container.querySelector("video")).toBe(video);expect(f.backend.history.toArchive()).toEqual(before);
 });
+
+it.each([6000,7200000])("trim handles and visible source bounds use the owning file clock (%sms) without changing ranges",async durationMs=>{
+ const backend=new ManualBackend({...source,durationMs});
+ await backend.createManualVideoClip({sourceId:source.id,expectedSnapshotId:backend.history.current.history.headSnapshotId!,sourceStartMs:1000,sourceEndMs:4000});
+ const before=backend.history.toArchive();const selectedId=backend.history.current.timeline.clips[0]!.id;
+ render(<Timeline project={backend.history.current} presentations={new Map()} selectedId={selectedId} playheadMs={0} zoom={100} t={t} onSelect={vi.fn()} onPlayheadChange={vi.fn()} onZoomChange={vi.fn()} onResizeStart={vi.fn()} trimAvailable onTrim={vi.fn()}/>);
+ expect(screen.getByLabelText(t("timeline.trimRange")).textContent).toBe(durationMs>=3600000?"IN 00:00:01 · OUT 00:00:04":"IN 00:01 · OUT 00:04");
+ expect(screen.getByRole("slider",{name:"Ajustar OUT do clip"}).getAttribute("aria-valuetext")).toBe(durationMs>=3600000?"00:00:04":"00:04");
+ expect(backend.history.toArchive()).toEqual(before);
+});

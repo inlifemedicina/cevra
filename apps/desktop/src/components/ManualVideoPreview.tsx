@@ -361,7 +361,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
       <p>{t("editing.fineTime")}</p><p>{t("editing.mediaTitleCaption")}</p>
     </EditingHelp>
     {clip && !sequencePreview && <div className="manual-preview-timing">
-      <time data-testid="preview-clip-timecode">{t("preview.clipElapsed", { time: formatMilliseconds(currentMs - startMs), duration: formatMilliseconds(endMs - startMs) })}</time>
+      <time data-testid="preview-clip-timecode">{t("preview.clipElapsed", { time: formatMilliseconds(currentMs - startMs, endMs - startMs), duration: formatMilliseconds(endMs - startMs) })}</time>
       <output>{t("preview.clipBounds", { start: timing ? formatFrames(timing.sourceStartFrame, source?.durationMs) : formatMilliseconds(startMs, source?.durationMs), end: timing ? formatFrames(timing.sourceEndFrame, source?.durationMs) : formatMilliseconds(endMs, source?.durationMs) })}</output>
     </div>}
     {sequenceEditing && timelineOccupied && !clip && <p className="manual-preview-hint" role="status">{t("sequence.previewPending")}</p>}

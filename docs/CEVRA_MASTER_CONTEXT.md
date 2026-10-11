@@ -3902,13 +3902,29 @@ typed operations, Project IR, ProjectHistory and permissions retain execution
 and state authority. Progress55%, F-A02 exhausted1/1 and later gates remain.
 
 
-Current isolated verification: UI322 PASS/1 runtime-packet case pending;
-Media Python159 PASS with pinned Python3.12.14; Node core692 PASS. Two of
-three initial Host failures were resolved by using that supported interpreter
-in its synthetic managed-runtime fixtures (33-case retest PASS); the remaining
-private-copy identity case is blocked under Documents. The first Python3.9
-failure is retained and is not a product defect. A distinct offline app
-candidate was compiled, but remains undelivered/unopened while render/signature
-and fresh-head CI gates are pending. Independent read-only static review
-confirmed the corrected time-input overflow/no-op and current-source filename
-regressions, with no concrete remaining finding in its checked scope.
+Current isolated verification: UI324 PASS/1 real runtime-packet case skipped;
+Media Python159 PASS with pinned Python3.12.14; Node core692 PASS; Rust55 PASS.
+Two of three initial Host failures were resolved by using that supported
+interpreter in synthetic managed-runtime fixtures (33-case retest PASS); the
+remaining private-copy identity case is blocked under Documents. The first
+Python3.9 failure is retained and is not a product defect. CI748 and exact
+Runtime107 passed on10202ba, including the packaged Inter selector test and
+actual Host/UI packet test. The final UI-only formatting follow-up needs its
+own exact-head CI confirmation; no older-head result is substituted.
+
+The final candidate was rebuilt for source-owned trim/ARIA clock width and
+clip-owned elapsed clock width, without changing cuts or History. It passed
+ad-hoc deep/strict signature verification and the packaged Host three-RPC smoke
+against an empty owned store, with no GUI, worker or provider execution. Its
+runtime manifest SHA256 is4299ee1a5352ef08e93cb24a169401725f131915be9292d1d62e4eb281303bc6.
+The original running app's1024-file inventory and signature were preserved.
+Our superseded10202ba candidate is recoverable in CEVRA/Apagar. The final
+candidate remains undelivered/unopened; the current Unicode H/V full-render
+gate stays BLOCKED pending the explicitly requested stable-scratch exception.
+
+PR98 is a distinct stacked draft over the frozen PR97; PR96/PR97 are unmerged
+and unchanged. Read-only independent review approved the final time/ARIA delta
+and found no remaining concrete defect within its static/component scope.
+The reported approximately two-second title reload was not delivered as an
+executable approved scope and is not claimed fixed. Director: compatible
+presentation extension; no new impact from the final formatting delta.
