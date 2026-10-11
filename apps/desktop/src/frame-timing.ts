@@ -1,11 +1,11 @@
 import { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, isCfr30Frame, MAX_CFR30_FRAME } from "@cevra/project-ir";
 
-export { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, isCfr30Frame };
+export { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, isCfr30Frame, MAX_CFR30_FRAME };
 
 import { formatTime } from "./ui-model";
 
-export function formatFrames(frame: number): string {
-  return formatTime(framesToMilliseconds(frame));
+export function formatFrames(frame: number, durationMs?: number): string {
+  return formatTime(framesToMilliseconds(frame), durationMs);
 }
 
 export function frameInput(value: string): number | null {

@@ -3853,3 +3853,62 @@ the subsequent edit/rejection; all 23 overlay tests pass. Production code,
 rendered inputs and guards are unchanged, so the supplemental render proof
 remains applicable. Final-head CI is required before closeout. Director:
 no new impact found from this deterministic test correction.
+
+
+### 2026-10-11 — Human review regressions and approved contextual cleanup
+
+**ACTIVE / NOT MERGED.** PR96 remains frozen at 45131a9 and PR97 at 329aef6.
+The Owner reported the first grouped app round: layout, direct title edits,
+export and vertical composition usable; Original pre-Play scrub counter,
+up-arrow text-selector preview, vertical filename visibility and removal-dialog
+spacing require correction. Delete/Undo and removal warning/Cancel/Undo were
+reported working; physical reopen and complete G1 are not inferred.
+
+The approved follow-up uses a separate branch/checkout, preserves the running
+app/project, and changes normal time to MM:SS below one hour, retaining hours
+for longer owning sequences/files. Focused drafts expose millisecond precision;
+focus/blur never reparses stored frame ranges. Long explanations move into
+clickable/focusable contextual Help, with short hover/focus hints. One layout
+control remains at the top; the main button says Exportar/Export, while the
+implemented MP4 profile stays in the export flow. No new formats, multiproject
+policy, real AI, engine or security work is authorized by this delta.
+
+FIX NOW: these reproduced UI/glyph defects are bounded in the current component
+and are cheaper to correct before dependent finishing work. Original counter
+now publishes the requested local position without waiting for decoder events;
+play admission still requires a decoded frame. CoreText accepts U+FE0E only
+with covered private-Inter base glyphs and verifies all shaped runs; missing
+bases, emoji and U+FE0F remain rejected. Source identity/model and the declared
+font/fallback policy remain unchanged. Runtime0.3.7 carries that bounded fix.
+
+Offscreen owned WK geometry shows the corrected vertical thumbnail at61px,
+full open/compact sidebar body height and spaced bounded removal dialog.
+A native Blob fixture seek completed before Play with seeking=false and no
+play event. These are objective component measurements, not perceived app
+fluency. The current full-render gate is **BLOCKED** by preview-file identity
+changes in Documents; guards remain intact and a stable-scratch exception is
+pending. Existing prior scratch authorization/evidence is not silently reused.
+
+The delivered app has one active-v1 autosaved project per installation. Its
+exclusive writer lock and durable current/previous/history recovery exist;
+project new/open/switch/save-as and a recent-project browser do not. MP4 exports
+are not reopenable project packages. Future project management requires its
+own proposal/approval and is not implemented here.
+
+Acceptance uses the existing non-duplicated catalog IDs. A distinct signed app
+and one bounded grouped visual follow-up are delivered only after technical
+gates. Director impact: compatible extension in both directions; existing
+typed operations, Project IR, ProjectHistory and permissions retain execution
+and state authority. Progress55%, F-A02 exhausted1/1 and later gates remain.
+
+
+Current isolated verification: UI322 PASS/1 runtime-packet case pending;
+Media Python159 PASS with pinned Python3.12.14; Node core692 PASS. Two of
+three initial Host failures were resolved by using that supported interpreter
+in its synthetic managed-runtime fixtures (33-case retest PASS); the remaining
+private-copy identity case is blocked under Documents. The first Python3.9
+failure is retained and is not a product defect. A distinct offline app
+candidate was compiled, but remains undelivered/unopened while render/signature
+and fresh-head CI gates are pending. Independent read-only static review
+confirmed the corrected time-input overflow/no-op and current-source filename
+regressions, with no concrete remaining finding in its checked scope.

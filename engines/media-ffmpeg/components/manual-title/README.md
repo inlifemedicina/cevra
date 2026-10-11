@@ -14,6 +14,9 @@ Fixed size: 56 px horizontal, 48 px vertical. Full geometry: 1920×1080 or
 1080×1920; margin 8% horizontally and 10% from the bottom; bar 84% wide.
 Preview reduces the composed canonical picture to 720×404 or 404×720.
 Glyph availability and overflow fail before publication; no clipping/fallback.
+A covered base may carry the Unicode text-presentation selector FE0E; the
+selector is shaped with its base, and every shaped run must retain private Inter.
+Leading/repeated FE0E, emoji presentation, missing base glyphs and fallback fail.
 The helper receives only runtime font path, canonical dimensions, bounded text
 and worker-owned output. PNG allocation is reserved before spawning it.
 

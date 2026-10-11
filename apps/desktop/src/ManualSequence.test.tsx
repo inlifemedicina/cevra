@@ -113,12 +113,12 @@ it("clip selection retains timeline scale and exposes exact total and selected d
   const positions = () => [...f.container.querySelectorAll<HTMLElement>("[data-clip-id]")].map(item => [item.style.left,item.style.width]);
   f.click(f.ids[0]!); const first = positions();
   f.click(f.ids[3]!); expect(positions()).toEqual(first);
-  expect(screen.getByTestId("timeline-total-duration").textContent).toContain("00:00:05");
-  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("00:00:02");
+  expect(screen.getByTestId("timeline-total-duration").textContent).toContain("00:05");
+  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("00:02");
   f.click(f.ids[1]!); f.click(f.ids[3]!, { shiftKey: true });
-  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (3): 00:00:04");
+  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (3): 00:04");
   f.click(f.ids[2]!, { metaKey: true });
-  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (2): 00:00:03");
+  expect(screen.getByTestId("timeline-selected-duration").textContent).toContain("Seleção (2): 00:03");
 });
 
 it("Cmd+A and Delete remove a montage in one Undo while typing, composition and modal dialogs are guarded", async () => {
@@ -459,7 +459,7 @@ it.each(["pt-BR", "en-US"] as const)("%s reveals compact export feedback and can
   fireEvent.change(draft, { target: { value: "Manter esta instrução sem executar IA" } });
   if (locale === "en-US") fireEvent.click(screen.getByRole("button", { name: "Trocar idioma" }));
   const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
-  fireEvent.click(screen.getByRole("button", { name: t("sidebar.compact") }));
+  fireEvent.click(screen.getByRole("button", { name: t("sidebar.activateCompact") }));
   expect(screen.getByRole("tab", { name: t("sidebar.directorTab") }).getAttribute("aria-selected")).toBe("true");
   const before = backend.history.toArchive();
   const selection = container.querySelector('[data-testid="app-shell"]')!.getAttribute("data-selected-project-item-id");
@@ -533,7 +533,7 @@ it("Escape restores numerical drafts and invalid, IME or other-source drafts cre
   fireEvent.compositionEnd(input);
   fireEvent.keyDown(input, { key: "Enter", isComposing: true, keyCode: 229 });
   fireEvent.keyDown(input, { key: "Escape" }); fireEvent.blur(input);
-  expect((input as HTMLInputElement).value).toBe("00:00:01");
+  expect((input as HTMLInputElement).value).toBe("00:01");
   fireEvent.change(input, { target: { value: "" } }); fireEvent.blur(input); fireEvent.keyDown(input, { key: "Enter" });
   expect(input.getAttribute("aria-invalid")).toBe("true");
   expect(input.getAttribute("aria-describedby")).toBeTruthy();
@@ -664,7 +664,7 @@ it("dirty range settles before selecting another clip, retaining its owner and o
   await user.click(f.item(f.ids[3]!));
   expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
   expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(f.ids[0]);
-  expect(input.value).toBe("00:00:00");
+  expect(input.value).toBe("00:00");
   await act(async () => release());
   await waitFor(() => expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(f.ids[3]));
   expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(29);
@@ -768,7 +768,7 @@ it("failed range settlement retains the draft and blocks a following duplicate u
   await user.click(controls().getByRole("button", { name: translate("pt-BR", "sequence.duplicate") }));
   await waitFor(() => expect(input.matches(":disabled")).toBe(false));
   expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
-  expect(input.value).toBe("00:00:00"); expect(f.backend.history.current).toEqual(before);
+  expect(input.value).toBe("00:00"); expect(f.backend.history.current).toEqual(before);
   f.backend.beforeEdit = async () => {};
   await user.click(controls().getByRole("button", { name: translate("pt-BR", "sequence.duplicate") }));
   await waitFor(() => expect(clips(f.backend)).toHaveLength(5));
@@ -811,7 +811,7 @@ it.each(["duplicate", "selection", "import", "export", "inspector-export", "pane
   await user.pointer({ target, keys: "[/MouseLeft]" });
   expect(backend.requests.map(r => r.type)).toEqual(["trim"]);
   expect(backend.history.current).toEqual(before);
-  expect(input.value).toBe("00:00:00"); expect(io.picker).not.toHaveBeenCalled(); expect(io.exporter).not.toHaveBeenCalled();
+  expect(input.value).toBe("00:00"); expect(io.picker).not.toHaveBeenCalled(); expect(io.exporter).not.toHaveBeenCalled();
   expect(screen.getByTestId("app-shell").classList.contains("media-open")).toBe(true);
   expect(screen.getByTestId("app-shell").getAttribute("data-selected-project-item-id")).toBe(ids[0]);
   if (kind === "repeat") expect((target as HTMLInputElement).checked).toBe(false);
@@ -898,7 +898,7 @@ it("source selector settles the old owner before switching to another source ran
   await user.click(input); await user.clear(input); await user.type(input, frameTime("29"));
   let release!: () => void; f.backend.beforeEdit = () => new Promise(resolve => { release = resolve; });
   await user.selectOptions(controls().getByRole("combobox", { name: "Fonte" }), "s1");
-  expect((input as HTMLInputElement).value).toBe("00:00:00");
+  expect((input as HTMLInputElement).value).toBe("00:00");
   expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
   await act(async () => release());
   await waitFor(() => expect((controls().getByRole("combobox", { name: "Fonte" }) as HTMLSelectElement).value).toBe("s1"));
@@ -921,7 +921,7 @@ it("a range failure during an existing drag consumes Drop without retrying trim 
   expect(f.backend.requests.map(r => r.type)).toEqual(["trim"]);
   expect(clips(f.backend).map(c => c.id)).toEqual(f.ids);
   expect(clips(f.backend)[0]!.frameTiming!.sourceEndFrame).toBe(30);
-  expect((input as HTMLInputElement).value).toBe("00:00:00");
+  expect((input as HTMLInputElement).value).toBe("00:00");
 });
 
 it("native shortcuts duplicate once and history shortcuts respect fields, modals, IME and browser ownership", async () => {
@@ -1006,7 +1006,7 @@ it("explicit Fit and duration edits keep the chosen pixels/time scale while slac
  await action(f.backend,"Duplicar selecionado");
  const next=parseFloat(f.item(f.ids[0]!).style.width)*parseFloat(f.container.querySelector<HTMLElement>(".timeline-table")!.style.getPropertyValue("--timeline-content-width"))/100;
  expect(next).toBeCloseTo(width);expect(f.backend.history.current.timeline.durationMs).toBe(6000);
- expect(screen.getByTestId("timeline-cursor").textContent).toMatch(/Cursor \d{2}:\d{2}:\d{2}/);
+ expect(screen.getByTestId("timeline-cursor").textContent).toMatch(/Cursor \d{2}:\d{2}/);
 });
 
 it.each(["fit", "resize"] as const)("in-flight trim cancels before release when %s changes captured geometry at zoom100", async change => {

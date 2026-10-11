@@ -415,3 +415,68 @@ the four/six supplemental proof remains applicable. The first CI failure
 and deterministic red/green logs are retained in the hardening evidence.
 Final head checks must pass before closeout; this is a test synchronization
 fix, not a retry used to conceal a defect or a new human acceptance round.
+
+
+## Human-review regressions — 2026-10-11
+
+Frozen PR96/97 and the running UX app are preserved. The Owner's reported
+acceptance and the follow-up expectations live in the existing
+[acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#reported-owner-results-and-bounded-follow-up--2026-10-11),
+without a second source of truth for scenario IDs. This isolated delta fixes
+Original requested-clock response, covered arrow text-selector rendering,
+vertical thumbnail/name layout and source-removal dialog spacing, plus the
+approved compact/fine time, contextual help, top-only layout controls and
+Exportar/Export action label. No new codec/container or project-manager flow.
+
+External evidence resides in
+`~/Documents/CEVRA/Vids/human-review-regressions-2026-10-11`.
+The red baseline `evidence/original-scrub-before-fix.log` reproduces a zero
+counter after requesting4321ms before Play. Its regression asserts immediate
+requested-clock publication, no play, no sequence-clock overwrite and unchanged
+History. Stored ranges are not converted on focus/blur; explicit edits and fine
+navigation are validated, including rounded frame29 at maximum, fraction
+removal, hour crossing and rejected values outside the CFR clock.
+
+`evidence/font-coverage.json` verifies Inter's U+2B06 base glyph is present,
+while direct U+FE0E glyph lookup returns zero and CoreText shaping resolves the
+covered sequence in Inter. Runtime0.3.7 verifies the base and every shaped run;
+text remains unchanged, no font is globally registered and no fallback is
+introduced. Source helper tests compare byte-identical H/V PNGs for plain
+arrow versus arrow+FE0E. Emoji/missing-base/leading-or-repeated-FE0E and FE0F
+negative cases reject normally, without a published PNG or native crash.
+The macOS runtime CI tests the packaged helper, not merely its source.
+
+`evidence/layout-before.json` measured a vertical thumbnail scroll extent of
+124px inside a61px box, covering the filename. `evidence/layout-after.json`
+measures both thumb extents at61px, open sidebar body500px and compact464px
+inside a500px sidebar. The corrected480×378 dialog has12px paragraph gaps and
+fits the900×680 minimum-window probe. This is owned offscreen WK source/CSS
+geometry, not a screenshot or a takeover of the user's app. The same probe
+uses an admitted Blob MP4, seeks to4.321 seconds before Play and observes
+seeking→timeupdate→seeked, readyState4, paused=true. No weaker readiness rule
+was required. App-level perceived fluency remains for subjective acceptance.
+
+The first complete Unicode H/V render attempt failed with
+`preview file identity changed` inside Documents. Its retained log is
+`evidence/unicode-real-renders-r1.log`; no render PASS is claimed from that
+attempt. The strict identity guard is unchanged. A current-task stable local
+scratch exception and verified SHA256 transfer are pending explicit approval.
+Earlier PR97 renders establish their historical scope only. Signature/app,
+new exact-head CI, independent closeout and the bounded human follow-up remain
+pending until current gates complete.
+
+Director impact: compatible presentation/glyph extension; typed IR/History
+operations and permissions stay unchanged in both directions. No full G1/K4,
+ADR0012, HDR/color or release acceptance is implied.
+
+
+Current isolated verification: UI322 PASS/1 runtime-packet case pending;
+Media Python159 PASS with pinned Python3.12.14; Node core692 PASS. Two of
+three initial Host failures were resolved by using that supported interpreter
+in its synthetic managed-runtime fixtures (33-case retest PASS); the remaining
+private-copy identity case is blocked under Documents. The first Python3.9
+failure is retained and is not a product defect. A distinct offline app
+candidate was compiled, but remains undelivered/unopened while render/signature
+and fresh-head CI gates are pending. Independent read-only static review
+confirmed the corrected time-input overflow/no-op and current-source filename
+regressions, with no concrete remaining finding in its checked scope.

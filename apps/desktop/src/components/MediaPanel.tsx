@@ -72,7 +72,7 @@ export function MediaPanel({ sources, presentations, selectedId, workspace, impo
                 {source.kind === "video" && backend?.thumbnailLocalVideo && <small>{t(thumbnails.failed(source) ? "media.thumbnailUnavailable" : "media.thumbnailLoading")}</small>}
               </>}
             </span>
-            <span className="media-card-copy"><strong>{presentations.get(source.id)!.label}</strong><small className="media-source-name">{source.displayName}</small><small>{metadata(source)}</small></span>
+            <span className="media-card-copy"><strong className="media-source-name">{source.displayName}</strong><small>{presentations.get(source.id)!.label}</small><small>{metadata(source)}</small></span>
           </button>
           {thumbnails.failed(source) && backend?.thumbnailLocalVideo && <button type="button" className="text-button" disabled={actionBusy || importBusy} onClick={() => action(() => thumbnails.retry(source))} aria-label={`${t("media.thumbnailRetry")} · ${presentations.get(source.id)!.label}`}>{t("media.thumbnailRetry")}</button>}
           </div>

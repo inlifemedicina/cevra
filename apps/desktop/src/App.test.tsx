@@ -276,7 +276,7 @@ describe("CEVRA Vids desktop shell", () => {
     await user.click(screen.getByRole("button", { name: "Trocar idioma" }));
     expect(screen.getByRole("tab", { name: "Edit" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Transcription" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Export MP4…" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
     expect(document.documentElement.lang).toBe("en-US");
   });
 
@@ -299,7 +299,7 @@ describe("CEVRA Vids desktop shell", () => {
   it("makes every deferred production action explicit and unavailable", async () => {
     await renderApplication();
     expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Exportar MP4…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Exportar" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("A importação real de arquivos não está conectada nesta versão de apresentação.")).toBeTruthy();
   });
 
@@ -311,7 +311,7 @@ describe("CEVRA Vids desktop shell", () => {
     expect(screen.queryByText(/Clareza gera confiança/)).toBeNull();
     expect(screen.getAllByTestId(/^timeline-track-/)).toHaveLength(7);
     expect(screen.getByRole("slider", { name: "Régua e cursor da linha do tempo" }).getAttribute("aria-valuemax")).toBe("0");
-    expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:00:00 / 00:00:00");
+    expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:00 / 00:00");
     expect(screen.getByTestId("app-shell").dataset.activeSourceId).toBeUndefined();
   });
 

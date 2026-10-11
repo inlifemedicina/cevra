@@ -4,6 +4,7 @@ import type { CreateManualVideoClipRequest, LocalVideoPreview } from "@cevra/app
 import type { ProjectIR, SourceAsset, TimelineClip } from "@cevra/project-ir";
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { DesktopBackend } from "../backend/desktop-backend";
+import { EditingHelp } from "./EditingHelp";
 import { formatMilliseconds, type Translate } from "../ui-model";
 import { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, formatFrames, snapSourceMark } from "../frame-timing";
 
@@ -18,6 +19,7 @@ interface Props {
   backend: DesktopBackend;
   source?: SourceAsset;
   sourceLabel?: string;
+  sourceFileName?: string;
   snapshotId: string;
   clip?: TimelineClip;
   sequencePreview?: readonly TimelineClip[];
@@ -41,7 +43,7 @@ interface Props {
 }
 
 /** Original bytes or a bounded, ephemeral derivative of the canonical clip. */
-export function ManualVideoPreview({ onAction, actionBusy, backend, source, sourceLabel, snapshotId, clip, sequencePreview, unsupportedClip, timelineOccupied, sequenceEditing, frameEditing, busy, seek, t, onPlayheadChange, onCreate, program, titleEditing, titleEditingBlocked }: Props) {
+export function ManualVideoPreview({ onAction, actionBusy, backend, source, sourceLabel, sourceFileName, snapshotId, clip, sequencePreview, unsupportedClip, timelineOccupied, sequenceEditing, frameEditing, busy, seek, t, onPlayheadChange, onCreate, program, titleEditing, titleEditingBlocked }: Props) {
   const controlBusy = actionBusy ?? busy;
   function runAction(action: () => void | Promise<void>) {
     if (onAction) void onAction(action).catch(() => {});
@@ -237,6 +239,17 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
     if (clip) onPlayheadChange(timing ? framesToMilliseconds(timing.timelineStartFrame + localFrame!) : clip.timelineStartMs + (milliseconds - startMs));
   }
 
+  function seekOriginal(milliseconds: number) {
+    const video = videoRef.current;
+    if (!video || !currentMedia()) return;
+    const localMs = Math.max(0, Math.min(mediaEndMs, endMs - startMs, milliseconds - startMs));
+    const changed = Math.abs(video.currentTime * 1000 - localMs) > 1e-6;
+    try { video.currentTime = localMs / 1000; } catch { fail("MANUAL_VIDEO_UNSUPPORTED"); return; }
+    // This is the requested source clock, not proof that the decoder painted it.
+    setCurrentMs(startMs + localMs); setSeeking(changed || video.seeking);
+    if (clip) onPlayheadChange(clip.timelineStartMs + localMs);
+  }
+
   function currentMedia() {
     const video = videoRef.current;
     return Boolean(video && ready && !busy && url && activePreviewUrl.current === url && video.getAttribute("src") === url);
@@ -275,6 +288,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
   const validRange = inMs !== null && outMs !== null && inMs < outMs && outMs <= (source?.durationMs ?? 0);
   const errorKey = error === "MANUAL_VIDEO_FRAME_GRID_UNAVAILABLE" ? "preview.gridUnavailable" : error === "MANUAL_VIDEO_PREVIEW_SETTLING" ? "preview.localSettling" : error === "MANUAL_VIDEO_TOO_LARGE" ? "preview.localTooLarge" : error === "MANUAL_VIDEO_STALE" || error === "MANUAL_SEQUENCE_STALE" || error === "MANUAL_VIDEO_SOURCE_CHANGED" ? "preview.localChanged" : "preview.localUnavailable";
   const programFrame = timing ? timing.timelineStartFrame + (Math.min(timing.sourceEndFrame, Math.max(timing.sourceStartFrame, nearestMsToFrames(Math.max(0, currentMs)))) - timing.sourceStartFrame) : undefined;
+  const clockDuration = program?.durationMs ?? source?.durationMs ?? endMs;
   const programMs = timing ? framesToMilliseconds(programFrame!) : clip ? clip.timelineStartMs + (currentMs - startMs) : 0;
   function keyboard(event: ReactKeyboardEvent<HTMLElement>) {
     const action = shortcutAction(event, "preview");
@@ -283,13 +297,13 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
       if (!ready || seeking || busy) return;
       event.preventDefault(); event.stopPropagation();
       if (program) runAction(() => programRef.current?.onSeek(action === "start" ? 0 : programRef.current.durationMs));
-      else if (videoRef.current) { setSeeking(true); videoRef.current.currentTime = action === "start" ? 0 : mediaEndMs / 1000; }
+      else seekOriginal(action === "start" ? startMs : endMs);
       return;
     }
     activateShortcut(event, event.currentTarget, action);
   }
   return <section className="manual-video-preview" aria-label={t("preview.localVideo")} tabIndex={0} onKeyDown={keyboard}>
-    <div className="manual-preview-heading"><strong>{sourceLabel ?? t("preview.localVideo")}</strong><span>{t(program ? "sequence.preview" : clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
+    <div className="manual-preview-heading"><strong title={sourceFileName ?? source?.displayName}>{sourceFileName ?? source?.displayName ?? sourceLabel ?? t("preview.localVideo")}</strong><span>{t(program ? "sequence.preview" : clip ? "preview.clipMode" : "preview.originalMode")}</span></div>
     <div className="manual-video-stage">
       <video ref={videoRef} src={url ?? undefined} hidden={Boolean(program && currentMs >= endMs)} preload="auto" playsInline onLoadedMetadata={event => { if (event.currentTarget === videoRef.current && url) metadataReady(); }} onLoadedData={frameReady} onCanPlay={frameReady} onError={() => { if (url) fail("MANUAL_VIDEO_UNSUPPORTED"); }}
         onSeeking={() => { pendingSeek.current = true; setSeeking(true); }} onSeeked={() => { pendingSeek.current = false; frameReady(); setSeeking(false); updateClock(); }} onTimeUpdate={updateClock} onPlay={() => { if (!currentMedia() || program && !program.resume) { videoRef.current?.pause(); return; } setPlaying(true); }} onPause={() => setPlaying(false)} onEnded={() => { if (!currentMedia()) return; setPlaying(false); if (program && clip) { setCurrentMs(endMs); onPlayheadChange(clip.timelineEndMs); finishClip(); } else updateClock(); }} />
@@ -336,31 +350,31 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
       onChange={(event) => {
         if (program?.onScrub && sliderScrub.current) { const value = timing ? framesToMilliseconds(Number(event.target.value)) : Number(event.target.value); runAction(() => programRef.current?.onScrub?.(value, "move")); return; }
         if (program) { const value = timing ? framesToMilliseconds(Number(event.target.value)) : Number(event.target.value); runAction(() => programRef.current?.onSeek(value, programRef.current.resume)); return; }
-        const video = videoRef.current; if (!video) return;
-        setSeeking(true); video.currentTime = Math.min(mediaEndMs, Number(event.target.value) - startMs) / 1000;
+        seekOriginal(Number(event.target.value));
       }} />
-      <time data-testid="preview-timecode">{timing && program ? t("sequence.position", { time: formatFrames(programFrame!) }) : t(program ? "sequence.position" : "preview.sourcePosition", { time: formatMilliseconds(program ? programMs : currentMs) })} / {timing && program ? formatFrames(floorMsToFrames(program.durationMs)) : formatMilliseconds(program ? program.durationMs : endMs)}</time>
+      <time data-testid="preview-timecode">{timing && program ? t("sequence.position", { time: formatFrames(programFrame!, clockDuration) }) : t(program ? "sequence.position" : "preview.sourcePosition", { time: formatMilliseconds(program ? programMs : currentMs, clockDuration) })} / {timing && program ? formatFrames(floorMsToFrames(program.durationMs), clockDuration) : formatMilliseconds(program ? program.durationMs : endMs, clockDuration)}</time>
     </div>
-    {(preview?.proxy || clip && !unsupportedClip) && <details className="editing-help"><summary>{t("editing.help")}</summary>
+    <EditingHelp t={t}>
       {preview?.proxy && <p>{t("preview.proxyHint")}</p>}
       {clip && !unsupportedClip && <p>{t("preview.boundedClip")}</p>}
-    </details>}
+      {!clip && <><p>{t("preview.marksDraft")}</p><p>{t("preview.localHint")}</p></>}
+      <p>{t("editing.fineTime")}</p><p>{t("editing.mediaTitleCaption")}</p>
+    </EditingHelp>
     {clip && !sequencePreview && <div className="manual-preview-timing">
       <time data-testid="preview-clip-timecode">{t("preview.clipElapsed", { time: formatMilliseconds(currentMs - startMs), duration: formatMilliseconds(endMs - startMs) })}</time>
-      <output>{t("preview.clipBounds", { start: timing ? formatFrames(timing.sourceStartFrame) : formatMilliseconds(startMs), end: timing ? formatFrames(timing.sourceEndFrame) : formatMilliseconds(endMs) })}</output>
+      <output>{t("preview.clipBounds", { start: timing ? formatFrames(timing.sourceStartFrame, source?.durationMs) : formatMilliseconds(startMs, source?.durationMs), end: timing ? formatFrames(timing.sourceEndFrame, source?.durationMs) : formatMilliseconds(endMs, source?.durationMs) })}</output>
     </div>}
     {sequenceEditing && timelineOccupied && !clip && <p className="manual-preview-hint" role="status">{t("sequence.previewPending")}</p>}
     {clip || timelineOccupied && !sequenceEditing ? (unsupportedClip || !clip) && <p className="manual-preview-hint" role="status">{t(unsupportedClip ? "preview.unsupportedClip" : "preview.singleClip")}</p> : <>
       <div className="manual-preview-marks">
-        <p>{t("preview.marksDraft")}</p>
-        <button {...shortcutProps("mark-in", t)} type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("in")}>{t("preview.markIn")}</button><output>{frameEditing && inMs !== null ? `IN ${formatFrames(nearestMsToFrames(inMs))}` : <>IN {inMs === null ? "—" : formatMilliseconds(inMs)}</>}</output>
-        <button {...shortcutProps("mark-out", t)} type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("out")}>{t("preview.markOut")}</button><output>{frameEditing && outMs !== null ? `OUT ${formatFrames(nearestMsToFrames(outMs))}` : <>OUT {outMs === null ? "—" : formatMilliseconds(outMs)}</>}</output>
+        <button {...shortcutProps("mark-in", t)} type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("in")}>{t("preview.markIn")}</button><output>{frameEditing && inMs !== null ? `IN ${formatFrames(nearestMsToFrames(inMs), source?.durationMs)}` : <>IN {inMs === null ? "—" : formatMilliseconds(inMs, source?.durationMs)}</>}</output>
+        <button {...shortcutProps("mark-out", t)} type="button" className="secondary-button" disabled={!ready || seeking || busy} onClick={() => mark("out")}>{t("preview.markOut")}</button><output>{frameEditing && outMs !== null ? `OUT ${formatFrames(nearestMsToFrames(outMs), source?.durationMs)}` : <>OUT {outMs === null ? "—" : formatMilliseconds(outMs, source?.durationMs)}</>}</output>
         <button type="button" className="manual-create-clip-button" disabled={!ready || seeking || busy || !validRange} onClick={() => {
           videoRef.current?.pause();
           if (source && validRange) void onCreate({ sourceId: source.id, expectedSnapshotId: snapshotId, sourceStartMs: inMs!, sourceEndMs: outMs! }).catch((cause: unknown) => fail(errorCode(cause)));
         }}>{t(busy ? "preview.creatingClip" : sequenceEditing && timelineOccupied ? "sequence.append" : "preview.createClip")}</button>
       </div>
-      <p className="manual-preview-hint">{inMs !== null && outMs !== null && !validRange ? t("preview.rangeInvalid") : t("preview.localHint")}</p>
+      {inMs !== null && outMs !== null && !validRange && <p className="manual-preview-hint" role="alert">{t("preview.rangeInvalid")}</p>}
     </>}
   </section>;
 }

@@ -74,8 +74,8 @@ it("keeps one export panel when source/title selection changes after title edits
     fireEvent.change(screen.getByLabelText("Texto do título"), { target: { value: text } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Aplicar título" })); });
     expect(screen.queryByRole("region", { name: "Exportar sequência" })).toBeNull();
-    expect(screen.getAllByRole("button", { name: "Exportar MP4…" })).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Exportar MP4…" }).closest("header")).not.toBeNull();
+    expect(screen.getAllByRole("button", { name: "Exportar" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Exportar" }).closest("header")).not.toBeNull();
   }
 });
 

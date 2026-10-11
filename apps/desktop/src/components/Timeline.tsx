@@ -271,7 +271,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
     };
   }
   const selectedDuration = project.timeline.clips.filter(clip => selectedIds.includes(clip.id)).reduce((total, clip) => total + clip.timelineEndMs - clip.timelineStartMs, 0);
-  const durationLabel = formatTime;
+  const durationLabel = (ms: number) => formatTime(ms, canonicalDuration);
 
   function movePlayheadFromKeyboard(event: ReactKeyboardEvent<HTMLElement>) {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || trimBusy || timelineShortcutBlocked(event.nativeEvent)) return;
@@ -296,7 +296,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
         <div className="timeline-zoom"><label htmlFor="timeline-zoom">{t("timeline.zoom")}</label><span>−</span><input id="timeline-zoom" type="range" min="70" max="180" value={zoom} onChange={(event) => onZoomChange(Number(event.target.value))} /><span>＋</span><button {...shortcutProps("fit", t)} type="button" onClick={fitTimeline}><Icon name="fit" size={14} />{t("timeline.fit")}</button></div>
       </div>
       <div className="timeline-summary">
-        <output className="timeline-cursor" data-testid="timeline-cursor">{t("timeline.cursorTime", { time: formatTime(playheadMs) })}</output>
+        <output className="timeline-cursor" data-testid="timeline-cursor">{t("timeline.cursorTime", { time: formatTime(playheadMs, canonicalDuration) })}</output>
         <output data-testid="timeline-total-duration">{t("timeline.totalDuration", { duration: durationLabel(canonicalDuration) })}</output>
         {dropCue && <output role="status">{dropCue.label}</output>}
         {selectedIds.length > 0 && <output data-testid="timeline-selected-duration">{t("timeline.selectedDuration", { count: selectedIds.length, duration: durationLabel(selectedDuration) })}</output>}
@@ -307,7 +307,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
       </div>
       {sequenceClips && onSequenceEdit && onCommitRange && rangeDraft && onRangeAction && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedIds.length === 1 ? selectedIds[0]! : null} selectedClipIds={selectedIds} playheadMs={playheadMs} busy={editingDisabled} t={t} onEdit={onSequenceEdit} onCommitRange={onCommitRange} rangeDraft={rangeDraft} onAction={onRangeAction} />}
       <div className="timeline-table" ref={table} onScroll={event => setScroll(event.currentTarget.scrollLeft)} style={{ "--timeline-content-width": `${geometry.width}px` } as CSSProperties}>
-        <div className="timeline-corner"><span className="timecode">{grid ? formatFrames(floorMsToFrames(playheadMs)) : trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs)}</span></div>
+        <div className="timeline-corner"><span className="timecode">{grid ? formatFrames(floorMsToFrames(playheadMs), canonicalDuration) : trimClip ? formatMilliseconds(playheadMs, canonicalDuration) : formatTime(playheadMs, canonicalDuration)}</span></div>
         <div
           className="timeline-ruler"
           role="slider"
@@ -316,7 +316,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
           aria-valuemin={0}
           aria-valuemax={grid ? floorMsToFrames(canonicalDuration) : canonicalDuration}
           aria-valuenow={grid ? floorMsToFrames(playheadMs) : playheadMs}
-          aria-valuetext={grid ? t("timeline.playhead", { time: formatTime(playheadMs) }) : t("timeline.playhead", { time: trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs) })}
+          aria-valuetext={grid ? t("timeline.playhead", { time: formatTime(playheadMs, canonicalDuration) }) : t("timeline.playhead", { time: trimClip ? formatMilliseconds(playheadMs, canonicalDuration) : formatTime(playheadMs, canonicalDuration) })}
           onPointerDown={event => {
             if (event.button !== 0 || scrub.current || trimBusy) return;
             const value = pointerPosition(event); if (value === null) return;
@@ -331,7 +331,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
           onKeyDown={movePlayheadFromKeyboard}
         >
           <div className="timeline-width">
-            {ticks.map(frame => <span key={frame} data-ruler-frame={frame} style={{ left: `${framesToMilliseconds(frame) / geometryDuration * 100}%` }}><i />{grid ? formatFrames(frame) : formatMilliseconds(framesToMilliseconds(frame))}</span>)}
+            {ticks.map(frame => <span key={frame} data-ruler-frame={frame} style={{ left: `${framesToMilliseconds(frame) / geometryDuration * 100}%` }}><i />{grid ? formatFrames(frame, canonicalDuration) : formatMilliseconds(framesToMilliseconds(frame), canonicalDuration)}</span>)}
           </div>
         </div>
         {tracks.map((track) => {

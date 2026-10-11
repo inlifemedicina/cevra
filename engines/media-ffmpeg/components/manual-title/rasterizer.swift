@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 // First-party fixed title component; private font loading, no global registration.
 enum RasterError: Error { case invalidArguments, font, glyph, overflow, output }
+func rasterize() throws {
 let args = CommandLine.arguments
 guard (args.count == 6 || args.count == 10), let width = Int(args[2]), let height = Int(args[3]),
       [(1920,1080),(1080,1920)].contains(where: { $0.0 == width && $0.1 == height }),
@@ -24,9 +25,15 @@ let baseFont = CTFontCreateWithGraphicsFont(graphicsFont, CGFloat(fontSize), nil
 let fontAttributes = [kCTFontCascadeListAttribute: []] as CFDictionary
 let font = CTFontCreateCopyWithAttributes(baseFont, CGFloat(fontSize), nil,
     CTFontDescriptorCreateWithAttributes(fontAttributes))
-let chars = Array(text.utf16)
+let units = Array(text.utf16)
+// Text-presentation selectors shape with their base; they have no standalone glyph.
+// Only FE0E is admitted, after a covered base, without changing the stored text.
+guard units.enumerated().allSatisfy({ index, value in
+    value != 0xFE0E || index > 0 && units[index - 1] != 0xFE0E
+}) else { throw RasterError.glyph }
+let chars = units.filter { $0 != 0xFE0E }
 var glyphs = [CGGlyph](repeating: 0, count: chars.count)
-guard CTFontGetGlyphsForCharacters(font, chars, &glyphs, chars.count), !glyphs.contains(0) else { throw RasterError.glyph }
+guard !chars.isEmpty, CTFontGetGlyphsForCharacters(font, chars, &glyphs, chars.count), !glyphs.contains(0) else { throw RasterError.glyph }
 guard let space = CGColorSpace(name: CGColorSpace.sRGB), let context = CGContext(data: nil,
     width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
     space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw RasterError.output }
@@ -46,6 +53,18 @@ let attributed = NSAttributedString(string: text, attributes: [
     NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(srgbRed: 0.96, green: 0.97, blue: 0.98, alpha: 1)
 ])
 let line = CTLineCreateWithAttributedString(attributed)
+// Shaping must still use the private Inter font, with every resulting glyph present.
+let runs = CTLineGetGlyphRuns(line) as NSArray
+for raw in runs {
+    let run = raw as! CTRun
+    let attributes = CTRunGetAttributes(run) as NSDictionary
+    guard let runFont = attributes[kCTFontAttributeName] else { throw RasterError.glyph }
+    let shapedFont = runFont as! CTFont
+    guard CFEqual(CTFontCopyPostScriptName(shapedFont), CTFontCopyPostScriptName(font)) else { throw RasterError.glyph }
+    var shapedGlyphs = [CGGlyph](repeating: 0, count: CTRunGetGlyphCount(run))
+    CTRunGetGlyphs(run, CFRange(location: 0, length: 0), &shapedGlyphs)
+    guard !shapedGlyphs.contains(0) else { throw RasterError.glyph }
+}
 let bounds = CTLineGetBoundsWithOptions(line, [.useGlyphPathBounds])
 guard bounds.width <= barWidth - 2 * padding, bounds.height <= barHeight - 12 else { throw RasterError.overflow }
 let origin = CGPoint(x: x + padding - bounds.minX, y: y + (barHeight - bounds.height) / 2 - bounds.minY)
@@ -62,3 +81,9 @@ let report: [String: Any] = ["width": width,"height":height,"text":text,"fontPos
 let json = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
 FileHandle.standardOutput.write(json)
 FileHandle.standardOutput.write(Data([10]))
+
+}
+do { try rasterize() } catch {
+    FileHandle.standardError.write(Data("MANUAL_TITLE_RASTER_FAILED: \(error)\n".utf8))
+    exit(1)
+}
