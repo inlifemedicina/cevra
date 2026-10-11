@@ -2,7 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
-**Last decision reconciliation:** 2026-10-03 UTC, bounded offline Editorial Draft V1 integrated by PR #75 after #74; its smallest offline host/backend/UI consumer is integrated through PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI 5/5 and Exact Runtime 1/1. The owner subsequently approved bounded offline admission of the designated existing F-A02 result/history into a temporary native review session; that addition is IN DEVELOPMENT / NOT MERGED (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
+**Last decision reconciliation:** 2026-10-11 UTC: approved Vids UX/direct titles IN DEVELOPMENT in Draft #96, grouped APP/OWNER pending (latest entries below). Earlier integrated context: 2026-10-03 UTC, bounded offline Editorial Draft V1 integrated by PR #75 after #74; its smallest offline host/backend/UI consumer is integrated through PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI 5/5 and Exact Runtime 1/1. The owner subsequently approved bounded offline admission of the designated existing F-A02 result/history into a temporary native review session; that addition is IN DEVELOPMENT / NOT MERGED (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
 
@@ -3739,3 +3739,42 @@ replacement, account/authentication operation or global configuration change.
 Director impact is planning-only at this transition; future visual-evidence
 and cut-plan consumers must delimit their compatible typed contracts before
 implementation. Progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.
+
+
+### 2026-10-11 — Approved Vids UX and direct title extension
+
+**IN DEVELOPMENT / NOT MERGED**, Draft #96, `feat/manual-title-v1`, extending
+`cc48413`. The Owner approved organization/time/removal first, then direct
+preview title manipulation, and clarified removal means only from the project.
+This is implementation authority for the two bounded scopes, not authority for
+merge, real AI, spending or security changes. Initial local work was preserved.
+
+Implemented: one top-right Export outside the inspector; adjustable taller
+timeline/compact bar; technical proxy/boundary help; media names without Fonte;
+HH:MM:SS display with lossless internal frame/legacy precision; selection-owned
+Delete and reviewed, atomic project-source removal with History/Undo/reopen.
+Direct title selection/text/position/proportional scale use the same typed title
+operations, Project IR and History, with snapshot-bound drafts and failure-safe
+transitions. Closed V2 layout extends the historical V1 record without rewriting
+it on open. Existing composition/media engine, font/license and privilege
+boundaries remain; runtime0.3.6 uses the same bounded component/rasterizer.
+
+Core/Host Node877, native55, Media Python157 and real source renders17/27 measured
+jobs passed. UI gates include real packet delivery, text→action success/failure,
+frame151 retention after playback/pause, exact-time focus/blur, conversion,
+Delete/Undo and source-removal review. Independent read-only review corrected
+concrete P2 defects and found none remaining in the reviewed scope. Exact
+code/package inventories and gate limits belong in the
+[canonical title proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#ux-e-manipulação-direta-aprovadas--2026-10-11).
+
+The isolated UX app uses `com.cevra.vids.uxtitles.test` and a CEVRA delivery
+shortcut; its signed package stays in Applications to avoid File Provider
+metadata. The original app, sources, historical receipts and failed attempts
+were preserved. The [existing grouped acceptance catalog](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#integrated-manual-title-app-round--2026-10-11)
+now covers both approved scopes in their requested order. **APP/OWNER PENDING**;
+local technical/DOM gates do not promote native visual or subjective UX PASS.
+No default engine, full G1/K4/ADR0012, Windows/release or color/HDR gate closes.
+Director impact: compatible extension in both directions; proposed validated
+V1/V2 titles and reviewed removal execute through existing IR/History commands.
+Progress55% and F-A02 exhausted1/1 remain; later audiovisual/AI blocks are not
+started by this extension.

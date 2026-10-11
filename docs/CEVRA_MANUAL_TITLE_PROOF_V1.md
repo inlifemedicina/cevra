@@ -159,3 +159,109 @@ esgotado1/1 permanecem.
 History compartilhados. O opcode nativo adicional é fechado para editar este
 título; não acrescenta shell/filtergraph arbitrário, provider, rede, credenciais
 ou quota de IA. Autoridade editorial continua na Application/Project IR.
+
+
+## UX e manipulação direta aprovadas — 2026-10-11
+
+**IN DEVELOPMENT / NOT MERGED**, continuação do Draft #96 em
+`feat/manual-title-v1`, base `cc48413`. O Owner aprovou dois escopos, nesta
+ordem: organização/tempo/remoção e manipulação direta de títulos. Confirmou
+`00:00:00`, Delete com Undo/aviso de impacto e “tirar midia do projeto.
+podemos seguir”. A aprovação inclui implementação, testes offline, renders,
+revisão independente, commit/push e Draft; não inclui merge ou IA real.
+As mudanças locais preexistentes de App/Timeline e o teste de workflow foram
+preservados antes das correções e incorporados, sem reset.
+
+### Comportamento implementado
+
+- Exportar MP4 existe uma vez no canto superior direito, fora do inspetor.
+  Selecionar/aplicar um título não duplica seções. A timeline ganha altura
+  ajustável por divisor, com limites responsivos e uma barra curta. Nomes de
+  mídia não recebem o prefixo Fonte. Proxy/bordas ficam na ajuda recolhida;
+  causas que impedem uma ação continuam visíveis e acionáveis.
+- Tempos exibidos usam HH:MM:SS. A edição mantém um valor interno exato em
+  quadros CFR30 ou milissegundos legados, independente da string mostrada.
+  Focar/sair sem alterar não arredonda cortes. Setas permitem ajuste fino;
+  valores fracionários digitados durante a edição são convertidos de forma
+  validada, sem frações persistentes. A revisão de conversão sinaliza mudanças
+  de precisão e expõe o delta exato na ajuda antes de confirmar.
+- Delete/Backspace respeitam a seleção e a posse de texto/IME/modais. Título
+  selecionado no preview ou timeline pode ser removido e desfeito. Mídia sai
+  somente do projeto: dependências e ripple são revistos antes de remover;
+  um comando `source.removeFromProject` registra fonte/trechos/transcrição e
+  eventual limite de título em um único History, com Undo/reopen. Snapshots e
+  dependências obsoletos são rejeitados. Arquivos originais não são apagados.
+- No preview pausado, clicar seleciona o título, duplo clique/Enter edita seu
+  texto, arrastar muda a posição e o canto ajusta o tamanho proporcional.
+  Controles por teclado complementam o gesto. Letterboxing fica fora das
+  coordenadas da imagem final. Escape/cancelamento/resize/blur retiram um gesto
+  incompleto sem edição; a soltura válida publica uma operação tipada.
+- O texto direto assenta antes de seleção, History, Export, cursor ou
+  transporte. Falha conserva o rascunho e consome o gesto já iniciado, sem
+  repetir automaticamente. A ação seguinte espera o snapshot canônico;
+  leituras editoriais de fundo não cancelam Play. Pausar sincroniza o cursor
+  do transporte com o quadro reproduzido antes de recarregar o preview.
+
+### Extensão fechada e compatibilidade
+
+`ManualTitle` aceita V1 histórico sem layout e V2 com layout V1 fechado:
+`x/y/width/fontScale` finitos em coordenadas normalizadas, com limites de
+posição, largura e escala. A abertura de V1 conserva exatamente o registro
+anterior; um gesto explícito produz V2. Mudar de aspecto valida e limita a
+posição ao novo canvas. TypeScript, payload Rust e worker Python validam os
+mesmos limites e rejeitam campos extras. Não há migração implícita de projetos.
+
+O mesmo componente `cevra.title.lower-third.inter.v1`, adapter, plano e
+rasterizador CoreText recebem o layout validado; preview/export usam a mesma
+semântica. Runtime 0.3.6, fonte Inter/OFL e pins anteriores mantidos. Nenhuma
+nova dependência, engine, provider, privilégio, shell/filtergraph de usuário,
+rede, configuração de segurança ou chamada de IA foi adicionada. Glyph,
+overflow, perfil BT709/TV e demais limites de admissão anteriores permanecem.
+
+**Director:** extensão compatível no escopo conferido, nos dois sentidos.
+Director pode propor o mesmo `ManualTitle` V1/V2 e os comandos tipados de
+remoção revisada; Application, Project IR e ProjectHistory continuam como
+fronteiras de execução/estado. Não há expansão da autoridade de providers.
+
+### Gates e entrega desta rodada
+
+A base externa é `~/Documents/CEVRA/Vids/ux-titulos-2026-10-11`.
+O catálogo canônico contém a única rodada agrupada; a prova offline fixa já
+aceita não é repetida. **APP/OWNER PENDING** para desenho/interação percebida,
+decode/paint nativo e comparação visual do app. Nenhum PASS global D23/K4/G1,
+benchmark ADR 0012, Windows, notarização ou release é inferido destes gates.
+
+| Evidência externa | Escopo verificado |
+|---|---|
+| `evidence/reported-bugs-baseline.log` | Reprodução dos bugs na base; regressões corrigidas na suíte integrada. |
+| `evidence/all-tests-final.log` | 877 testes Node dos pacotes core/Host PASS, incluindo persistência física V2 e remoção/Undo, sem execução de IA. |
+| `evidence/ui-delivery-final.log` + `real-ui-delivery.json` | UI299/299 PASS e entrega de seis pacotes reais Host/MP4/PNG, com snapshot antigo rejeitado. DOM/Blob não prova pintura nativa. |
+| `evidence/rust-tests-1.log` + `python-tests-final-2.log` | 55 Rust e 157 Media Python PASS; contratos fechados e destino supervisionado do helper. |
+| `evidence/real-renders.json` | 17 renders / 27 jobs medidos PASS: V1/V2, horizontal/vertical, intervalo exato, cache/Undo, áudio dentro do perfil, fontes intactas, negativos específicos e cancel/deadline sem publicação. |
+| `evidence/independent-review-final.json` + inventários | Revisão independente somente leitura, achados corrigidos; inventários ligam a revisão ao código entregue. |
+| `evidence/app-signature-final.json` + `host-bundle-smoke.json` | Assinatura ad hoc/deep/strict, runtime byte a byte igual ao renderizado, Node privado e store vazio próprio; title/import/export disponíveis. |
+
+Manifest do runtime: `0188d734aeede541f4d453c749dcc1832a8a0fd31f21740d38f8b03357782960`.
+Recibo de renders: `b8d1c15f43aabe594bf9ae6f1dbb4fc2faa8064f8cf0ea67dd4222094be74050`.
+V2 horizontal MAE 0,9670 / PSNR 42,8456 dB; vertical 2,7154 / 38,4552 dB,
+conservando os limites MAE≤3 e PSNR≥35 dB. Os 300 quadros e 480.000 amostras
+por final, AAC por perfil e pins de originais/cópias declaradas permanecem.
+O V2 usa IN91/OUT209: o oráculo percorre todos os quadros, inclusive bordas
+não inteiras em segundos. Pico RSS amostrado 199.802.880 bytes (~190,55 MiB)
+com orçamento 512 MiB; watchdog amostrado não garante teto rígido.
+
+O File Provider alterou a identidade de arquivos de scratch dentro de
+Documents durante duas tentativas, que permanecem FAIL preservadas. A rodada
+PASS usou scratch efêmero do sistema; todos os 20 arquivos de entrega foram
+copiados para a base CEVRA e conferidos por SHA256 em `render-transfer.json`.
+As entradas `fixtures/revisao-horizontal.mp4` e `revisao-vertical.mp4` são as
+cópias sintéticas BT709 explícitas já verificadas; os originais históricos
+continuam preservados. Nenhuma regra de integridade foi relaxada.
+
+O novo `CEVRA Vids UX.app`, identificador `com.cevra.vids.uxtitles.test`,
+0.1.0/runtime0.3.6, tem atalho dentro dessa base. O pacote assinado permanece
+em `~/Applications/CEVRA Vids UX 2026-10-11` para evitar atributos do File
+Provider; a cópia anterior ao selo foi conferida byte a byte, e o runtime não
+foi modificado pela assinatura. É teste local ad hoc, sem notarização. O app
+anterior não foi encerrado/substituído, e o agente não abriu projetos humanos.
+Obsoletos próprios ficam recuperáveis em `~/Documents/CEVRA/Apagar`.

@@ -841,28 +841,35 @@ grouped subjective round; do not repeat this approved offline visual test.
 
 ## Integrated manual-title app round — 2026-10-11
 
-**AUTO/UNIT PASS; APP/OWNER PENDING.** The limited integration was authorized
-after the historical proof acceptance. Reuse the stable IDs below; no blanket
-catalog PASS or new scenario ID. Local build/CI, exact-runtime original-source
-render, no-title regression, persistence/History and real-packet UI delivery
-passed. DOM/Blob evidence does not replace native playback or subjective UX.
-[Contracts, receipt hashes and bounds](CEVRA_MANUAL_TITLE_PROOF_V1.md#integração-limitada-autorizada--2026-10-11).
+**AUTO/UNIT PASS; APP/OWNER PENDING.** This single grouped app round now includes
+both Owner-approved UX scopes: organization/time/removal, then direct title
+manipulation. It supersedes the earlier pending app instructions at this same
+anchor; the accepted offline fixed-title visual proof remains closed. Reuse the
+stable IDs below without a blanket catalog PASS or new scenario ID.
+[Implemented contracts and gate bounds](CEVRA_MANUAL_TITLE_PROOF_V1.md#ux-e-manipulação-direta-aprovadas--2026-10-11).
 
-One grouped round uses the isolated `CEVRA Vids Manual Title.app` (0.1.0,
-runtime0.3.5) and the two synthetic inputs in its delivery folder. Test the app,
-not the previously accepted offline MP4s. The fixture lasts ten seconds at
-30fps, with a visible cut at five seconds and an audio tone/pulse.
+Open the isolated `CEVRA Vids UX.app` shortcut in
+`~/Documents/CEVRA/Vids/ux-titulos-2026-10-11` (0.1.0/runtime0.3.6). The signed
+package stays in Applications. Import `fixtures/revisao-horizontal.mp4`, then
+`fixtures/revisao-vertical.mp4` for the second aspect; these admitted synthetic
+fixtures each last ten seconds, with a visible cut at five seconds and an audio
+tone/pulse. Keep human exports in the base's `rodada-humana` folder.
 
-| Existing IDs / action | Expected result |
+| Existing IDs / grouped action | Expected result |
 |---|---|
-| D14-T2, D23-T1/T2: import horizontal input; create V1 from the whole ten-second Original using Mark IN at start / OUT at end and Create clip from excerpt; add title `Ação, café e conexão`, IN90, OUT210, 16:9. | One title is visible on the timeline and in V1 from 3s inclusive until 7s exclusive, crossing the 5s cut. Accents and safe margins appear correctly; the Original remains unchanged. |
-| D14-T2, D23-T1/T2, X-T1/T2: change text and range to IN120/OUT240, Apply; Undo, Redo; Remove and Undo. | Each applied edit/removal is one History step. Text/range and title restore coherently; montage/audio stay intact. An unadded draft requires Add or Discard before leaving. |
-| X-T7, I17-T9: wait for the top bar to show Saved, close the isolated app normally and reopen it. | The same saved title/text/range/aspect and montage reopen; no draft is silently promoted to a saved title. |
-| D23-T1/T2, bounded K3-T2/K4-T2: export horizontal with the matching 16:9 target and compare to the current V1. | Final 1920×1080 title, timing, margins, montage and audio match the selected plan; no unexpected silence, freeze, missing accents or inherited title from a prior snapshot. This does not close the broader K4 benchmark. |
-| D14-T2, D23-T1/T2 and bounded K3-T2/K4-T2: after the horizontal save/reopen/export, remove its title and timeline clip in this isolated test project; import/select the vertical input and repeat creation/preview/export with 9:16 title/target. | Preview and final1080×1920 preserve the selected text/timing, readable accents and safe margins; audio stays coherent. Imported sources remain intact and History retains the horizontal edits. Report visual/UX judgment for both aspects together. |
+| D14-T2, D23-T1/T2: import horizontal; mark IN at start and OUT at end, create the whole ten-second clip; inspect layout and move the timeline divider. | Preview remains usable above the larger, adjustable timeline. One Exportar MP4 appears at top right outside the inspector. Media names have no Fonte prefix; ordinary time displays show HH:MM:SS. Technical proxy/boundary copy is in collapsed help. |
+| D14-T2, X-T1/T2: add `Ação, café e conexão`, title IN00:00:03/OUT00:00:07 and16:9; select title on timeline, Delete, Undo. | Applying/changing selection never duplicates Export. The title appears at its inclusive IN/exclusive OUT; Delete removes the selected title once, and Undo restores it without changing clips/audio. Typing Delete edits text. |
+| D23-T1/T2, X-T1/T2: while title is paused inside its interval, select in preview, double-click/edit text, drag position, resize by the corner; Undo/Redo. Play, pause near the middle, then edit text again. | Selection is clear and gestures feel direct. Text/position/size restore together through History. Saving after playback keeps the paused frame; following clicks/transport remain usable. No Project IR or engine controls appear. |
+| D23-T1/T2, bounded K3-T2/K4-T2: export `horizontal-humano.mp4` from the top button and compare with the current preview. |1920×1080 final has the current title text, position, size and interval, with coherent cut/audio, accents and no freeze or inherited title. This comparison remains a bounded component check, not the complete K4 benchmark. |
+| X-T7, I17-T9: wait for Saved, close the isolated app normally and reopen. Then select its media card and Delete; read dependent-clip/title warning, cancel once, confirm, Undo. | The saved title/layout/range and timeline reopen. Cancel has no impact. Confirmation removes only the project source/dependent clips in one History step, with disclosed ripple/title impact; Undo restores them. The fixture file remains in Finder. |
+| D14-T2, D23-T1/T2, X-T1/T2 and bounded K3-T2/K4-T2: after the horizontal review, remove that source from this isolated project; import/select the vertical fixture, create its whole clip, choose9:16 and repeat direct title/preview/export as `vertical-humano.mp4`. |1080×1920 preview/final agree on current text, position, proportional size and timing; letterboxing does not distort placement, and accents/audio remain coherent. Report visual and UX judgment for both aspects together. |
 
-No new real media, AI, login, Xcode/iPhone operation or active human project-store
-inspection is necessary. Profile/glyph/overflow/snapshot negatives, cancellation,
-deadline, sampled budgets and original hash checks are automated; do not burden
-the Owner with a second technical negative-test round. The historical offline
-OWNER VISUAL PASS, progress55%, F-A02 exhausted1/1 and full G1 unaccepted remain.
+Exact precision/fine navigation/conversion, stale snapshots, native closed
+payloads, physical History persistence, glyph/profile/overflow negatives,
+cancel/deadline, sampled budgets and original hashes are automated. Do not
+repeat their technical negative cases with the Owner. DOM/Blob receipts do not
+prove native decode/paint or perceived fluency. No new real media, AI, login,
+Xcode/iPhone operation or human project-store inspection is necessary. Full
+G1/ADR0012, Windows/notarization/release and unimplemented catalog variants stay
+**BLOCKED/PENDING**. Progress55%, F-A02 exhausted1/1 and the historical offline
+OWNER VISUAL PASS remain.
