@@ -299,7 +299,7 @@ Additional coverage, distinct from the sealed delivery totals:
 - Final TypeScript/Vite build and diff whitespace check PASS. Existing
   BigInt target warnings remain outside this UI-only change.
 
-**Supplemental real-render gate BLOCKED:** the new canvas-edge/title/removal/
+**Initial supplemental real-render gate (at `2da579d`) BLOCKED:** the new canvas-edge/title/removal/
 reopen harness reached the release worker, but its preview file failed the
 existing identity guard (`preview file identity changed`) under Documents.
 A separate `.nosync` directory within CEVRA failed with the same symptom.
@@ -331,3 +331,72 @@ MR-V02/K2 color/HDR gates and the bounded execution-feasibility/product decision
 remain prerequisites for affected finishing work. F-A02 stays exhausted1/1;
 no real AI or provider execution is authorized. No later feature was invented
 or started to fill the waiting period.
+
+
+## Supplemental render gate resolved — 2026-10-11
+
+The Owner authorized diagnosis of the PR97 supplemental render failure,
+verified new copies and stable same-host local paths, with the index/receipts
+kept in CEVRA if Documents could not host the working files. The delivered
+PR96 app, fixtures and receipt remain frozen; no engine, runtime, guard,
+security setting or application code was changed for this follow-up.
+
+An exception-only observer outside the pinned runtime tree captured the exact
+release guard failure in `_hash_stable`: the newly sealed private
+`source-0.mp4` changed only `st_ctime_ns` between `lstat` and `fstat`
+(113,259,724 ns). Device, inode, size and mtime were identical. The worker's
+`_seal` code closes its copy before that check and performs no intervening
+write/chmod/utime. The strict guard rejected the changed identity as intended.
+Observer setup failures are retained separately and are not product/render
+results; the positive render proof uses the original worker without an observer.
+
+A copy-only control using the same release seal function reproduced later
+ctime-only changes in all three Documents copies and none of three copies in
+local temporary storage. All six SHA256 values matched the immutable synthetic
+input. `com.apple.provenance` existed in both locations; its presence does not
+identify the writer. Path-specific macOS metadata interference is verified;
+File Provider attribution remains an inference, not a process-level proof.
+This is not evidence of changed fixture bytes or a PR97 layout/render defect.
+
+The supplemental harness also had a distinct assertion error: it counted
+future Redo entries before an export after Undo. ProjectHistory correctly
+prunes that tail and appends one audited `export.add`. The external harness now
+checks retained entries at the active revision plus one, revision/parent-entry
+links, unchanged sources/timeline/title, and exact Undo/Redo of the export.
+Production History/export code is unchanged.
+
+New runtime, fixtures and baseline copies were verified byte for byte.
+An exclusively owned `/private/tmp/cevra-pr97-evidence-*` directory on the
+same Mac hosted the working files; this uses the same execution environment
+and release verification, with no disabled guard or bypassed denial.
+The normal derived-preview consumer already defaults to the system temporary
+root. This choice closes the bounded supplemental proof, not general
+Documents/File Provider destination compatibility. Native final export
+currently creates its private workspace in the picked destination parent;
+that route's exposure to volatile metadata remains a separate operational
+constraint, with no storage-policy change or broad compatibility PASS here.
+
+**PASS: four real renders / six measured jobs.** Both aspects preserve the
+closed V2 picture edge (`x=.08`, `width=.92`, `fontScale=.92/.84`, bottom
+edge), frames 91..209 across the frame 150 cut, 300 decoded CFR 30 frames and
+480,000 decoded PCM samples per artifact. AAC payload matches the existing
+baseline for each profile. Three media-removal/Undo/Redo cycles and two
+physical reopens per aspect preserve the original-source pins, title and
+exact ranges. Reference ROI remains MAE≤3 / PSNR≥35 dB: horizontal
+0.959949 / 40.392894 dB, vertical 2.815941 / 37.858998 dB. Sampled peak
+renderer RSS 195,739,648 bytes and owned logical files 5,090,330 bytes stay
+within the existing budgets; sampled observations are not rigid guarantees.
+
+External evidence in the hardening base:
+`identity-diagnostic/hash-identity-exceptions.jsonl`,
+`evidence/metadata-copy-comparison.json`, `stable-render-index.json`,
+`real-edge-recovery-stable.json`, `supplemental-render-transfer.json` and
+`supplemental-render-closeout.json`. All eight output/reference/archive files
+were transferred into `renders-edge-validated` with matching SHA256. Their
+portable evidence copies do not rewrite IR URIs or publication identities.
+Prior failed attempts and the frozen delivery's 17/27 proof remain separate.
+
+Director impact: no new impact in either direction within this evidence-only
+follow-up; typed operations, permissions, Project IR and History are unchanged.
+The app was not replaced or opened, no human project was inspected and no
+new human round was added. **APP/OWNER PENDING** and later product gates remain.

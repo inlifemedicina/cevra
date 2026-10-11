@@ -3796,7 +3796,7 @@ one-ULP minimum-scale finding was reproduced before correction. UI151,
 Application/Host53 and final desktop build passed; the new removal matrix covers
 48 sequences with repeated Undo/Redo and archive restoration. These scoped
 totals overlap previous gates and are not added to the delivery's totals.
-Supplemental edge/reopen real renders remain **BLOCKED** by preview-file
+At this head, supplemental edge/reopen real renders were **BLOCKED** by preview-file
 identity changes in Documents, including `.nosync`; guards were not relaxed.
 See the [canonical follow-up proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#isolated-offline-hardening--2026-10-11)
 for reproduced cases, external evidence and gate limits.
@@ -3810,3 +3810,36 @@ exhausted1/1. No new scope, provider, engine, schema, dependency or security
 change was introduced. Director impact: no new impact found within this delta;
 UI arithmetic/error handling preserves the typed execution and IR/History
 boundaries in both directions. Progress55% remains unchanged.
+
+
+### 2026-10-11 — PR97 supplemental real renders closed without weakening identity
+
+**IN DEVELOPMENT / NOT MERGED.** The Owner authorized bounded diagnosis and
+verified stable local scratch if Documents changed working-file identity.
+The release guard captured a ctime-only change on a newly sealed private
+source copy. A copy-only control reproduced later ctime changes 3/3 under
+Documents and 0/3 in local scratch with all bytes/SHA256 unchanged. The exact
+metadata writer is unproven; File Provider attribution remains an inference.
+The strict guard was correct and was not relaxed. A separate external-harness
+assertion wrongly counted a Redo tail; it now verifies one export entry from
+the active cursor. No product History/export/runtime code changed.
+
+Verified new runtime/fixture/baseline copies in exclusively owned same-Mac
+`/private/tmp` scratch passed four supplemental H/V preview/export renders
+and six measured jobs: exact 300 frames/480,000 PCM samples, frames 91..209
+across cut 150, AAC identity by profile, three source-removal/Undo/Redo cycles
+and two physical reopens per aspect. Both reference ROI quality gates passed.
+All eight output/reference/archive files were transferred by matching SHA256
+into the CEVRA hardening base. See the [canonical proof and evidence limits](CEVRA_MANUAL_TITLE_PROOF_V1.md#supplemental-render-gate-resolved--2026-10-11).
+
+This resolves the supplemental proof block recorded at 2da579d; it does not
+claim general File Provider destination support. Derived preview already
+uses system temporary storage by default; Native final export uses the
+picked destination parent and may encounter volatile metadata there. That
+operational constraint was not changed or hidden. PR96, its signed app,
+fixtures, shortcut and sealed receipt remain frozen at 45131a9; previous
+17 renders/27 jobs are not combined with the new totals. No merge, app
+replacement, provider/AI execution, security change or second human round.
+Director impact: no new impact found in either direction; this is evidence/
+harness correction only. **APP/OWNER PENDING**, Progress 55% and later gates
+remain unchanged.
