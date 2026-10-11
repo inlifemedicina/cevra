@@ -3843,3 +3843,13 @@ replacement, provider/AI execution, security change or second human round.
 Director impact: no new impact found in either direction; this is evidence/
 harness correction only. **APP/OWNER PENDING**, Progress 55% and later gates
 remain unchanged.
+
+
+The first post-proof CI at `cd08f98` exposed one existing overlay-test race:
+commit invocation was mistaken for async settlement before the next edit.
+A held-promise reproducer failed identically. The test now verifies pending
+editing is blocked, awaits settlement with React `act`, and then verifies
+the subsequent edit/rejection; all 23 overlay tests pass. Production code,
+rendered inputs and guards are unchanged, so the supplemental render proof
+remains applicable. Final-head CI is required before closeout. Director:
+no new impact found from this deterministic test correction.

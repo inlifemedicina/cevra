@@ -400,3 +400,18 @@ Director impact: no new impact in either direction within this evidence-only
 follow-up; typed operations, permissions, Project IR and History are unchanged.
 The app was not replaced or opened, no human project was inspected and no
 new human round was added. **APP/OWNER PENDING** and later product gates remain.
+
+
+### Final CI exposed an existing test race
+
+The first fresh-head CI at `cd08f98` failed one existing overlay test: its
+next double-click raced the async layout commit's pending state. A held
+commit reproduced the identical missing-text-input failure locally. The
+test now asserts that editing stays blocked while that commit is pending,
+settles the controlled promise inside React `act`, and verifies a fresh
+edit and invalid-text rejection afterward. All 23 overlay tests pass.
+No implementation, runtime, identity policy or rendered input changed;
+the four/six supplemental proof remains applicable. The first CI failure
+and deterministic red/green logs are retained in the hardening evidence.
+Final head checks must pass before closeout; this is a test synchronization
+fix, not a retry used to conceal a defect or a new human acceptance round.
