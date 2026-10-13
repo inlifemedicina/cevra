@@ -1281,6 +1281,31 @@ For every candidate, record:
 
 ---
 
+## 18.1 Selective engineering references — 2026-10-13
+
+**RESEARCH COMPLETE / ROUTINE GUIDANCE IN DEVELOPMENT / NOT MERGED.** Owner
+approved selective use (reported 12 October, Brasília evening). The checked
+CEVRA baseline is `cdc8f8099387d4fce36aca791731665ef15986bd`.
+[mattpocock/skills@49dd158](https://github.com/mattpocock/skills/tree/49dd158d1076134a641b33efb035946536778336)
+(`writing-for-agents`, `diagnosing-bugs`, `code-review`, `handoff`, `tdd`) and
+[blader/baton@c7213e1](https://github.com/blader/baton/tree/c7213e1411b6fb1c9cc8d2d5fb8e7744319fb208)
+were read; pinned LICENSE files confirm MIT (Matt Pocock 2026; blader 2025).
+Only principles inform independently worded §21 guidance; no external code,
+skill text or assets are copied and no dependency is added.
+
+The useful gaps are a duplicated hygiene policy and nonstandard diagnostic/
+handoff returns. §21.3 delegates hygiene to AGENTS rule 31; §21.4 fills the latter.
+Existing UI `ManualVideoPreview`/`ManualTitleWorkflow`, Host `manual-grid-preview`
+and Python `test_manual_sequence` tests cover late/cancelled results, snapshot
+binding, History and preview/export sampling. No concrete additional test gap
+was established in this checked scope; reuse those tests and catalog IDs.
+Collection/hooks installation, blanket dual reviews, repeated seam approvals,
+`.baton`/TMP defaults and a second checklist/catalog are not adopted.
+Course-video-manager/MiraViewer remain idea-only per Owner restriction, without
+code reuse or a new license audit. The signed candidate/PR98 checkout stay
+intact; title latency and the preview-delivery decision remain open. Director:
+no impact found in this instruction-only scope; no product or architecture change.
+
 # 19. Marketplace and package direction
 
 ## 19.1 CANONICAL
@@ -1388,17 +1413,39 @@ When Codex requires an environment approval, request the minimum approval once a
 
 ## 21.3 Repository hygiene
 
-Repository housekeeping follows **CLEAN + TRACEABLE + MINIMAL + NO DUPLICATE SOURCE OF TRUTH** without encouraging aggressive deletion.
-
-- Keep the tracked tree intentional. Do not commit scratch files, dumps, logs, temporary exports, local caches, generated comparison files, backups or investigation artifacts without an explicit canonical reason.
-- Keep heavy research files, videos, screenshots, scratch assets and exports outside the repository unless they are necessary versioned inputs.
-- Avoid duplicate documents or artifacts that can become competing sources of truth. Do not retain obsolete tracked files merely “for safety” when Git already preserves their history.
-- Before removing a tracked file, verify references, provenance, license/legal obligations, compatibility and architectural or historical value. Accepted ADRs, required provenance, relevant audits, notices/licenses and necessary evidence are not removed merely because they are old.
-- When older material has historical value but does not belong in the active tree, evaluate an archive or external storage.
-- Remove temporary branches locally and remotely after merge or closeout unless retention has an explicit purpose. A historical branch fully incorporated by a successor is a deletion candidate only after confirming that it contains no useful unique material.
-- Do not perform opportunistic destructive cleanup inside an unrelated feature.
+Use [AGENTS.md rule 31](../AGENTS.md) as the single housekeeping authority:
+**CLEAN + TRACEABLE + MINIMAL + NO DUPLICATE SOURCE OF TRUTH**.
+Avoid competing documents; Git history alone is sufficient for obsolete tracked
+material only after checking the obligations and historical value in that rule.
 
 PR #12 closeout completed this housekeeping policy: `docs/post-transcription-canon` was removed after merge, and the historical `docs/master-context` branch was removed locally and remotely after a final comparison confirmed that it contained no useful exclusive content. Repository hygiene passed without deleting unrelated refs or evidence.
+
+
+## 21.4 Reproducible diagnosis and concise handoff
+
+For a concrete bug, use a fixture-driven command that detects the exact symptom
+at the observed boundary. Control late/cancelled events with promises rather
+than sleeps, use independent expected values, and extend the existing test/case.
+For media, check the relevant timeline/preview/export and snapshot invariants;
+reuse [catalog IDs](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md) and the
+[EDVID preservation policy](EDVID_PARITY.md#non-regression-implementation-policy).
+For performance, label measured and unmeasured stages; Host admission is not
+visible paint. The existing §21.1 review checks scope and rules on a pinned diff.
+
+For unfinished work, verify Git state and send this compact return:
+
+```text
+Goal/status: current authorized slice; delivered or still open
+State: checkout, branch, HEAD, base SHA; dirty paths or clean
+Evidence: exact tested SHA; command/result and existing receipt/CI links
+Limits: unmeasured behavior, blocker/decision; failed approach worth retaining
+Next: one concrete next action within authorization
+Protected: candidate/project or other state that must stay intact
+```
+
+Link canonical records instead of retelling them. If continuation needs a file,
+keep it in the task's external CEVRA/Vids artifact directory; recheck its SHA on
+resume and supersede stale returns. Durable findings stay here. No new gate.
 
 ---
 
