@@ -1,13 +1,163 @@
 # CEVRA ORBIT — ORGANOGRAMA ATUAL
 
-**Updated:** 2026-10-06
+**Updated:** 2026-10-14 — faster-preview evaluation approved; commercial requirement confirmed; no architecture adoption or implementation here.
 **Authority:** compact sequencing reference; `docs/CEVRA_MASTER_CONTEXT.md`, `docs/ARCHITECTURE_V1.md` and accepted ADRs remain the detailed authorities.
 **Current global weighted roadmap progress:** 55%.
 
-**Active approved sequence:** foundation → G1 continuous manual montage,
-program preview and simple original-master export → identity/composition →
-audio/captions/refinement → presets/Director → distribution. G5 fluency and G6
-recovery accompany each available flow; automation precedes grouped owner review.
+**Sequência aprovada em curso:** concluir títulos → delimitar acabamento
+audiovisual → delimitar estratégia/seleção/cortes por IA. G5 fluidez e G6 recovery
+acompanham os fluxos disponíveis. A [decisão do Owner em 2026-10-11](CEVRA_MASTER_CONTEXT.md#2026-10-11--owner-approved-order-after-the-title-slice)
+define a ordem, sem autorizar as implementações seguintes ou prometer datas.
+
+## Revisao de decisoes Vids 2026-10-13
+
+Revisão contra `main` `48353df62901aed7f102fc7e186a7c64c92949e3` e base documental
+`17e15a586f318c0d337fe14b49437d311d77aa8f` (PR99 sobre PR98). O
+[checkpoint do master](CEVRA_MASTER_CONTEXT.md#241-main) registra Git/CI; esta
+fila organiza decisões. Take é revisado separadamente. Ajustes/testes aprovados
+continuam no seu escopo; esta revisão não acrescenta uma barreira de aprovação.
+
+| Classificação | Escopo e evidência | Consequência |
+|---|---|---|
+| Decidido e implementado em recortes fechados | Project IR/History/persistência, ingest, ASR/alinhamento/cache locais, projeção e fronteira de análise; montagem/preview/export manual e UI/reuso até #94 no main. | Preservar bases; disponibilidade no pacote, cobertura total e aceite de release são verificações distintas. |
+| Comportamento já decidido | Editor compartilhado, comandos reversíveis, originais imutáveis, CFR30/conversão legada explícita (ADR0033), recursos operacionais (ADR0034), visual B e controles diretos de título. | Não reabrir timebase, contrato de recursos, identidade visual ou privilégios de agentes. |
+| Implementado na branch de títulos, não merged | PR98: edição tipada, Unicode, preview/export, History/reabertura; CI762/Runtime114 passaram. | Concluir o aceite subjetivo existente. Admissão Host de 2202–2363 ms e pintura/gestos não medidos são limites técnicos/de aceite, não funções por decidir. |
+| Direção aprovada, entrega pendente | D1–D13 editorial; D14–D18 presets/legendas; D19–D23 ativos/componentes; Director, I1–I19 e Update Strategy. Primitivas/títulos não completam famílias inteiras. | Delimitar implementação no consumidor correto; não pedir novamente aprovação da direção completa. |
+| Planejamento aprovado em draft separado | Perfil editorial opcional no [PR76 @cbac3cd](https://github.com/inlifemedicina/cevra/pull/76), ausente desta base. | Reconciliar seu conteúdo único no bloco brief/contexto; não criar outro perfil/preset. |
+| Decidido em 2026-10-14 | Avaliar preview rápido do Vids; produto comercial conforme [requisito de componentes](LICENSING.md#commercial-requirement--owner-confirmed-2026-10-14). | Comparação aprovada; resultado, arquitetura e implementação permanecem abertos. A aprovação separada de Gravar agora no Take não altera esta tarefa Vids. |
+| Prioridade proposta, aguardando aprovação do Owner | Gestão de projetos Novo/Abrir/Recentes/Duplicar projeto e relocalização de mídia movida. | A pergunta sobre incluir ambas no próximo bloco já foi encaminhada; não inferir resposta nem autorização de execução. Autosave/recuperação já existem (ADR0016). |
+| Proposto, implementação não aprovada | Arquitetura vídeo-base/PNG, ensaios de autonomia/voz abaixo; escolhas finais de motor/modelo/provider. | Adoção material depende de proposta concreta com viabilidade/impacto; nenhum recurso ou privilégio é entregue por este registro. |
+
+### Decisoes por bloco
+
+São escolhas ainda abertas, com recomendações para decidir no marco correto.
+Falhas, correções e testes pendentes permanecem nos registros existentes e no
+[catálogo único de aceite](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md).
+
+| Momento | Escolha real em aberto | Recomendação e dependência |
+|---|---|---|
+| Agora, avaliação aprovada | Após comparar, manter caminho atual ou recomendar vídeo-base/camada gráfica? | Executar somente a avaliação no escopo autorizado, pelo plano abaixo; continuar ajustes/testes aprovados. Implementação/arquitetura continuam por decidir. Priorizar inventário comercial real antes de recomendar outra dependência; nenhum motor é escolhido agora. |
+| Próximo bloco, prioridade proposta | Priorizar gestão Novo/Abrir/Recentes/Duplicar projeto e relocalização de mídia? | AGUARDANDO APROVAÇÃO do Owner. Reusar autosave, Store/History e recovery existentes, sem nova persistência. Relocalização deve preservar identidade do conteúdo e ajustes, sem aceitar apenas nome/path/mtime iguais; escopo concreto segue após aprovação. |
+| Próximo bloco: acabamento audiovisual | Menor recorte e critérios para áudio, legendas, cor e componentes. | Reusar D10/D11/D14–D23; começar com título existente e no máximo um componente adicional. Delimitar tratamento/normalização e integração de legendas, preservando os seis estilos + Nenhum e D18 pós-V1. Cor/HDR depende de perfil/dependências MR-V02/K2; perfis desconhecidos continuam explícitos. Evitar um PR monolítico. |
+| Depois: estratégia/Director | Escopo/orçamento/transporte do próximo ensaio real; depois consumidor plano→comando e limites de autonomia. | Reusar contexto compacto, evidência offline e planejamento do perfil. Cumprir os gates pertinentes antes de declarar edição por IA. F-A02 não prova visão, cortes com timing ou I1-T1/plano/Change Set; nenhuma chamada nova está autorizada. |
+| Depois do fluxo textual: voz | Implementar o ensaio push-to-talk? Com que captura/retenção/disclosure? | Viabilidade de reuso avaliada abaixo; entrega após o mesmo fluxo Director/plano. Áudio curto local, texto revisável e um comando existente. ASR já existe; conversa/TTS, wake-word e microfone aberto são extensões distintas. |
+| No consumidor correspondente | Motor final; padrão ASR/packs; providers de ativos/visão. | Priorizar componentes próprios e dependências permissivas; HyperFrames é candidato condicionado ao ADR0012, não escolhido. Remotion é comparador somente se elegível, nunca incorporado ou dependência obrigatória. Aplicar requisito comercial ao pacote inteiro; comparar qualidade/recursos antes de alterar `base` e reusar I6–I14. |
+| Antes do release | Windows 5B/fallback se necessário, perfil HDR/export, empacotamento runtime/modelos, termos de entitlement, artifact host/crash provider. | macOS arm64 + Windows x64, DMG/NSIS assinados, Tauri updater, proteção offline, crash opt-in e telemetry NoOp já são direção. Decidir detalhes com K1–K5, licença/custo; teste clean-machine faltante é gate técnico, não nova escolha de plataforma. |
+| Expansão, no marco aprovado | Implementação de tracking/matting/3D, Creation Modes/Brand Kit, Creator/Bridge, mobile/P2P e cloud com computador desligado. | Preservar D19–D23/I9–I19 e INT-CLOUD-01–05: Faceless/Slideshow são direção, Music-to-video condicional; providers/tiers precisam de evidência. Marketplace, publishing/analytics, Product Launch/WebGPU e personalização ampla ficam depois. Não pressupor cloud renderer, API paga ou integração Take. |
+
+### Preview rapido avaliacao aprovada 2026-10-14
+
+**APROVADA A AVALIAÇÃO; ARQUITETURA/IMPLEMENTAÇÃO NÃO ADOTADAS.** Comparar o
+executável PR98 `21c3b67d6dab18deb7ffc29eb3bd0d3a47d01973` (head documental
+`cdc8f8099387d4fce36aca791731665ef15986bd`) com vídeo-base admitido e camada
+gráfica derivada. O [Host atual](../apps/desktop-host/src/derived-video-preview.ts)
+inclui composição na identidade do preview; alteração visível de título ainda
+recodifica vídeo. O [rasterizador existente](../engines/media-ffmpeg/components/manual-title/README.md)
+gera PNG, mas falta pacote tipado da camada e composição nativa validada sobre
+base reutilizada. Reusar esses caminhos antes de avaliar outra biblioteca.
+
+| Comparação mínima | Evidência necessária, reutilizando D23/X/K4 pertinentes |
+|---|---|
+| Mesma fixture H/V, títulos, fontes e frame/range; caminho atual versus base + PNG | Separar preparação da base, raster/transferência, admissão e pintura visível. Os 2202–2363 ms Host e 88–96 ms de PNG são referências parciais, não ganho comprovado. Medir alterações texto/posição/tamanho e reuse; não declarar instantâneo sem pintura medida. |
+| Mesmo timing/resultado e estado | Comparar alpha/Unicode, fit/pad/aspecto, limites meio-abertos, seek/Play e export dos originais; testar stale/cancel/Undo/Redo/reabertura com guardas de fonte/runtime/fontes/snapshot/ABA/geometria. PNG/base são derivados descartáveis; comandos/IR/History e export continuam autoridades. |
+
+O trabalho mínimo eventual afeta Host/contratos/worker/UI: identidade separada
+da base e da camada, pacote validado e sua admissão/composição; não exige trocar
+Project IR ou motor de export. Nesta rodada, apenas leitura e plano documental:
+nenhum protótipo, render ou operação Mac/iPhone. A comparação nativa real ainda
+depende do ambiente/escopo de ensaio; não está executada. Retornar manter atual
+ou recomendar a menor extensão, com ganho, custo e limites; resultado insuficiente
+preserva o caminho atual. Uma revisão potente pode ser sugerida com motivo ao
+usuário quando agregar valor; nenhum provider/Claude é chamado automaticamente.
+
+### Prioridades de custo-beneficio e lacunas
+
+| Prioridade | Escolha anterior ou lacuna | Recomendação atual |
+|---|---|---|
+| Comercial primeiro | Licença do projeto não prova licença do pacote: FFmpeg/PyAV, bibliotecas nativas/transitivas, pesos, fontes/assets e possíveis direitos de codecs. | Usar [inventário existente](../THIRD_PARTY_LICENSES.md) e [política comercial](LICENSING.md#commercial-requirement--owner-confirmed-2026-10-14). PyAV wheels GPL já são vedados no release. Verificação focal dos direitos comerciais de codecs antes do release: LGPL não resolve patentes, mas nenhuma taxa devida ou troca obrigatória está comprovada nesta revisão. |
+| Fluidez agora | Recodificação do vídeo após edição apenas gráfica. | Avaliação aprovada acima: reusar base/raster existentes se equivalência e ganho forem demonstrados; não substituir stack por pressuposto. |
+| Composição/Windows no consumidor | PR98 vendoriza Inter/OFL e lê AppleColorEmoji/ArialUnicodeMS do sistema sem redistribuir seus bytes; componente atual não está disponível em Windows. | Não há infração de fontes comprovada nesta revisão. Preservar o teste Mac; validar uso/redistribuição efetivos e solução Windows no bloco correspondente. Componentes próprios/permissivos primeiro; HyperFrames/WAAPI condicionados, Remotion só comparativo se elegível, nunca incorporado. |
+| Próximo bloco, aguardando Owner | Novo/Abrir/Recentes/Duplicar projeto e relocalização de mídia não existem na superfície atual; autosave/recovery já existem. | [TopBar](../apps/desktop/src/components/TopBar.tsx) tem menu desabilitado; [protocolo Host](../apps/desktop-host/src/protocol.ts) e [ADR0016](adr/0016-desktop-project-persistence-recovery.md) delimitam a base existente. A prioridade proposta aguarda aprovação, sem reinventar persistência; Duplicar projeto não é duplicar clips. Director e benchmark ASR continuam nos blocos posteriores já previstos. |
+
+### Autonomia em tres etapas proposta
+
+Proposta pequena dentro de D23/D14 e do Director existente. A
+[pesquisa de candidatos](CEVRA_MASTER_CONTEXT.md#182-near-term-automation-candidates--2026-10-13)
+alimenta comparações; não seleciona motor nem incorpora bibliotecas inteiras.
+
+| Etapa / posição de entrega | Menor trabalho adicional | Critérios verificáveis |
+|---|---|---|
+| 1. Componentes editáveis / acabamento | Estender o título fixo/versionado para catálogo mínimo, parâmetros/schema/defaults/limites tipados; integrar capability/compiler, UI, preview/export e compatibilidade somente onde faltam. | D14-T1/T2, D23-T1/T2, X-T1/T2/T5: editar o mesmo item manualmente/pelos comandos, rejeitar parâmetros/código desconhecidos, preservar versão/aparência antiga, Undo/Redo e reabertura física; timing/layout 9:16 e 16:9 correspondem no export dos originais. |
+| 2. Pedido/plano/execução / Director posterior | Pedido/contexto limitado → plano candidato versionado → revisão/autonomia delimitada → mesmos comandos do editor. Acrescentar validação/integração ausentes; presets resolvem deterministicamente sem inferência extra. | I1-T1/T2/T3/T4 e I5: plano desconhecido/stale/tardio/cancelado não muta; retry não duplica; comandos têm journal e resultado ajustável manualmente. Fixture prova integração, não agente real; sucesso real exige autorização/evidência próprias. |
+| 3. Referência opcional e composição original / após etapa 2 | Amostrar frames/texto/intervalos pertinentes quando autorizados; propor estilo/estrutura com evidência, ou composição original pelo brief usando o mesmo catálogo. | Citar fonte/intervalo, marcar incerteza e permitir revisão; brief original funciona sem referência. Visão/provider ausentes ficam explícitos. I5-T1/T2/T3/T5 e D14/D23/K4 pertinentes verificam disclosure mínimo, prompt injection, resultado editável e qualidade dos originais. |
+
+Primeiro ensaio completo proposto: **20–30 segundos, duas ou três fontes locais
+autorizadas, um ou dois componentes**, inicialmente sobre montagem existente,
+sem iniciar seleção/cortes no acabamento. Depois acrescentar plano autorizado e
+referência opcional à mesma fixture. Medir preparação, pedido, validação,
+confirmação dos comandos, preview nativo e export separadamente; reusar IDs e
+uma avaliação subjetiva agrupada. Cenários indisponíveis permanecem BLOCKED.
+
+Preservar originais, versionamento, reabertura, Undo/Redo, contexto mínimo e última
+versão válida. Autonomia tem limites configuráveis de escopo, comandos, tempo,
+tentativas e gasto, com resultado revisável. Nenhum upload/fallback remoto,
+compra/publicação ou mudança arquitetural silenciosos. **Criar/revisar templates
+reutilizáveis é separado de executar seus parâmetros durante a edição.** Novos
+templates entram no catálogo first-party revisado; JS/HTML/TSX/shell arbitrário
+de agente e acesso nativo filesystem/rede nunca são entradas da edição.
+Impacto no Director: extensão planejada compatível; aplicação tipada, History e
+Project IR conservam execução/estado. Nova arquitetura de preview/provider
+externo permanece decisão material própria.
+
+### Voz: viabilidade de reuso, sem captura ou execucao
+
+[faster-whisper 1.2.1](../engines/transcription/src/types.ts) e seu
+[adapter](../engines/transcription/src/adapter.ts) já implementam ASR local,
+auto/PT/EN, cancelamento e um job ativo. `base` é provisório; a
+[allow-list](../engines/transcription/src/model-selection.ts) inclui tiny, small,
+medium, large-v3 e `turbo` → `mobiuslabsgmbh/faster-whisper-large-v3-turbo`.
+Isso não prova modelo instalado. Alinhamento CTC separado adaptado de WhisperX
+v3.8.6 está fechado pelo ADR0017; persistência/cache já existem na aplicação.
+WhisperX completo/diarização não estão entregues; não recriar blocos existentes.
+
+O [Host](../apps/desktop-host/src/session.ts) exige runtime/ambiente/modelo local
+explícitos e desabilita downloads. Não foi encontrado consumidor de microfone,
+push-to-talk ou intenção por voz nos fontes app/host consultados. Whisper
+transcreve; não interpreta intenção, planeja nem conversa. O
+[transcribeSource](../packages/application/src/transcription-service.ts) exige
+fonte canônica e promove transcrição: não usar esse serviço inalterado para
+cadastrar gravações de comandos no projeto. Faltam captura nativa limitada com
+permissão/cancelamento, entrada ASR temporária na aplicação e integração ao mesmo
+pedido/plano do Director; não é necessário outro motor/API de ASR.
+
+Ensaio push-to-talk futuro: pressionar explicitamente → áudio local curto (ex.
+3–8 s) → ASR existente → texto visível/corrigível → agente/plano autorizado → um
+comando de título existente validado → preview/Undo. Primeiro avaliar arquivo→texto
+com clip pré-gravado autorizado; captura depende de sua permissão delimitada.
+Modelo/runtime ausentes resultam em indisponibilidade, sem download/fallback
+remoto automático. Fixture pode provar integração enquanto o gate real aguarda
+sua autorização; não comprova interpretação/conversa. Verificar texto/título
+exato PT/EN, latência ASR/total, recursos, negação/cancelamento, plano inválido/stale,
+ausência de duplicação, Undo e limpeza do áudio temporário. Sem inserir gravação
+como mídia do projeto ou enviar áudio por padrão; microfone fechado fora do
+pressionamento. **PROPOSTO / NOT RUN**, sem captura, instalação ou inferência aqui.
+
+### Divergencias documentais e leitura correta
+
+| Divergência aparente | Reconciliação / evidência |
+|---|---|
+| Cabeçalhos antigos do organograma/G1/ADRs dizem NOT MERGED/reuso pendente; final do master diz CI do PR98 pendente. | Git em `48353df` prova #86/#87/#89–#94 integrados; checkpoint atual registra checks PR98/99 por SHA. Preservar histórico sem inferir novo merge ou aceite subjetivo. |
+| UI_UX_SPEC mantém Director sob preview e runtime sem save/preview/export. | Checkpoint V0.1 superado para layout/save/edição manual pela coluna/compact, visual B e G1 merged. Não reabrir layout; execução Director/presets continua pendente. |
+| Arquitetura/README menciona WhisperX ou lista alignment/cache/persistência ausentes. | ADR0017 e registros Application/Store/cache comprovam consumidores separados; engine ASR retorna resultado. Não inferir WhisperX completo/diarização ou model manager empacotado. |
+| Adendo de integração/Phase A diz round-trip NOT DEMONSTRATED; F-A02 tem resultado aceito. | Checkpoints históricos V1/preparação. Atual: um candidato textual PT-BR limitado, citações PARTIAL, gate completo OPEN, F-A02 1/1 consumido; nenhum plano/edição completa decorre daí. |
+| D19–D23 diz implementação pendente; título funciona na branch. Perfil PR76 ausente desta base. | Um título cobre consumidor limitado D23, não catálogo/motor/ativos completos. PR76 continua draft distinto; referenciar seu planejamento sem merge/duplicação. |
+
+## Historical checkpoints — 2026-10-03 to 2026-10-09
+
+Os registros abaixo preservam evidência e escopo originais. A reconciliação acima
+rege sequência/estado atuais; OPEN/NOT MERGED/PENDING históricos não concedem
+novas decisões de produto, implementação ou execução.
+
 [Milestones and pending material choices](CEVRA_MANUAL_SEQUENCE_G1.md).
 After explicit approval of their exact heads, #84→#85 merged at `6e2cce16` and
 `60345a7d`. Post-#85 exact runtime passed; general CI attempt 4 completed SUCCESS

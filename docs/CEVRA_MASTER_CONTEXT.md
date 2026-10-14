@@ -2,6 +2,7 @@
 
 **Canonical continuity document**
 **Initial consolidation:** 2026-09-14
+**Latest verified checkpoint:** 2026-10-14 UTC; documentary publication authorized on top of PR99's head, as a separate Draft without merge. Owner approved evaluating faster Vids preview and confirmed the commercial component-cost requirement. Evaluation does not adopt an architecture or authorize implementation/live AI; current Git/CI evidence is in §24.1 and the Vids queue is in the organogram.
 **Last decision reconciliation:** 2026-10-11 UTC: approved Vids UX/direct titles IN DEVELOPMENT in Draft #96, grouped APP/OWNER pending (latest entries below). Earlier integrated context: 2026-10-03 UTC, bounded offline Editorial Draft V1 integrated by PR #75 after #74; its smallest offline host/backend/UI consumer is integrated through PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI 5/5 and Exact Runtime 1/1. The owner subsequently approved bounded offline admission of the designated existing F-A02 result/history into a temporary native review session; that addition is IN DEVELOPMENT / NOT MERGED (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.
 **Purpose:** prevent loss of project context when a ChatGPT/Codex/Claude conversation reaches its length limit and provide one durable source that a new chat can read before proposing changes.
@@ -514,7 +515,7 @@ Operational rule:
 - normal focused implementation within known architecture: intermediate model/effort;
 - runtime, ML, concurrency, persistence, migrations, difficult debugging, security-sensitive architectural changes: strong model such as Sol High;
 - maximum/extra-high effort only when materially justified;
-- Claude is used as an independent adversarial reviewer only when a second model adds real value, not for every PR.
+- Tell the Owner when a strong independent review, including Claude, would add material value and explain why. Do not call another provider automatically or add a second-model review to every PR.
 
 Prompts should minimize repeated context and rely on canonical repo documents where possible.
 
@@ -722,9 +723,17 @@ All composition engines remain behind `CompositionEngineAdapter`.
 ## 13.2 PENDING DECISION — HyperFrames vs Remotion
 
 - HyperFrames is the preferred candidate **only if measured equal/better** than the required EDVID composition behavior.
-- Remotion is an eligible candidate/fallback, not a current mandatory dependency and not prohibited.
+- Historical eligibility considered Remotion as a candidate/fallback; the 2026-10-14 commercial clarification below now limits it to an eligible comparison reference, not a required dependency or an incorporated engine.
 - Final selection must not sacrifice visual quality, automation, exact timing or editorial capability for licensing preference alone.
 - Any commercial Remotion incorporation requires exact-version/current-license review at decision time.
+
+**Owner clarification — 2026-10-14:** the historical Remotion eligibility above
+is subject to the [commercial requirement](LICENSING.md#commercial-requirement--owner-confirmed-2026-10-14).
+Remotion remains a behavior/benchmark reference; a conditional free tier cannot
+justify a required commercial dependency. No engine is selected or replaced.
+Prefer first-party components and permissive dependencies. HyperFrames remains
+conditional on quality/commercial evidence, not selected; Remotion is comparison
+only where eligible and has never been incorporated.
 
 Benchmark must cover at least:
 
@@ -1306,6 +1315,58 @@ code reuse or a new license audit. The signed candidate/PR98 checkout stay
 intact; title latency and the preview-delivery decision remain open. Director:
 no impact found in this instruction-only scope; no product or architecture change.
 
+## 18.2 Near-term automation candidates — 2026-10-13
+
+**RESEARCH REFERENCES / SELECTION PENDING.** Target: Vids suggests, creates and
+executes an editable result from supplied references or an original brief.
+The [existing roadmap's bounded proposal](CEVRA_ORGANOGRAMA.md#autonomia-em-tres-etapas-proposta)
+extends D23, D14 and the Director; it does not add a parallel editor or roadmap.
+Primary repository documentation and the linked licenses were checked at the
+revisions below. Upstream capabilities are candidates, not CEVRA benchmark results.
+
+| Candidate / checked revision | Useful role | Free-use and integration limit |
+|---|---|---|
+| [HyperFrames @8147f7b](https://github.com/heygen-com/hyperframes/tree/8147f7b940aaccde963a3ed5a3ee6099abf2b8cf) | Seekable player, transparent overlays and parameterized compositions. | [Apache-2.0](https://github.com/heygen-com/hyperframes/blob/8147f7b940aaccde963a3ed5a3ee6099abf2b8cf/LICENSE); compare with the current title path and Remotion under ADR0012. |
+| [Orkas VideoStudio @8a2b51a](https://github.com/Orkas-AI/Orkas-VideoStudio/tree/8a2b51af787830e722f2565b3e13d479ffed5c17) | Reference-recreation, stage-decide/stage-plan, design-system-importer, validated EDL and delivery guards are method candidates. | [MIT](https://github.com/Orkas-AI/Orkas-VideoStudio/blob/8a2b51af787830e722f2565b3e13d479ffed5c17/LICENSE) for its code; visual understanding still needs a capable model/agent. Study selective methods; its EDL/shell/runtime never replace CEVRA contracts. |
+| [PySceneDetect @7cd1005](https://github.com/Breakthrough/PySceneDetect/tree/7cd1005e8349d8e913d0930fc1750363eb4ddc51) | Scene-boundary evidence for later visual analysis. | [BSD-3-Clause](https://github.com/Breakthrough/PySceneDetect/blob/7cd1005e8349d8e913d0930fc1750363eb4ddc51/LICENSE); detects boundaries, not narrative value or the best take. |
+| [SentrySearch @ab68813](https://github.com/ssrajadh/sentrysearch/tree/ab688137e2a4a9d6f67cac5677be26db16dc406c) | Optional visual retrieval with local Qwen/MLX, including footage without speech. | [Apache-2.0](https://github.com/ssrajadh/sentrysearch/blob/ab688137e2a4a9d6f67cac5677be26db16dc406c/LICENSE) for the tool; separately audit weights, dependencies, hardware and resource use. Retrieval is not narrative selection; reject first-use downloads/remote defaults unless authorized. |
+| [Remotion @36adb0a](https://github.com/remotion-dev/remotion/tree/36adb0a773143a07f64f59ce5424cf1a6278a2ac) | Behavior/benchmark reference for data-driven components and preview/export. | [Own license](https://github.com/remotion-dev/remotion/blob/36adb0a773143a07f64f59ce5424cf1a6278a2ac/LICENSE.md), with conditional free eligibility and commercial licensing; not MIT. No required incorporation without satisfying the Owner's commercial requirement; not an automatic fallback. |
+
+[Web Animations API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Animations_API)
+is an initial animation option to evaluate without another animation library.
+GSAP, fonts, assets and every transitive dependency require their own exact
+license review; an engine's permissive license does not cover the whole stack.
+The earlier Extract-ds reference concerns website design cataloguing, not video
+export; its exact source/revision is unresolved here and the earlier consulted
+repository had no explicit license. It is not a reuse recommendation.
+No candidate is declared better without CEVRA evidence. Local paths can avoid
+paid APIs, but compute, model resources and optional agent access are separate
+costs. No third-party library, skill collection, model or asset is incorporated.
+
+**2026-10-14 — DECIDED / EVALUATION APPROVED:** the Owner replied
+“Sim, vamos fazer dessa forma” to evaluating faster Vids preview and the separate
+optional Take “Gravar agora” direction, and reiterated commercial distribution
+without royalties/mandatory component subscriptions. This Vids patch records
+only preview evaluation and the [commercial policy](LICENSING.md#commercial-requirement--owner-confirmed-2026-10-14);
+Take implementation remains outside it. The [bounded comparison plan](CEVRA_ORGANOGRAMA.md#preview-rapido-avaliacao-aprovada-2026-10-14)
+uses existing title/runtime primitives. Architecture adoption, measured gains,
+implementation and engine selection remain unresolved; no AI, installation,
+download, Mac/iPhone operation or remote publication is authorized by this entry.
+
+**2026-10-14 — PROPOSALS AWAITING OWNER APPROVAL:** product review proposed
+prioritizing project New/Open/Recents/Duplicate and moved-media relocation in the
+next block. The Owner question is pending; neither execution nor a reordered
+delivery sequence is authorized. Reuse existing autosave/recovery under ADR0016;
+the [single decision queue](CEVRA_ORGANOGRAMA.md#decisoes-por-bloco) records the gaps
+against PR98 TopBar/Host commands. Duplicate project is distinct from clip
+duplication; do not create another persistence model.
+
+**2026-10-14 — DOCUMENTARY PUBLICATION AUTHORIZED:** publish these three
+reviewed documents on a separate branch/Draft based on PR99; no merge, product
+change, live AI or engine adoption. Project/relink priority remains proposed
+until the specific Owner decision is recorded. This publication does not execute
+the preview comparison or reopen any exhausted agent allocation.
+
 # 19. Marketplace and package direction
 
 ## 19.1 CANONICAL
@@ -1572,6 +1633,35 @@ Architecture authority remains `ARCHITECTURE_V1.md` and accepted ADRs. The recor
 # 24. Current repository state
 
 ## 24.1 `main`
+
+**Verified remote checkpoint — reconfirmed 2026-10-14:** `main` remains
+`48353df62901aed7f102fc7e186a7c64c92949e3`. Its history incorporates #86,
+#87 and #89–#94: manual sequence/preview/export, usability, segment reuse,
+consolidated editing and visual B are merged within their bounded scopes.
+The older NOT MERGED entries below and in the organogram describe dated
+checkpoints, not open choices to repeat. Full G1/release acceptance is not implied.
+The detailed integration closeout remains in the separate
+[Draft PR95](https://github.com/inlifemedicina/cevra/pull/95); it is not merged,
+copied or superseded by this decision queue.
+
+[PR98](https://github.com/inlifemedicina/cevra/pull/98) remains OPEN / DRAFT /
+NOT MERGED at `cdc8f8099387d4fce36aca791731665ef15986bd`, with
+[CI762](https://github.com/inlifemedicina/cevra/actions/runs/38180972232) and
+[Runtime114](https://github.com/inlifemedicina/cevra/actions/runs/38180972230)
+COMPLETED / SUCCESS. [PR99](https://github.com/inlifemedicina/cevra/pull/99)
+remains OPEN / DRAFT / NOT MERGED at
+`17e15a586f318c0d337fe14b49437d311d77aa8f`, based on that PR98 head;
+[CI764](https://github.com/inlifemedicina/cevra/actions/runs/38326754832)
+is COMPLETED / SUCCESS. These are remote checks of existing heads, not checks
+of this new documentary patch. The signed test app and both PRs are preserved.
+Title subjective follow-up remains pending; new-title Host admission is
+2202–2363 ms, not native first-paint or latency elimination. The whole real-agent
+gate stays OPEN, F-A02 exhausted 1/1, with no new AI call authorized.
+
+The [Vids decision reconciliation](CEVRA_ORGANOGRAMA.md#revisao-de-decisoes-vids-2026-10-13)
+is the single queue for now/next/later, including the bounded component and voice
+feasibility proposals. D1–D23, I1–I19 and accepted ADRs remain the detailed
+direction; proposals in that queue are not adopted decisions. Progress stays 55%.
 
 **Offline Editorial Draft V1 — APPLICATION AND OFFLINE REVIEW CONSUMER INTEGRATED; DESIGNATED F-A02 ADMISSION IN DEVELOPMENT:**
 The owner explicitly approved reusing the saved F-A02 candidate to create a

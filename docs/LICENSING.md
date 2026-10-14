@@ -2,6 +2,28 @@
 
 CEVRA-owned code is proprietary and all rights are reserved unless explicitly stated otherwise.
 
+## Commercial requirement — Owner confirmed 2026-10-14
+
+CEVRA is a commercial product. Incorporated components must permit the intended
+commercial redistribution without royalties or per-unit/render/task charges;
+the core must not require a third-party subscription. Conditional free tiers do
+not establish that requirement for distribution or future growth. Paid external
+services remain explicitly optional and cannot become a silent dependency.
+
+Audit the actual distributed artifact: exact source/license, build flags, linked
+native/transitive libraries, model weights, fonts and assets, required notices
+and redistribution rights. Reuse the existing provenance and release checks.
+Open-source code alone does not establish universal patent clearance, codec
+rights or zero operating cost; [FFmpeg's own legal guidance](https://ffmpeg.org/legal.html)
+distinguishes code licensing from possible patent obligations. Keep unresolved
+commercial implications explicit before adoption; no engine replacement follows
+from this requirement alone.
+Perform the focused codec-commercial-rights check before release; this document
+does not establish that a fee is due or require a codec/engine replacement.
+PR98 vendors Inter under OFL and uses system AppleColorEmoji/ArialUnicodeMS
+without redistributing their bytes. No font infringement is established here;
+audit actual use and redistribution, not an assumed bundled system-font pack.
+
 ## Preferred third-party licenses
 - Apache-2.0
 - MIT
