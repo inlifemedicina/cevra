@@ -21,7 +21,7 @@ import cevra_bounded_preview as inspection
 import cevra_job_control as jobs
 import cevra_manual_title as title_component
 from cevra_streaming_process import reduce_lines
-from cevra_preview_segments import CACHE as preview_segments, encode as encode_segment_identity
+from cevra_preview_segments import CACHE as preview_segments, MAX_SEGMENT_BYTES, encode as encode_segment_identity
 
 CFR30_SOURCE_SAMPLER = "fps=30:start_time=0:round=near:eof_action=pass"
 SAMPLING_POLICY = "source-pts-fps30-near-v1"
@@ -541,8 +541,20 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
         budget = _LogicalBudget(root, root_stamp, OWNED_BYTES)
         raster = None
         if composition:
-            raster = directory / "title.png"; owned_files.append(raster)
-            title_component.rasterize(common, budget, composition, raster)
+            canonical_width, canonical_height = (1080, 1920) if composition["title"]["aspect"] == "9:16" else (1920, 1080)
+            raster_allowance = canonical_width * canonical_height * 4 + 65536
+            mandatory = sum(next(item["source_content"]["size_bytes"] for item in items if item["input"] == str(original)) for original in originals)
+            mandatory += total * 1600 * 8 + 1024 * 1024
+            # Preserve eager admission for export, non-retained previews,
+            # out-of-program titles and tight budgets. Equal-content aliases can
+            # restore one entry into several files; bound each occurrence, not
+            # only the cache's retained memory, before deferring its raster.
+            restored_allowance = len(items) * min(MAX_SEGMENT_BYTES, preview_segments.maximum_bytes)
+            defer_raster = (cache_transaction is not None and composition["title"]["startFrame"] < total
+                            and mandatory + restored_allowance + raster_allowance <= budget.remaining)
+            if not defer_raster:
+                raster = directory / "title.png"; owned_files.append(raster)
+                title_component.rasterize(common, budget, composition, raster)
         source_targets = {}
         # Admit all mandatory copies and the conservative stereo PCM allowance
         # before copying/encoding. Encoder targets are not file-size bounds.
@@ -619,6 +631,11 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                     budget.restore_segment(segment, payload)
                     del payload
                 else:
+                    if composition and raster is None:
+                        # A sealed hit already contains its admitted title. Any
+                        # miss restores the original raster/producer ordering.
+                        raster = directory / "title.png"; owned_files.append(raster)
+                        title_component.rasterize(common, budget, composition, raster)
                     command = common.ffmpeg_base(overwrite=False) + ["-threads", "2", "-filter_threads", "2", "-filter_complex_threads", "2", "-copyts", "-i", str(sealed)]
                     if interval:
                         canonical_width, canonical_height = (1080, 1920) if composition["title"]["aspect"] == "9:16" else (1920, 1080)
