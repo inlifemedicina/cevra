@@ -4161,3 +4161,21 @@ merge remains excluded. The draft remains stacked over PR98's verified
 `fix/vids-human-review-2026-10-11` head, with this documentary delta separate
 from the exact source commit. Director: no new impact found in this bounded
 cache/acceptance scope; IR/History and typed execution remain authoritative.
+
+
+### 2026-10-14 — Preview-raster latency follow-up on Mac
+
+**IN DEVELOPMENT / OFFLINE VALIDATED, separate from approved PR101.** Branch
+`fix/vids-preview-latency-2026-10-14` starts at head61619e6. The existing renderer
+now skips its title PNG only on an all-segment-hit retained preview with enough
+conservative disk headroom; eager export/noncache/tight-budget behavior remains.
+Per-occurrence allowance covers equal-content source aliases. Runtime source0.3.11
+is tested in isolation; no new signed app or Owner verdict. [Measured scope and
+gates](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-14--bounded-preview-raster-latency-follow-up)
+record 181–212 ms/17–19% lower all-hit recomposition medians, no demonstrated gain
+for new text/layout encodes, Python168 and configured Host/Media332 PASS, decoded
+H/V/PCM equality, exact clocks, History/export/reopen and final runtime integrity.
+The first Node run330/332 FAIL is preserved with confirmed wrong-Python diagnosis;
+owned test-copy bytecodes were recovered before final sealing. No new architecture,
+engine, provider, permission, GUI/Take action or merge. Director no new impact in
+checked scope. PR101/checks and historical cloud FAIL11 are not reclassified.
