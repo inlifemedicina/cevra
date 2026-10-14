@@ -868,7 +868,7 @@ elimination, native first-paint or general release acceptance is claimed.
 
 ## Offline title-duration cache correction — 2026-10-14
 
-**LOCAL SOURCE PATCH / INDEPENDENT REVIEW AND NATIVE VALIDATION PENDING.**
+**HISTORICAL CLOUD SOURCE PATCH / PRE-MAC GATES.**
 Checked base: PR98 `cdc8f8099387d4fce36aca791731665ef15986bd`; executable
 source remains the previously packaged `21c3b67`. Git confirms `main` at
 `48353df`, PR99's branch at `17e15a5` and PR100's branch at `4c4bcff`.
@@ -943,3 +943,57 @@ sealed-runtime/package/CI and independent review remain PENDING/BLOCKED here.
 No commit/push/PR/merge or changes to originals, permissions, providers or
 telemetry. Director impact: no new impact found within this key-only correction;
 typed operations, Project IR, History and execution authority are preserved.
+
+### Mac exact-source closeout and bounded Owner report — 2026-10-14
+
+This supersedes only the pending native/package/Owner status of the historical
+cloud investigation above. Exact source commit:
+`185bb3d3c3683dbf6f2c95a8a78119887e1b42d7`, base
+`cdc8f8099387d4fce36aca791731665ef15986bd`, seven-path diff SHA256
+`33e545af2f12dac2dbb03e4512b1227a256fee527443899175392831b1c6f456`.
+The correction normalizes only the derived segment-cache title bounds to the
+local half-open exposure. Canonical IR/History, raster/export inputs and the
+existing engine remain unchanged. The later documentation commit changes
+only records, not the candidate's executable/runtime bytes.
+
+Mac build, 165 native Media Python, 1,271 Node and 341 UI/one skip passed.
+H/V fixtures cover 18 cached and 18 uncached references with exact decoded
+frames/PCM, half-open title bounds and actual segment producers/hits. Changed
+local exposure still renders; unchanged exposure reuses admitted segments.
+Native Undo/Redo, export and archive/reopen passed. Independent source,
+package and receipt review found no concrete product defect in the examined
+scope. Runtime manifest SHA256:
+`017cd9189b00d0c5fe7553e22ab97c1e429b6a2eda4f3427c3e7b9457918c982`;
+isolated signed candidate inventory SHA256:
+`d7a472b23beb860ea929536289209a1ca322a325700330b08607f65fe19eb767`
+(1,024 files). Runtime 0.3.10; bundle/interface 0.1.0. No prior app replacement.
+
+Packaged Host/WK H/V checks admit the requested frame and retain the previous
+paused picture across typed text/position/size edits. Held pixels were equal;
+current snapshot, one History revision, canvas release and AVFoundation ROI
+checks passed. Synthesized local native duration events and Undo/Redo passed.
+The harness permits autoplay, uses fixture HTTP and forces WK snapshots: these
+results do not alone establish normal Tauri IPC, natural first paint or
+physical gesture fluency. The normal Tauri editor was separately observed
+loaded, and the Owner subsequently confirmed the full requested synthetic
+import, range/title, play/pause, duration/OUT and Undo/Redo sequence. Reuse
+D1-T1, I4-T1, bounded D14-T2/D23-T2 and X-T1/T6; no blanket catalog
+acceptance. X-T2 save/reopen, X-T9 measured cost and D23-T1 schema/security
+guards remain technical evidence, without a new Owner verdict. No human export, new H/V/Unicode matrix or physical reopen claim.
+
+Measured WK admission remains 2.452–2.614 s. The later forced snapshot includes
+a deliberate 100 ms settle interval. Separate Host duration extension was
+1.708–1.828 s; cached Undo/Redo 15.85–18.58 ms. These surfaces are distinct and
+not a causal before/after benchmark; encoding/admission latency is not gone.
+No base-video/PNG architecture was adopted.
+
+Cloud history remains **FAIL: 11 failures**. Follow-up confirmed seven exited
+worker PIDs in state Z under container PID1, not collected by PID1. Three UI
+failures and one RPC failure passed unchanged repeat runs; their root causes
+remain unproven. No process guard/assertion was relaxed, no failed aggregate
+was changed to PASS, and no additional Mac blocker was demonstrated. This is
+not a finding of eleven product bugs. New remote draft checks are reported
+separately on their exact head. Private logs, personal paths, project stores
+and binaries remain local, outside version control. Routine draft publication
+is authorized, with no merge. Director impact remains bounded and compatible;
+existing IR/History/typed boundaries are authoritative.

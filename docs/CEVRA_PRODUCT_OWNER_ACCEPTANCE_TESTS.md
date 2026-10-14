@@ -1011,3 +1011,43 @@ The complete2692entry scratch archive is recoverable and independently verified
 before exclusive cleanup. This is the current candidate; the prior038 closeout
 is retained as history. No app is opened by the agent or prior acceptance
 repeated. [Current package/evidence](CEVRA_MANUAL_TITLE_PROOF_V1.md#signed039-package-and-recoverable-closeout).
+
+## Exact preview-duration candidate: bounded grouped Owner acceptance — 2026-10-14
+
+**APP/OWNER FUNCTIONAL PASS, LIMITED VARIANTS.** The Owner confirmed all
+requested steps on the isolated CEVRA Vids Patch Exato candidate with sealed
+media runtime 0.3.10 (bundle/interface 0.1.0), rather than import alone. Exact
+source commit `185bb3d3c3683dbf6f2c95a8a78119887e1b42d7` is based on PR98
+`cdc8f8099387d4fce36aca791731665ef15986bd`; seven-path diff SHA256
+`33e545af2f12dac2dbb03e4512b1227a256fee527443899175392831b1c6f456`.
+Candidate inventory: 1,024 files, SHA256
+`d7a472b23beb860ea929536289209a1ca322a325700330b08607f65fe19eb767`.
+Reuse these stable IDs without expanding the result to every variant.
+
+| Existing IDs / this tested variant | Owner result |
+|---|---|
+| D1-T1; I4-T1 — import synthetic MP4 and add a range | APP/OWNER FUNCTIONAL PASS in the isolated project. |
+| D14-T2; bounded preview-title variant of D23-T2 — add title and change timeline duration/OUT | APP/OWNER FUNCTIONAL PASS for this sequence. |
+| X-T1 — Desfazer/Refazer in the tested title/duration flow | APP/OWNER FUNCTIONAL PASS. |
+| Bounded preview variant X-T6 — reproduce and pause | APP/OWNER FUNCTIONAL PASS; no new sync or natural-paint benchmark. |
+
+The functional Owner report is distinct from the earlier incomplete automated
+GUI attempt. That attempt observed the loaded normal editor, then was blocked
+at modal selection/coordinate routing. File type, permissions, configured
+native filter and packaged Host import subsequently passed in isolated
+background probes; the Owner completed the real grouped sequence. No product
+change was made by speculation. X-T2 save/reopen and X-T9 complete cost measurements have only technical
+evidence in this round, not a new Owner verdict. Schema/security guards under
+D23-T1 remain automated evidence. No additional move/resize/HV/Unicode matrix,
+human export or new physical reopen is accepted here. Earlier visual/export
+acceptance remains historical and is not repeated or enlarged by this record.
+
+Technical native export and Host/WK results stay separate. Latency remains
+(WK 2.452–2.614 s; isolated Host duration 1.708–1.828 s); functional acceptance
+is not latency elimination or a global fluency score. The broad cloud run
+still has 11 failed assertions: seven exited worker PIDs left in Z under
+container PID1 were confirmed; three UI and one RPC transient failures passed
+unchanged repeats with unproven root causes. This is not eleven demonstrated
+product bugs, and the failed aggregate is not relabelled PASS. Other catalog
+variants, G1/ADR0012/global release and platforms remain unresolved/blocked as
+applicable. Draft publication is authorized separately; merge is not.
