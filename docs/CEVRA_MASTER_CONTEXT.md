@@ -4095,3 +4095,69 @@ Obsolete Documents staging is retained recoverably in Apagar. The running old
 app/project and frozen PR96/97 are preserved. No new engine, security, paid
 provider or persistence boundary; Director extension remains compatible.
 Only the same minimal subjective follow-up remains after fresh final-head CI.
+
+### 2026-10-14 — Offline preview-duration investigation
+
+**HISTORICAL CLOUD INVESTIGATION / PRE-MAC GATES.** Git-read
+reconciliation confirms `main`48353df, PR98 branchcdc8f80, documentary PR99
+branch17e15a5 and PR100 branch4c4bcff. API access returned Forbidden; current
+PR/check metadata was not revalidated. The signed PR98 executable remains21c3b67.
+No architecture adoption follows from the approved preview evaluation.
+
+The [existing title proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#offline-title-duration-cache-correction--2026-10-14)
+records a reproduced excess cache miss during title-duration edits and the
+bounded local correction: equivalent local title exposure reuses admitted
+segments while global canonical bounds remain intact. Runtime source0.3.10
+is not packaged/delivered. Offline build, focused Host/UI and media Python
+checks pass in their stated scopes; full test:ci fails and is not green CI.
+Native CoreText/H/V pixels/WK paint, exact package and independent review remain
+pending. New-title MP4 encoding and prior Mac latency are not eliminated.
+Base-video + PNG remains a proposal requiring material approval before adoption.
+No new engine, AI/provider run, security change, commit/push/merge or human
+retest. Director: no new impact found in the checked key-only scope; IR/History
+and typed execution remain authoritative. Existing acceptance/progress remain.
+
+### 2026-10-14 — Exact preview-duration patch: Mac closeout and bounded Owner acceptance
+
+**APP/OWNER FUNCTIONAL PASS — THIS GROUPED CANDIDATE ONLY.** The exact
+seven-path transfer was materialized and verified on Mac at base
+`cdc8f8099387d4fce36aca791731665ef15986bd`, then committed as
+`185bb3d3c3683dbf6f2c95a8a78119887e1b42d7`. Its diff SHA256 remains
+`33e545af2f12dac2dbb03e4512b1227a256fee527443899175392831b1c6f456`.
+This subsequent documentary change does not change product bytes. Runtime
+0.3.10 was assembled after gates. The isolated signed candidate has 1,024
+verified files and inventory SHA256
+`d7a472b23beb860ea929536289209a1ca322a325700330b08607f65fe19eb767`.
+Bundle/interface version remains 0.1.0; sealed media runtime is 0.3.10.
+
+Mac build, native Media Python 165, Node 1,271 and UI 341/one skip pass.
+Actual H/V duration hit/miss counts, uncached frame/PCM equivalence,
+Undo/Redo/export and packaged Host/WK receipts passed with independent review
+in their declared scopes. WK forced snapshots, fixture HTTP, allowed autoplay
+and synthesized local events remain harness evidence, separate from Owner
+acceptance. The normal Tauri editor loaded, and the Owner later confirmed the
+full requested synthetic import, range/title, playback, title-duration and
+Undo/Redo sequence rather than import alone. This closes only the bounded
+follow-up under existing D1/I4/D14/D23/X variants. No human export, quantified
+fluency, new H/V/Unicode matrix or physical reopen acceptance is inferred.
+WK admission 2.452–2.614 s and Host duration extension 1.708–1.828 s remain;
+latency was not eliminated.
+
+The original broad cloud command remains **FAIL: 11 failures**, not eleven
+established product bugs. Follow-up confirmed seven exited worker PIDs in
+state Z under container PID1, not collected by PID1. Three UI failures and
+one RPC failure were transient in unchanged passing repeats; their root
+causes remain unproven. This diagnosis does not rewrite the failed aggregate
+run as PASS. No additional Mac blocker was demonstrated. Remote checks on
+the newly published draft head are a separate run and must be reported by
+exact SHA without erasing the cloud history.
+
+Evidence, synthetic stores, private logs and binaries remain outside Git.
+The previous app's final bytes were restored and verified after the recorded
+21-pyc test effect; uninterrupted preservation is not claimed. No previous
+app replacement, Take operation, new engine, provider/AI call, security or
+architecture change. Routine commit/push/draft publication is authorized;
+merge remains excluded. The draft remains stacked over PR98's verified
+`fix/vids-human-review-2026-10-11` head, with this documentary delta separate
+from the exact source commit. Director: no new impact found in this bounded
+cache/acceptance scope; IR/History and typed execution remain authoritative.

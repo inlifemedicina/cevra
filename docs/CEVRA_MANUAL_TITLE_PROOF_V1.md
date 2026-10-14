@@ -865,3 +865,135 @@ Receipts are `round-2/app-signature039.json`, `package-smoke039.json`,
 `scratch-verified-cleanup039.json`. Final checks precede creating the new
 CEVRA shortcut and the same grouped subjective follow-up. No merge, latency
 elimination, native first-paint or general release acceptance is claimed.
+
+## Offline title-duration cache correction — 2026-10-14
+
+**HISTORICAL CLOUD SOURCE PATCH / PRE-MAC GATES.**
+Checked base: PR98 `cdc8f8099387d4fce36aca791731665ef15986bd`; executable
+source remains the previously packaged `21c3b67`. Git confirms `main` at
+`48353df`, PR99's branch at `17e15a5` and PR100's branch at `4c4bcff`.
+The latter two diffs contain documentation only. GitHub API queries returned
+Forbidden; no fresh PR/CI-state claim is made and no alternate API access was
+attempted. No signed Mac app was rebuilt, opened or replaced.
+
+The existing path is typed title edit → History/checkpoint → snapshot-bound
+`DerivedVideoPreview.prepare` → `render-manual-video-preview` → CoreText PNG
+→ affected segment encodes → PCM/concat/mux/admission → initial-frame extraction
+→ UI Blob/decode/seek admission. The retained paused picture handles continuity.
+The whole-preview cache already excludes metadata-only snapshot identity and
+rechecks current sources/runtime/native fonts; untitled segment reuse already
+exists. These fixes were preserved rather than reimplemented.
+
+FIX NOW: `_occurrence_composition` included global title IN/OUT even when its
+local visible interval was identical. For a title90..210 extended to240, the
+occurrence0..150 still displays90..150 but previously missed its segment cache.
+Only the derived key now substitutes the local half-open bounds. The canonical
+composition, raster input, current packet, History and export plan are unchanged.
+Text/layout/aspect/font/helper/runtime/source/profile and changed local exposure
+remain invalidators. Runtime source identity advances0.3.9→0.3.10; this is not a
+new packaged executable or permission to reuse an old runtime manifest.
+
+Three regressions extend the existing Python suite: the full synthetic
+orchestrator/cache counts segment producers across three repeated occurrences,
+negative identity cases retain visual invalidation, and60 H/V interval cases
+compare key equality against independently enumerated per-frame visibility.
+The orchestrator is deliberately mocked at raster/media execution; it proves
+cache routing, not pixels or speed. Before correction, shortening and then
+moving title exposure caused2/1 encodes; after correction1/0 are sufficient.
+Composition equality, exact frame/PCM accounting, original bytes, mandatory
+audio production/cleanup and uncached final export remain asserted.
+
+Offline commands and results on the local diff:
+
+- `npm run build`: PASS (existing Vite chunk-size warning).
+- Media Python discovery with Python3.12.14:161 PASS,4 CoreText/macOS-only SKIP.
+- Host `manual-grid-preview`, `derived-video-preview`, `manual-title`:47 PASS.
+- UI `ManualTitleWorkflow`, `ManualVideoPreview`, `ManualTitleOverlay`,
+  `TimeInput`:139 PASS under jsdom, not native video playback.
+- Full UI with `vitest run --maxWorkers=1`:341 PASS,1 real-packet SKIP.
+- Full `npm run test:ci`: FAIL (11 failures). The first UI run had two missing
+  editorial-label assertions and one timeout; unchanged UI subsequently passed
+  in full as above, without changing tests or timeouts. Host had2 lifecycle
+  failures, Alignment1 lifecycle failure, Media5 lifecycle/resource/RPC failures.
+  Three reported Python PIDs were verified exited/zombie under container PID1;
+  absence checks do not pass in that state. This observation does not establish
+  the cause of every failed assertion. Original logs remain external; no process
+  protection, resource limit or assertion was relaxed. No failed run is relabelled
+  PASS, and the command's subsequent fake-Claude suite was NOT_RUN after failure.
+  The unchanged RPC test passes1/1 in isolation with its original1000ms timeout;
+  that rerun does not close the remaining lifecycle/resource failures.
+
+Tested local `cevra_manual_sequence.py` SHA256:
+`e21a3153709fc370909d2da580709891c2e050b5bcced7792bbc2ae22c77650b`.
+
+No milliseconds were measured for this change. New text/position/size still
+requires PNG and affected segment encoding, followed by current-program
+assembly/admission. The prior2202–2363ms Host and88–96ms raster observations
+remain historical Mac measurements; they are not measurements on this host.
+For eliminating that encoding wait, the smallest architectural candidate remains
+the existing admitted base-video + derived-PNG approach, requiring a typed layer
+packet, independent base/layer identity, snapshot/ABA/source/runtime/font/geometry
+guards and native preview/export equivalence. Evaluation is approved; adoption
+and implementation are not. No new engine/library/provider is needed for the
+first feasibility comparison. Keep the current composition path meanwhile.
+
+Reuses existing title/preview acceptance IDs; no new human round is requested.
+Native H/V render equality, Unicode/color-font raster, WK paint/gesture fluency,
+sealed-runtime/package/CI and independent review remain PENDING/BLOCKED here.
+No commit/push/PR/merge or changes to originals, permissions, providers or
+telemetry. Director impact: no new impact found within this key-only correction;
+typed operations, Project IR, History and execution authority are preserved.
+
+### Mac exact-source closeout and bounded Owner report — 2026-10-14
+
+This supersedes only the pending native/package/Owner status of the historical
+cloud investigation above. Exact source commit:
+`185bb3d3c3683dbf6f2c95a8a78119887e1b42d7`, base
+`cdc8f8099387d4fce36aca791731665ef15986bd`, seven-path diff SHA256
+`33e545af2f12dac2dbb03e4512b1227a256fee527443899175392831b1c6f456`.
+The correction normalizes only the derived segment-cache title bounds to the
+local half-open exposure. Canonical IR/History, raster/export inputs and the
+existing engine remain unchanged. The later documentation commit changes
+only records, not the candidate's executable/runtime bytes.
+
+Mac build, 165 native Media Python, 1,271 Node and 341 UI/one skip passed.
+H/V fixtures cover 18 cached and 18 uncached references with exact decoded
+frames/PCM, half-open title bounds and actual segment producers/hits. Changed
+local exposure still renders; unchanged exposure reuses admitted segments.
+Native Undo/Redo, export and archive/reopen passed. Independent source,
+package and receipt review found no concrete product defect in the examined
+scope. Runtime manifest SHA256:
+`017cd9189b00d0c5fe7553e22ab97c1e429b6a2eda4f3427c3e7b9457918c982`;
+isolated signed candidate inventory SHA256:
+`d7a472b23beb860ea929536289209a1ca322a325700330b08607f65fe19eb767`
+(1,024 files). Runtime 0.3.10; bundle/interface 0.1.0. No prior app replacement.
+
+Packaged Host/WK H/V checks admit the requested frame and retain the previous
+paused picture across typed text/position/size edits. Held pixels were equal;
+current snapshot, one History revision, canvas release and AVFoundation ROI
+checks passed. Synthesized local native duration events and Undo/Redo passed.
+The harness permits autoplay, uses fixture HTTP and forces WK snapshots: these
+results do not alone establish normal Tauri IPC, natural first paint or
+physical gesture fluency. The normal Tauri editor was separately observed
+loaded, and the Owner subsequently confirmed the full requested synthetic
+import, range/title, play/pause, duration/OUT and Undo/Redo sequence. Reuse
+D1-T1, I4-T1, bounded D14-T2/D23-T2 and X-T1/T6; no blanket catalog
+acceptance. X-T2 save/reopen, X-T9 measured cost and D23-T1 schema/security
+guards remain technical evidence, without a new Owner verdict. No human export, new H/V/Unicode matrix or physical reopen claim.
+
+Measured WK admission remains 2.452–2.614 s. The later forced snapshot includes
+a deliberate 100 ms settle interval. Separate Host duration extension was
+1.708–1.828 s; cached Undo/Redo 15.85–18.58 ms. These surfaces are distinct and
+not a causal before/after benchmark; encoding/admission latency is not gone.
+No base-video/PNG architecture was adopted.
+
+Cloud history remains **FAIL: 11 failures**. Follow-up confirmed seven exited
+worker PIDs in state Z under container PID1, not collected by PID1. Three UI
+failures and one RPC failure passed unchanged repeat runs; their root causes
+remain unproven. No process guard/assertion was relaxed, no failed aggregate
+was changed to PASS, and no additional Mac blocker was demonstrated. This is
+not a finding of eleven product bugs. New remote draft checks are reported
+separately on their exact head. Private logs, personal paths, project stores
+and binaries remain local, outside version control. Routine draft publication
+is authorized, with no merge. Director impact remains bounded and compatible;
+existing IR/History/typed boundaries are authoritative.
