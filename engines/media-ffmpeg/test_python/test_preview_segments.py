@@ -13,6 +13,7 @@ import cevra_preview_segments as segments
 import cevra_manual_sequence as manual
 import cevra_media_worker as worker
 import test_manual_sequence as manual_fixture
+from test_manual_title import composition
 
 GRID = {"version": 1, "frames": 30, "width": 720, "height": 404}
 
@@ -177,6 +178,79 @@ class PreviewSegmentTests(unittest.TestCase):
             folder = self.root / "export"; folder.mkdir()
             _, common, _, _ = helper._pipeline(str(folder), preview=False)
             self.assertEqual(len([c for c in common.commands if Path(c[-1]).name.startswith("segment-")]), 1)
+
+    def test_title_duration_edits_reuse_occurrences_with_unchanged_local_exposure(self):
+        helper = manual_fixture.ManualSequenceTests()
+        original_run = manual.run
+        plan = composition()
+        plan["title"].update(startFrame=0, endFrame=3)
+        def cached_run(*args, **kwargs):
+            return original_run(*args, **kwargs, retain_segments=True)
+        def rasterize(_common, budget, _composition, destination):
+            budget.write_text(destination, "synthetic raster; no native pixel claim")
+        with mock.patch.object(manual, "_segment_runtime_identity", return_value={"fixture": "verified-runtime"}), \
+                mock.patch.object(manual.title_component, "identity", return_value={"font": "verified-font"}), \
+                mock.patch.object(manual.title_component, "rasterize", side_effect=rasterize), \
+                mock.patch.object(manual, "run", side_effect=cached_run):
+            # Three occurrences of the same source frame. Only exposure changes:
+            # all -> first two -> middle -> all. The first edit needs one new
+            # untitled segment; subsequent edits can reuse both admitted variants.
+            for index, (start, end, encodes) in enumerate(((0, 3, 1), (0, 2, 1), (1, 2, 0), (0, 3, 0))):
+                with self.subTest(start=start, end=end):
+                    folder = self.root / str(index); folder.mkdir()
+                    plan["title"].update(startFrame=start, endFrame=end)
+                    before = copy.deepcopy(plan)
+                    args, common, result, original = helper._pipeline(str(folder), preview=True, composition=plan, repetitions=3)
+                    self.assertEqual(sum(Path(c[-1]).name.startswith("segment-") for c in common.commands), encodes)
+                    self.assertEqual(result["structuredContent"]["manualSequence"]["composition"], before)
+                    self.assertEqual(result["structuredContent"]["manualSequence"]["totalFrames"], 3)
+                    self.assertEqual(result["structuredContent"]["manualSequence"]["totalPcmSamples"], 4800)
+                    self.assertTrue(any(Path(c[-1]).suffix == ".wav" for c in common.commands))
+                    self.assertEqual(plan, before)
+                    self.assertEqual(Path(args["items"][0]["input"]).read_bytes(), original)
+                    self.assertEqual(list((folder / "job").iterdir()), [folder / "job/published-account.mp4"])
+            folder = self.root / "titled-export"; folder.mkdir()
+            _, common, _, _ = helper._pipeline(str(folder), composition=plan, repetitions=3)
+            self.assertEqual(sum(Path(c[-1]).name.startswith("segment-") for c in common.commands), 1)
+
+    def test_visible_title_key_keeps_text_layout_aspect_fonts_and_local_boundaries(self):
+        plan = composition()
+        plan["title"].update(version=2, layout={"version": 1, "x": .1, "y": .2, "width": .7, "fontScale": 1})
+        def key(value, component=None, interval=(0, 30)):
+            return segments.encode(manual._occurrence_composition(value, component or {"font": "a", "helper": "b", "nativeFonts": "c"}, interval))
+        baseline = key(plan)
+        for field, value in (("text", "Novo 👩🏽‍⚕️"), ("aspect", "9:16"), ("version", 1)):
+            changed = copy.deepcopy(plan); changed["title"][field] = value
+            self.assertNotEqual(key(changed), baseline)
+        for field in ("x", "y", "width", "fontScale"):
+            changed = copy.deepcopy(plan); changed["title"]["layout"][field] += .01
+            self.assertNotEqual(key(changed), baseline)
+        for field in ("font", "helper", "nativeFonts"):
+            component = {"font": "a", "helper": "b", "nativeFonts": "c", field: "changed"}
+            self.assertNotEqual(key(plan, component), baseline)
+        for interval in ((1, 30), (0, 29), None):
+            self.assertNotEqual(key(plan, interval=interval), baseline)
+
+    def test_duration_key_equality_matches_frame_visibility_at_cut_boundaries(self):
+        for aspect in ("16:9", "9:16"):
+            for offset in (0, 150, 300):
+                by_visibility = {}
+                by_identity = {}
+                for start, end in ((0, 450), (90, 210), (90, 240), (0, 150), (150, 300),
+                                   (150, 299), (151, 300), (300, 450), (301, 450), (0, 1)):
+                    plan = composition(); plan["title"].update(startFrame=start, endFrame=end, aspect=aspect)
+                    before = copy.deepcopy(plan)
+                    # Independent oracle: title visible at each owning CFR frame.
+                    visible = tuple(start <= frame < end for frame in range(offset, offset + 150))
+                    interval = manual.title_component.local_interval(plan, offset, 150)
+                    key = segments.encode(manual._occurrence_composition(plan, {"font": "verified"}, interval))
+                    if visible in by_visibility:
+                        self.assertEqual(key, by_visibility[visible])
+                    if key in by_identity:
+                        self.assertEqual(visible, by_identity[key])
+                    by_visibility[visible] = key
+                    by_identity[key] = visible
+                    self.assertEqual(plan, before)
 
     def test_failed_admission_or_cleanup_does_not_publish_segments(self):
         helper = manual_fixture.ManualSequenceTests(); original_run = manual.run

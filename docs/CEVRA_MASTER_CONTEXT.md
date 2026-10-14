@@ -4095,3 +4095,24 @@ Obsolete Documents staging is retained recoverably in Apagar. The running old
 app/project and frozen PR96/97 are preserved. No new engine, security, paid
 provider or persistence boundary; Director extension remains compatible.
 Only the same minimal subjective follow-up remains after fresh final-head CI.
+
+### 2026-10-14 — Offline preview-duration investigation
+
+**LOCAL PATCH / NOT COMMITTED, REVIEW/NATIVE GATES PENDING.** Git-read
+reconciliation confirms `main`48353df, PR98 branchcdc8f80, documentary PR99
+branch17e15a5 and PR100 branch4c4bcff. API access returned Forbidden; current
+PR/check metadata was not revalidated. The signed PR98 executable remains21c3b67.
+No architecture adoption follows from the approved preview evaluation.
+
+The [existing title proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#offline-title-duration-cache-correction--2026-10-14)
+records a reproduced excess cache miss during title-duration edits and the
+bounded local correction: equivalent local title exposure reuses admitted
+segments while global canonical bounds remain intact. Runtime source0.3.10
+is not packaged/delivered. Offline build, focused Host/UI and media Python
+checks pass in their stated scopes; full test:ci fails and is not green CI.
+Native CoreText/H/V pixels/WK paint, exact package and independent review remain
+pending. New-title MP4 encoding and prior Mac latency are not eliminated.
+Base-video + PNG remains a proposal requiring material approval before adoption.
+No new engine, AI/provider run, security change, commit/push/merge or human
+retest. Director: no new impact found in the checked key-only scope; IR/History
+and typed execution remain authoritative. Existing acceptance/progress remain.

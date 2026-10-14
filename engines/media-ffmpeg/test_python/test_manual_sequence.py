@@ -475,15 +475,22 @@ class ManualSequenceTests(unittest.TestCase):
                     tools._run_extract_frame(common, args)
                 self.assertEqual(output.read_bytes(), b"foreign png")
 
-    def _pipeline(self, directory: str, *, failure: str | None = None, preview: bool = False):
+    def _pipeline(self, directory: str, *, failure: str | None = None, preview: bool = False,
+                  composition: dict | None = None, repetitions: int | None = None):
         from contextlib import ExitStack
         root = Path(directory).resolve(); workspace = root / "job"; workspace.mkdir(mode=0o700)
         original = root / "original.mp4"; content = b"original immutable bytes"; original.write_bytes(content)
         one = {**item(str(original)), "source_content": {"sha256": hashlib.sha256(content).hexdigest(), "size_bytes": len(content)}}
         args = {"version": 1, "items": [one] if preview else [one, one], "output": str(root / "final.mp4"), "owned_workspace": str(workspace)}
+        if repetitions is not None:
+            args["items"] = [one] * repetitions
+        if composition is not None:
+            args.update(version=3 if preview else 2, composition=composition)
         frames = len(args["items"]); common = PipelineCommon(workspace, frames * 1600, failure=failure, original=original, preview=preview)
         meta = {"duration": 1, "video": {"codec": "h264", "width": 1920, "height": 1080, "bit_depth": 8, "pix_fmt": "yuv420p"},
                 "audio": {"codec": "aac", "sample_rate": 48000, "channels": 2, "channel_layout": "stereo"}}
+        if composition is not None:
+            meta["video"].update(color_space="bt709", color_primaries="bt709", color_transfer="bt709", color_range="tv")
         clock = [Fraction(index, 30) for index in range(30)]
         def check_cancelled():
             if failure == "late-cancel" and Path(args["output"]).exists():
@@ -493,7 +500,7 @@ class ManualSequenceTests(unittest.TestCase):
         with ExitStack() as stack:
             stack.enter_context(mock.patch.dict(os.environ, {"CEVRA_VIDEO_ENCODER_H264": "h264_videotoolbox"}))
             stack.enter_context(mock.patch.object(manual.inspection, "_inspect_source", return_value=(meta, clock, [Fraction(1, 30)] * 30, Fraction(1, 30000), {}, (0, 48000))))
-            stack.enter_context(mock.patch.object(manual, "_streams", return_value=[{"index": 0, "codec_type": "video"}, {"index": 3, "codec_type": "audio"}]))
+            stack.enter_context(mock.patch.object(manual, "_streams", return_value=[{**meta["video"], "index": 0, "codec_type": "video"}, {"index": 3, "codec_type": "audio"}]))
             stack.enter_context(mock.patch.object(manual, "_video_clock", side_effect=lambda _common, _path, count, *_dimensions: Fraction(count, 30)))
             stack.enter_context(mock.patch.object(manual, "_audio_clock", side_effect=lambda _common, _path, count, _channels: Fraction(count, 48000)))
             stack.enter_context(mock.patch.object(tools, "_ffmpeg_encoders", return_value=["aac"]))

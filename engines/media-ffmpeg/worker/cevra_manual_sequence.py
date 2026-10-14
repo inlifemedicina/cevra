@@ -502,7 +502,10 @@ def _occurrence_composition(composition, component_identity, interval):
         return None
     # A title outside this occurrence cannot affect its bytes. Keep the owning
     # sequence aspect, which still controls fit/pad geometry, in that identity.
-    return ({"component": component_identity, "plan": composition, "interval": interval}
+    # Visible pixels depend on the local half-open interval, not on the title's
+    # global bounds beyond this occurrence. Do not mutate the canonical plan.
+    local_plan = {**composition, "title": {**composition["title"], "startFrame": interval[0], "endFrame": interval[1]}} if interval else None
+    return ({"component": component_identity, "plan": local_plan, "interval": interval}
             if interval else {"aspect": composition["title"]["aspect"]})
 
 
