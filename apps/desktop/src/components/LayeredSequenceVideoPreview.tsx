@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { validateManualTitle } from "@cevra/project-ir";
-import type { LocalVideoPreview, LayerPreviewFallbackV1 } from "@cevra/application";
+import type { LocalVideoPreview, LayerPreviewFallbackV1, LayerPreviewPlaybackV1 } from "@cevra/application";
 import { ManualVideoPreview } from "./ManualVideoPreview";
 import { ManualTitleOverlay } from "./ManualTitleOverlay";
 import { cfr30DecoderSeekSeconds, floorMsToFrames, framesToMilliseconds } from "../frame-timing";
@@ -17,6 +17,11 @@ type Images = {
     graphic: ImageBitmap;
     canonicalSha: string;
     graphicSha: string;
+};
+type PlaybackScope = {
+    operationId: string; snapshot: string; epoch: number; start: number;
+    callbacks: number; scheduled: boolean; lastCallbackAt: number | null; lastMediaTimeMs: number | null;
+    submitted: number; failed: number; lastDrawAt: number | null;
 };
 export type LayerPreviewTiming=import("@cevra/application").LayerPreviewPresentationV1;
 class AdmissionError extends Error {
@@ -75,6 +80,40 @@ export function LayeredSequenceVideoPreview(props: Props) {
     } | null>(null);
     const [fallback, setFallback] = useState(false), [ready, setReady] = useState(false), [playing, setPlaying] = useState(false), [frame, setFrame] = useState(0);
     const fallbackRecorded = useRef(false), requestTiming = useRef({ operationId: "layer-preview", start: performance.now() });
+    const playback = useRef<PlaybackScope | null>(null), playbackRecords = useRef(0);
+    function observePlayback(reason: LayerPreviewPlaybackV1["reason"], scope = playback.current) {
+        const now = current.current, v = video.current;
+        if (!scope || scope !== playback.current || scope.epoch !== viewEpoch.current || scope.snapshot !== now.snapshotId
+            || packet.current?.snapshotId !== now.snapshotId || now.busy || fallbackRecorded.current || !v)
+            return;
+        const hasFrame = admitted.current?.snapshot === now.snapshotId && admitted.current?.epoch === scope.epoch;
+        if (reason === "sample" && (!now.program?.resume || !hasFrame))
+            return;
+        // Per mounted renderer, across all seeks/snapshots: 23 samples and one
+        // draw failure. Native persistence retains its separate 100-row ceiling.
+        if (playbackRecords.current >= (reason === "sample" ? 23 : 24))
+            return;
+        const at = performance.now(), elapsedMs = at - scope.start;
+        if (!Number.isFinite(elapsedMs) || elapsedMs < 0 || elapsedMs > 3_600_000)
+            return;
+        const age = (value: number | null) => {
+            const delta = value === null ? null : at - value;
+            return delta !== null && Number.isFinite(delta) && delta >= 0 && delta <= 3_600_000 ? delta : null;
+        };
+        const mediaTime = (value: number) => Number.isFinite(value) && value >= 0 && value <= 604_800_000 ? value : null;
+        const code = v.error?.code;
+        const receipt: LayerPreviewPlaybackV1 = { version: 1, kind: "playback", reason, operationId: scope.operationId,
+            snapshotId: scope.snapshot, epoch: scope.epoch, elapsedMs, intentToPlay: now.program?.resume === true,
+            frame: hasFrame ? displayedFrame.current : null, pendingSeek: pendingSeek.current,
+            decoder: { timeMs: mediaTime(v.currentTime * 1000), paused: v.paused, ended: v.ended, seeking: v.seeking,
+                readyState: v.readyState, networkState: v.networkState, errorCode: code === 1 || code === 2 || code === 3 || code === 4 ? code : null },
+            callback: { received: scope.callbacks, scheduled: scope.scheduled, lastMediaTimeMs: scope.lastMediaTimeMs, lastAgeMs: age(scope.lastCallbackAt) },
+            draw: { submitted: scope.submitted, failed: scope.failed, lastAgeMs: age(scope.lastDrawAt) },
+            visibility: document.visibilityState === "visible" ? "visible" : document.visibilityState === "hidden" ? "hidden" : "unknown",
+            endpoint: "playback-observation" };
+        playbackRecords.current++;
+        try { void now.backend.recordLayerPresentation?.(receipt).catch(() => {}); } catch { /* Observation must not control playback or fallback. */ }
+    }
     function fallBack(stage: LayerPreviewFallbackV1["stage"], cause: unknown, reason?: LayerPreviewFallbackV1["reason"]) {
         setFallback(true);
         if (fallbackRecorded.current) return;
@@ -128,10 +167,16 @@ export function LayeredSequenceVideoPreview(props: Props) {
         catch (error) {
             // A failed playback/resize/end draw must use the same bounded
             // fallback as an initial decode, rather than abandon its callback.
-            if (isCurrent(epoch))
+            if (isCurrent(epoch)) {
+                const scope = playback.current;
+                if (scope?.epoch === epoch) scope.failed++;
+                observePlayback("draw-failure", scope);
                 fallBack("decode", error);
+            }
             return false;
         }
+        const scope = playback.current;
+        if (scope?.epoch === epoch) { scope.submitted++; scope.lastDrawAt = performance.now(); }
         admitted.current = { snapshot: now.snapshotId, epoch };
         displayedFrame.current = f;
         setFrame(f);
@@ -190,7 +235,11 @@ export function LayeredSequenceVideoPreview(props: Props) {
         cancelScrub(); }, blur = () => cancelScrub(); window.addEventListener("keydown", escape); window.addEventListener("blur", blur); return () => { window.removeEventListener("keydown", escape); window.removeEventListener("blur", blur); cancelScrub(false); }; }, []);
     useEffect(() => { if (busy)
         cancelScrub(false); }, [busy]);
-    useLayoutEffect(() => { ended.current = false; viewEpoch.current++; viewAbort.current?.abort(); video.current?.pause(); pendingSeek.current = true; clear(); }, [snapshotId, seek.sequence, busy]);
+    useLayoutEffect(() => { ended.current = false; viewEpoch.current++;
+        playback.current = { operationId: `playback-${crypto.randomUUID()}`, snapshot: snapshotId, epoch: viewEpoch.current,
+            start: performance.now(), callbacks: 0, scheduled: false, lastCallbackAt: null, lastMediaTimeMs: null,
+            submitted: 0, failed: 0, lastDrawAt: null };
+        viewAbort.current?.abort(); video.current?.pause(); pendingSeek.current = true; clear(); }, [snapshotId, seek.sequence, busy]);
     useEffect(() => { if (packet.current?.snapshotId === snapshotId) {
         pendingTiming.current = {operationId:`seek-${crypto.randomUUID()}`,start:performance.now(),decodeMs:0,kind:"seek"};
         void showCurrent();
@@ -294,15 +343,29 @@ export function LayeredSequenceVideoPreview(props: Props) {
             fallBack("capability", null, "video-frame-callback-unavailable");
             return;
         }
+        const scope = playback.current;
+        if (!scope || scope.epoch !== epoch) return;
         let stopped = false, id = 0;
         const tick = (_now: number, metadata: VideoFrameCallbackMetadata) => { if (stopped || epoch !== viewEpoch.current || baseId !== base.current?.id || expectedSnapshot !== current.current.snapshotId)
-            return; const p = packet.current, now = current.current; if (p && now.program?.resume && !v.paused && !v.seeking && !pendingSeek.current && admitted.current?.snapshot === now.snapshotId) {
+            return;
+            scope.scheduled = false; scope.callbacks++; scope.lastCallbackAt = performance.now();
+            scope.lastMediaTimeMs = Number.isFinite(metadata.mediaTime) && metadata.mediaTime >= 0 && metadata.mediaTime <= 604_800 ? metadata.mediaTime * 1000 : null;
+            const p = packet.current, now = current.current; if (p && now.program?.resume && !v.paused && !v.seeking && !pendingSeek.current && admitted.current?.snapshot === now.snapshotId) {
             const f = Math.min(p.sequence!.totalFrames, Math.floor(metadata.mediaTime * 30 + 1e-5));
             draw(epoch, f);
-        } id = v.requestVideoFrameCallback(tick); };
-        id = v.requestVideoFrameCallback(tick);
-        return () => { stopped = true; v.cancelVideoFrameCallback(id); };
+        } id = v.requestVideoFrameCallback(tick); scope.scheduled = true; };
+        id = v.requestVideoFrameCallback(tick); scope.scheduled = true;
+        return () => { stopped = true; scope.scheduled = false; v.cancelVideoFrameCallback(id); };
     }, [fallback, ready, snapshotId, seek.sequence]);
+    useEffect(() => {
+        const scope = playback.current;
+        if (!scope || fallback || !ready || busy || !program?.resume || playbackRecords.current >= 23) return;
+        const timer = window.setInterval(() => {
+            observePlayback("sample", scope);
+            if (playbackRecords.current >= 23) window.clearInterval(timer);
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [fallback, ready, busy, program?.resume, snapshotId, seek.sequence]);
     useEffect(() => { if (!fallback)
         return; viewAbort.current?.abort(); modelAbort.current?.abort(); release(images.current); images.current = null; if (base.current)
         URL.revokeObjectURL(base.current.url); base.current = null; packet.current = null; }, [fallback]);

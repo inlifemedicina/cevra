@@ -297,3 +297,69 @@ receipt/scheduling and mediaTime, and the draw outcome under the same snapshot
 and epoch. GUI/Owner gates and historical broad CI failures remain separate.
 Director impact: compatible presentation guard only; typed execution, Project IR,
 History, permissions, dependencies and existing engine boundaries are unchanged.
+
+## Bounded playback observations — 2026-10-15
+
+The approved offline continuation starts at `e5b06c8`; it neither attributes nor
+claims to fix the real frame218 retention. A third closed variant of the existing
+candidate-only `desktop_record_layer_presentation` argument records playback
+observations. No new command, ACL, telemetry destination, filesystem access,
+dependency, engine or provider is added. Ordinary build flags remain off.
+
+An interval observes at1Hz only while the current admitted snapshot/epoch has
+playback intent, ready state and no busy/fallback state. It does not issue play,
+pause, seek, retry, fallback-on-silence or other recovery. Each renderer mount
+has23 sample attempts and one additional draw-failure attempt across all its
+seeks and snapshots. This is separate from the unchanged native ceiling of100
+rows per process and exclusive0600 JSONL file. A full native file can still
+omit later observations; the local reservation does not promise persistence.
+
+Each row contains only IDs/epoch, elapsed time, playback intent, admitted frame
+or null, pendingSeek, decoder time/paused/ended/seeking/readyState/networkState
+and a closed media error code, callback count/pending flag/last media time/age,
+successful and failed canvas draw counts/last success age, and a closed document
+visibility value. It has endpoint `playback-observation`, never a paint or
+playback-success claim. Unobserved event times are null. Numeric values and
+strings are bounded at the native boundary; unknown fields, including nested
+path/text/error-message/paint fields, are rejected.
+
+Epoch/snapshot/reference ownership precedes counter updates and observation
+emission. Old callbacks, canceled timers and old cleanup cannot pollute a new
+scope. The per-mount attempt budget is not reset by a seek. Timers are cleared
+on pause, busy state, fallback and unmount. A current canvas exception emits a
+best-effort draw-failure observation before the existing bounded fallback;
+writer rejection never blocks fallback, cleanup or transport.
+
+Directed evidence:35 layer cases and63 Rust cases pass, including eight new UI
+diagnostic cases and three new native closed-schema cases. Independent UI review
+reruns35/35 and both UI/native reviewers approve the limited scope. The original
+no-diagnostic base fails five selected observation assertions. An early numeric
+assertion used exact floating-point milliseconds; a close comparison corrects
+that test invocation without changing the observation values or product guards.
+
+The optional actual-Host React delivery consumer is executable in this round:
+two fresh runtime0.3.13 production Host sequence packets come from an isolated
+copy of the saved square1 checkpoint and a byte-identical own source. Only that
+own History is relocated and title-duration-edited. The real Host closes
+normally, copied inputs and original source remain unchanged, and the consumer
+confirms current Blob/PNG delivery, stale-response rejection and native readiness
+remaining disabled. This does not prove native decode, paint or fluency. These
+packets replace the prior round's missing optional input rather than rewriting
+its historical SKIP. Seven affected UI suites pass276 tests in each flag mode.
+
+The package includes the existing draw guard and unchanged sealed runtime0.3.13.
+It has an exclusive bundle/store and fresh own fixture; no prior app/store is
+updated or used as a seed. Building/verifying it does not authorize GUI use.
+The next coordinated CUA round should create the minimal own fixture/two clips/
+Unicode title, confirm canvas, and observe one continuous two-cycle attempt
+without seeks or repeated remounting. If apparent retention occurs, leave2–3s
+for consecutive observations, pause normally and preserve the receipt. Correlate
+same-scope clock, callback and draw progress; missing rows alone are inconclusive
+because collection conditions, budgets or the UI event loop may prevent them.
+The remaining physical Tauri reopen needs verified manual access and coordination.
+
+Original square1 receipts, failure observations, apps and baselines remain frozen.
+No current GUI, Take, security/energy/network setting, default adoption, real AI,
+merge, push, publication or Owner acceptance occurs. Historical broad FAILs remain
+unchanged. Director impact remains a compatible observation/diagnostic extension;
+typed execution, Project IR and History retain their existing authority.

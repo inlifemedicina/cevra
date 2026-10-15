@@ -25,10 +25,39 @@ pub struct FallbackReceipt {
     capabilities:BrowserCapabilities,endpoint:String,
 }
 #[derive(Deserialize, Serialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct DecoderState {
+    time_ms:Option<f64>,paused:bool,ended:bool,seeking:bool,ready_state:u8,network_state:u8,error_code:Option<u8>,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct CallbackState { received:u32,scheduled:bool,last_media_time_ms:Option<f64>,last_age_ms:Option<f64> }
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct DrawState { submitted:u32,failed:u32,last_age_ms:Option<f64> }
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct PlaybackReceipt {
+    version:u8,kind:String,reason:String,operation_id:String,snapshot_id:String,epoch:u64,elapsed_ms:f64,
+    intent_to_play:bool,frame:Option<u32>,pending_seek:bool,decoder:DecoderState,callback:CallbackState,draw:DrawState,
+    visibility:String,endpoint:String,
+}
+#[derive(Deserialize, Serialize)]
 #[serde(untagged)]
-pub enum DiagnosticReceipt { Presentation(PresentationReceipt), Fallback(FallbackReceipt) }
+pub enum DiagnosticReceipt { Presentation(PresentationReceipt), Fallback(FallbackReceipt), Playback(PlaybackReceipt) }
 fn finite(v:f64)->bool{v.is_finite() && (0.0..=3_600_000.0).contains(&v)}
 fn identifier(v:&str)->bool{!v.is_empty() && v.len()<=128 && v.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-')}
+fn media_time(v:f64)->bool{v.is_finite() && (0.0..=604_800_000.0).contains(&v)}
+fn valid_playback(v:&PlaybackReceipt)->bool{
+    v.version==1 && v.kind=="playback" && ["sample","draw-failure"].contains(&v.reason.as_str())
+    && v.endpoint=="playback-observation" && v.epoch>0 && identifier(&v.operation_id) && identifier(&v.snapshot_id)
+    && finite(v.elapsed_ms) && v.frame.map_or(true,|n|n<=18_144_000)
+    && v.decoder.time_ms.map_or(true,media_time) && v.decoder.ready_state<=4 && v.decoder.network_state<=3
+    && v.decoder.error_code.map_or(true,|n|(1..=4).contains(&n))
+    && v.callback.received<=18_144_000 && v.callback.last_media_time_ms.map_or(true,media_time) && v.callback.last_age_ms.map_or(true,finite)
+    && v.draw.submitted<=18_144_000 && v.draw.failed<=18_144_000 && v.draw.last_age_ms.map_or(true,finite)
+    && ["visible","hidden","unknown"].contains(&v.visibility.as_str())
+}
 fn valid_fallback(v:&FallbackReceipt)->bool{
     v.version==1 && v.kind=="fallback" && v.endpoint=="encoded-fallback" && v.epoch>0
     && identifier(&v.operation_id) && identifier(&v.snapshot_id) && finite(v.elapsed_ms)
@@ -47,7 +76,7 @@ static RECEIPTS:Mutex<Option<(File,usize)>>=Mutex::new(None);
 #[tauri::command]
 pub fn desktop_record_layer_presentation(app:AppHandle,args:DiagnosticReceipt)->Result<(),DesktopCommandError>{
     if option_env!("CEVRA_EXPERIMENTAL_TITLE_LAYER")!=Some("1"){return Err(DesktopCommandError::new("MANUAL_LAYER_UNAVAILABLE","Experimental diagnostics disabled."))}
-    if !match &args {DiagnosticReceipt::Presentation(v)=>valid(v),DiagnosticReceipt::Fallback(v)=>valid_fallback(v)}{return Err(DesktopCommandError::new("HOST_INVALID_PARAMS","Invalid presentation receipt."))}
+    if !match &args {DiagnosticReceipt::Presentation(v)=>valid(v),DiagnosticReceipt::Fallback(v)=>valid_fallback(v),DiagnosticReceipt::Playback(v)=>valid_playback(v)}{return Err(DesktopCommandError::new("HOST_INVALID_PARAMS","Invalid presentation receipt."))}
     let result=(||->std::io::Result<()>{
         let mut state=RECEIPTS.lock().map_err(|_|std::io::Error::other("receipt unavailable"))?;
         if state.is_none(){
@@ -77,5 +106,31 @@ pub fn desktop_record_layer_presentation(app:AppHandle,args:DiagnosticReceipt)->
         for key in ["operationId","snapshotId"]{let mut v=fallback();v[key]=serde_json::json!("/private/path");assert!(!valid_fallback(&serde_json::from_value(v).unwrap()))}
         let mut v=fallback();v["elapsedMs"]=serde_json::json!(-1);assert!(!valid_fallback(&serde_json::from_value(v).unwrap()));
         let mut v=fallback();v["endpoint"]=serde_json::json!("canvas-submit");assert!(!valid_fallback(&serde_json::from_value(v).unwrap()));
+    }
+    fn playback()->serde_json::Value{serde_json::json!({"version":1,"kind":"playback","reason":"sample","operationId":"playback-1","snapshotId":"snapshot-1","epoch":2,"elapsedMs":1000.0,"intentToPlay":true,"frame":218,"pendingSeek":false,"decoder":{"timeMs":8500.0,"paused":false,"ended":false,"seeking":false,"readyState":2,"networkState":1,"errorCode":null},"callback":{"received":10,"scheduled":true,"lastMediaTimeMs":7266.666,"lastAgeMs":1000.0},"draw":{"submitted":11,"failed":0,"lastAgeMs":1000.0},"visibility":"visible","endpoint":"playback-observation"})}
+    #[test] fn accepts_closed_playback_observation_with_unknown_event_times(){
+        let mut v=playback();assert!(valid_playback(&serde_json::from_value(v.clone()).unwrap()));
+        assert!(matches!(serde_json::from_value::<DiagnosticReceipt>(v.clone()).unwrap(),DiagnosticReceipt::Playback(_)));
+        v["frame"]=serde_json::Value::Null;v["decoder"]["timeMs"]=serde_json::Value::Null;
+        for k in ["lastMediaTimeMs","lastAgeMs"]{v["callback"][k]=serde_json::Value::Null;}
+        v["draw"]["lastAgeMs"]=serde_json::Value::Null;v["reason"]=serde_json::json!("draw-failure");
+        assert!(valid_playback(&serde_json::from_value(v).unwrap()));
+    }
+    #[test] fn refuses_playback_private_fields_and_open_strings_at_every_level(){
+        for key in ["path","message","title","physicalPaintMs"]{
+            let mut v=playback();v[key]=serde_json::json!("private");assert!(serde_json::from_value::<DiagnosticReceipt>(v).is_err());
+            for nested in ["decoder","callback","draw"]{let mut v=playback();v[nested][key]=serde_json::json!("private");assert!(serde_json::from_value::<DiagnosticReceipt>(v).is_err());}
+        }
+        for key in ["reason","visibility","endpoint","operationId","snapshotId"]{let mut v=playback();v[key]=serde_json::json!("/private/path");assert!(!valid_playback(&serde_json::from_value(v).unwrap()));}
+    }
+    #[test] fn refuses_invalid_playback_numbers_states_and_error_codes(){
+        for (path,n) in [("frame",18_144_001),("decoder/readyState",5),("decoder/networkState",4),("decoder/errorCode",0),("decoder/errorCode",5),("callback/received",18_144_001),("draw/submitted",18_144_001),("draw/failed",18_144_001)]{
+            let mut v=playback();*v.pointer_mut(&format!("/{path}")).unwrap()=serde_json::json!(n);assert!(!valid_playback(&serde_json::from_value(v).unwrap()));
+        }
+        for path in ["elapsedMs","decoder/timeMs","callback/lastMediaTimeMs","callback/lastAgeMs","draw/lastAgeMs"]{
+            let mut v=playback();*v.pointer_mut(&format!("/{path}")).unwrap()=serde_json::json!(-1.0);assert!(!valid_playback(&serde_json::from_value(v).unwrap()));
+        }
+        let mut v:PlaybackReceipt=serde_json::from_value(playback()).unwrap();v.decoder.time_ms=Some(f64::INFINITY);assert!(!valid_playback(&v));
+        v.decoder.time_ms=Some(0.0);v.elapsed_ms=f64::NAN;assert!(!valid_playback(&v));
     }
 }

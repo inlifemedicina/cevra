@@ -211,7 +211,19 @@ export interface LayerPreviewFallbackV1 {
   capabilities: { resizeObserver: boolean; videoFrameCallback: boolean; imageBitmap: boolean; webCryptoDigest: boolean };
   endpoint: "encoded-fallback";
 }
-export type LayerPreviewDiagnosticV1 = LayerPreviewPresentationV1 | LayerPreviewFallbackV1;
+/** Bounded candidate observation, not a physical-paint or playback-success receipt. */
+export interface LayerPreviewPlaybackV1 {
+  version: 1; kind: "playback"; reason: "sample" | "draw-failure";
+  operationId: string; snapshotId: string; epoch: number; elapsedMs: number;
+  intentToPlay: boolean; frame: number | null; pendingSeek: boolean;
+  decoder: { timeMs: number | null; paused: boolean; ended: boolean; seeking: boolean;
+    readyState: number; networkState: number; errorCode: 1 | 2 | 3 | 4 | null };
+  callback: { received: number; scheduled: boolean; lastMediaTimeMs: number | null; lastAgeMs: number | null };
+  draw: { submitted: number; failed: number; lastAgeMs: number | null };
+  visibility: "visible" | "hidden" | "unknown";
+  endpoint: "playback-observation";
+}
+export type LayerPreviewDiagnosticV1 = LayerPreviewPresentationV1 | LayerPreviewFallbackV1 | LayerPreviewPlaybackV1;
 
 export interface LayerPreviewPresentationV1 {
   version:1;kind:"asset-update"|"seek";operationId:string;snapshotId:string;epoch:number;frame:number;

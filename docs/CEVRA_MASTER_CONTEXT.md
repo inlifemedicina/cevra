@@ -2,6 +2,20 @@
 
 **Canonical continuity document**
 
+**Bounded playback diagnosis, 2026-10-15:** a distinct offline successor over
+`e5b06c8` adds local playback observations to the existing candidate-only receipt
+command. It samples admitted playback at1Hz, at most23 sample attempts plus one
+draw-failure attempt per mounted renderer, under the unchanged native100-row
+ceiling and0600 file policy. Closed decoder/callback/draw state distinguishes
+otherwise ambiguous UI indicators without seek, retry, playback recovery or new
+access. Tests and independent UI/native reviews cover stale ownership, budgets,
+nullable event times, numeric admission and writer failures. The optional React
+delivery check now uses two legitimate current-runtime Host packets from an
+isolated own store. A distinct verified package is prepared for later coordinated
+CUA only; source/runtime/candidate square1 remain preserved. Frame218 cause,
+physical Tauri reopen and Owner acceptance remain unproven. See the
+[diagnostic continuation](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#bounded-playback-observations--2026-10-15).
+
 **Offline playback follow-up, 2026-10-15:** real Tauri candidate `694d6c3`
 admits the square-pixel base to canvas and passes the observed title/cut limits,
 picker export and single-source Locate. Its second playback cycle apparently

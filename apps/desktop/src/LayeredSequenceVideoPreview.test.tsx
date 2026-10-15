@@ -42,7 +42,7 @@ beforeEach(()=>{
  Object.defineProperty(HTMLVideoElement.prototype,"cancelVideoFrameCallback",{configurable:true,value:vi.fn()});
  Object.defineProperty(URL,"createObjectURL",{configurable:true,value:vi.fn(()=>"blob:owned-"+randomUUID())});Object.defineProperty(URL,"revokeObjectURL",{configurable:true,value:revoke});
 });
-afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();vi.unstubAllEnvs()});
+afterEach(()=>{cleanup();vi.useRealTimers();vi.restoreAllMocks();vi.unstubAllGlobals();vi.unstubAllEnvs()});
 async function ready(container:HTMLElement){await waitFor(()=>expect(container.querySelector("canvas.layered-picture")?.getAttribute("data-ready")).toBe("true"));return container.querySelector("video")!}
 
 it("admits base and PNG before ready and preserves its decoder across React frame updates",async()=>{
@@ -199,4 +199,67 @@ it.each(["video-frame", "ended", "resize"] as const)("falls back and releases la
  expect(JSON.stringify(failures)).not.toContain("private path");
  expect(revoke).toHaveBeenCalledWith(url);expect(close.every(fn=>fn.mock.calls.length===1)).toBe(true);
  expect(program.onClipEnd).not.toHaveBeenCalled();
+});
+
+function playbackRows(f:ReturnType<typeof fixture>){return vi.mocked(f.backend.recordLayerPresentation!).mock.calls.map(([r])=>r).filter(r=>r.kind==="playback")}
+async function observedPlayback(){
+ vi.useFakeTimers({toFake:["setInterval","clearInterval"]});
+ let at=performance.now();vi.spyOn(performance,"now").mockImplementation(()=>at);
+ const intervals=vi.spyOn(window,"setInterval"),f=fixture(),program={...f.props.program!,resume:true};
+ const view=render(f.view({program})),video=await ready(view.container);
+ Object.defineProperty(video,"paused",{configurable:true,writable:true,value:false});
+ const step=async(ms:number)=>{at+=ms;await act(async()=>{vi.advanceTimersByTime(ms)})};
+ const tick=async(frame:number)=>{await act(async()=>{video.currentTime=frame/30;[...callbacks.values()].at(-1)!(at,{mediaTime:frame/30} as VideoFrameCallbackMetadata)})};
+ return {f,program,video,step,tick,intervals,...view};
+}
+it("observes an advancing decoder with silent frame callbacks without changing playback or inventing paint",async()=>{
+ const v=await observedPlayback();await v.tick(218);const playCount=play.mock.calls.length,loads=load.mock.calls.length;
+ v.video.currentTime=8.5;await v.step(1000);v.video.currentTime=9.5;await v.step(1000);
+ const rows=playbackRows(v.f);expect(rows).toHaveLength(2);
+ expect(rows[0]).toMatchObject({kind:"playback",reason:"sample",intentToPlay:true,frame:218,pendingSeek:false,decoder:{timeMs:8500,paused:false,ended:false,seeking:false,readyState:2,errorCode:null},callback:{received:1,scheduled:true},draw:{failed:0},endpoint:"playback-observation"});
+ expect(rows[1]).toMatchObject({decoder:{timeMs:9500},callback:{received:1}});
+ for(const [i,row] of rows.entries()){expect(row.callback.lastAgeMs).toBeCloseTo((i+1)*1000);expect(row.draw.lastAgeMs).toBeCloseTo((i+1)*1000)}
+ expect(rows[0].callback.lastMediaTimeMs).toBeCloseTo(218/30*1000);
+ expect(v.container.querySelector("canvas")!.getAttribute("data-frame")).toBe("218");expect(play).toHaveBeenCalledTimes(playCount);expect(load).toHaveBeenCalledTimes(loads);
+ expect(JSON.stringify(rows)).not.toContain("physicalPaint");expect(screen.queryByText("preview.layerFallback")).toBeNull();
+});
+it.each(["paused","seeking","waiting"] as const)("distinguishes native %s state from playback intent",async state=>{
+ const v=await observedPlayback();await v.tick(218);
+ if(state==="paused")Object.defineProperty(v.video,"paused",{configurable:true,value:true});
+ if(state==="seeking")Object.defineProperty(v.video,"seeking",{configurable:true,value:true});
+ if(state==="waiting")Object.defineProperty(v.video,"readyState",{configurable:true,value:1});
+ await v.step(1000);const row=playbackRows(v.f)[0]!;
+ expect(row.intentToPlay).toBe(true);expect(row.frame).toBe(218);
+ expect(row.decoder).toMatchObject({paused:state==="paused",seeking:state==="seeking",readyState:state==="waiting"?1:2});
+});
+it("uses null for never-observed callbacks and binds observations to the new epoch without stale timer/callback pollution",async()=>{
+ const v=await observedPlayback(),oldTick=[...callbacks.values()].at(-1)!,oldTimer=v.intervals.mock.calls.at(-1)![0] as ()=>void;
+ await v.step(1000);const first=playbackRows(v.f)[0]!;expect(first.callback).toMatchObject({received:0,lastMediaTimeMs:null,lastAgeMs:null});
+ v.rerender(v.f.view({program:v.program,seek:{sequence:2,timelineMs:8000}}));await ready(v.container);
+ const before=playbackRows(v.f).length;await act(async()=>{oldTimer();oldTick(0,{mediaTime:1} as VideoFrameCallbackMetadata)});expect(playbackRows(v.f)).toHaveLength(before);
+ await v.step(1000);const current=playbackRows(v.f).at(-1)!;
+ expect(current.epoch).toBeGreaterThan(first.epoch);expect(current.operationId).not.toBe(first.operationId);expect(current.frame).toBe(240);
+ expect(current.callback).toMatchObject({received:0,scheduled:true,lastAgeMs:null});
+});
+it("does not collect while paused or busy and stops its timer on unmount",async()=>{
+ const v=await observedPlayback();v.rerender(v.f.view({program:{...v.program,resume:false}}));await v.step(2000);expect(playbackRows(v.f)).toHaveLength(0);
+ v.rerender(v.f.view({program:v.program,busy:true}));await v.step(2000);expect(playbackRows(v.f)).toHaveLength(0);
+ v.unmount();await v.step(2000);expect(playbackRows(v.f)).toHaveLength(0);
+});
+it("keeps the23-sample mount budget across seeks and reserves one draw-failure observation",async()=>{
+ const v=await observedPlayback();await v.step(25000);expect(playbackRows(v.f)).toHaveLength(23);
+ v.rerender(v.f.view({program:v.program,seek:{sequence:2,timelineMs:8000}}));await ready(v.container);await v.step(2000);expect(playbackRows(v.f)).toHaveLength(23);
+ draw.mockImplementationOnce(()=>{throw new DOMException("private path","InvalidStateError")});await v.tick(241);
+ await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());
+ const rows=playbackRows(v.f);expect(rows).toHaveLength(24);expect(rows.at(-1)).toMatchObject({reason:"draw-failure",frame:240,draw:{failed:1},endpoint:"playback-observation"});
+ expect(JSON.stringify(rows)).not.toContain("private path");await v.step(2000);expect(playbackRows(v.f)).toHaveLength(24);
+});
+it("isolates observation write failures from draw fallback and cleanup",async()=>{
+ const v=await observedPlayback(),url=v.video.getAttribute("src");
+ vi.mocked(v.f.backend.recordLayerPresentation!).mockImplementation(async row=>{if(row.kind==="playback")throw Error("private write error")});
+ draw.mockImplementationOnce(()=>{throw new DOMException("private canvas error","InvalidStateError")});await v.tick(218);
+ await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());expect(revoke).toHaveBeenCalledWith(url);
+ const calls=vi.mocked(v.f.backend.recordLayerPresentation!).mock.calls.map(([r])=>r);
+ expect(calls.filter(r=>r.kind==="fallback")).toHaveLength(1);expect(calls.filter(r=>r.kind==="playback")).toHaveLength(1);
+ expect(JSON.stringify(calls)).not.toContain("private canvas");
 });
