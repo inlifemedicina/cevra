@@ -1,6 +1,7 @@
 import { createRef } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { translate } from "@cevra/i18n";
 import { createEmptyProject, ProjectHistory, frameTimingMilliseconds, manualTitleHeight, MANUAL_TITLE_COMPONENT } from "@cevra/project-ir";
 import { ManualTitleApplicationService, type ManualTitleEdit } from "@cevra/application";
@@ -72,6 +73,45 @@ it("unavailable platform cannot add a title", () => {
   expect(screen.getByLabelText(f.t("title.text")).matches(":disabled")).toBe(true);
   expect(screen.getByText(f.t("title.unavailable"))).toBeTruthy();
   expect(f.commit).not.toHaveBeenCalled();
+});
+
+it.each(["pt-BR", "en-US"] as const)("%s Enter on Discard preserves History for both a new and an existing title", async locale => {
+  const f = fixture(locale), user = userEvent.setup();
+  const input = screen.getByLabelText(f.t("title.text")) as HTMLInputElement;
+  for (const existing of [false, true]) {
+    if (existing) {
+      fireEvent.change(input, { target: { value: "Título preservado" } });
+      await user.click(screen.getByRole("button", { name: f.t("title.add") }));
+    }
+    const before = f.history.toArchive();
+    f.commit.mockClear();
+    await user.click(input);
+    await user.clear(input);
+    await user.type(input, "Rascunho para descartar");
+    await user.tab(); await user.tab(); await user.tab(); await user.tab(); await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: f.t("title.cancel") }));
+    await user.keyboard("{Enter}");
+    expect(f.commit).not.toHaveBeenCalled();
+    expect(f.history.toArchive()).toEqual(before);
+    expect(input.value).toBe(existing ? "Título preservado" : "");
+    expect(f.draft.current!.settle()).toBeUndefined();
+  }
+});
+
+it("keeps Enter confirmation in fields and native activation for Apply and the aspect chooser", async () => {
+  const f = fixture(), user = userEvent.setup();
+  const input = screen.getByLabelText(f.t("title.text"));
+  await user.type(input, "Título confirmado{Enter}");
+  expect(f.history.current.graphics[0]?.text).toBe("Título confirmado");
+  expect(f.commit).toHaveBeenCalledTimes(1);
+  await user.selectOptions(screen.getByLabelText(f.t("title.aspect")), "9:16");
+  await user.keyboard("{Enter}");
+  expect(f.commit).toHaveBeenCalledTimes(1);
+  await user.tab();
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: f.t("title.apply") }));
+  await user.keyboard("{Enter}");
+  expect(f.commit).toHaveBeenCalledTimes(2);
+  expect(f.history.current.graphics[0]?.extensions?.["cevra.manual-title"]).toMatchObject({ aspect: "9:16" });
 });
 
 

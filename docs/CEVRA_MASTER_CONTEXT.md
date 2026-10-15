@@ -4161,3 +4161,18 @@ merge remains excluded. The draft remains stacked over PR98's verified
 `fix/vids-human-review-2026-10-11` head, with this documentary delta separate
 from the exact source commit. Director: no new impact found in this bounded
 cache/acceptance scope; IR/History and typed execution remain authoritative.
+
+### 2026-10-15 — Title inspector keyboard activation correction
+
+**IN DEVELOPMENT / NOT MERGED**, based on PR101 `61619e6`. Enter on the
+inspector's Discard button incorrectly submitted the title draft. The bounded
+UI correction limits field confirmation to inputs, preserving native button
+and aspect-selector keyboard activation. Tab/Enter regressions reproduce four
+failures on the parent; the corrected source passes those four cases and all
+55 focused title/workflow/time-input tests. Desktop build passes with
+chunk/target warnings. Independent review and exact draft-head CI are tracked
+with the implementation PR; no native-package or Owner acceptance is inferred.
+Reuse I4-T1, D14-T2 and X-T1/T7; no new human round. Director impact: no new
+impact found in this keyboard-only scope; typed commands, IR/History and
+execution authority remain unchanged. Latency and later feature decisions
+remain separate; no engine, provider, permission or persistence change.

@@ -80,6 +80,25 @@ it("keeps one export panel when source/title selection changes after title edits
   }
 });
 
+it("keyboard Discard clears the inspector draft before the next App action without editing History", async () => {
+  const f = await mountTitle(), user = userEvent.setup();
+  const input = screen.getByLabelText("Texto do título") as HTMLInputElement;
+  await waitFor(() => expect(input.disabled).toBe(false));
+  const before = f.history.toArchive();
+  f.editManualTitle.mockClear();
+  await user.click(input); await user.clear(input); await user.type(input, "Não aplicar este rascunho");
+  await user.tab(); await user.tab(); await user.tab(); await user.tab(); await user.tab();
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: translate("pt-BR", "title.cancel") }));
+  await user.keyboard("{Enter}");
+  expect(input.value).toBe("Título integrado");
+  expect(f.editManualTitle).not.toHaveBeenCalled();
+  expect(f.history.toArchive()).toEqual(before);
+  await user.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(f.backend.exportManualSequence).toHaveBeenCalledTimes(1));
+  expect(f.editManualTitle).not.toHaveBeenCalled();
+  expect(f.history.toArchive()).toEqual(before);
+});
+
 it("Delete removes a selected timeline title once, with Undo/Redo and guarded text/IME/modal focus", async () => {
   const fixture = await mountTitle();
   const before = fixture.history.current, entries = fixture.history.entries.length;
