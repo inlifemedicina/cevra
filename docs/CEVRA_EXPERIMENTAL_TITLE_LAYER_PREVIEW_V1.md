@@ -237,3 +237,63 @@ Source, evidence/scripts and the old CUA failure disposition are recorded in the
 external integration evidence directory. New graphical/IPC gates require a new
 isolated package and explicit parent release; no default promotion or Owner
 acceptance follows from this technical integration.
+
+## Real Tauri square-pixel result and offline draw guard — 2026-10-15
+
+The coordinated official CUA run of frozen `694d6c3`/runtime0.3.13 admits the
+experimental canvas, with 15 canvas-submit receipts and no fallback receipt.
+Title boundaries89/90 and239/240 and cut149/150 were observed in real images.
+One initial request records3617ms request-to-canvas,88ms UI decode,3507.10ms
+Host and3520ms Tauri; physicalPaintMs remains null. This is one sample, not a
+latency promise. The later30ms cached refresh follows an export-history snapshot
+change and is not a measured title-edit operation.
+
+The native picker export completes and persists. Read-only analysis of that
+actual output confirms H2641920x1080/BT709tv/SAR1/CFR30,300 fully decoded frames
+on the exact PTS grid and480000 decoded AAC48k stereo samples per channel.
+The exact title plan's alpha region has negligible source-relative luma
+difference at89/240 and a strong title signal at90/239; subjective glyph,
+colour and audible fidelity remain unaccepted. Native Locate of the own moved
+fixture changes only URI plus audited History/updatedAt; all other project
+content is identical. No Host replay substitutes for either GUI action.
+
+Two complete playback cycles did not pass. Native accessibility observations
+record the first299→3 return and a second apparent retention at218/7.27s,
+also seen in a later image while the UI still displayed Pause. The operator
+paused explicitly. There was no fallback receipt. No cause or attribution to
+product versus environment is established. A subsequent official CUA lock error
+blocked physical close/reopen before closing; the own app was left paused/Saved
+with no export or CUA call pending, and the GUI reservation was released.
+
+Independent source review and three isolated characterizations explain why the
+existing indicators cannot resolve the cause: the button follows playback
+intent, while the displayed frame follows successful canvas drawing. Absent
+frame callbacks, native pause with retained intent, or a synchronous canvas
+exception can retain those indicators. The historical two-loop unit check
+directly injects ended events and is not a continuous native playback proof.
+
+A separate bounded source successor protects canvas work in the shared draw
+function. A synchronous current draw failure during a frame callback, ResizeObserver
+or final-frame completion now enters the existing decode/unexpected encoded
+fallback and returns false before frame admission or sequence completion. The
+existing local receipt excludes raw exception messages; existing URL/bitmap
+cleanup owns release. Three new cases fail before and pass after the guard.
+This fixes a demonstrated failure mechanism; it does not prove or claim to fix
+the real frame218 retention. No watchdog, clock/CSS change, replay or new native
+diagnostic schema is introduced.
+
+Validation of the source-only successor: the27 layer cases pass, including the
+three new failing-before regressions. Six affected UI suites pass267 tests in
+each flag mode; one opt-in actual-Host receipt consumer is skipped because no
+CEVRA_PREVIEW_SEGMENT_UI_RECEIPT is designated for this source-only round. Full
+default build and experimental UI build pass. Independent review reruns27/27
+and reports no P1/P2 within the bounded guard. No Rust/runtime test is repeated
+for unchanged Rust/worker bytes, and historical broad FAILs remain unchanged.
+
+The tested `694d6c3` app/store and runtime0.3.13 remain frozen. This source-only
+successor has no new GUI designation. A future discriminating observation needs
+correlated native currentTime/paused/ended/seeking/readyState, frame-callback
+receipt/scheduling and mediaTime, and the draw outcome under the same snapshot
+and epoch. GUI/Owner gates and historical broad CI failures remain separate.
+Director impact: compatible presentation guard only; typed execution, Project IR,
+History, permissions, dependencies and existing engine boundaries are unchanged.

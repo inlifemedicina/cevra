@@ -103,25 +103,34 @@ export function LayeredSequenceVideoPreview(props: Props) {
             return false;
         const total = p.sequence!.totalFrames;
         const f = Math.max(0, Math.min(total, requested));
-        const context = c.getContext("2d");
-        if (!context)
-            return false;
-        const box = c.getBoundingClientRect(), scale = Math.min(box.width / 720, box.height / 404);
-        const backing = Math.max(720, Math.min(1920, Math.round(720 * scale * (window.devicePixelRatio || 1))));
-        const h = Math.round(backing * 404 / 720);
-        if (c.width !== backing || c.height !== h) {
-            c.width = backing;
-            c.height = h;
+        try {
+            const context = c.getContext("2d");
+            if (!context)
+                return false;
+            const box = c.getBoundingClientRect(), scale = Math.min(box.width / 720, box.height / 404);
+            const backing = Math.max(720, Math.min(1920, Math.round(720 * scale * (window.devicePixelRatio || 1))));
+            const h = Math.round(backing * 404 / 720);
+            if (c.width !== backing || c.height !== h) {
+                c.width = backing;
+                c.height = h;
+            }
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = "high";
+            context.fillStyle = "#000";
+            context.fillRect(0, 0, c.width, c.height);
+            if (f < total) {
+                context.drawImage(v, 0, 0, c.width, c.height);
+                const title = p.layered.title;
+                if (f >= title.startFrame && f < title.endFrame)
+                    context.drawImage(backing > 720 ? pair.canonical : pair.graphic, 0, 0, c.width, c.height);
+            }
         }
-        context.imageSmoothingEnabled = true;
-        context.imageSmoothingQuality = "high";
-        context.fillStyle = "#000";
-        context.fillRect(0, 0, c.width, c.height);
-        if (f < total) {
-            context.drawImage(v, 0, 0, c.width, c.height);
-            const title = p.layered.title;
-            if (f >= title.startFrame && f < title.endFrame)
-                context.drawImage(backing > 720 ? pair.canonical : pair.graphic, 0, 0, c.width, c.height);
+        catch (error) {
+            // A failed playback/resize/end draw must use the same bounded
+            // fallback as an initial decode, rather than abandon its callback.
+            if (isCurrent(epoch))
+                fallBack("decode", error);
+            return false;
         }
         admitted.current = { snapshot: now.snapshotId, epoch };
         displayedFrame.current = f;

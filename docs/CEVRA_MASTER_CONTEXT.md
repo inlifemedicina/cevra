@@ -2,6 +2,17 @@
 
 **Canonical continuity document**
 
+**Offline playback follow-up, 2026-10-15:** real Tauri candidate `694d6c3`
+admits the square-pixel base to canvas and passes the observed title/cut limits,
+picker export and single-source Locate. Its second playback cycle apparently
+retains frame218; the cause remains unknown. Physical Tauri reopen was blocked
+by an official CUA lock error before closing. A separate source-only successor
+catches synchronous current-frame canvas failures through the existing bounded
+fallback, after three failing-before/passing-after cases. This reproducible gap
+is not established as the cause of the real retention. No existing candidate,
+store, runtime, default flag, History/IR or permission is changed. See the
+[scoped follow-up](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#real-tauri-square-pixel-result-and-offline-draw-guard--2026-10-15).
+
 **Isolated correction, 2026-10-15:** the real diagnostic candidate reports
 `decode/base-grid`. Its experimental V4 base has coded720x404 but SAR404:405;
 AVFoundation presents natural width718.222. The bounded runtime0.3.13 correction

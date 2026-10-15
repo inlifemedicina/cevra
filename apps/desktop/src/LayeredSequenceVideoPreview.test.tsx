@@ -180,3 +180,23 @@ it("binds a new request failure to its operation while the prior packet awaited 
  const request=f.preview.mock.calls.find(([r])=>r.expectedSnapshotId==="s2")![0];
  expect(f.backend.recordLayerPresentation).toHaveBeenCalledWith(expect.objectContaining({kind:"fallback",stage:"request",operationId:request.operationId,snapshotId:"s2",nativeCode:"HOST_UNAVAILABLE"}));
 });
+
+it.each(["video-frame", "ended", "resize"] as const)("falls back and releases layer resources when a current %s draw throws",async origin=>{
+ const observers:{target:Element|null;callback:()=>void}[]=[];
+ vi.stubGlobal("ResizeObserver",class{row={target:null as Element|null,callback:()=>{}};constructor(callback:()=>void){this.row.callback=callback;observers.push(this.row)}observe(target:Element){this.row.target=target}disconnect(){}});
+ const f=fixture(),program={...f.props.program!,resume:true},{container}=render(f.view({program}));
+ const video=await ready(container),url=video.getAttribute("src"),tick=[...callbacks.values()].at(-1)!;
+ Object.defineProperty(video,"paused",{configurable:true,value:false});
+ vi.mocked(video.parentElement!.querySelector("canvas")!.getContext("2d")!.fillRect).mockImplementationOnce(()=>{throw new DOMException("private path and title text","InvalidStateError")});
+ await act(async()=>{
+  if(origin==="video-frame")tick(0,{mediaTime:218/30} as VideoFrameCallbackMetadata);
+  else if(origin==="ended"){video.currentTime=video.duration;fireEvent.ended(video)}
+  else observers.find(row=>row.target?.tagName==="CANVAS")!.callback();
+ });
+ await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());
+ const failures=vi.mocked(f.backend.recordLayerPresentation!).mock.calls.map(([row])=>row).filter(row=>row.kind==="fallback");
+ expect(failures).toHaveLength(1);expect(failures[0]).toMatchObject({stage:"decode",reason:"unexpected",snapshotId:"s1",endpoint:"encoded-fallback",nativeCode:null});
+ expect(JSON.stringify(failures)).not.toContain("private path");
+ expect(revoke).toHaveBeenCalledWith(url);expect(close.every(fn=>fn.mock.calls.length===1)).toBe(true);
+ expect(program.onClipEnd).not.toHaveBeenCalled();
+});
