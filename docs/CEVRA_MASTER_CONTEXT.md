@@ -4250,3 +4250,104 @@ candidate; cancellation failure/race injection remains automated. Director
 impact: compatible closed error reporting, with no new editing authority;
 typed operations, Project IR and History remain authoritative. No dependency,
 provider, persistence, permission or commercial component change.
+
+### 2026-10-14 — Preview-raster latency follow-up on Mac
+
+**IN DEVELOPMENT / OFFLINE VALIDATED, separate from approved PR101.** Branch
+`fix/vids-preview-latency-2026-10-14` starts at head61619e6. The existing renderer
+now skips its title PNG only on an all-segment-hit retained preview with enough
+conservative disk headroom; eager export/noncache/tight-budget behavior remains.
+Per-occurrence allowance covers equal-content source aliases. Runtime source0.3.11
+is tested in isolation; no new signed app or Owner verdict. [Measured scope and
+gates](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-14--bounded-preview-raster-latency-follow-up)
+record 181–212 ms/17–19% lower all-hit recomposition medians, no demonstrated gain
+for new text/layout encodes, Python168 and configured Host/Media332 PASS, decoded
+H/V/PCM equality, exact clocks, History/export/reopen and final runtime integrity.
+The first Node run330/332 FAIL is preserved with confirmed wrong-Python diagnosis;
+owned test-copy bytecodes were recovered before final sealing. No new architecture,
+engine, provider, permission, GUI/Take action or merge. Director no new impact in
+checked scope. PR101/checks and historical cloud FAIL11 are not reclassified.
+
+### 2026-10-15 — Approved isolated title-layer integration experiment
+
+**EXPERIMENTAL / NATIVE BACKEND VALIDATED; CURRENT APP GATES PENDING.** The Owner
+approved integration of the previously measured static H/SDR base+PNG trial into
+the existing sequence preview on an own branch based at1e0ca37. Both compile flags
+remain off in ordinary builds. The isolated candidate uses runtime0.3.12 and an
+exclusive bundle identity/store, retains bounded caches, clear loading/current
+frame admission and encoded fallback, and preserves Project IR/History, typed
+editing, CoreText/FFmpeg and original-derived final export. This is not adoption
+of a new default or Composition engine.
+
+[Scope, gates and measured limits](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md)
+record build/Rust/Python/UI, native CJS/cache/cancel/source/fallback checks,
+decoded300-frame/480000-sample final equivalence and independent static reviews.
+The broad aggregate remains FAIL, with baseline transcription fixtures and scoped
+native-process observation diagnosed separately. Historical cloud FAIL11 remains.
+The Mac was locked at the UI attempt; current Tauri/IPC/presentation/visual and
+Owner gates are BLOCKED pending manual unlock and execution. No latency promise,
+global replacement, Take operation, merge, push or publication. Director impact
+is a compatible presentation/typed-contract extension with no new authority.
+
+### 2026-10-15 — Offline aggregate triage and experimental fallback correction
+
+**ISOLATED CONTINUATION, no GUI or global adoption.** Directed comparison of the
+last six aggregate failures separates two inherited Python-selection fixtures
+and three inherited restricted-process-observation failures from the RPC list
+expectation already corrected in 9ac2c71. Correct Python 3.12 passes both Host cases
+on base/head; approved native scope passes all three guard cases on base/head.
+Historical aggregates and cloud FAIL11 are not rewritten as PASS.
+
+The initial forced-experiment UI failures also exposed a new P2: unconditional
+ResizeObserver construction could prevent encoded fallback when the API is
+absent. A minimal guard, two failing-before/passing-after tests, complete Canvas
+mocks and current-decoder admission in the legacy fixture close that recut:
+44 affected tests PASS with the experiment on, 29 workflows PASS off. No broad
+suite was repeated. [Correction and classification](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#offline-broad-test-triage-and-capability-correction--2026-10-15)
+record the limits. The first candidate/source 9ac2c71 remain frozen; a distinct
+candidate carries this correction. Host/runtime/contracts/export are unchanged.
+Parent explicitly reserved GUI access; no operation/capture is permitted until
+its release. Director impact remains compatible presentation, with IR/History
+and typed operations unchanged. No merge/push/publication or Take operation.
+
+
+### 2026-10-15 — Isolated reconciliation of PR104 and the experimental layer
+
+**LOCAL INTEGRATION ONLY / GRAPHICAL GATES PENDING.** A separate checkout combines
+PR104 `5261b424812daeec6d19582b632181404542e549` (including PR102/103) and the
+experimental continuation `821a1bd7b5b13675c5b1cd331ca9a344d795fb36`, over common
+base `61619e6`. Product files merge without textual conflict; both independent
+historical documentation additions are retained. Neither preserved candidate
+is overwritten. Ordinary Host/UI builds keep their experimental flags off.
+
+Independent review found a P2 already present in the experimental renderer: a
+late decoder `ended` event could finish the current program after snapshot
+invalidation, while busy/paused or without reaching the media end. Four cases
+fail before the bounded guard and pass after. Native ended state, playback
+intent, current snapshot/epoch admission and successful draw now precede the
+callback; duplicate events and two legitimate loops remain covered. No IR,
+History, engine, persistence, permission or runtime policy changed for this fix.
+
+The reconciled tree passes 106 affected Node tests, 153 UI tests in each flag
+mode and 58 Rust tests. These are directed checks, not a new all-workspace CI.
+A production CJS/native-runtime proof confirms real relocation with cached title
+graphics, missing-source refusal after Undo, Redo, source-byte invalidation,
+physical Host reopen, compile-time default-off and exact BT709 preview/export
+refusal codes after experimental admission declines. Runtime 0.3.12 stays byte
+identical. Initial/relocated/Redo Host request+refresh were 2741/831/20 ms; these
+are single technical samples, not Tauri round trips, paint or fluency acceptance.
+
+An earlier own harness placed TMPDIR under Documents and failed with worker
+`preview file identity changed`; the same cause reproduces with the preserved
+821 CJS in a diagnostic copy. The uninstrumented combined proof passes with an
+owned system temporary root. The precise external metadata actor is unproven;
+File Provider compatibility and the historical FAILs are not claimed fixed.
+No integrity guard was weakened. PR104's own 11/11 CI stays scoped to its SHA;
+that evidence does not transfer to this local integration head.
+
+No GUI/capture or real AI/provider call occurs in this round. The old CUA call
+records a terminal failure; an external approval disposition is not established.
+The parent must release GUI explicitly before a distinct consolidated candidate
+can run the remaining technical Tauri/IPC/visual group. Owner judgment remains
+separate. Director: compatible presentation/closed-error/source-location
+reconciliation, with unchanged typed execution, Project IR and History authority.

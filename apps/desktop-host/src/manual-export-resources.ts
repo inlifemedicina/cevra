@@ -21,6 +21,11 @@ export function guardManualExportEngine(engine: MediaEngineAdapter,
         return guarded.result;
       }
       admittedPreview = undefined;
+      if (operation.type === "render-manual-title-preview") {
+        const guarded = await transport.withOwnedRenderBudget({ ownedDirectory: operation.ownedWorkspaceUri,
+          rendererRssLimitBytes: MANUAL_EXPORT_LIMITS.rendererRssBytes, ownedFileLimitBytes: MANUAL_EXPORT_LIMITS.ownedJobBytes }, () => engine.execute(operation, context));
+        return guarded.result;
+      }
       if (operation.type !== "render-manual-video-sequence" && operation.type !== "render-manual-video-preview") return engine.execute(operation, context);
       // A final observer failure can follow publication. The transport retires
       // its generation; retain final/account evidence for Host reconciliation.

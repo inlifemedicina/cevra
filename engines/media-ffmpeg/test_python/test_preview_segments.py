@@ -190,17 +190,19 @@ class PreviewSegmentTests(unittest.TestCase):
             budget.write_text(destination, "synthetic raster; no native pixel claim")
         with mock.patch.object(manual, "_segment_runtime_identity", return_value={"fixture": "verified-runtime"}), \
                 mock.patch.object(manual.title_component, "identity", return_value={"font": "verified-font"}), \
-                mock.patch.object(manual.title_component, "rasterize", side_effect=rasterize), \
+                mock.patch.object(manual.title_component, "rasterize", side_effect=rasterize) as raster, \
                 mock.patch.object(manual, "run", side_effect=cached_run):
             # Three occurrences of the same source frame. Only exposure changes:
             # all -> first two -> middle -> all. The first edit needs one new
             # untitled segment; subsequent edits can reuse both admitted variants.
-            for index, (start, end, encodes) in enumerate(((0, 3, 1), (0, 2, 1), (1, 2, 0), (0, 3, 0))):
+            for index, (start, end, encodes, rasters) in enumerate(((0, 3, 1, 1), (0, 2, 1, 1), (1, 2, 0, 0), (0, 3, 0, 0))):
                 with self.subTest(start=start, end=end):
                     folder = self.root / str(index); folder.mkdir()
                     plan["title"].update(startFrame=start, endFrame=end)
                     before = copy.deepcopy(plan)
+                    raster_before = raster.call_count
                     args, common, result, original = helper._pipeline(str(folder), preview=True, composition=plan, repetitions=3)
+                    self.assertEqual(raster.call_count - raster_before, rasters)
                     self.assertEqual(sum(Path(c[-1]).name.startswith("segment-") for c in common.commands), encodes)
                     self.assertEqual(result["structuredContent"]["manualSequence"]["composition"], before)
                     self.assertEqual(result["structuredContent"]["manualSequence"]["totalFrames"], 3)
@@ -210,7 +212,9 @@ class PreviewSegmentTests(unittest.TestCase):
                     self.assertEqual(Path(args["items"][0]["input"]).read_bytes(), original)
                     self.assertEqual(list((folder / "job").iterdir()), [folder / "job/published-account.mp4"])
             folder = self.root / "titled-export"; folder.mkdir()
+            raster_before = raster.call_count
             _, common, _, _ = helper._pipeline(str(folder), composition=plan, repetitions=3)
+            self.assertEqual(raster.call_count - raster_before, 1)
             self.assertEqual(sum(Path(c[-1]).name.startswith("segment-") for c in common.commands), 1)
 
     def test_visible_title_key_keeps_text_layout_aspect_fonts_and_local_boundaries(self):
@@ -251,6 +255,79 @@ class PreviewSegmentTests(unittest.TestCase):
                     by_visibility[visible] = key
                     by_identity[key] = visible
                     self.assertEqual(plan, before)
+
+    def test_lazy_raster_failure_cleans_sealed_source_and_never_admits_segments(self):
+        helper = manual_fixture.ManualSequenceTests()
+        original_run = manual.run
+        def cached_run(*args, **kwargs): return original_run(*args, **kwargs, retain_segments=True)
+        folder = self.root / "raster-failure"; folder.mkdir()
+        plan = composition(); plan["title"].update(startFrame=0, endFrame=1)
+        with mock.patch.object(manual, "_segment_runtime_identity", return_value={"fixture": "verified-runtime"}), \
+                mock.patch.object(manual.title_component, "identity", return_value={"font": "verified-font"}), \
+                mock.patch.object(manual.title_component, "rasterize", side_effect=RuntimeError("raster failed after source seal")) as raster, \
+                mock.patch.object(manual, "run", side_effect=cached_run):
+            args, _, _, original = helper._pipeline(str(folder), preview=True, composition=plan, failure="raster-failure")
+            raster.assert_called_once()
+        self.assertEqual(Path(args["items"][0]["input"]).read_bytes(), original)
+        self.assertFalse(Path(args["output"]).exists())
+        self.assertEqual(list((folder / "job").iterdir()), [])
+        self.assertEqual(worker.preview_segments.state()["entries"], 0)
+        self.assertEqual(worker.preview_segments.state()["pendingEntries"], 0)
+
+    def test_tight_budget_keeps_eager_raster_admission_before_source_copy_on_hits_and_misses(self):
+        helper = manual_fixture.ManualSequenceTests()
+        original_run, original_seal = manual.run, manual._seal
+        events = []
+        plan = composition(); plan["title"].update(startFrame=0, endFrame=1)
+        def cached_run(*args, **kwargs): return original_run(*args, **kwargs, retain_segments=True)
+        def rasterize(_common, budget, _composition, destination):
+            events.append("raster")
+            budget.reserve(destination, 1920 * 1080 * 4 + 65536)
+            data = b"small admitted synthetic raster"
+            budget.check_write(destination, 0, len(data)); destination.write_bytes(data); budget.settle(destination)
+        def seal(*args, **kwargs):
+            events.append("seal"); return original_seal(*args, **kwargs)
+        with mock.patch.object(manual, "OWNED_BYTES", 9 * 1024 * 1024), \
+                mock.patch.object(manual, "_segment_runtime_identity", return_value={"fixture": "verified-runtime"}), \
+                mock.patch.object(manual.title_component, "identity", return_value={"font": "verified-font"}), \
+                mock.patch.object(manual.title_component, "rasterize", side_effect=rasterize), \
+                mock.patch.object(manual, "_seal", side_effect=seal), \
+                mock.patch.object(manual, "run", side_effect=cached_run):
+            for index in range(2):
+                folder = self.root / ("tight-budget-" + str(index)); folder.mkdir()
+                events.clear()
+                _, common, _, _ = helper._pipeline(str(folder), preview=True, composition=plan)
+                self.assertEqual(events, ["raster", "seal"])
+                self.assertEqual(sum(Path(c[-1]).name.startswith("segment-") for c in common.commands), 1 if index == 0 else 0)
+
+    def test_equal_content_aliases_use_occurrence_headroom_before_a_late_miss(self):
+        helper = manual_fixture.ManualSequenceTests()
+        original_run, original_seal = manual.run, manual._seal
+        events = []
+        plan = composition(); plan["title"].update(startFrame=0, endFrame=1)
+        def cached_run(*args, **kwargs): return original_run(*args, **kwargs, retain_segments=True)
+        def rasterize(_common, budget, _composition, destination):
+            events.append("raster"); budget.write_text(destination, "synthetic raster")
+        def seal(*args, **kwargs):
+            events.append("seal"); return original_seal(*args, **kwargs)
+        with mock.patch.object(manual, "OWNED_BYTES", 64 * 1024 * 1024), \
+                mock.patch.object(manual, "_segment_runtime_identity", return_value={"fixture": "verified-runtime"}), \
+                mock.patch.object(manual.title_component, "identity", return_value={"font": "verified-font"}), \
+                mock.patch.object(manual.title_component, "rasterize", side_effect=rasterize), \
+                mock.patch.object(manual, "_seal", side_effect=seal), \
+                mock.patch.object(manual, "run", side_effect=cached_run):
+            first = self.root / "alias-prime"; first.mkdir()
+            helper._pipeline(str(first), preview=True, composition=plan)
+            plan["title"]["endFrame"] = 10
+            folder = self.root / "aliases"; folder.mkdir(); events.clear()
+            before = worker.preview_segments.state()
+            args, common, _, _ = helper._pipeline(str(folder), preview=True, composition=plan, aliases=10, distinct_last=True)
+            after = worker.preview_segments.state()
+            self.assertEqual(events, ["raster"] + ["seal"] * 10)
+            self.assertEqual(after["hits"] - before["hits"], 9)
+            self.assertEqual(after["misses"] - before["misses"], 1)
+            self.assertEqual(sum(Path(c[-1]).name.startswith("segment-") for c in common.commands), 1)
+            self.assertEqual(len({item["input"] for item in args["items"]}), 10)
 
     def test_failed_admission_or_cleanup_does_not_publish_segments(self):
         helper = manual_fixture.ManualSequenceTests(); original_run = manual.run

@@ -3,6 +3,7 @@
 mod command_manifest;
 mod media_drop;
 mod commands;
+mod layer_preview_diagnostics;
 mod fa02_review;
 mod protocol;
 mod supervisor;
@@ -45,6 +46,7 @@ fn main() {
             desktop_import_dropped_media,
             desktop_retry_checkpoint,
             desktop_get_state,
+            layer_preview_diagnostics::desktop_record_layer_presentation,
             desktop_pick_and_ingest_media,
             desktop_transcribe_source,
             desktop_undo,

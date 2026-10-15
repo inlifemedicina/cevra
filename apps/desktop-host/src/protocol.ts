@@ -239,10 +239,15 @@ export function validateVideoThumbnailParams(params: Record<string, unknown>, id
 }
 
 export function validateVideoPreviewParams(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {
-  exactKeys(params, ["sourceId", "expectedSnapshotId", "clipId", "operationId", "sequence"], id);
+  exactKeys(params, ["sourceId", "expectedSnapshotId", "clipId", "operationId", "sequence", "experimentalLayer"], id);
+  if (params.experimentalLayer !== undefined) {
+    const v = params.experimentalLayer as {version: unknown; knownBaseId?: unknown};
+    if (!v || typeof v !== "object" || Array.isArray(v) || v.version !== 1 || Object.keys(v).some(k=>!["version","knownBaseId"].includes(k))
+      || (v.knownBaseId !== undefined && (typeof v.knownBaseId !== "string" || !/^[a-f0-9]{64}$/.test(v.knownBaseId))) || params.sequence !== true || params.operationId === undefined) throw new ProtocolValidationError("HOST_INVALID_PARAMS", "Invalid experimental preview binding.", id);
+  }
   if (params.sequence !== undefined && (params.sequence !== true || params.clipId !== undefined || params.operationId === undefined)) throw new ProtocolValidationError("HOST_INVALID_PARAMS", "Sequence preview binding is invalid.", id);
   if (params.clipId === undefined && params.operationId === undefined) return videoBinding(params, id);
-  return { ...videoBinding(params, id), ...(params.sequence === true ? { sequence: true as const } : {}), ...(params.clipId === undefined ? {} : { clipId: boundedString(params.clipId, 128, "clipId", id) }), operationId: operationId(params.operationId, id) };
+  return { ...videoBinding(params, id), ...(params.experimentalLayer ? {experimentalLayer: params.experimentalLayer as {version:1;knownBaseId?:string}} : {}), ...(params.sequence === true ? { sequence: true as const } : {}), ...(params.clipId === undefined ? {} : { clipId: boundedString(params.clipId, 128, "clipId", id) }), operationId: operationId(params.operationId, id) };
 }
 
 export function validateManualClipParams(params: Record<string, unknown>, id: string): CreateManualVideoClipRequest {

@@ -544,5 +544,8 @@
   "title.timelineIn": "Timeline title IN",
   "title.timelineOut": "Timeline title OUT",
   "title.timelineTrimIn": "Adjust title IN",
-  "title.timelineTrimOut": "Adjust title OUT"
+  "title.timelineTrimOut": "Adjust title OUT",
+  "preview.layerExperimental": "Experimental preview",
+  "preview.layerLoading": "Preparing preview…",
+  "preview.layerFallback": "Using the standard preview."
 }

@@ -17,6 +17,7 @@ pub const APPLICATION_COMMANDS: &[&str] = &[
     "desktop_revise_editorial_draft",
     "desktop_thumbnail_local_video",
     "desktop_preview_local_video",
+    "desktop_record_layer_presentation",
     "desktop_prepare_manual_export",
     "desktop_export_manual_sequence",
     "desktop_preview_manual_sequence_conform",

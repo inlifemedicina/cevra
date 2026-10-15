@@ -921,7 +921,7 @@ function maximumSimultaneousAudioItems(operation: Extract<MediaOperation, { type
 
 function resolvedDelivery(operation: MediaOperation) {
   switch (operation.type) {
-    case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
+    case "render-manual-title-preview": case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
     case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
     case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);
     case "volume": case "loudness-normalize": case "audio-fade": return resolveAudioMutationDelivery(operation.outputUri);

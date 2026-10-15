@@ -56,10 +56,16 @@ export interface RenderManualVideoPreviewOperationV3 extends Omit<RenderManualVi
   version: 3;
   composition: ManualTitleCompositionPlanV1;
 }
+/** Experimental prepared H/SDR picture, admitted separately from editable graphics. */
+export interface RenderManualVideoPreviewOperationV4 extends Omit<RenderManualVideoPreviewOperationV2, "version"> {
+  version: 4;
+  baseProfile: "canonical-h-bt709-v1";
+}
 export type RenderManualVideoOperation = RenderManualVideoSequenceOperationV1 | RenderManualVideoSequenceOperationV2
-  | RenderManualVideoPreviewOperationV1 | RenderManualVideoPreviewOperationV2 | RenderManualVideoPreviewOperationV3;
+  | RenderManualVideoPreviewOperationV1 | RenderManualVideoPreviewOperationV2 | RenderManualVideoPreviewOperationV3 | RenderManualVideoPreviewOperationV4;
 export interface ManualSequenceExecutionEvidenceV1 {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
+  baseProfile?: "canonical-h-bt709-v1";
   outputSha256: string;
   composition?: ManualTitleCompositionPlanV1;
   profile: "manual-cfr30-export-v1" | "manual-cfr30-preview-v1";
@@ -118,8 +124,9 @@ export function validateManualVideoOperation(value: unknown): RenderManualVideoO
   const preview = value.type === "render-manual-video-preview";
   const single = preview && value.version === 1;
   const composed = value.version === (preview ? 3 : 2);
-  closed(value, ["type", "version", single ? "item" : "items", "outputUri", "ownedWorkspaceUri", ...(composed ? ["composition"] : [])], "Manual video operation");
-  if ((!preview && value.type !== "render-manual-video-sequence") || (preview ? ![1, 2, 3].includes(value.version as number) : ![1, 2].includes(value.version as number))) throw Error("Manual video operation version/type is invalid.");
+  closed(value, ["type", "version", single ? "item" : "items", "outputUri", "ownedWorkspaceUri", ...(composed ? ["composition"] : []), ...(preview && value.version === 4 ? ["baseProfile"] : [])], "Manual video operation");
+  if ((!preview && value.type !== "render-manual-video-sequence") || (preview ? ![1, 2, 3, 4].includes(value.version as number) : ![1, 2].includes(value.version as number))) throw Error("Manual video operation version/type is invalid.");
+  if (preview && value.version === 4 && value.baseProfile !== "canonical-h-bt709-v1") throw Error("Invalid experimental base profile.");
   if (composed) validateManualTitleComposition(value.composition);
   path(value.outputUri); path(value.ownedWorkspaceUri);
   if (!value.outputUri.toLowerCase().endsWith(".mp4") || value.outputUri === value.ownedWorkspaceUri) throw Error("Manual output must be a distinct MP4 path.");
@@ -140,7 +147,7 @@ export function validateManualVideoOperation(value: unknown): RenderManualVideoO
 export function validateManualSequenceExecutionEvidence(value: unknown): ManualSequenceExecutionEvidenceV1 {
   const hasBudget = record(value) && Object.hasOwn(value, "logicalBudget");
   const composed = record(value) && value.version === 2;
-  closed(value, ["version", "outputSha256", "profile", "samplingPolicy", "frameRate", "container", "videoCodec", "audioCodec", "dynamicRange", "width", "height", "targetVideoBitsPerSecond", "totalFrames", "outputFrameCount", "totalPcmSamples", "outputAudioSampleCount", "audioSampleRate", "audioChannelLayout", "durationMs", "muxVideoDurationMs", "muxAudioDurationMs", "itemCount", "uniqueSegmentCount", "sources", ...(hasBudget ? ["logicalBudget"] : []), ...(composed ? ["composition"] : [])], "Manual sequence evidence");
+  closed(value, ["version", "outputSha256", "profile", "samplingPolicy", "frameRate", "container", "videoCodec", "audioCodec", "dynamicRange", "width", "height", "targetVideoBitsPerSecond", "totalFrames", "outputFrameCount", "totalPcmSamples", "outputAudioSampleCount", "audioSampleRate", "audioChannelLayout", "durationMs", "muxVideoDurationMs", "muxAudioDurationMs", "itemCount", "uniqueSegmentCount", "sources", ...(hasBudget ? ["logicalBudget"] : []), ...(composed ? ["composition"] : []), ...(record(value) && value.version === 3 ? ["baseProfile"] : [])], "Manual sequence evidence");
   const portrait = composed && validateManualTitleComposition(value.composition).title.aspect === "9:16";
   if (hasBudget) {
     const budget = value.logicalBudget;
@@ -152,7 +159,8 @@ export function validateManualSequenceExecutionEvidence(value: unknown): ManualS
   }
   if (typeof value.outputSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.outputSha256)) throw Error("Manual output SHA-256 is invalid.");
   const preview = value.profile === "manual-cfr30-preview-v1";
-  if (![1, 2].includes(value.version as number) || (!preview && value.profile !== "manual-cfr30-export-v1") || value.samplingPolicy !== MANUAL_SEQUENCE_SAMPLING_POLICY
+  if (value.version === 3 && (value.baseProfile !== "canonical-h-bt709-v1" || !preview)) throw Error("Invalid base evidence.");
+  if (![1, 2, 3].includes(value.version as number) || (!preview && value.profile !== "manual-cfr30-export-v1") || value.samplingPolicy !== MANUAL_SEQUENCE_SAMPLING_POLICY
     || value.container !== "mp4" || value.videoCodec !== "h264" || value.audioCodec !== "aac" || value.dynamicRange !== "sdr"
     || value.width !== (preview ? portrait ? 404 : 720 : portrait ? 1080 : 1920) || value.height !== (preview ? portrait ? 720 : 404 : portrait ? 1920 : 1080) || value.targetVideoBitsPerSecond !== (preview ? 700_000 : 20_000_000)
     || value.audioSampleRate !== 48_000 || !["mono", "stereo"].includes(value.audioChannelLayout as string)) throw Error("Manual sequence profile evidence is invalid.");

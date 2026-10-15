@@ -544,5 +544,8 @@
   "title.timelineIn": "IN do título na timeline",
   "title.timelineOut": "OUT do título na timeline",
   "title.timelineTrimIn": "Ajustar IN do título",
-  "title.timelineTrimOut": "Ajustar OUT do título"
+  "title.timelineTrimOut": "Ajustar OUT do título",
+  "preview.layerExperimental": "Prévia experimental",
+  "preview.layerLoading": "Preparando prévia…",
+  "preview.layerFallback": "Usando a prévia tradicional."
 }

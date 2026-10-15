@@ -1072,3 +1072,49 @@ checkpoint com falha e três reaberturas físicas do Host com Undo/Redo persisti
 **APP/PICKER/OWNER: NÃO EXECUTADO** nesta entrega; nenhuma tela ou aplicativo
 existente foi usado. Essas verificações técnicas não promovem os IDs completos
 a PASS e não autorizam uma nova rodada humana por botão.
+
+## Experimental title-layer integration — 2026-10-15
+
+Reuse D14-T2, D23-T1/T2, X-T1/T2/T6 and the bounded K3/K4 preview/export
+variants; no new global Owner acceptance is implied. The Owner approved an
+isolated experimental implementation, with ordinary builds disabled.
+
+AUTO backend: fixed H/SDR CJS base/graphic reuse, duration/Undo/Redo,
+text/position, encoded fallback, source invalidation, trim and native PNG
+cancellation/settlement/cleanup passed. Full final export decoded equivalence
+passed for the recorded fixture. UI regression and Rust diagnostic tests pass.
+The broad aggregate remains FAIL with separately recorded follow-ups.
+
+APP and OWNER visual/fluency, real Tauri timing, native continuous playback and
+current integration seek/image comparison are **BLOCKED**: the Mac was locked
+when UI inventory was attempted. Manual unlock and actual candidate execution
+remain necessary. Prior standalone WebKit proof does not close these gates.
+[Experimental scope, limits and gate evidence](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md).
+
+### Offline capability correction follow-up — 2026-10-15
+
+The later directed review found and corrected a new missing-ResizeObserver
+fallback defect in a separate continuation/candidate. Two regression cases fail
+before/pass after; affected UI files pass 44 cases with the experimental flag and
+29 workflows without it. These are JSDOM/unit outcomes, not native presentation
+or Owner acceptance. Historical aggregate FAIL and the original candidate are
+preserved. The existing D14/D23/X/K3/K4 variants above remain APP/OWNER BLOCKED;
+GUI is reserved explicitly by the parent until release, even if unlocked.
+
+
+### Local reconciliation of Localizar/PR104 and experimental title layers — 2026-10-15
+
+Reuse the existing I4/X relocation and D14/D23/K3/K4 experimental variants above.
+AUTO only: 106 affected Node, 153 UI per flag mode and 58 Rust pass in the
+combined tree. Four regression cases first reproduce a stale `ended` callback;
+the correction preserves two legitimate loops and rejects obsolete/busy/paused
+events. Native production CJS confirms source relocation, missing-source/cache
+admission, Undo/Redo, Host reopen and the exact BT709 refusal codes, with unchanged
+runtime 0.3.12 and compile-time experiment disabled in the ordinary bundle.
+
+These checks do not establish Tauri/IPC/physical presentation or Owner fluency.
+Those same APP/OWNER variants remain pending; no new manual checklist is added.
+A Documents-TMPDIR native FAIL is preserved and reproduced with the earlier CJS;
+its precise metadata cause remains unresolved, despite a passing system-TMPDIR
+proof. No historical failure or PR104-specific CI is promoted to integration CI.
+The parent reserves GUI until explicit release; no capture is allowed meanwhile.

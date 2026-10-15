@@ -210,16 +210,21 @@ it("Delete on a media card reviews impact before one project-only removal and Un
 });
 
 
+function admitPreviewVideo(container:HTMLElement,aspect: "16:9" | "9:16" = "16:9") {
+ const video=container.querySelector("video")!;
+ Object.defineProperties(video,{duration:{configurable:true,value:10},readyState:{configurable:true,value:HTMLMediaElement.HAVE_CURRENT_DATA},videoWidth:{configurable:true,value:aspect === "16:9" ? 1920 : 1080},videoHeight:{configurable:true,value:aspect === "16:9" ? 1080 : 1920}});
+ video.getBoundingClientRect=()=>({x:0,y:0,left:0,top:0,right:800,bottom:600,width:800,height:600,toJSON(){}});
+ fireEvent.loadedMetadata(video);fireEvent.loadedData(video);fireEvent.load(container.querySelector(".manual-initial-frame")!);fireEvent.seeked(video);
+ return video;
+}
+
 async function mountPreviewTitle(f=backendFixture(), aspect: "16:9" | "9:16" = "16:9") {
  const t=(key:Parameters<typeof translate>[1])=>translate("pt-BR",key);
  new ManualTitleApplicationService(f.history).edit({version:1,type:"set",expectedSnapshotId:f.history.current.history.headSnapshotId!,title:{version:1,componentId:"cevra.title.lower-third.inter.v1",text:"Título",startFrame:0,endFrame:300,aspect}});
  const png="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==";
  f.backend.previewLocalVideo=async request=>({sourceId:"source",snapshotId:request.expectedSnapshotId,durationMs:10000,mimeType:"video/mp4",base64:btoa("offline"),proxy:{profile:"manual-cfr30-preview-v1",sourceDurationMs:10000},sequence:{timingPolicy:"cfr30",totalFrames:300,clipIds:["clip"]},initialFrame:{mimeType:"image/png",base64:png,width:1,height:1,sourceTimeMs:0}});
  const {container}=render(<App backend={f.backend}/>);const sequenceButton=await screen.findByRole("button",{name:t("sequence.preview")});await act(async()=>fireEvent.click(sequenceButton));await waitFor(()=>expect(container.querySelector("video")?.getAttribute("src")).toMatch(/^blob:/));
- const video=container.querySelector("video")!;
- Object.defineProperties(video,{duration:{configurable:true,value:10},readyState:{configurable:true,value:HTMLMediaElement.HAVE_CURRENT_DATA},videoWidth:{configurable:true,value:aspect === "16:9" ? 1920 : 1080},videoHeight:{configurable:true,value:aspect === "16:9" ? 1080 : 1920}});
- video.getBoundingClientRect=()=>({x:0,y:0,left:0,top:0,right:800,bottom:600,width:800,height:600,toJSON(){}});
- fireEvent.loadedMetadata(video);fireEvent.loadedData(video);fireEvent.load(container.querySelector(".manual-initial-frame")!);fireEvent.seeked(video);
+ const video=admitPreviewVideo(container,aspect);
  return {f,container,video,t};
 }
 
@@ -230,7 +235,8 @@ it("keeps direct title text after a failed native-bound commit and retries exact
  expect(f.history.current.graphics).toHaveLength(0);await act(async()=>fireEvent.click(screen.getByRole("button",{name:"Desfazer"})));
  expect(f.history.current).toEqual(beforeDelete);
  await waitFor(()=>expect(container.querySelector("video")?.getAttribute("src")).toMatch(/^blob:/));
- fireEvent.loadedMetadata(video);fireEvent.loadedData(video);fireEvent.load(container.querySelector(".manual-initial-frame")!);fireEvent.seeked(video);
+ // Undo may remount the decoder when experimental presentation falls back.
+ admitPreviewVideo(container);
  fireEvent.doubleClick(await screen.findByRole("button",{name:t("title.selectPreview")}));
  const input=screen.getByLabelText(t("title.editPreview")) as HTMLInputElement;fireEvent.change(input,{target:{value:"Nova ação"}});
  let reject!:(cause:unknown)=>void; const original=f.backend.editManualTitle!;f.backend.editManualTitle=vi.fn(()=>new Promise<Awaited<ReturnType<NonNullable<DesktopBackend["editManualTitle"]>>>>((_resolve,rej)=>{reject=rej}));
@@ -327,7 +333,7 @@ it("preserves the canonical playback frame after pausing and editing a title, ra
 
 it.each(["16:9", "9:16"] as const)("keeps a bounded admitted frame visible while a committed %s title preview refreshes", async aspect => {
   const draw = vi.fn();
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: draw, getImageData: () => ({ data: Uint8ClampedArray.from([0, 0, 0, 255]) }) } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ clearRect: vi.fn(), drawImage: draw, getImageData: () => ({ data: Uint8ClampedArray.from([0, 0, 0, 255]) }) } as unknown as CanvasRenderingContext2D);
   const { f, t, container, video } = await mountPreviewTitle(backendFixture(), aspect);
   video.currentTime = 151 / 30; fireEvent.timeUpdate(video);
   const before = f.history.current, entries = f.history.entries.length, oldUrl = video.getAttribute("src");
@@ -361,7 +367,7 @@ it.each(["16:9", "9:16"] as const)("keeps a bounded admitted frame visible while
 
 async function pendingTitleRefresh() {
   const draw = vi.fn();
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: draw, getImageData: () => ({ data: Uint8ClampedArray.from([0, 0, 0, 255]) }) } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ clearRect: vi.fn(), drawImage: draw, getImageData: () => ({ data: Uint8ClampedArray.from([0, 0, 0, 255]) }) } as unknown as CanvasRenderingContext2D);
   const mounted = await mountPreviewTitle();
   const { f, t, container, video } = mounted;
   video.currentTime = 151 / 30; fireEvent.timeUpdate(video);
@@ -417,7 +423,7 @@ it("clears the inert picture and cancels its owned pending request when leaving 
 
 
 it("rejects a transparent decoded-video capture instead of retaining a blank frame", async () => {
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: vi.fn(),
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ clearRect: vi.fn(), drawImage: vi.fn(),
     getImageData: () => ({ data: Uint8ClampedArray.from([0, 0, 0, 0]) }) } as unknown as CanvasRenderingContext2D);
   const { f, t, container, video } = await mountPreviewTitle();
   video.currentTime = 151 / 30; fireEvent.timeUpdate(video);

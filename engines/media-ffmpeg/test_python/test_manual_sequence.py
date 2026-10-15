@@ -476,7 +476,8 @@ class ManualSequenceTests(unittest.TestCase):
                 self.assertEqual(output.read_bytes(), b"foreign png")
 
     def _pipeline(self, directory: str, *, failure: str | None = None, preview: bool = False,
-                  composition: dict | None = None, repetitions: int | None = None):
+                  composition: dict | None = None, repetitions: int | None = None,
+                  aliases: int | None = None, distinct_last: bool = False):
         from contextlib import ExitStack
         root = Path(directory).resolve(); workspace = root / "job"; workspace.mkdir(mode=0o700)
         original = root / "original.mp4"; content = b"original immutable bytes"; original.write_bytes(content)
@@ -484,6 +485,13 @@ class ManualSequenceTests(unittest.TestCase):
         args = {"version": 1, "items": [one] if preview else [one, one], "output": str(root / "final.mp4"), "owned_workspace": str(workspace)}
         if repetitions is not None:
             args["items"] = [one] * repetitions
+        if aliases is not None:
+            args["items"] = []
+            for index in range(aliases):
+                alias = root / f"alias-{index}.mp4"
+                payload = b"distinct immutable bytes" if distinct_last and index == aliases - 1 else content
+                alias.write_bytes(payload)
+                args["items"].append({**one, "input": str(alias), "source_content": {"sha256": hashlib.sha256(payload).hexdigest(), "size_bytes": len(payload)}})
         if composition is not None:
             args.update(version=3 if preview else 2, composition=composition)
         frames = len(args["items"]); common = PipelineCommon(workspace, frames * 1600, failure=failure, original=original, preview=preview)
