@@ -21,8 +21,11 @@ export interface DesktopBackendState {
   readonly status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "checkpoint-pending" | "host-unavailable" | "temporary-review";
   readonly checkpoint?: { readonly token: string; readonly pending: boolean };
   readonly closePending?: boolean;
-  readonly capabilities: Readonly<Record<DesktopRuntimeCapability, DesktopCapabilityState> & { "title.edit"?: DesktopCapabilityState }>;
+  readonly capabilities: Readonly<Record<DesktopRuntimeCapability, DesktopCapabilityState> & { "title.edit"?: DesktopCapabilityState; "media.locate"?: DesktopCapabilityState }>;
 }
+
+export interface LocateMediaRequest { version: 1; sourceId: string; expectedSnapshotId: string; operationId: string; locale: "pt-BR" | "en-US" }
+export type LocateMediaResult = { readonly outcome: "cancelled" } | { readonly outcome: "located"; readonly state: DesktopBackendState; readonly sourceId: string; readonly changed: boolean };
 
 export type ImportMediaResult =
   | { readonly outcome: "cancelled" }
@@ -76,6 +79,7 @@ export interface DesktopBackend {
   editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopBackendState; changedClipIds: string[] }>;
   editManualTitle?(request: ManualTitleEdit): Promise<{ state: DesktopBackendState; graphicId?: string }>;
   pickAndImportMedia(locale: "pt-BR" | "en-US"): Promise<ImportMediaResult>;
+  locateMedia?(request: LocateMediaRequest): Promise<LocateMediaResult>;
   getNativeMediaDropState?(): Promise<NativeMediaDropState>;
   importDroppedMedia?(receiptId: string, locale: "pt-BR" | "en-US"): Promise<DroppedMediaResult>;
   transcribeSource(sourceId: string, operationId: string, locale: "pt-BR" | "en-US"): Promise<DesktopBackendState>;

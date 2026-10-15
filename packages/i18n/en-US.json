@@ -1,4 +1,13 @@
 {
+  "media.locate": "Locate media",
+  "media.locating": "Verifying the selected file…",
+  "media.locateCancel": "Cancel verification",
+  "media.located": "Media located. Your edits were preserved.",
+  "media.locateHelp": "Choose the same file in its new folder. Cuts and titles are preserved.",
+  "media.locateUnavailable": "This media has no verified content identity for relocation.",
+  "media.locateMismatch": "The selected file is different. Choose the same original file.",
+  "media.locateStale": "The project changed during verification. Select the media and try again.",
+  "media.locateFailed": "The selected file could not be verified. The project was not changed.",
   "preview.marksDraft": "Original marks define the next excerpt to create. Edit the selected clip's IN/OUT fields in the montage controls.",
   "editorialReview.titleForBlock": "Block {number} title (up to 200 characters)",
   "editorialReview.noteForBlock": "Your note for block {number} (up to 2,000 characters)",

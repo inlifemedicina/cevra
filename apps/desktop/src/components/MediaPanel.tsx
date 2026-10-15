@@ -20,7 +20,8 @@ const filters = [
   ["image", "media.filter.image"]
 ] as const;
 
-export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, nativeDropHovering = false, thumbnailBusy = false, actionBusy = thumbnailBusy, onAction, backend, snapshotId, t, onSelect, onImport, onRemove }: { sources: readonly SourceAsset[]; backend?: DesktopBackend; snapshotId?: string; thumbnailBusy?: boolean; actionBusy?: boolean; onAction?: RangeActionGate; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; nativeDropHovering?: boolean; t: Translate; onSelect(id: string): void; onImport(): void; onRemove?(id: string): void }) {
+export function MediaPanel({ sources, presentations, selectedId, workspace, importAvailable, importReason, importBusy, nativeDropHovering = false, thumbnailBusy = false, actionBusy = thumbnailBusy, onAction, backend, snapshotId, t, onSelect, onImport, onRemove, onLocate, locating = false, locateCancelRequested = false, onCancelLocate }: { sources: readonly SourceAsset[]; backend?: DesktopBackend; snapshotId?: string; thumbnailBusy?: boolean; actionBusy?: boolean; onAction?: RangeActionGate; presentations: ReadonlyMap<string, SourcePresentation>; selectedId: string | null; workspace: Workspace; importAvailable: boolean; importReason: DesktopCapabilityReason; importBusy: boolean; nativeDropHovering?: boolean; t: Translate; onSelect(id: string): void; onImport(): void; onRemove?(id: string): void; onLocate?(id: string): void; locating?: boolean; locateCancelRequested?: boolean; onCancelLocate?(): void }) {
+  const selectedSource = sources.find(source => source.id === selectedId);
   const thumbnails = useSourceThumbnails(sources, backend, snapshotId, thumbnailBusy || importBusy);
   const [filter, setFilter] = useState<MediaFilter>("all");
   const [query, setQuery] = useState("");
@@ -79,6 +80,12 @@ export function MediaPanel({ sources, presentations, selectedId, workspace, impo
         ))}
         {visibleSources.length === 0 && <p className="empty-state">{t("media.empty")}</p>}
       </div>
+      {onLocate && selectedSource && <button type="button" className="secondary-button"
+        disabled={actionBusy || importBusy || !selectedSource.technicalDescriptor || !["video", "audio"].includes(selectedSource.kind)}
+        title={t(selectedSource.technicalDescriptor ? "media.locateHelp" : "media.locateUnavailable")}
+        onClick={() => onLocate(selectedSource.id)}>{t("media.locate")}</button>}
+      {locating && <div><p role="status">{t("media.locating")}</p><button type="button" className="secondary-button"
+        disabled={locateCancelRequested} onClick={onCancelLocate}>{t("media.locateCancel")}</button></div>}
       {onRemove && sources.some(source => source.id === selectedId) && <button type="button" className="secondary-button" disabled={actionBusy || importBusy} onClick={() => onRemove(selectedId!)}>{t("media.remove")}</button>}
       {(!importAvailable || importBusy || actionBusy) && <p className="unavailable-note" role="status"><span aria-hidden="true">●</span>{t(importBusy || actionBusy ? "status.busy" : importReason === "desktop-runtime-deferred" ? "media.importUnavailable" : capabilityReasonKey(importReason))}</p>}
     </aside>

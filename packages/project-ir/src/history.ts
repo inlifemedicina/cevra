@@ -342,6 +342,7 @@ function transcriptMutationSource(command: EditCommand): Id | undefined {
       return command.transcript.sourceId;
     case "project.rename":
     case "source.add":
+    case "source.relocate":
     case "source.technicalDescriptor.set":
     case "track.add":
     case "track.remove":

@@ -11,7 +11,8 @@ import type {
   DesktopCapabilityReason,
   DesktopOperationError,
   ManualSequenceExportResult,
-  ImportMediaResult, NativeMediaDropState, DroppedMediaResult, DroppedMediaItem
+  ImportMediaResult, NativeMediaDropState, DroppedMediaResult, DroppedMediaItem,
+  LocateMediaRequest, LocateMediaResult
 } from "./desktop-backend";
 
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -29,6 +30,7 @@ interface HostState {
     transcription: { available: boolean; reason: DesktopCapabilityReason };
     manualExport?: { available: boolean; reason: DesktopCapabilityReason };
     manualTitle?: { available: boolean; reason: DesktopCapabilityReason };
+    sourceRelocation?: { available: boolean; reason: DesktopCapabilityReason };
   };
 }
 
@@ -109,6 +111,12 @@ export class TauriDesktopBackend implements DesktopBackend {
     };
   }
 
+  async locateMedia(request: LocateMediaRequest): Promise<LocateMediaResult> {
+    const { version, sourceId, expectedSnapshotId, operationId, locale } = request;
+    const response = await this.call<{ outcome: "cancelled" } | { outcome: "located"; result: { state: HostState; sourceId: string; changed: boolean } }>("desktop_locate_media", { args: { version, sourceId, expectedSnapshotId, operationId, locale } });
+    return response.outcome === "cancelled" ? response : { outcome: "located", ...response.result, state: fromHostState(response.result.state) };
+  }
+
   async getNativeMediaDropState(): Promise<NativeMediaDropState> {
     return this.call("desktop_get_media_drop_state");
   }
@@ -187,6 +195,7 @@ function fromHostState(state: HostState): DesktopBackendState {
     ...(state.checkpoint ? { checkpoint: { ...state.checkpoint } } : {}),
     ...(state.closePending !== undefined ? { closePending: state.closePending } : {}),
     capabilities: {
+      ...(state.capabilities.sourceRelocation ? { "media.locate": { ...state.capabilities.sourceRelocation } } : {}),
       ...(state.capabilities.manualTitle ? { "title.edit": { ...state.capabilities.manualTitle } } : {}),
       "media.import": { ...state.capabilities.mediaImport },
       "transcription.transcribe": { ...state.capabilities.transcription },

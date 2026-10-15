@@ -4176,3 +4176,39 @@ Reuse I4-T1, D14-T2 and X-T1/T7; no new human round. Director impact: no new
 impact found in this keyboard-only scope; typed commands, IR/History and
 execution authority remain unchanged. Latency and later feature decisions
 remain separate; no engine, provider, permission or persistence change.
+
+### 2026-10-15 — Approved single-source media location
+
+**IN DEVELOPMENT / NOT MERGED.** The Owner approved the bounded Localizar
+mídia slice after feasibility review: select the same moved file for one
+existing source, verify its adopted SHA256 and byte size, then preserve the
+source ID, descriptors, cuts, titles, numbering and History. The implementation
+is isolated over PR102 `1a304aa`; the latency investigation, its candidate and
+Take remain separate. New/Open/Recent/Duplicate project management, replacing
+different content, legacy content adoption and automatic disk scanning are
+outside this approval.
+
+The existing native picker now supplies the locator to a narrow typed Host
+operation; WebView arguments contain IDs/snapshot/operation/locale only. The
+existing artifact identity adapter verifies candidate bytes without reading
+the unavailable original. A stale snapshot, changed candidate, cancellation
+before commit or content mismatch leaves History unchanged. A verified same
+locator is a no-op. One `source.relocate` command changes only the source URI,
+uses the existing journal/checkpoint path and supports persisted Undo/Redo.
+Legacy sources without an adopted identity remain unavailable for this action.
+The existing persistence failure reconciliation remains authoritative.
+
+Offline evidence: build PASS, 122 focused Node tests PASS, 45 focused UI tests
+PASS and 56 Rust tests PASS. The 14 new application/Host tests also pass in
+independent review, including real renamed files, same-size wrong bytes,
+cancellation/stale guards, checkpoint failure and three physical Host reopen
+cycles. Both independent domain/Host and native/UI reviews approve without
+P1/P2 findings. Exact draft-head CI is recorded in the implementation PR.
+No GUI/picker execution, installed package or Owner acceptance is inferred;
+reuse the bounded I4-T1/X-T1/T2/T7/I17-T9 variants in the acceptance catalog.
+
+Director impact: compatible typed-operation extension; Director execution
+must use the same validation, History and IR authority. No engine, provider,
+dependency, persistence model or broad filesystem permission is introduced;
+the existing native command ACL gains only this picker command. No original
+bytes are changed, no AI/provider runs occur and no merge is authorized.

@@ -1,6 +1,7 @@
 import { removeManualProjectSource } from "@cevra/application";
 import {
   LocalSourceIngestService,
+  LocalSourceRelocationService,
   EditorialDraftService,
   MediaApplicationService,
   ResolvedAudioPlanApplicationService,
@@ -78,6 +79,7 @@ function nativeDestinationPath(uri: string): string {
 export interface DesktopSessionServices {
   history: ProjectHistory;
   ingest?: Pick<LocalSourceIngestService, "ingest"> & Partial<Pick<LocalSourceIngestService, "reuseRegistered">>;
+  sourceRelocation?: Pick<LocalSourceRelocationService, "relocate">;
   sourceTechnicalDescriptor?: Pick<SourceTechnicalDescriptorApplicationService, "adopt">;
   transcription?: Pick<TranscriptionApplicationService, "transcribeSource">;
   mediaCapability: CapabilityState;
@@ -164,6 +166,7 @@ export class DesktopSession {
       } } : {}),
       closePending: this.closeAttempt !== null,
       capabilities: {
+        sourceRelocation: this.services.sourceRelocation && !this.services.temporaryEditorialReview ? available() : unavailable(this.services.temporaryEditorialReview ? "review-session" : "runtime-not-configured"),
         manualTitle: this.services.temporaryEditorialReview ? unavailable("review-session") : this.services.manualTitleCapability ?? unavailable("runtime-not-configured"),
         mediaImport: { ...this.services.mediaCapability },
         transcription: { ...this.services.transcriptionCapability },
@@ -244,6 +247,16 @@ export class DesktopSession {
       }, signal);
       await this.persistMutation();
       return this.state();
+    }));
+  }
+
+  async relocateLocalSource(params: { version: 1; sourceId: string; expectedSnapshotId: string; uri: string; operationId: string; locale: Locale }): Promise<{ state: DesktopHostState; sourceId: string; changed: boolean }> {
+    if (!this.services.sourceRelocation) throw safeError("SOURCE_RELOCATION_UNAVAILABLE");
+    const { operationId, locale: _locale, ...request } = params;
+    return this.runOperation(operationId, signal => this.runMutation(async () => {
+      const outcome = await this.services.sourceRelocation!.relocate(request, signal);
+      if (outcome.changed) await this.persistMutation();
+      return { state: this.state(), sourceId: outcome.sourceId, changed: outcome.changed };
     }));
   }
 
@@ -666,6 +679,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       : await createTranscriptionServices(history, environment, configuredMediaRuntime.paths?.root, sourceIdentity);
     return new DesktopSession({
       history,
+      sourceRelocation: new LocalSourceRelocationService(history, sourceIdentity),
       manualVideoClip: new ManualVideoClipApplicationService({ history, identity: sourceIdentity }),
       manualVideoSequence: new ManualVideoSequenceApplicationService({ history, identity: sourceIdentity }),
       ...(media?.manualTitleCapability ? { manualTitleCapability: media.manualTitleCapability } : {}),

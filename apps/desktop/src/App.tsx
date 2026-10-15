@@ -45,6 +45,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [runtimeNotice, setRuntimeNotice] = useState<TranslationKey | null>(null);
   const [runtimeNoticeParameters, setRuntimeNoticeParameters] = useState<Record<string, number>>({});
   const [importBusy, setImportBusy] = useState(false);
+  const [locateOperationId, setLocateOperationId] = useState<string | null>(null);
+  const [locateCancelRequested, setLocateCancelRequested] = useState(false);
   const [manualMutationBusy, setManualMutationBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [removeReview, setRemoveReview] = useState<{ sourceId: string; snapshot: string; clipIds: string[] } | null>(null);
@@ -380,6 +382,29 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
     return true;
   }
 
+  async function locateMedia(sourceId: string) {
+    const current = canonicalProject.current;
+    const source = current?.sources.find(item => item.id === sourceId);
+    if (!backend.locateMedia || !canonicalBackendState.current?.capabilities["media.locate"]?.available
+      || !source?.technicalDescriptor || !["video", "audio"].includes(source.kind)
+      || importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending || exportBusy) return;
+    const operationId = `locate-${globalThis.crypto.randomUUID()}`;
+    manualMutationInFlight.current = true; setManualMutationBusy(true); setLocateOperationId(operationId); setLocateCancelRequested(false);
+    setRuntimeError(null); setRuntimeNotice(null);
+    try {
+      const result = await backend.locateMedia({ version: 1, sourceId, expectedSnapshotId: current!.history.headSnapshotId!, operationId, locale });
+      if (result.outcome === "located") { applyBackendState(result.state, undefined, true); setRuntimeNotice("media.located"); }
+      else setRuntimeNotice("media.pickerCancelled");
+    } catch (cause) { handleRuntimeError(cause, true); }
+    finally { manualMutationInFlight.current = false; setManualMutationBusy(false); setLocateOperationId(null); setLocateCancelRequested(false); }
+  }
+
+  function cancelLocateMedia() {
+    if (!locateOperationId || locateCancelRequested) return;
+    setLocateCancelRequested(true);
+    void backend.cancelOperation(locateOperationId).catch(cause => handleRuntimeError(cause, true));
+  }
+
   async function changeHistory(direction: "undo" | "redo") {
     if (importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending) return;
     manualMutationInFlight.current = true;
@@ -688,7 +713,7 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       <TopBar projectName={project.project.name} workspace={workspace} locale={locale} mediaOpen={mediaOpen} sidebarCompact={sidebarCompact} exportAvailable={exportAvailable && !manualActionBusy} status={backendState.status} retryAvailable={Boolean(backendState.checkpoint) && (backendState.status === "persistence-error" || backendState.status === "local-unsaved")} retryBusy={manualActionBusy} canUndo={backendState.canUndo && !manualActionBusy} canRedo={backendState.canRedo && !manualActionBusy} t={t} onWorkspaceChange={value => { void afterRangeDraft(() => setWorkspace(value)).catch(() => {}); }} onLocaleChange={value => requestAction(() => setLocale(value))} onMediaToggle={() => requestAction(() => setMediaOpen(value => !value))} onSidebarToggle={() => requestAction(() => setSidebarCompact(value => !value))} onUndo={() => { void afterRangeDraft(() => changeHistory("undo")).catch(() => {}); }} onRedo={() => { void afterRangeDraft(() => changeHistory("redo")).catch(() => {}); }} onRetryCheckpoint={() => requestAction(retryCheckpoint)} exportPanel={exportClips && exportClips.length > 0 && <ManualExportPreparationPanel headerOnly key={`export-${project.project.id}`} backend={backend} snapshotId={project.history.headSnapshotId!} locale={locale} busy={editingBusy} actionBusy={manualActionBusy && !exportBusy} onConfirmAction={confirmActionSnapshot} available={exportAvailable} exportRequest={exportRequest} t={t} onBusyChange={value => { manualMutationInFlight.current = value; setExportBusy(value); }} onExported={result => applyBackendState(result.state, undefined, true)} onReconciled={(state, code) => handleRuntimeError({ code, reconciledState: state }, true)} />} onExport={() => { void afterRangeDraft(() => setExportRequest(value => value + 1)).catch(() => {}); }} />
       <div className="editor-area">
         <ToolRail selected={activeTool} t={t} onSelect={id => requestAction(() => { setActiveTool(id); if (id === "media") setMediaOpen(true); })} />
-        {mediaOpen && <MediaPanel nativeDropHovering={nativeDropHovering} backend={!backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? backend : undefined} snapshotId={project.history.headSnapshotId ?? undefined} thumbnailBusy={mutationBusy} actionBusy={manualActionBusy} onAction={action => afterRangeDraft(action)} sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !manualActionBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} onRemove={!backend.presentationOnly && backendState.status !== "temporary-review" ? requestRemoveSource : undefined} onSelect={selectProjectItem} onImport={() => requestAction(importMedia)} />}
+        {mediaOpen && <MediaPanel nativeDropHovering={nativeDropHovering} backend={!backend.presentationOnly && backendState.status !== "temporary-review" && backendState.status !== "host-unavailable" ? backend : undefined} snapshotId={project.history.headSnapshotId ?? undefined} thumbnailBusy={mutationBusy} actionBusy={manualActionBusy} onAction={action => afterRangeDraft(action)} sources={project.sources} presentations={sourcePresentations} selectedId={selectedProjectItemId} workspace={workspace} importAvailable={backendState.capabilities["media.import"].available && !manualActionBusy} importReason={backendState.capabilities["media.import"].reason} importBusy={importBusy} t={t} locating={locateOperationId !== null} locateCancelRequested={locateCancelRequested} onCancelLocate={cancelLocateMedia} onLocate={!backend.presentationOnly && backendState.capabilities["media.locate"]?.available && backend.locateMedia ? sourceId => requestAction(() => locateMedia(sourceId)) : undefined} onRemove={!backend.presentationOnly && backendState.status !== "temporary-review" ? requestRemoveSource : undefined} onSelect={selectProjectItem} onImport={() => requestAction(importMedia)} />}
         <div className="center-stack">
           <div className="workspace-stage" role="tabpanel" aria-label={t(workspaceKeys[workspace])}>
             {realPreview ? sequenceClips && (sequenceClips.length > 1 || project.timeline.timingPolicy === "cfr30" && sequenceClips.length > 0)
@@ -752,6 +777,7 @@ function desktopOperationError(cause: unknown): DesktopOperationError {
 function isCancellationCode(code: string): boolean {
   return new Set([
     "OPERATION_CANCELLED",
+    "SOURCE_RELOCATION_CANCELLED",
     "MEDIA_OPERATION_CANCELLED",
     "TRANSCRIPTION_APP_CANCELLED",
     "TRANSCRIPTION_CANCELLED"
@@ -772,6 +798,9 @@ function isTerminalHostCode(code: string): boolean {
 }
 
 function runtimeErrorKey(code: string): TranslationKey {
+  if (code === "SOURCE_RELOCATION_CONTENT_MISMATCH") return "media.locateMismatch";
+  if (code === "SOURCE_RELOCATION_STALE") return "media.locateStale";
+  if (code.startsWith("SOURCE_RELOCATION_")) return "media.locateFailed";
   if (code === "MANUAL_TITLE_UNAVAILABLE" || code === "MANUAL_TITLE_UNSUPPORTED") return "title.unavailable";
   if (code.startsWith("MANUAL_TITLE_")) return "title.invalid";
   if (code === "MANUAL_EXPORT_COMMITTED_ERROR") return "export.committedError";

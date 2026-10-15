@@ -5,6 +5,9 @@ import { computeTranscriptDigest } from "./transcript-digest.js";
 import { assertValidProjectIR, validateProjectIR, validateTimelineEditOperation } from "./validation.js";
 
 export type ProjectCommandErrorCode =
+  | "PROJECT_SOURCE_RELOCATION_INVALID"
+  | "PROJECT_SOURCE_RELOCATION_STALE"
+  | "PROJECT_SOURCE_RELOCATION_NO_OP"
   | "PROJECT_TIMELINE_EDIT_INVALID"
   | "PROJECT_TIMELINE_EDIT_NO_OP"
   | "PROJECT_TRANSCRIPT_INVALID"
@@ -46,6 +49,23 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
       rejectDuplicate(next.sources, command.source.id, "source");
       next.sources.push(clone(command.source));
       break;
+    case "source.relocate": {
+      if (command.version !== 1 || Object.keys(command).some(key => !["type", "version", "sourceId", "expectedSourceUri", "uri", "expectedContent"].includes(key))
+        || !validLocalLocator(command.uri) || !validLocalLocator(command.expectedSourceUri)
+        || !isRecord(command.expectedContent) || Object.keys(command.expectedContent).sort().join() !== "sha256,sizeBytes") {
+        throw new ProjectCommandError("PROJECT_SOURCE_RELOCATION_INVALID", "Invalid local source relocation.");
+      }
+      const source = next.sources.find(item => item.id === command.sourceId);
+      if (!source || !["video", "audio"].includes(source.kind) || !source.technicalDescriptor) {
+        throw new ProjectCommandError("PROJECT_SOURCE_RELOCATION_INVALID", "A verified local media source is required.");
+      }
+      if (source.uri !== command.expectedSourceUri || !deepEqual(source.technicalDescriptor.content, command.expectedContent)) {
+        throw new ProjectCommandError("PROJECT_SOURCE_RELOCATION_STALE", "The source binding changed.");
+      }
+      if (source.uri === command.uri) throw new ProjectCommandError("PROJECT_SOURCE_RELOCATION_NO_OP", "The source location is unchanged.");
+      source.uri = command.uri;
+      break;
+    }
     case "source.removeFromProject": {
       const dependencies = next.timeline.clips.filter(clip => clip.sourceId === command.sourceId).map(clip => clip.id).sort();
       if (command.version !== 1 || JSON.stringify(dependencies) !== JSON.stringify([...command.dependentClipIds].sort())) throw new Error("Source dependencies changed.");
@@ -221,6 +241,16 @@ function applyTimelineEdit(project: ProjectIR, command: Extract<EditCommand, { t
   if (JSON.stringify(project.timeline) === before) {
     throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_NO_OP", "Atomic timeline edit has no effect.");
   }
+}
+
+function validLocalLocator(value: unknown): value is string {
+  if (typeof value !== "string" || !value || value.length > 8192 || value !== value.trim() || /[\u0000-\u001f\u007f]/u.test(value)) return false;
+  if (/^[A-Za-z]:[\\/]/u.test(value) || value.startsWith("/") && !value.startsWith("//")) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "file:" && ["", "localhost"].includes(url.hostname) && !url.username && !url.password && !url.port
+      && !url.search && !url.hash && url.pathname.startsWith("/") && !url.pathname.startsWith("//");
+  } catch { return false; }
 }
 
 function applySourceTechnicalDescriptorSet(

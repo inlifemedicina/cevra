@@ -8,6 +8,7 @@ mod protocol;
 mod supervisor;
 
 use commands::{
+    desktop_locate_media,
     desktop_edit_manual_title,
     desktop_edit_manual_video_sequence,
     desktop_get_close_state,
@@ -36,6 +37,7 @@ fn main() {
         .manage(supervisor)
         .manage(media_drops)
         .invoke_handler(tauri::generate_handler![
+            desktop_locate_media,
             desktop_edit_manual_title,
             desktop_edit_manual_video_sequence,
             desktop_get_close_state,

@@ -46,6 +46,54 @@ pub struct LocaleArgs {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocateMediaArgs {
+    version: u8,
+    source_id: String,
+    expected_snapshot_id: String,
+    operation_id: String,
+    locale: String,
+}
+
+fn validate_locate_media(args: &LocateMediaArgs) -> Result<(), DesktopCommandError> {
+    validate_id(&args.source_id, "sourceId")?;
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    validate_id(&args.operation_id, "operationId")?;
+    validate_locale(&args.locale)?;
+    let operation = args.operation_id.as_bytes();
+    if args.version != 1 || !operation[0].is_ascii_alphanumeric()
+        || !operation.iter().all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(byte)) {
+        return Err(DesktopCommandError::new("SOURCE_RELOCATION_INVALID", "Invalid relocation request."));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn desktop_locate_media(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: LocateMediaArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_locate_media(&args)?;
+    supervisor.ensure_started(&app).await?;
+    let lease = supervisor.begin_preparation_picker(&args.operation_id)?;
+    let title = if args.locale == "pt-BR" { "Localizar mídia" } else { "Locate media" };
+    let picked = app.dialog().file().set_title(title).blocking_pick_file();
+    let Some(picked) = picked else { return Ok(json!({ "outcome": "cancelled" })); };
+    let path = picked.into_path().map_err(|_| DesktopCommandError::new("PICKER_INVALID_SELECTION", "The selected file is invalid."))?;
+    let uri = path.to_str().filter(|_| path.is_absolute()).ok_or_else(|| DesktopCommandError::new("PICKER_INVALID_SELECTION", "The selected file is invalid."))?;
+    // The existing native lease serializes cancellation/admission and reconciles late canonical completion.
+    let result = match supervisor.request_picked_mutation(&lease, "media.relocateLocal", json!({
+        "version": args.version, "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id,
+        "operationId": args.operation_id, "locale": args.locale, "uri": uri
+    })).await {
+        Ok(result) => result,
+        Err(error) => return Err(recover_mutation(&app, &supervisor, error).await),
+    };
+    Ok(json!({ "outcome": "located", "result": result }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TranscriptionArgs {
     source_id: String,
     operation_id: String,
@@ -817,6 +865,24 @@ mod video_boundary_tests {
         for operation in ["", "../foreign", "/tmp/path", "bad\nidentifier"] {
             let mut injected = valid.clone(); injected["operationId"] = json!(operation);
             assert!(validate_export_preparation(&serde_json::from_value::<ManualExportPreparationArgs>(injected).unwrap()).is_err());
+        }
+    }
+
+    #[test]
+    fn locate_media_boundary_allows_one_source_and_never_a_webview_path_or_content_identity() {
+        let valid = json!({"version":1,"sourceId":"source","expectedSnapshotId":"snapshot","operationId":"locate-1","locale":"pt-BR"});
+        assert!(validate_locate_media(&serde_json::from_value::<LocateMediaArgs>(valid.clone()).unwrap()).is_ok());
+        for extra in ["uri", "path", "paths", "sourceIds", "sha256", "sizeBytes", "commands", "replace"] {
+            let mut injected = valid.clone(); injected[extra] = json!("injected");
+            assert!(serde_json::from_value::<LocateMediaArgs>(injected).is_err());
+        }
+        for field in ["version", "sourceId", "expectedSnapshotId", "operationId", "locale"] {
+            let mut missing = valid.clone(); missing.as_object_mut().unwrap().remove(field);
+            assert!(serde_json::from_value::<LocateMediaArgs>(missing).is_err());
+        }
+        for (field, value) in [("version",json!(2)),("locale",json!("fr")),("sourceId",json!("")),("operationId",json!("../file"))] {
+            let mut invalid = valid.clone(); invalid[field] = value;
+            assert!(validate_locate_media(&serde_json::from_value::<LocateMediaArgs>(invalid).unwrap()).is_err());
         }
     }
 

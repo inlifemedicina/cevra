@@ -11,6 +11,7 @@ import {
   validateCloseParams,
   validateEditorialRevisionParams,
   validateIngestParams,
+  validateSourceRelocationParams,
   validateNoParams,
   validateTranscriptionParams,
   validateVideoPreviewParams, validateVideoThumbnailParams,
@@ -124,6 +125,8 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       return { result: await requireSession(session).retryCheckpoint(validateCheckpointParams(request.params, request.id)) };
     case "media.ingestLocal":
       return { result: await requireSession(session).ingestLocal(validateIngestParams(request.params, request.id)) };
+    case "media.relocateLocal":
+      return { result: await requireSession(session).relocateLocalSource(validateSourceRelocationParams(request.params, request.id)) };
     case "video.thumbnailLocal":
       return { result: await requireSession(session).thumbnailLocalVideo(validateVideoThumbnailParams(request.params, request.id)) };
     case "video.previewLocal":

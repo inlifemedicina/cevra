@@ -5,9 +5,9 @@ import { createEmptyProject, ProjectHistory, frameTimingMilliseconds, resolveMan
 import { removeManualProjectSource, ManualTitleApplicationService, type ManualTitleEdit } from "@cevra/application";
 import { translate } from "@cevra/i18n";
 import { App } from "./App";
-import type { DesktopBackend, DesktopBackendState } from "./backend/desktop-backend";
+import type { DesktopBackend, DesktopBackendState, LocateMediaRequest, LocateMediaResult } from "./backend/desktop-backend";
 
-function backendFixture() {
+function backendFixture(relocation = false) {
   const history = new ProjectHistory(createEmptyProject({ id: "title-workflow" }));
   history.commit({ type: "source.add", source: {
     id: "source", kind: "video", uri: "/offline-title-workflow.mp4", displayName: "Original.mp4", durationMs: 10000,
@@ -27,6 +27,7 @@ function backendFixture() {
   const loadState = async (): Promise<DesktopBackendState> => ({
     project: history.current, sourceNumbering: history.sourceNumbering, canUndo: history.canUndo, canRedo: history.canRedo, status: "local-saved",
     capabilities: { "media.import": unavailable, "transcription.transcribe": unavailable,
+      ...(relocation ? { "media.locate": available } : {}),
       "director.execute": unavailable, "changes.apply": unavailable, "project.export": available, "title.edit": available },
   });
   const editManualTitle = vi.fn(async (request: ManualTitleEdit) => {
@@ -57,8 +58,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-async function mountTitle() {
-  const fixture = backendFixture();
+async function mountTitle(fixture = backendFixture()) {
   await act(async () => { render(<App backend={fixture.backend} />); });
   await waitFor(() => expect(screen.getByLabelText("Texto do título").matches(":disabled")).toBe(false));
   fireEvent.change(screen.getByLabelText("Texto do título"), { target: { value: "Título integrado" } });
@@ -66,6 +66,65 @@ async function mountTitle() {
   await waitFor(() => expect(fixture.history.current.graphics).toHaveLength(1));
   return fixture;
 }
+
+it.each(["pt-BR", "en-US"] as const)("%s locates one selected source through the native route and preserves title/cuts with Undo/Redo", async locale => {
+  const f = backendFixture(true), user = userEvent.setup(), t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
+  f.backend.locateMedia = vi.fn(async (request: LocateMediaRequest): Promise<LocateMediaResult> => {
+    const source = f.history.current.sources.find(source => source.id === request.sourceId)!;
+    expect(request.expectedSnapshotId).toBe(f.history.current.history.headSnapshotId);
+    f.history.commit({ type: "source.relocate", version: 1, sourceId: source.id, expectedSourceUri: source.uri, uri: "/moved/original.mp4", expectedContent: source.technicalDescriptor!.content });
+    return { outcome: "located", state: await f.backend.loadState(), sourceId: source.id, changed: true };
+  });
+  await mountTitle(f);
+  if (locale === "en-US") await user.click(screen.getByRole("button", { name: translate("pt-BR", "top.switchLanguage") }));
+  await user.click(screen.getByRole("button", { name: `${locale === "pt-BR" ? "Vídeo" : "Video"} 1 · Original.mp4` }));
+  const before = f.history.current;
+  await user.click(screen.getByRole("button", { name: t("media.locate") }));
+  await screen.findByText(t("media.located"));
+  expect(f.backend.locateMedia).toHaveBeenCalledOnce();
+  const request = vi.mocked(f.backend.locateMedia!).mock.calls[0]![0];
+  expect(Object.keys(request).sort()).toEqual(["expectedSnapshotId", "locale", "operationId", "sourceId", "version"]);
+  expect(request.locale).toBe(locale); expect(request.sourceId).toBe("source");
+  const after = f.history.current;
+  expect(after.sources[0]).toEqual({ ...before.sources[0], uri: "/moved/original.mp4" });
+  expect(after.timeline).toEqual(before.timeline); expect(after.graphics).toEqual(before.graphics);
+  await user.click(screen.getByRole("button", { name: t("action.undo") })); await waitFor(() => expect(f.history.current).toEqual(before));
+  await user.click(screen.getByRole("button", { name: t("action.redo") })); await waitFor(() => expect(f.history.current).toEqual(after));
+});
+
+it.each(["cancelled", "mismatch"] as const)("a %s media selection preserves the project and reports the outcome", async outcome => {
+  const f = backendFixture(true), user = userEvent.setup();
+  f.backend.locateMedia = vi.fn(async (): Promise<LocateMediaResult> => { if (outcome === "mismatch") throw { code: "SOURCE_RELOCATION_CONTENT_MISMATCH" }; return { outcome: "cancelled" }; });
+  await mountTitle(f); await user.click(screen.getByRole("button", { name: "Vídeo 1 · Original.mp4" }));
+  const before = f.history.toArchive();
+  await user.click(screen.getByRole("button", { name: "Localizar mídia" }));
+  await screen.findByText(translate("pt-BR", outcome === "cancelled" ? "media.pickerCancelled" : "media.locateMismatch"));
+  expect(f.history.toArchive()).toEqual(before); expect(f.backend.locateMedia).toHaveBeenCalledOnce();
+});
+
+it("media verification cancellation holds action guards and never replays a failed selection", async () => {
+  const f = backendFixture(true), user = userEvent.setup(); let reject!: (cause: unknown) => void;
+  f.backend.locateMedia = vi.fn(() => new Promise<LocateMediaResult>((_resolve, fail) => { reject = fail; }));
+  f.backend.cancelOperation = vi.fn(async operationId => ({ operationId, cancelled: true }));
+  await mountTitle(f); await user.click(screen.getByRole("button", { name: "Vídeo 1 · Original.mp4" })); const before = f.history.toArchive();
+  await user.click(screen.getByRole("button", { name: "Localizar mídia" }));
+  expect(screen.getByRole("button", { name: "Desfazer" }).matches(":disabled")).toBe(true);
+  await user.click(screen.getByRole("button", { name: "Cancelar verificação" }));
+  expect(f.backend.cancelOperation).toHaveBeenCalledWith(vi.mocked(f.backend.locateMedia!).mock.calls[0]![0].operationId);
+  expect(screen.getByRole("button", { name: "Cancelar verificação" }).matches(":disabled")).toBe(true);
+  await act(async () => reject({ code: "SOURCE_RELOCATION_CANCELLED" }));
+  await screen.findByText(translate("pt-BR", "runtime.operationCancelled"));
+  expect(f.history.toArchive()).toEqual(before); expect(f.backend.locateMedia).toHaveBeenCalledOnce();
+});
+
+it("legacy media without adopted content identity cannot open a relocation picker", async () => {
+  const f = backendFixture(true), user = userEvent.setup(); f.backend.locateMedia = vi.fn();
+  f.history.commit({ type: "source.add", source: { id: "legacy", kind: "video", uri: "/legacy.mp4", displayName: "Legacy.mp4" } });
+  await mountTitle(f); await user.click(screen.getByRole("button", { name: "Vídeo 2 · Legacy.mp4" }));
+  const button = screen.getByRole("button", { name: "Localizar mídia" });
+  expect(button.matches(":disabled")).toBe(true); expect(button.title).toBe(translate("pt-BR", "media.locateUnavailable"));
+  await user.click(button); expect(f.backend.locateMedia).not.toHaveBeenCalled();
+});
 
 it("keeps one export panel when source/title selection changes after title edits", async () => {
   await mountTitle();
