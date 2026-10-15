@@ -20,7 +20,7 @@ import cevra_job_control as job_control
 import cevra_audio_measurement as audio_measurement
 import cevra_bounded_preview as bounded_preview
 
-CUSTOM_TOOLS = {"cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio", "cevra-render-audio-sequence", "cevra-measure-audio", "cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"}
+CUSTOM_TOOLS = {"cevra-render-manual-title-preview","cevra-extract-frame", "cevra-scale", "cevra-overlay-media", "cevra-speed", "cevra-transcode", "cevra-mux-audio", "cevra-render-audio-sequence", "cevra-measure-audio", "cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"}
 
 AUDIO_SEQUENCE_VERSION = 1
 AUDIO_SEQUENCE_SAMPLE_RATE = 48_000
@@ -1143,6 +1143,9 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path, *, reta
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             if name == "cut" and args.get("bounded_preview") is True:
                 return bounded_preview.run_take(common, args) if args.get("preview_profile") == "take-v1" else bounded_preview.run(common, args)
+            if name == "cevra-render-manual-title-preview":
+                import cevra_title_preview
+                return cevra_title_preview.run(common, args)
             if name == "cevra-extract-frame":
                 return _run_extract_frame(common, args)
             if name == "cevra-scale":
@@ -1170,7 +1173,7 @@ def call_custom_tool(name: str, args: Dict[str, Any], vendor_root: Path, *, reta
         text = "\n".join(stderr.getvalue().strip().splitlines()[-12:]) or stdout.getvalue().strip()
         return {"isError": True, "content": [{"type": "text", "text": f"{name} failed (exit {code})\n{text}"}]}
     except Exception as exc:
-        if name in {"cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"} and job_control.is_logical_file_budget_failure(exc):
+        if name in {"cevra-render-manual-title-preview", "cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"} and job_control.is_logical_file_budget_failure(exc):
             raise
         return {"isError": True, "content": [{"type": "text", "text": f"{name} failed: {type(exc).__name__}: {exc}"}]}
     return {"isError": True, "content": [{"type": "text", "text": f"{name} failed without a result"}]}

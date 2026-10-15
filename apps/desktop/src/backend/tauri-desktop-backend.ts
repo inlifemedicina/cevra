@@ -55,8 +55,12 @@ export class TauriDesktopBackend implements DesktopBackend {
     return this.call("desktop_thumbnail_local_video", { args: request });
   }
 
+  async recordLayerPresentation(receipt:import("@cevra/application").LayerPreviewPresentationV1):Promise<void>{await this.call("desktop_record_layer_presentation",{args:receipt})}
   async previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> {
-    return this.call("desktop_preview_local_video", { args: request });
+    const start=performance.now();
+    const value=await this.call<LocalVideoPreview>("desktop_preview_local_video", { args: request });
+    if(value.layered)value.layered.timings.tauriRoundTripMs=performance.now()-start;
+    return value;
   }
 
   async prepareManualExport(request: ManualExportPreparationRequest): Promise<

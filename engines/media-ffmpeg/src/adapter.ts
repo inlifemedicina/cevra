@@ -80,6 +80,18 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
     if (plannedDelivery) await this.assertDeliveryAvailable(plannedDelivery, signal);
     const call = (name: string, args: Record<string, unknown>) => this.call(name, args, context.jobId, signal);
     switch (operation.type) {
+      case "render-manual-title-preview": {
+        const value = await call("cevra-render-manual-title-preview", { version: 1, composition: operation.composition, base: operation.baseUri,
+          base_content: { sha256: operation.baseContent.sha256, size_bytes: operation.baseContent.sizeBytes }, canonical: operation.canonicalUri, preview: operation.previewUri, owned_workspace: operation.ownedWorkspaceUri });
+        if (value.type !== "manual-title-preview" || value.canonicalUri !== operation.canonicalUri || value.previewUri !== operation.previewUri
+          || !/^[a-f0-9]{64}$/.test(String(value.canonicalSha256)) || !/^[a-f0-9]{64}$/.test(String(value.previewSha256)) || value.colourProfile !== "kCGColorSpaceCoreMedia709") throw Error("Invalid native title preview result.");
+        const publications = value.publications as {canonical: unknown; preview: unknown};
+        for (const p of [publications?.canonical, publications?.preview]) {
+          const stamp = p as { version: unknown; scheme: unknown; device: unknown; inode: unknown };
+          if (!stamp || stamp.version !== 1 || stamp.scheme !== "posix-dev-inode" || !/^\d+$/.test(String(stamp.device)) || !/^\d+$/.test(String(stamp.inode))) throw Error("Invalid title publication.");
+        }
+        return value as unknown as Extract<MediaOperationResult, {type: "manual-title-preview"}>;
+      }
       case "measure-audio": {
         const report = await call("cevra-measure-audio", { version: operation.version, input: operation.inputUri, stream_index: operation.streamIndex, start_ms: operation.startMs, end_ms: operation.endMs });
         return { type: "measure-audio", report: validateAudioMeasurementReport(report, operation, context.jobId) };
@@ -91,10 +103,12 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
         const result = fileResult(await call(operation.type === "render-manual-video-preview" ? "cevra-render-manual-video-preview" : "cevra-render-manual-video-sequence", {
           version: operation.version, output: operation.outputUri, owned_workspace: operation.ownedWorkspaceUri,
           ...("composition" in operation ? { composition: operation.composition } : {}),
+          ...("baseProfile" in operation ? { base_profile: operation.baseProfile } : {}),
           items: items.map(item => ({ input: item.inputUri, source_start_frame: item.sourceStartFrame,
             source_end_frame: item.sourceEndFrame, source_content: { sha256: item.sourceContent.sha256, size_bytes: item.sourceContent.sizeBytes }, audio_selection: item.audioSelection }))
         }), operation.outputUri);
         if (result.type !== "file" || !result.manualSequence || !result.publication) throw Error("Manual sequence result lacks measured sequence/publication evidence.");
+        if (result.manualSequence.baseProfile !== ("baseProfile" in operation ? operation.baseProfile : undefined)) throw Error("Experimental base profile mismatch.");
         const evidence = result.manualSequence, expectedFrames = items.reduce((total, item) => total + item.sourceEndFrame - item.sourceStartFrame, 0);
         if (JSON.stringify(evidence.composition) !== JSON.stringify("composition" in operation ? operation.composition : undefined)) throw Error("Manual title composition evidence disagrees with the request.");
         if (evidence.totalFrames !== expectedFrames || evidence.itemCount !== items.length
@@ -489,7 +503,7 @@ function parseEffectiveProfile(value: unknown): EffectiveMediaProfile {
 function operationDelivery(operation: MediaOperation): ResolvedMediaDelivery | undefined {
   switch (operation.type) {
     case "trim": return resolveStandardAvDelivery(operation.outputUri, !operation.boundedPreview);
-    case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
+    case "render-manual-title-preview": case "probe": case "detect-silence": case "extract-frame": case "render-audio-sequence": case "measure-audio": return undefined;
     case "render-manual-video-sequence": case "render-manual-video-preview": return { container: "mp4", audioOnly: false, videoCodec: "h264", audioCodec: "aac" };
     case "transcode": return resolveTranscodeDelivery({ outputUri: operation.outputUri, ...(operation.container ? { container: operation.container } : {}), ...(operation.videoCodec ? { videoCodec: operation.videoCodec } : {}), ...(operation.audioCodec ? { audioCodec: operation.audioCodec } : {}), transformsVideo: operation.width !== undefined || operation.height !== undefined || operation.fps !== undefined });
     case "extract-audio": return resolveAudioDelivery(operation.outputUri, operation.audioCodec);

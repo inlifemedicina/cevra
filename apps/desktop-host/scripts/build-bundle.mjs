@@ -19,7 +19,7 @@ for (const [entry, outfile] of [
     target: "node22",
     sourcemap: false,
     legalComments: "none",
-    define: { "import.meta.url": "cevraImportMetaUrl" },
+    define: { "import.meta.url": "cevraImportMetaUrl", "process.env.CEVRA_EXPERIMENTAL_TITLE_LAYER": JSON.stringify(process.env.CEVRA_EXPERIMENTAL_TITLE_LAYER === "1" ? "1" : "0") },
     banner: { js: 'const cevraImportMetaUrl = require("node:url").pathToFileURL(__filename).href;' }
   });
 }

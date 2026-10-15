@@ -523,3 +523,8 @@ h1, h2, h3, p { margin: 0; }
 
 .timeline-title-range { min-width: 0; }
 .timeline-title-range .timeline-trim-handle { width: min(16px, 50%); min-width: 4px; }
+
+/* Candidate-only layer renderer; loading never exposes a previous snapshot. */
+.layered-video-stage .layered-decoder { opacity: 0; pointer-events: none; }
+.layered-video-stage .layered-picture { position: absolute; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.layered-video-stage .layered-picture[hidden] { display: none; }

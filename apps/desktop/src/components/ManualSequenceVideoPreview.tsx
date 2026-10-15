@@ -1,3 +1,4 @@
+import { LayeredSequenceVideoPreview } from "./LayeredSequenceVideoPreview";
 import type { TitlePreviewEditing } from "./ManualTitleOverlay";
 import type { CreateManualVideoClipRequest } from "@cevra/application";
 import type { ProjectIR, TimelineClip } from "@cevra/project-ir";
@@ -32,6 +33,7 @@ interface Props {
 
 /** CFR30 montage uses one admitted derivative/decoder; Original keeps its source clock. */
 export function ManualSequenceVideoPreview({ onAction, backend, project, clips, presentations, originalSourceId, originalSelected = false, busy, actionBusy = busy, requestedMode, requestedLoop, onModeChange, onLoopChange, seek, t, onPlayheadChange, onCreate, titleEditing }: Props) {
+  const [experimentalLayer,setExperimentalLayer]=useState(import.meta.env.VITE_CEVRA_TITLE_LAYER_EXPERIMENT === "1");
   const durationMs = project.timeline.durationMs;
   const titleContinuityKey = useMemo(() => titleEditing ? JSON.stringify({ projectId: project.project.id,
     sources: project.sources, timeline: project.timeline, graphicId: titleEditing.graphicId,
@@ -87,13 +89,15 @@ export function ManualSequenceVideoPreview({ onAction, backend, project, clips, 
     setMode(next);
     scrubIntent.current = null;
   }
+  const Preview=experimentalLayer&&continuous&&titleEditing?.title.aspect==="16:9"?LayeredSequenceVideoPreview:ManualVideoPreview;
   return <div className="manual-sequence-preview">
     <div className="manual-sequence-preview-modes" role="group" aria-label={t("sequence.previewMode")}>
+      {import.meta.env.VITE_CEVRA_TITLE_LAYER_EXPERIMENT === "1"&&<label><input type="checkbox" checked={experimentalLayer} disabled={actionBusy} onChange={event=>{const checked=event.target.checked;const change=()=>setExperimentalLayer(checked);if(onAction)void onAction(change).catch(()=>{});else change()}}/>{t("preview.layerExperimental")}</label>}
       <button type="button" className="secondary-button" aria-pressed={mode === "sequence"} disabled={actionBusy} onClick={() => onModeChange ? onModeChange("sequence") : changeMode("sequence")}>{t("sequence.preview")}</button>
       <button type="button" className="secondary-button" aria-pressed={mode === "original"} disabled={actionBusy} onClick={() => onModeChange ? onModeChange("original") : changeMode("original")}>{t("preview.originalMode")}</button>
       {mode === "sequence" && <label><input type="checkbox" checked={loop} disabled={actionBusy} onChange={event => onLoopChange ? onLoopChange(event.target.checked) : setLoop(event.target.checked)} />{t("sequence.repeat")}</label>}
     </div>
-    <ManualVideoPreview onAction={onAction} actionBusy={actionBusy} key={`${mode}:${sourceId}:${mode === "sequence" ? continuous ? "continuous" : clip.id : "original"}`} backend={backend}
+    <Preview onAction={onAction} actionBusy={actionBusy} key={`${mode}:${sourceId}:${mode === "sequence" ? continuous ? "continuous" : clip.id : "original"}`} backend={backend}
       sourceFileName={presentations.get(currentSourceId!)?.fileName ?? project.sources.find(source => source.id === currentSourceId)?.displayName}
       source={project.sources.find(source => source.id === sourceId)} sourceLabel={currentSourceId ? presentations.get(currentSourceId)?.label : undefined}
       titleContinuityKey={continuous ? titleContinuityKey : undefined} titleEditing={continuous ? titleEditing : undefined} titleEditingBlocked={actionBusy} snapshotId={project.history.headSnapshotId!} clip={mode === "sequence" ? programClip : undefined} sequencePreview={continuous ? clips : undefined}

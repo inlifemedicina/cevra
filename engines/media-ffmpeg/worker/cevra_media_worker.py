@@ -24,7 +24,7 @@ if str(WORKER_DIRECTORY) not in sys.path:
 
 from runtime_integrity import release_mode_for, sanitize_release_environment, verify_release_bundle
 
-WORKER_VERSION = "0.3.11"
+WORKER_VERSION = "0.3.12"
 PROTOCOL_VERSION = 1
 UPSTREAM_VERSION = "1.4.2"
 UPSTREAM_COMMIT = "58f64f9d9e6a0ced4a4cd6a198d7476dede50d1a"
@@ -486,6 +486,10 @@ def _custom_health(tools: Dict[str, Dict[str, Any]], profile: Dict[str, str], ff
     title_usable = not missing_manual and "overlay" in available_filters and cevra_manual_title.available()
     tools["cevra-manual-title-inter-v1"] = {"usable": "yes" if title_usable else "no",
         **({"detail": "bounded first-party CoreText/Inter component; macOS only"} if title_usable else {"missing": ["verified macOS title component/overlay capability"]})}
+    colour_helper = Path(__file__).resolve().parent.parent / "components/manual-title/preview-colour"
+    title_preview_usable = title_usable and png_available and {"scale", "format"}.issubset(available_filters) and colour_helper.is_file() and not colour_helper.is_symlink() and os.access(colour_helper, os.X_OK)
+    tools["cevra-render-manual-title-preview"] = {"usable": "yes" if title_preview_usable else "no",
+        **({"detail": "experimental fixed H/SDR PNG pair; verified native colour helper and owned-job guards required"} if title_preview_usable else {"missing": ["verified macOS title preview colour/PNG capability"]})}
     required_measurement = {"astats", "ebur128", "aeval", "aresample", "aformat", "asplit", "asettb", "atrim", "asetpts", "ametadata", "anullsink"}
     missing_measurement = sorted(required_measurement - available_filters)
     if "pcm_f64le" not in available_encoders:
@@ -768,8 +772,8 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
                 "required": ["sha256", "size_bytes"]}},
         "required": ["input", "source_start_frame", "source_end_frame", "audio_selection", "source_content"]}
     def manual_schema(preview: bool) -> Dict[str, Any]:
-        return {"properties": {"version": {"type": "integer", "enum": [1, 2, 3] if preview else [1, 2]}, "output": path, "owned_workspace": path,
-            "composition": {"type": "object"},
+        return {"properties": {"version": {"type": "integer", "enum": [1, 2, 3, 4] if preview else [1, 2]}, "output": path, "owned_workspace": path,
+            "composition": {"type": "object"}, "base_profile": {"type": "string", "enum": ["canonical-h-bt709-v1"]},
             "items": {"type": "array", "minItems": 1, "maxItems": 2048, "items": manual_item}},
             "required": ["version", "output", "owned_workspace", "items"]}
     audio_source = {
@@ -846,6 +850,7 @@ def _custom_tool_specs() -> List[Dict[str, Any]]:
             },
             "required": ["version", "sources", "items", "output", "output_duration_ms", "output_channel_layout"],
         },
+        "cevra-render-manual-title-preview": {"properties": {"version": {"type":"integer","enum":[1]}, "composition":{"type":"object"}, "base":path, "base_content":{"type":"object"}, "canonical":path, "preview":path, "owned_workspace":path}, "required":["version","composition","base","base_content","canonical","preview","owned_workspace"]},
         "cevra-render-manual-video-sequence": manual_schema(False),
         "cevra-render-manual-video-preview": manual_schema(True),
     }
@@ -923,6 +928,9 @@ def _validate_tool_arguments(name: str, arguments: Dict[str, Any]) -> None:
     if _contains_non_finite_number(arguments):
         raise ValueError("tool arguments must contain only finite numbers")
     _validate_schema_value(arguments, _schema_for_tool(name), f"tool {name} arguments")
+    if name == "cevra-render-manual-title-preview":
+        from cevra_title_preview import validate
+        validate(arguments)
     if name in ("cevra-render-manual-video-sequence", "cevra-render-manual-video-preview"):
         from cevra_manual_sequence import validate
         validate(arguments, name == "cevra-render-manual-video-preview")
@@ -1050,7 +1058,7 @@ def _start_job(request_id: Any, params: Dict[str, Any]) -> Optional[Dict[str, An
     if _JOB_THREAD is not None or job_control.active_job_id() is not None:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32001, "message": "media worker is busy"}}
     guarded = params.get("ownedPreviewCache") is True
-    if not guarded or name not in ("cevra-render-manual-video-preview", "cevra-extract-frame"):
+    if not guarded or name not in ("cevra-render-manual-title-preview", "cevra-render-manual-video-preview", "cevra-extract-frame"):
         preview_segments.clear()
     job_control.begin_job(job_id)
     thread = threading.Thread(target=_job_response, args=(request_id, job_id, name, arguments, guarded and name == "cevra-render-manual-video-preview"), name=f"cevra-media-job-{job_id}")

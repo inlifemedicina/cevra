@@ -58,9 +58,14 @@ pub struct CancelArgs {
     operation_id: String,
 }
 
+#[derive(Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExperimentalLayerArgs { version: u8, known_base_id: Option<String> }
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VideoPreviewArgs {
+    experimental_layer: Option<ExperimentalLayerArgs>,
     sequence: Option<bool>,
     source_id: String,
     expected_snapshot_id: String,
@@ -216,9 +221,18 @@ pub async fn desktop_preview_local_video(
         }
         params["sequence"] = json!(true);
     }
+    if let Some(layer) = args.experimental_layer {
+        if layer.version != 1 || args.sequence != Some(true) || args.operation_id.is_none()
+            || layer.known_base_id.as_ref().map_or(false, |id| id.len()!=64 || !id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))) {
+            return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_REQUEST", "Invalid experimental layer binding."));
+        }
+        let mut value=json!({"version":1});if let Some(id)=layer.known_base_id{value["knownBaseId"]=json!(id);}params["experimentalLayer"]=value;
+    }
+    let started=std::time::Instant::now();
     supervisor.ensure_started(&app).await?;
     if let Some(operation) = args.operation_id {
-        supervisor.request_preparation("video.previewLocal", params, &operation).await
+        let mut result=supervisor.request_preparation("video.previewLocal", params, &operation).await?;
+        if result.get("layered").is_some(){result["layered"]["timings"]["rustHostMs"]=json!(started.elapsed().as_secs_f64()*1000.0);}Ok(result)
     } else {
         supervisor.request_control("video.previewLocal", params).await
     }

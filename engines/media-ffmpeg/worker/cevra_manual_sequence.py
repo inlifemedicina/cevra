@@ -45,11 +45,14 @@ def _integer(value: Any, minimum: int, maximum: int, label: str) -> int:
 
 
 def validate(args: dict, preview: bool) -> tuple[list[dict], int]:
+    base_profile = preview and args.get("version") == 4
     composed = args.get("version") == (3 if preview else 2)
-    _closed(args, {"version", "items", "output", "owned_workspace"} | ({"composition"} if composed else set()), "manual operation")
+    _closed(args, {"version", "items", "output", "owned_workspace"} | ({"composition"} if composed else set()) | ({"base_profile"} if base_profile else set()), "manual operation")
+    if base_profile and args["base_profile"] != "canonical-h-bt709-v1":
+        raise ValueError("invalid experimental base profile")
     if composed:
         title_component.validate(args["composition"])
-    if args["version"] not in ((1, 2, 3) if preview else (1, 2)) or isinstance(args["version"], bool):
+    if args["version"] not in ((1, 2, 3, 4) if preview else (1, 2)) or isinstance(args["version"], bool):
         raise ValueError("manual operation version is invalid")
     items = args["items"]
     if not isinstance(items, list) or not 1 <= len(items) <= (1 if preview and args["version"] == 1 else MAX_ITEMS):
@@ -516,6 +519,12 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
     if output.suffix.lower() != ".mp4":
         raise ValueError("manual delivery must be MP4")
     originals = list(dict.fromkeys(_path(item["input"]) for item in items))
+    base_identity = None
+    if args.get("base_profile"):
+        empty_asset = Path(__file__).resolve().parent.parent / "components/manual-title/empty-h.png"
+        if empty_asset.is_symlink() or hashlib.sha256(empty_asset.read_bytes()).hexdigest() != "05dfa378222e0220b74385202702bd0595950e75f3f1a00b094ca448dde8df74":
+            raise RuntimeError("experimental empty raster identity changed")
+        base_identity = {"baseProfile": args["base_profile"], "empty": "05dfa378222e0220b74385202702bd0595950e75f3f1a00b094ca448dde8df74"}
     root, root_stamp = _workspace(args["owned_workspace"], output, originals)
     width, height, bitrate = (720, 404, 700_000) if preview else (1920, 1080, 20_000_000)
     composition = args.get("composition")
@@ -612,7 +621,7 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                 raise ValueError("manual requested frame range exceeds measured video/audio clock coverage")
             pcm_items.append({"source_id": source_id, "source_start_sample": start * 1600, "source_end_sample": end * 1600})
             interval = title_component.local_interval(composition, offset, end - start) if composition else None
-            occurrence_composition = _occurrence_composition(composition, component_identity, interval)
+            occurrence_composition = base_identity or _occurrence_composition(composition, component_identity, interval)
             key = (source_id, start, end, json.dumps(occurrence_composition, sort_keys=True))
             offset += end - start
             if key not in segments:
@@ -642,6 +651,13 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                         # PNG is canonical final geometry; preview scales the complete picture once.
                         graph = f"[0:{stream_index}]{_video_filter(start, end, canonical_width, canonical_height)}[base];[base][1:v]overlay=0:0:format=rgb:eof_action=repeat:enable='gte(n,{interval[0]})*lt(n,{interval[1]})',scale={width}:{height}:out_color_matrix=bt709:out_range=tv:flags=lanczos,format=yuv420p[out]"
                         command += ["-i", str(raster), "-filter_complex", graph, "-map", "[out]", "-an"]
+                    elif preview and args.get("base_profile") == "canonical-h-bt709-v1":
+                        info = metadata[source_id]["video"]
+                        if any(info.get(k) != "bt709" for k in ("color_primaries", "color_transfer", "color_space")) or info.get("color_range") != "tv" or info.get("pix_fmt") != "yuv420p":
+                            raise ValueError("experimental base requires admitted SDR BT709 limited-range yuv420p")
+                        empty = Path(__file__).resolve().parent.parent / "components/manual-title/empty-h.png"
+                        graph = f"[0:{stream_index}]{_video_filter(start, end, 1920, 1080)}[base];[base][1:v]overlay=0:0:format=rgb:eof_action=repeat,scale={width}:{height}:out_color_matrix=bt709:out_range=tv:flags=lanczos,format=yuv420p[out]"
+                        command += ["-i", str(empty), "-filter_complex", graph, "-map", "[out]", "-an"]
                     else:
                         command += ["-map", f"0:{stream_index}", "-an", "-vf", _video_filter(start, end, width, height)]
                     budget.run_native(common, command + [*encoder_args, str(segment)])
@@ -688,6 +704,8 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                     raise RuntimeError("manual sealed original changed during render")
             if cache_transaction and _segment_runtime_identity(common) != runtime_identity:
                 raise RuntimeError("preview segment runtime changed during render")
+            if base_identity and hashlib.sha256(empty_asset.read_bytes()).hexdigest() != base_identity["empty"]:
+                raise RuntimeError("experimental empty raster changed during render")
             if composition and title_component.identity() != component_identity:
                 raise RuntimeError("title component changed during render")
             candidate_stream = next(s for s in _streams(common, candidate) if s.get("codec_type") == "video")
@@ -716,7 +734,7 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
         if inspection._hash_stable(output, output.lstat(), OWNED_BYTES) != measured["sha256"]:
             raise RuntimeError("manual final publication bytes changed")
         jobs.check_cancelled()
-        evidence = {"version": 2 if composition else 1, **({"composition": composition} if composition else {}), "outputSha256": measured["sha256"], "profile": "manual-cfr30-preview-v1" if preview else "manual-cfr30-export-v1", "samplingPolicy": SAMPLING_POLICY,
+        evidence = {"version": 2 if composition else 3 if args.get("base_profile") else 1, **({"baseProfile": args["base_profile"]} if args.get("base_profile") else {}), **({"composition": composition} if composition else {}), "outputSha256": measured["sha256"], "profile": "manual-cfr30-preview-v1" if preview else "manual-cfr30-export-v1", "samplingPolicy": SAMPLING_POLICY,
             "frameRate": {"numerator": 30, "denominator": 1}, "container": "mp4", "videoCodec": "h264", "audioCodec": "aac", "dynamicRange": "sdr",
             "width": width, "height": height, "targetVideoBitsPerSecond": bitrate, "totalFrames": total, "outputFrameCount": total,
             "totalPcmSamples": samples, "outputAudioSampleCount": int(measured["audio"] * 48000), "audioSampleRate": 48000, "audioChannelLayout": layout,

@@ -4179,3 +4179,24 @@ The first Node run330/332 FAIL is preserved with confirmed wrong-Python diagnosi
 owned test-copy bytecodes were recovered before final sealing. No new architecture,
 engine, provider, permission, GUI/Take action or merge. Director no new impact in
 checked scope. PR101/checks and historical cloud FAIL11 are not reclassified.
+
+### 2026-10-15 — Approved isolated title-layer integration experiment
+
+**EXPERIMENTAL / NATIVE BACKEND VALIDATED; CURRENT APP GATES PENDING.** The Owner
+approved integration of the previously measured static H/SDR base+PNG trial into
+the existing sequence preview on an own branch based at1e0ca37. Both compile flags
+remain off in ordinary builds. The isolated candidate uses runtime0.3.12 and an
+exclusive bundle identity/store, retains bounded caches, clear loading/current
+frame admission and encoded fallback, and preserves Project IR/History, typed
+editing, CoreText/FFmpeg and original-derived final export. This is not adoption
+of a new default or Composition engine.
+
+[Scope, gates and measured limits](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md)
+record build/Rust/Python/UI, native CJS/cache/cancel/source/fallback checks,
+decoded300-frame/480000-sample final equivalence and independent static reviews.
+The broad aggregate remains FAIL, with baseline transcription fixtures and scoped
+native-process observation diagnosed separately. Historical cloud FAIL11 remains.
+The Mac was locked at the UI attempt; current Tauri/IPC/presentation/visual and
+Owner gates are BLOCKED pending manual unlock and execution. No latency promise,
+global replacement, Take operation, merge, push or publication. Director impact
+is a compatible presentation/typed-contract extension with no new authority.

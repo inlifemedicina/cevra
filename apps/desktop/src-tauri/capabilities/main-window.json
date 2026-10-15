@@ -20,6 +20,7 @@
     "allow-desktop-revise-editorial-draft",
     "allow-desktop-thumbnail-local-video",
     "allow-desktop-preview-local-video",
+    "allow-desktop-record-layer-presentation",
     "allow-desktop-prepare-manual-export",
     "allow-desktop-export-manual-sequence",
     "allow-desktop-preview-manual-sequence-conform",

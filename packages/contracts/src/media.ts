@@ -1,3 +1,4 @@
+import { validateManualTitleComposition } from "./manual-title-composition.js";
 import type { EngineAdapter, ExecutionContext } from "./base.js";
 import type { MeasureAudioOperationV1, AudioMeasurementReportV1 } from "./audio-measurement.js";
 import { validateManualVideoOperation, type RenderManualVideoOperation, type ManualSequenceExecutionEvidenceV1 } from "./manual-video-sequence.js";
@@ -299,6 +300,7 @@ export interface EffectiveMediaProfile {
 }
 
 export type MediaOperation =
+  | { type: "render-manual-title-preview"; version: 1; composition: import("./manual-title-composition.js").ManualTitleCompositionPlanV1; baseUri: string; baseContent: { sha256: string; sizeBytes: number }; canonicalUri: string; previewUri: string; ownedWorkspaceUri: string }
   | RenderManualVideoOperation
   | MeasureAudioOperationV1
   | { type: "probe"; inputUri: string }
@@ -320,6 +322,7 @@ export type MediaOperation =
 
 export type MediaOperationResult =
   | { type: "measure-audio"; report: AudioMeasurementReportV1 }
+  | { type: "manual-title-preview"; canonicalUri: string; previewUri: string; canonicalSha256: string; previewSha256: string; colourProfile: string; publications: { canonical: MediaPublicationEvidenceV1; preview: MediaPublicationEvidenceV1 } }
   | { type: "probe"; probe: MediaProbeResult }
   | { type: "detect-silence"; ranges: SilenceRange[] }
   | { type: "file"; outputUri: string; durationMs?: number; probe: MediaProbeResult; effectiveProfile: EffectiveMediaProfile; audioSequence?: AudioSequenceExecutionEvidence; manualSequence?: ManualSequenceExecutionEvidenceV1; publication?: MediaPublicationEvidenceV1; muxDuration?: MuxAudioDurationEvidenceV1; boundedPreview?: BoundedVideoPreviewEvidenceV1 | BoundedVideoPreviewEvidenceV2 };
@@ -333,8 +336,9 @@ const MEDIA_CONTAINERS = new Set(["mp4", "mov", "mkv", "wav", "m4a"]);
 const VIDEO_CODECS = new Set(["h264", "h265", "av1", "copy"]);
 const AUDIO_CODECS = new Set(["aac", "opus", "pcm", "copy"]);
 const OPERATION_FIELDS: Readonly<Record<MediaOperation["type"], ReadonlySet<string>>> = {
+  "render-manual-title-preview": new Set(["type", "version", "composition", "baseUri", "baseContent", "canonicalUri", "previewUri", "ownedWorkspaceUri"]),
   "render-manual-video-sequence": new Set(["type", "version", "items", "outputUri", "ownedWorkspaceUri", "composition"]),
-  "render-manual-video-preview": new Set(["type", "version", "item", "items", "outputUri", "ownedWorkspaceUri", "composition"]),
+  "render-manual-video-preview": new Set(["type", "version", "item", "items", "outputUri", "ownedWorkspaceUri", "composition", "baseProfile"]),
   "measure-audio": new Set(["type", "version", "inputUri", "streamIndex", "startMs", "endMs"]),
   probe: new Set(["type", "inputUri"]),
   trim: new Set(["type", "inputUri", "outputUri", "startMs", "endMs", "boundedPreview", "previewProfile"]),
@@ -434,6 +438,16 @@ export function validateMediaOperation(value: unknown): MediaOperation {
       break;
     }
     case "render-audio-sequence": validateAudioSequence(value); break;
+    case "render-manual-title-preview": {
+      const v = value as Extract<MediaOperation, { type: "render-manual-title-preview" }>;
+      if (v.version !== 1 || Object.keys(v).length !== 8 || !v.baseContent || Object.keys(v.baseContent).length !== 2
+        || !/^[a-f0-9]{64}$/.test(v.baseContent.sha256) || !Number.isSafeInteger(v.baseContent.sizeBytes) || v.baseContent.sizeBytes < 1 || v.baseContent.sizeBytes > 8 * 1024 * 1024) throw Error("Invalid title preview binding.");
+      validateManualTitleComposition(v.composition);
+      if (v.composition.title.aspect !== "16:9") throw Error("Title preview initially requires H.");
+      for (const p of [v.baseUri, v.canonicalUri, v.previewUri, v.ownedWorkspaceUri]) if (typeof p !== "string" || !p.startsWith("/") || /[\0\r\n]/.test(p)) throw Error("Invalid owned title path.");
+      if (new Set([v.baseUri, v.canonicalUri, v.previewUri, v.ownedWorkspaceUri]).size !== 4) throw Error("Aliased title preview paths.");
+      break;
+    }
     case "render-manual-video-sequence": case "render-manual-video-preview": validateManualVideoOperation(value); break;
     default: throw new Error(`Unsupported media operation ${String(value.type)}.`);
   }

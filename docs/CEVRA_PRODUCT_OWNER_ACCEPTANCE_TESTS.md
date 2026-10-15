@@ -1051,3 +1051,21 @@ unchanged repeats with unproven root causes. This is not eleven demonstrated
 product bugs, and the failed aggregate is not relabelled PASS. Other catalog
 variants, G1/ADR0012/global release and platforms remain unresolved/blocked as
 applicable. Draft publication is authorized separately; merge is not.
+
+## Experimental title-layer integration — 2026-10-15
+
+Reuse D14-T2, D23-T1/T2, X-T1/T2/T6 and the bounded K3/K4 preview/export
+variants; no new global Owner acceptance is implied. The Owner approved an
+isolated experimental implementation, with ordinary builds disabled.
+
+AUTO backend: fixed H/SDR CJS base/graphic reuse, duration/Undo/Redo,
+text/position, encoded fallback, source invalidation, trim and native PNG
+cancellation/settlement/cleanup passed. Full final export decoded equivalence
+passed for the recorded fixture. UI regression and Rust diagnostic tests pass.
+The broad aggregate remains FAIL with separately recorded follow-ups.
+
+APP and OWNER visual/fluency, real Tauri timing, native continuous playback and
+current integration seek/image comparison are **BLOCKED**: the Mac was locked
+when UI inventory was attempted. Manual unlock and actual candidate execution
+remain necessary. Prior standalone WebKit proof does not close these gates.
+[Experimental scope, limits and gate evidence](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md).
