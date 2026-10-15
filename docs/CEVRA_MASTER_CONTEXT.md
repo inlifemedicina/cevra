@@ -4200,3 +4200,24 @@ The Mac was locked at the UI attempt; current Tauri/IPC/presentation/visual and
 Owner gates are BLOCKED pending manual unlock and execution. No latency promise,
 global replacement, Take operation, merge, push or publication. Director impact
 is a compatible presentation/typed-contract extension with no new authority.
+
+### 2026-10-15 — Offline aggregate triage and experimental fallback correction
+
+**ISOLATED CONTINUATION, no GUI or global adoption.** Directed comparison of the
+last six aggregate failures separates two inherited Python-selection fixtures
+and three inherited restricted-process-observation failures from the RPC list
+expectation already corrected in 9ac2c71. Correct Python 3.12 passes both Host cases
+on base/head; approved native scope passes all three guard cases on base/head.
+Historical aggregates and cloud FAIL11 are not rewritten as PASS.
+
+The initial forced-experiment UI failures also exposed a new P2: unconditional
+ResizeObserver construction could prevent encoded fallback when the API is
+absent. A minimal guard, two failing-before/passing-after tests, complete Canvas
+mocks and current-decoder admission in the legacy fixture close that recut:
+44 affected tests PASS with the experiment on, 29 workflows PASS off. No broad
+suite was repeated. [Correction and classification](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#offline-broad-test-triage-and-capability-correction--2026-10-15)
+record the limits. The first candidate/source 9ac2c71 remain frozen; a distinct
+candidate carries this correction. Host/runtime/contracts/export are unchanged.
+Parent explicitly reserved GUI access; no operation/capture is permitted until
+its release. Director impact remains compatible presentation, with IR/History
+and typed operations unchanged. No merge/push/publication or Take operation.

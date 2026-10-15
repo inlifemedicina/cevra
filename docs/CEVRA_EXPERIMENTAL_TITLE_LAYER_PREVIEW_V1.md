@@ -102,3 +102,39 @@ Director impact: **compatible presentation/typed-contract extension** in this
 trial. The Director gains no new authority or generic tool execution. A future
 default or broader composition scope requires a separate Owner decision and
 the applicable architectural/benchmark gates.
+
+## Offline broad-test triage and capability correction — 2026-10-15
+
+A later directed review identified a **new P2 in the experimental renderer**:
+`ResizeObserver` was constructed without a capability check, including during
+fallback. Its absence could throw before the existing encoded preview appeared.
+This path does not exist on the base. The original 28 forced-experiment UI
+failures therefore cannot all be dismissed as fixture limitations.
+
+The isolated continuation guards observer construction, skips it after fallback
+or canvas removal, and selects encoded fallback when the API is absent. Two
+new tests fail on the prior implementation and pass with the correction, with
+and without a video-frame callback. All 15 layer regressions pass. Completing
+three partial Canvas mocks with the real `clearRect` method and admitting the
+current decoder after Undo/remount fixes the remaining test-fixture assumptions;
+no assertions were relaxed. The affected files pass 44 tests with the experiment
+on (29 existing workflows plus 15 layer cases) and 29 workflows with it off.
+No full UI or workspace suite was repeated for this bounded change.
+
+The last aggregate's six failures were also compared directly with the base:
+- The two transcription fixtures use Xcode Python 3.9.6 unless
+  `CEVRA_TEST_PYTHON` is set. The unchanged managed worker requires Python 3.12.
+  The two cases pass on both base and experimental head with the isolated test
+  Python 3.12. They are inherited executor configuration failures.
+- The three native process-observation cases fail in the restricted executor on
+  the base as well. Both base and experimental head pass all three with the
+  approved native process scope. Resource enforcement was not weakened.
+- The exact RPC list expectation was a new intermediate test mismatch, already
+  corrected in 9ac2c71 for the one closed internal tool. It passes on both heads.
+
+The historical aggregates remain FAIL; these targeted comparisons do not turn
+those runs into green CI. The correction is built as a separate second candidate;
+the first 9ac2c71 app/archive and source remain frozen. Runtime/Host bytes and
+contracts are unchanged by this UI correction. Current Tauri/visual/IPC gates
+remain unexecuted: GUI access is explicitly reserved by the coordinating parent
+and must stay untouched even after unlock until that parent releases it.

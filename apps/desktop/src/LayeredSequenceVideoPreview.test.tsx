@@ -114,3 +114,13 @@ it("keeps pointerdown from blurring the title and waits for its commit before Pl
  fireEvent.change(input,{target:{value:"Novo"}});input.focus();const playButton=screen.getByRole("button",{name:"preview.playLocal"});expect(fireEvent.pointerDown(playButton,{button:0})).toBe(false);expect(document.activeElement).toBe(input);expect(f.onCommit).not.toHaveBeenCalled();
  fireEvent.click(playButton);await waitFor(()=>expect(f.onCommit).toHaveBeenCalledTimes(1));expect(play).not.toHaveBeenCalled();await act(async()=>f.commit.resolve());
 });
+
+it.each([true,false])("uses encoded fallback without ResizeObserver (video frame callback present: %s)",async frameCallbackPresent=>{
+ vi.stubGlobal("ResizeObserver",undefined);
+ if(!frameCallbackPresent)Object.defineProperty(HTMLVideoElement.prototype,"requestVideoFrameCallback",{configurable:true,value:undefined});
+ const f=fixture(),{container}=render(f.view());
+ await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());
+ expect(container.querySelector("canvas.layered-picture")).toBeNull();
+ await waitFor(()=>expect(f.preview.mock.calls.some(([request])=>request.experimentalLayer===undefined)).toBe(true));
+ expect(container.querySelector("video.layered-decoder")).toBeNull();
+});

@@ -273,9 +273,19 @@ export function LayeredSequenceVideoPreview(props: Props) {
     useEffect(() => { if (!fallback)
         return; viewAbort.current?.abort(); modelAbort.current?.abort(); release(images.current); images.current = null; if (base.current)
         URL.revokeObjectURL(base.current.url); base.current = null; packet.current = null; }, [fallback]);
-    useEffect(() => { const observer = new ResizeObserver(() => { if (admitted.current?.epoch === viewEpoch.current)
-        draw(viewEpoch.current, displayedFrame.current); }); if (canvas.current)
-        observer.observe(canvas.current); return () => observer.disconnect(); }, [fallback]);
+    useEffect(() => {
+        const picture = canvas.current;
+        if (fallback || !picture)
+            return;
+        if (typeof ResizeObserver !== "function") {
+            setFallback(true);
+            return;
+        }
+        const observer = new ResizeObserver(() => { if (admitted.current?.epoch === viewEpoch.current)
+            draw(viewEpoch.current, displayedFrame.current); });
+        observer.observe(picture);
+        return () => observer.disconnect();
+    }, [fallback]);
     useEffect(() => { const v = video.current, epoch = viewEpoch.current, id = base.current?.id; let active = true; if (!program?.resume) {
         v?.pause();
         return;

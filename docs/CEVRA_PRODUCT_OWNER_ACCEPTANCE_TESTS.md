@@ -1069,3 +1069,13 @@ current integration seek/image comparison are **BLOCKED**: the Mac was locked
 when UI inventory was attempted. Manual unlock and actual candidate execution
 remain necessary. Prior standalone WebKit proof does not close these gates.
 [Experimental scope, limits and gate evidence](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md).
+
+### Offline capability correction follow-up — 2026-10-15
+
+The later directed review found and corrected a new missing-ResizeObserver
+fallback defect in a separate continuation/candidate. Two regression cases fail
+before/pass after; affected UI files pass 44 cases with the experimental flag and
+29 workflows without it. These are JSDOM/unit outcomes, not native presentation
+or Owner acceptance. Historical aggregate FAIL and the original candidate are
+preserved. The existing D14/D23/X/K3/K4 variants above remain APP/OWNER BLOCKED;
+GUI is reserved explicitly by the parent until release, even if unlocked.
