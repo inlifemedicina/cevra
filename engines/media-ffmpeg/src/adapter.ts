@@ -19,6 +19,7 @@ import {
   validateAudioMeasurementReport,
   AUDIO_MEASUREMENT_ERROR_CODES,
   AudioMeasurementError,
+  ManualTitleColourError,
   type CapabilityDescriptor,
   type EngineHealth,
   type EngineIdentity,
@@ -88,12 +89,23 @@ export class FfmpegMediaEngine implements MediaEngineAdapter {
         return { type: "probe", probe: parseProbe(await call("probe", { inputs: [operation.inputUri] }), operation.inputUri) };
       case "render-manual-video-sequence": case "render-manual-video-preview": {
         const items = operation.type === "render-manual-video-preview" && operation.version === 1 ? [operation.item] : operation.items;
-        const result = fileResult(await call(operation.type === "render-manual-video-preview" ? "cevra-render-manual-video-preview" : "cevra-render-manual-video-sequence", {
+        const tool = operation.type === "render-manual-video-preview" ? "cevra-render-manual-video-preview" : "cevra-render-manual-video-sequence";
+        let payload: Record<string, unknown>;
+        try { payload = await call(tool, {
           version: operation.version, output: operation.outputUri, owned_workspace: operation.ownedWorkspaceUri,
           ...("composition" in operation ? { composition: operation.composition } : {}),
           items: items.map(item => ({ input: item.inputUri, source_start_frame: item.sourceStartFrame,
             source_end_frame: item.sourceEndFrame, source_content: { sha256: item.sourceContent.sha256, size_bytes: item.sourceContent.sizeBytes }, audio_selection: item.audioSelection }))
-        }), operation.outputUri);
+        }); } catch (cause) {
+          if (signal?.aborted) throw abortError();
+          const colourRejection = "MANUAL_TITLE_UNSUPPORTED_COLOUR: title V1 requires explicit BT709 limited-range SDR";
+          if ("composition" in operation && cause instanceof Error
+            && (cause.message === colourRejection || cause.message === `${tool} failed: ValueError: ${colourRejection}`)) {
+            throw new ManualTitleColourError();
+          }
+          throw cause;
+        }
+        const result = fileResult(payload, operation.outputUri);
         if (result.type !== "file" || !result.manualSequence || !result.publication) throw Error("Manual sequence result lacks measured sequence/publication evidence.");
         const evidence = result.manualSequence, expectedFrames = items.reduce((total, item) => total + item.sourceEndFrame - item.sourceStartFrame, 0);
         if (JSON.stringify(evidence.composition) !== JSON.stringify("composition" in operation ? operation.composition : undefined)) throw Error("Manual title composition evidence disagrees with the request.");

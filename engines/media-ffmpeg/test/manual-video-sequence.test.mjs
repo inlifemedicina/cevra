@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { FixedManualTitleCompositionAdapter, ManualTitleColourError } from "@cevra/contracts";
+import { MANUAL_TITLE_COMPONENT } from "@cevra/project-ir";
 import { FfmpegMediaEngine } from "../dist/index.js";
 
 const item = () => ({ inputUri: "/original.mp4", sourceStartFrame: 1, sourceEndFrame: 2,
@@ -84,4 +86,40 @@ test("whole-montage preview requires its closed V2 items shape and preserves occ
   assert.equal(worker.calls[0].name,"cevra-render-manual-video-preview");assert.equal(worker.calls[0].args.version,2);
   for(const bad of [{...operation,version:1},{...operation,item:item()},{...operation,items:[]},{...operation,type:"render-manual-video-sequence"}]) await assert.rejects(engine.execute(bad,context));
   assert.equal(worker.calls.length,1);
+});
+
+const colourRejection = "MANUAL_TITLE_UNSUPPORTED_COLOUR: title V1 requires explicit BT709 limited-range SDR";
+const composition = () => new FixedManualTitleCompositionAdapter().compile({ version: 1, componentId: MANUAL_TITLE_COMPONENT,
+  text: "Colour admission", startFrame: 0, endFrame: 2, aspect: "16:9" });
+test("only the exact title colour admission failure becomes a closed typed error for preview and export", async () => {
+  for (const type of ["render-manual-video-preview", "render-manual-video-sequence"]) {
+    for (const response of ["rpc-bare", "rpc-envelope", "tool-bare", "tool-envelope"]) {
+      const tool = type === "render-manual-video-preview" ? "cevra-render-manual-video-preview" : "cevra-render-manual-video-sequence";
+      const message = response.endsWith("envelope") ? `${tool} failed: ValueError: ${colourRejection}` : colourRejection;
+      const worker = new Worker();
+      worker.callTool = async () => { if (response.startsWith("rpc")) throw Object.assign(Error(message), { code: -32000 });
+        return { isError: true, content: [{ type: "text", text: message }] }; };
+      const operation = { ...final(), type, version: type.endsWith("preview") ? 3 : 2, composition: composition() };
+      await assert.rejects(new FfmpegMediaEngine(worker).execute(operation, context), error => {
+        assert.ok(error instanceof ManualTitleColourError); assert.equal(error.code, "MANUAL_TITLE_UNSUPPORTED_COLOUR"); return true;
+      });
+    }
+  }
+});
+test("colour-like diagnostics, untitled renders and other tools keep their original failure", async () => {
+  const title = { ...final(), version: 2, composition: composition() };
+  for (const [operation, message] of [[title, colourRejection + " extra"], [title, "prefix " + colourRejection],
+    [title, "MANUAL_TITLE_UNSUPPORTED_COLOUR"], [title, `cevra-render-manual-video-preview failed: ValueError: ${colourRejection}`],
+    [title, `cevra-render-manual-video-sequence failed: RuntimeError: ${colourRejection}`],
+    [title, `cevra-render-manual-video-sequence failed: ValueError: ${colourRejection} extra`], [final(), colourRejection],
+    [{ type: "probe", inputUri: "/original.mp4" }, colourRejection]]) {
+    const failure = Error(message), worker = new Worker(); worker.callTool = async () => { throw failure; };
+    await assert.rejects(new FfmpegMediaEngine(worker).execute(operation, context), error => error === failure);
+  }
+});
+test("cancellation during the failed title call takes priority over colour feedback", async () => {
+  const controller = new AbortController(), worker = new Worker();
+  worker.callTool = async () => { controller.abort(); throw Error(colourRejection); };
+  await assert.rejects(new FfmpegMediaEngine(worker).execute({ ...final(), version: 2, composition: composition() },
+    { ...context, signal: controller.signal }), { name: "AbortError" });
 });

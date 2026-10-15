@@ -100,6 +100,7 @@ export function ManualExportPreparationPanel({ backend, snapshotId, locale, busy
     : errorCode === "MANUAL_EXPORT_CLEANUP_FAILED" ? "export.cleanupFailed"
     : errorCode === "MANUAL_EXPORT_RESOURCE_UNAVAILABLE" ? "export.resourceUnavailable"
     : errorCode === "MANUAL_EXPORT_SOURCE_UNVERIFIED" ? "export.sourceUnverified"
+    : errorCode === "MANUAL_EXPORT_TITLE_COLOUR_UNSUPPORTED" ? "export.titleColourUnsupported"
     : errorCode === "MANUAL_EXPORT_FRAME_GRID_REQUIRED" || errorCode === "MANUAL_EXPORT_CONFORM_REQUIRED" ? "export.gridRequired"
     : errorCode === "MANUAL_EXPORT_ADMISSION_FAILED" || errorCode === "MANUAL_EXPORT_CLOCK_INVALID" ? "export.admissionFailed" : "export.failed";
   const resourceMessage = resourceCause === "MANUAL_EXPORT_MEMORY_LIMIT" ? "export.memoryLimit" : resourceCause === "MANUAL_EXPORT_DISK_LIMIT" ? "export.diskLimit" : "export.resourceUnavailable";

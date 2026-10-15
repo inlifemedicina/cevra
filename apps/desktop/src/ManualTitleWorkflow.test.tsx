@@ -516,3 +516,69 @@ it("release during pending inspector settlement cannot start a late title edge g
  expect(f.history.current.graphics[0]!.text).toBe("Texto mais recente");expect(resolveManualTitle(f.history.current.graphics[0]!).startFrame).toBe(resolveManualTitle(before.graphics[0]!).startFrame);
  expect(f.backend.editManualTitle).toHaveBeenCalledTimes(1);
 });
+
+function pending<T>() {
+  let resolve!: (value: T) => void, reject!: (cause: unknown) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+it.each(["pt-BR", "en-US"] as const)("%s retries a failed verification cancellation without replaying Locate or unlocking mutations", async locale => {
+  const f = backendFixture(true), user = userEvent.setup(), locate = pending<LocateMediaResult>(), cancel = pending<{ operationId: string; cancelled: boolean }>();
+  const t = (key: Parameters<typeof translate>[1]) => translate(locale, key);
+  f.backend.locateMedia = vi.fn(() => locate.promise);
+  let cancelAttempts = 0;
+  f.backend.cancelOperation = vi.fn(operationId => operationId.startsWith("locate-") && ++cancelAttempts === 1 ? cancel.promise : Promise.resolve({ operationId, cancelled: true }));
+  await mountTitle(f);
+  if (locale === "en-US") await user.click(screen.getByRole("button", { name: translate("pt-BR", "top.switchLanguage") }));
+  await user.click(screen.getByRole("button", { name: `${locale === "pt-BR" ? "Vídeo" : "Video"} 1 · Original.mp4` }));
+  const before = f.history.toArchive();
+  await user.click(screen.getByRole("button", { name: t("media.locate") }));
+  await user.click(screen.getByRole("button", { name: t("media.locateCancel") }));
+  expect(screen.getByRole("button", { name: t("media.locateCancel") }).matches(":disabled")).toBe(true);
+  await act(async () => cancel.reject({ code: "HOST_OPERATION_FAILED" }));
+  await screen.findByText(t("runtime.hostUnavailable"));
+  expect(screen.getByRole("button", { name: t("media.locateCancel") }).matches(":disabled")).toBe(false);
+  expect(screen.getByRole("button", { name: t("action.undo") }).matches(":disabled")).toBe(true);
+  await user.click(screen.getByRole("button", { name: t("media.locateCancel") }));
+  const id = vi.mocked(f.backend.locateMedia!).mock.calls[0][0].operationId;
+  expect(vi.mocked(f.backend.cancelOperation).mock.calls.filter(([id]) => id.startsWith("locate-"))).toEqual([[id], [id]]);
+  expect(f.backend.locateMedia).toHaveBeenCalledOnce();
+  await act(async () => locate.reject({ code: "SOURCE_RELOCATION_CANCELLED" }));
+  await screen.findByText(t("runtime.operationCancelled")); expect(f.history.toArchive()).toEqual(before);
+});
+it("an old failed cancellation cannot reconcile or unlock a newer media verification", async () => {
+  const f = backendFixture(true), user = userEvent.setup(), first = pending<LocateMediaResult>(), second = pending<LocateMediaResult>();
+  const oldCancel = pending<{ operationId: string; cancelled: boolean }>();
+  f.backend.locateMedia = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  let cancelAttempts = 0;
+  f.backend.cancelOperation = vi.fn(operationId => operationId.startsWith("locate-") && ++cancelAttempts === 1 ? oldCancel.promise : Promise.resolve({ operationId, cancelled: true }));
+  await mountTitle(f); await user.click(screen.getByRole("button", { name: "Vídeo 1 · Original.mp4" }));
+  const before = f.history.toArchive(), oldState = { ...await f.backend.loadState(), project: createEmptyProject({ id: "stale-cancel-state" }) };
+  await user.click(screen.getByRole("button", { name: "Localizar mídia" }));
+  await user.click(screen.getByRole("button", { name: "Cancelar verificação" }));
+  await act(async () => first.resolve({ outcome: "cancelled" }));
+  await screen.findByText(translate("pt-BR", "media.pickerCancelled"));
+  await user.click(screen.getByRole("button", { name: "Localizar mídia" }));
+  await user.click(screen.getByRole("button", { name: "Cancelar verificação" }));
+  await act(async () => oldCancel.reject({ code: "HOST_OPERATION_FAILED", reconciledState: oldState }));
+  expect(screen.queryByText(translate("pt-BR", "runtime.hostUnavailable"))).toBeNull();
+  expect(screen.getByRole("button", { name: "Cancelar verificação" }).matches(":disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Desfazer" }).matches(":disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Vídeo 1 · Original.mp4" })).toBeTruthy();
+  expect(f.backend.locateMedia).toHaveBeenCalledTimes(2);
+  await act(async () => second.reject({ code: "SOURCE_RELOCATION_CANCELLED" }));
+  await screen.findByText(translate("pt-BR", "runtime.operationCancelled")); expect(f.history.toArchive()).toEqual(before);
+});
+it("an old failed cancellation preserves a completed canonical media result", async () => {
+  const f = backendFixture(true), user = userEvent.setup(), locate = pending<LocateMediaResult>(), cancel = pending<{ operationId: string; cancelled: boolean }>();
+  f.backend.locateMedia = vi.fn(() => locate.promise); f.backend.cancelOperation = vi.fn(operationId => operationId.startsWith("locate-") ? cancel.promise : Promise.resolve({ operationId, cancelled: true }));
+  await mountTitle(f); await user.click(screen.getByRole("button", { name: "Vídeo 1 · Original.mp4" }));
+  const before = f.history.toArchive();
+  await user.click(screen.getByRole("button", { name: "Localizar mídia" })); await user.click(screen.getByRole("button", { name: "Cancelar verificação" }));
+  await act(async () => locate.resolve({ outcome: "located", state: await f.backend.loadState(), sourceId: "source", changed: false }));
+  await screen.findByText(translate("pt-BR", "media.located"));
+  await act(async () => cancel.reject({ code: "HOST_OPERATION_FAILED" }));
+  expect(screen.getByText(translate("pt-BR", "media.located"))).toBeTruthy();
+  expect(screen.queryByText(translate("pt-BR", "runtime.hostUnavailable"))).toBeNull();
+  expect(f.history.toArchive()).toEqual(before); expect(f.backend.locateMedia).toHaveBeenCalledOnce();
+});

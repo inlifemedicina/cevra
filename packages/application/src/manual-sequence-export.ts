@@ -2,8 +2,9 @@ import type { ProjectHistory } from "@cevra/project-ir";
 import { resolveManualVideoSequence } from "./manual-video-sequence.js";
 import { ManualSequencePreviewApplicationService, type ManualSequencePreviewPlan } from "./manual-sequence-preview.js";
 import type { SourceContentIdentityPort } from "./source-technical-descriptor.js";
-import { FixedManualTitleCompositionAdapter, type MediaPublicationEvidenceV1 } from "@cevra/contracts";
+import { FixedManualTitleCompositionAdapter, ManualTitleColourError, type MediaPublicationEvidenceV1 } from "@cevra/contracts";
 import { MediaApplicationService } from "./media-service.js";
+import { MediaApplicationError } from "./errors.js";
 import type { MediaExecutionOutcome } from "./types.js";
 import { localSourceProbeInput } from "./local-source-uri.js";
 import { resolveProjectManualTitle } from "./manual-title.js";
@@ -127,7 +128,7 @@ export class ManualSequenceExportApplicationService {
       await this.sequence.revalidate(plan, guardSignal);
       guardSignal?.throwIfAborted();
     };
-    return this.options.media.execute({
+    try { return await this.options.media.execute({
       id: executionId, locale: stable.locale,
       operation: plan.title
         ? { type: "render-manual-video-sequence", version: 2, composition: new FixedManualTitleCompositionAdapter().compile(plan.title), items, outputUri, ownedWorkspaceUri }
@@ -159,7 +160,12 @@ export class ManualSequenceExportApplicationService {
         await verify(guardSignal);
       } },
       assertCurrent: () => { signal?.throwIfAborted(); this.sequence.assertCurrent(plan); }
-    });
+    }); } catch (cause) {
+      if (plan.title && cause instanceof MediaApplicationError && cause.code === "MEDIA_OPERATION_FAILED" && cause.cause instanceof ManualTitleColourError) {
+        throw Object.assign(manualExportError("MANUAL_EXPORT_TITLE_COLOUR_UNSUPPORTED"), { cause });
+      }
+      throw cause;
+    }
   }
 }
 

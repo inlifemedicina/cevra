@@ -4212,3 +4212,41 @@ must use the same validation, History and IR authority. No engine, provider,
 dependency, persistence model or broad filesystem permission is introduced;
 the existing native command ACL gains only this picker command. No original
 bytes are changed, no AI/provider runs occur and no merge is authorized.
+
+### 2026-10-15 — Three bounded offline corrections over Localizar mídia
+
+**IN DEVELOPMENT / NOT MERGED.** The Owner requested three useful blocks while
+away. This round stays in the approved manual-title preview/export (§28) and
+single-source location scope above, based on PR103 `ece3a2e`; it does not approve
+New/Open/Recent/Duplicate or incorporate the separate layer/latency experiment.
+
+Preview and final export now explain the existing title colour refusal through
+closed typed errors and separate PT-BR/EN-US messages. The adapter recognizes
+only the exact known guard text or the exact current-tool ValueError envelope;
+it does not expose worker diagnostics. SDR BT709 limited-range admission,
+worker/runtime 0.3.10, rendering and cache policy are unchanged. Export retains
+the original cause, durable failed execution and the existing cancellation,
+resource, publication, cleanup and confirmed-commit precedence.
+
+A rejected request to cancel media verification now re-enables Cancel for that
+same pending operation. A synchronous request guard prevents duplicate dispatch;
+operation ownership prevents late replies from reconciling or unlocking a later
+verification, or replacing its completed result. Only Locate's completion
+releases mutation guards; no automatic locate/retry/replay is introduced.
+
+Evidence: full build and final desktop build PASS; 75 focused Node and 124 UI
+tests PASS. Independent Domain/Host/Adapter/Application and UI reviews approve
+with no unresolved P1/P2. Review caught a missing worker-envelope case, fixed
+before commit; eight new colour cases pass independently. An isolated production
+session with the unchanged signed runtime confirms both refusal codes, unchanged
+History/original SHA256, one durable failed export attempt, absent destination
+and no retained private export workspace. The sandbox run lacked runtime
+admission; the same proof outside it passed without a source/runtime change.
+Exact draft-head CI is tracked in the implementation PR. No GUI, installed
+candidate replacement or Owner acceptance is claimed in this round.
+
+Reuse D23-T2/I17-T9 and I4-T1/X-T1/T2/T7 at the next consolidated authorized
+candidate; cancellation failure/race injection remains automated. Director
+impact: compatible closed error reporting, with no new editing authority;
+typed operations, Project IR and History remain authoritative. No dependency,
+provider, persistence, permission or commercial component change.

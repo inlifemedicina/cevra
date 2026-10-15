@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { createEmptyProject, ProjectHistory } from '@cevra/project-ir';
-import { ManualVideoClipApplicationService, ManualVideoSequenceApplicationService, ManualSequencePreviewApplicationService } from '@cevra/application';
+import { ManualTitleApplicationService, ManualVideoClipApplicationService, ManualVideoSequenceApplicationService, ManualSequencePreviewApplicationService } from '@cevra/application';
+import { ManualTitleColourError } from '@cevra/contracts';
+import { MANUAL_TITLE_COMPONENT } from '@cevra/project-ir';
 import { NodeMediaArtifactStore } from '@cevra/media-ffmpeg';
 import { DesktopSession, DesktopHostProtocolServer } from '../dist/index.js';
 import { DerivedVideoPreview, previewPreparationBudgetMs } from '../dist/derived-video-preview.js';
@@ -304,4 +306,32 @@ test('unproved retirement retains owned files and cannot replace a primary error
   const f = await setup(t, async op => { input = op.inputUri; throw Object.assign(new Error('primary'), { code: 'MANUAL_VIDEO_SOURCE_CHANGED' }); }, async () => { throw new Error('retirement not proved'); });
   await assert.rejects(f.session.previewLocalVideo(f.request), error => error.code === 'MANUAL_VIDEO_SOURCE_CHANGED' && error.cleanupError.code === 'MANUAL_VIDEO_CLEANUP_FAILED');
   assert.ok((await lstat(input)).isFile()); assert.deepEqual(await readFile(f.sourcePath), f.bytes);
+});
+
+async function titleSequence(f) {
+  const editor = new ManualVideoSequenceApplicationService({ history: f.history, identity: new NodeMediaArtifactStore() });
+  await editor.edit({ version: 2, type: 'conform', expectedSnapshotId: f.history.current.history.headSnapshotId,
+    clips: f.history.current.timeline.clips.map(clip => ({ clipId: clip.id, sourceStartFrame: 30, sourceEndFrame: 120 })) });
+  new ManualTitleApplicationService(f.history, () => 'colour-title').edit({ version: 1, type: 'set', expectedSnapshotId: f.history.current.history.headSnapshotId,
+    title: { version: 1, componentId: MANUAL_TITLE_COMPONENT, text: 'Colour admission', startFrame: 0, endFrame: 30, aspect: '16:9' } });
+  return { sourceId: 'source', sequence: true, expectedSnapshotId: f.history.current.history.headSnapshotId, operationId: 'title-colour' };
+}
+test('title colour rejection returns a closed preview code without changing history, redo, originals or retaining cache/files', async t => {
+  const f = await setup(t, async () => { throw new ManualTitleColourError(); });
+  const request = await titleSequence(f);
+  f.history.commit({ type: 'project.rename', name: 'retained title redo' }); f.history.undo();
+  const before = f.history.toArchive(), lines = [];
+  const server = new DesktopHostProtocolServer(f.session, { writeProtocolLine: line => lines.push(JSON.parse(line)), writeLog(){}, requestShutdown(){} });
+  await server.handleLine(JSON.stringify({ protocolVersion: 1, id: 'colour', method: 'video.previewLocal', params: request }));
+  assert.equal(lines[0].error.code, 'MANUAL_VIDEO_TITLE_COLOUR_UNSUPPORTED');
+  assert.deepEqual(f.history.toArchive(), before); assert.equal(f.history.canRedo, true);
+  assert.deepEqual(await readFile(f.sourcePath), f.bytes); assert.equal(f.calls.length, 1);
+  assert.deepEqual(f.service.cacheState(), { entries: 0, retainedBytes: 0 }); await noTemporaryFiles(f.root);
+});
+test('preview cancellation takes priority over a title colour rejection and still retires private files', async t => {
+  const controller = new AbortController();
+  const f = await setup(t, async () => { controller.abort(); throw new ManualTitleColourError(); });
+  const request = await titleSequence(f), before = f.history.toArchive();
+  await assert.rejects(f.service.prepare(request, controller.signal), { code: 'OPERATION_CANCELLED' });
+  assert.deepEqual(f.history.toArchive(), before); await noTemporaryFiles(f.root);
 });
