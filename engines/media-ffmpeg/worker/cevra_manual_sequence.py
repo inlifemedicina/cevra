@@ -343,7 +343,7 @@ def _streams(common: Any, path: Path) -> list[dict]:
         if not values or "index" not in values or "codec_type" not in values:
             raise ValueError("manual stream descriptor is unavailable")
         streams.append({key: int(value) if key in integers and re.fullmatch(r"-?[0-9]+", value) else value for key, value in values.items()})
-    fields = "index,codec_type,codec_name,sample_rate,channels,channel_layout,time_base,duration_ts,start_pts,nb_frames,width,height,pix_fmt,avg_frame_rate,r_frame_rate,color_space,color_transfer,color_primaries,color_range"
+    fields = "index,codec_type,codec_name,sample_rate,channels,channel_layout,time_base,duration_ts,start_pts,nb_frames,width,height,pix_fmt,sample_aspect_ratio,avg_frame_rate,r_frame_rate,color_space,color_transfer,color_primaries,color_range"
     reduce_lines([common.require_tool("ffprobe"), "-v", "error", "-show_streams", "-show_entries", "stream=" + fields,
                   "-of", "compact=p=0:nk=0", str(path)], consume, timeout=30)
     if not streams:
@@ -374,11 +374,13 @@ def _fields(line: str) -> dict[str, str]:
     return values
 
 
-def _video_clock(common: Any, path: Path, expected_frames: int, width: int, height: int) -> Fraction:
+def _video_clock(common: Any, path: Path, expected_frames: int, width: int, height: int, *, square_pixels: bool = False) -> Fraction:
     streams = [s for s in _streams(common, path) if s.get("codec_type") == "video"]
     if len(streams) != 1:
         raise RuntimeError("manual video must contain exactly one video stream")
     stream = streams[0]
+    if square_pixels and stream.get("sample_aspect_ratio") != "1:1":
+        raise RuntimeError("experimental base must use square pixels")
     if stream.get("codec_name") != "h264" or stream.get("width") != width or stream.get("height") != height or stream.get("pix_fmt") != "yuv420p" \
             or Fraction(stream.get("avg_frame_rate", "0")) != 30 or Fraction(stream.get("r_frame_rate", "0")) != 30:
         raise RuntimeError("manual encoded video profile postcondition failed")
@@ -527,6 +529,10 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
         base_identity = {"baseProfile": args["base_profile"], "empty": "05dfa378222e0220b74385202702bd0595950e75f3f1a00b094ca448dde8df74"}
     root, root_stamp = _workspace(args["owned_workspace"], output, originals)
     width, height, bitrate = (720, 404, 700_000) if preview else (1920, 1080, 20_000_000)
+    def video_clock(path: Path, frames: int) -> Fraction:
+        if base_identity:
+            return _video_clock(common, path, frames, width, height, square_pixels=True)
+        return _video_clock(common, path, frames, width, height)
     composition = args.get("composition")
     if composition and composition["title"]["aspect"] == "9:16":
         width, height = height, width
@@ -656,14 +662,14 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                         if any(info.get(k) != "bt709" for k in ("color_primaries", "color_transfer", "color_space")) or info.get("color_range") != "tv" or info.get("pix_fmt") != "yuv420p":
                             raise ValueError("experimental base requires admitted SDR BT709 limited-range yuv420p")
                         empty = Path(__file__).resolve().parent.parent / "components/manual-title/empty-h.png"
-                        graph = f"[0:{stream_index}]{_video_filter(start, end, 1920, 1080)}[base];[base][1:v]overlay=0:0:format=rgb:eof_action=repeat,scale={width}:{height}:out_color_matrix=bt709:out_range=tv:flags=lanczos,format=yuv420p[out]"
+                        graph = f"[0:{stream_index}]{_video_filter(start, end, 1920, 1080)}[base];[base][1:v]overlay=0:0:format=rgb:eof_action=repeat,scale={width}:{height}:out_color_matrix=bt709:out_range=tv:flags=lanczos,setsar=1,format=yuv420p[out]"
                         command += ["-i", str(empty), "-filter_complex", graph, "-map", "[out]", "-an"]
                     else:
                         command += ["-map", f"0:{stream_index}", "-an", "-vf", _video_filter(start, end, width, height)]
                     budget.run_native(common, command + [*encoder_args, str(segment)])
                     segment_stamp = segment.lstat()
                     segment_digest = inspection._hash_stable(segment, segment_stamp, inspection.MAX_BYTES) if cache_transaction and segment_stamp.st_size <= inspection.MAX_BYTES else None
-                    _video_clock(common, segment, end - start, width, height)
+                    video_clock(segment, end - start)
                     if segment_digest is not None:
                         if inspection._hash_stable(segment, segment_stamp, inspection.MAX_BYTES) != segment_digest:
                             raise RuntimeError("preview segment changed during grid validation")
@@ -685,14 +691,14 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
         # Generated relative names contain no caller text or quoting surface.
         budget.write_text(listing, "ffconcat version 1.0\n" + "".join(f"file {segment.name}\n" for segment in occurrences))
         budget.run_native(common, common.ffmpeg_base(overwrite=False) + ["-f", "concat", "-safe", "1", "-auto_convert", "0", "-i", str(listing), "-map", "0:v:0", "-c:v", "copy", "-an", "-video_track_timescale", "30000", str(video)])
-        _video_clock(common, video, total, width, height)
+        video_clock(video, total)
         measured = {}
         def admit(candidate: Path, probe: dict) -> None:
             nonlocal publication
             _root_current(root, root_stamp)
             if preview and not 0 < candidate.stat().st_size <= inspection.MAX_BYTES:
                 raise ValueError("manual disposable preview exceeds the inherited 8 MiB admission bound")
-            measured["video"] = _video_clock(common, candidate, total, width, height)
+            measured["video"] = video_clock(candidate, total)
             measured["audio"] = _audio_clock(common, candidate, samples, channels)
             for original, stamp in original_stamps.items():
                 expected = next(item["source_content"]["sha256"] for item in items if item["input"] == str(original))

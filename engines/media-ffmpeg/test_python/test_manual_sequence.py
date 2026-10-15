@@ -86,6 +86,22 @@ class Runtime:
 
 
 class ManualSequenceTests(unittest.TestCase):
+    def test_experimental_base_requires_square_pixels_without_relaxing_frame_clock(self):
+        stream = {"codec_type": "video", "codec_name": "h264", "width": 720, "height": 404,
+                  "pix_fmt": "yuv420p", "avg_frame_rate": "30/1", "r_frame_rate": "30/1",
+                  "time_base": "1/30000", "duration_ts": 2000, "nb_frames": "2"}
+        def frames(_command, consume, **_kwargs):
+            consume("best_effort_timestamp=0|duration=1000")
+            consume("best_effort_timestamp=1000|duration=1000")
+        for ratio in ("404:405", "0:1", "N/A", None):
+            with self.subTest(ratio=ratio), mock.patch.object(manual, "_streams", return_value=[{**stream, "sample_aspect_ratio": ratio}]), mock.patch.object(manual, "reduce_lines", side_effect=frames):
+                with self.assertRaisesRegex(RuntimeError, "square pixels"):
+                    manual._video_clock(Common(), Path("base.mp4"), 2, 720, 404, square_pixels=True)
+        with mock.patch.object(manual, "_streams", return_value=[{**stream, "sample_aspect_ratio": "1:1"}]), mock.patch.object(manual, "reduce_lines", side_effect=frames):
+            self.assertEqual(manual._video_clock(Common(), Path("base.mp4"), 2, 720, 404, square_pixels=True), Fraction(1, 15))
+            with self.assertRaisesRegex(RuntimeError, "coverage/count"):
+                manual._video_clock(Common(), Path("base.mp4"), 3, 720, 404, square_pixels=True)
+
     def test_unaffected_title_occurrences_reuse_pixels_but_aspect_and_visible_text_invalidate(self):
         from copy import deepcopy
         plan = {"title": {"aspect": "9:16", "text": "Ação ❤️", "startFrame": 90, "endFrame": 120}}

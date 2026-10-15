@@ -2,6 +2,15 @@
 
 **Canonical continuity document**
 
+**Isolated correction, 2026-10-15:** the real diagnostic candidate reports
+`decode/base-grid`. Its experimental V4 base has coded720x404 but SAR404:405;
+AVFoundation presents natural width718.222. The bounded runtime0.3.13 correction
+normalizes only that base to square pixels and enforces SAR1:1 before publication,
+preserving strict UI admission, all decoded video/audio and title PNG bytes.
+Existing default flags, normal/export paths, IR/History and native dependencies
+remain unchanged. Current Tauri/visual and Owner gates await coordinated retest;
+this is neither experimental default adoption nor an acceptance claim.
+
 **Active isolated continuation, 2026-10-15:** the real Tauri smoke of consolidated
 `5f82ef1` confirmed manual edits but observed experimental encoded fallback with
 no canvas receipts. Exact-checkpoint native Host preparation succeeds separately.

@@ -4,6 +4,36 @@ Status: **isolated experiment; not a default, release, merge or Owner acceptance
 
 ## Real Tauri fallback diagnosis — 2026-10-15
 
+### Isolated square-pixel correction
+
+The real diagnostic receipt reports `decode/base-grid`, with ResizeObserver,
+video-frame callbacks, ImageBitmap and WebCrypto available. The prepared V4
+base has coded dimensions 720x404 but SAR 404:405: its last downscale preserves
+the preceding 16:9 display ratio after changing the encoded grid. Native
+AVFoundation measures natural width 718.222 instead of 720, while duration is
+exactly 10 seconds. A metadata-only square-pixel control yields natural 720x404.
+
+The isolated runtime 0.3.13 adds `setsar=1` after that final V4 downscale and
+requires SAR 1:1 when admitting experimental segments, concatenation and final
+publication. Existing V1/V2/V3 previews and final-export graphs retain their
+paths; the UI's strict geometry/frame guard remains intact. No source media is
+rewritten. Runtime identity changes invalidate retained derived cache identities.
+
+Before/after production Host requests using the exact diagnostic checkpoint
+produce SAR 404:405 and 1:1 respectively. Native natural size becomes 720x404;
+all 300 decoded frames, 480000 decoded audio samples per channel, and canonical
+and preview PNG bytes are equal. The new square-pixel postcondition rejects
+missing, invalid and non-unit SAR and retains exact frame coverage. All 169
+Media Python tests pass. Only the worker entry/version, manual worker and runtime
+manifest differ in the isolated runtime; native components and dependencies are
+unchanged. The first verification helper's URL-argument failure is retained;
+the corrected verifier checks existing artifacts without replaying rendering.
+
+The successor still needs the coordinated real Tauri run to close fallback,
+canvas/IPC, continuous playback/loop, picker export, source relocation and
+physical app-reopen gates. No visual-latency or human-acceptance claim follows
+from Host, CoreMedia, pixel equality or unit evidence alone.
+
 The consolidated candidate at `5f82ef1` opened in a real CUA-operated Tauri
 session. Import, the continuous 300-frame sequence, Unicode title bounds/layout
 and Undo/Redo were observed, but the experimental renderer selected encoded
