@@ -3,6 +3,7 @@ import type { ReviseEditorialDraftRequest } from "@cevra/application";
 import type { LocalVideoPreviewRequest, SourceThumbnailRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
 import { validateManualVideoSequenceEdit, type ManualVideoSequenceEdit } from "@cevra/application";
 import { validateManualTitleEdit } from "@cevra/application";
+import { validateLocalSourceRelocationRequest } from "@cevra/application";
 import { validateManualExportPreparationRequest, type ManualExportPreparationRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
@@ -23,6 +24,7 @@ export type HostMethod =
   | "editorial.snapshot"
   | "editorial.revise"
   | "media.ingestLocal"
+  | "media.relocateLocal"
   | "video.previewLocal"
   | "video.thumbnailLocal"
   | "video.prepareManualExport"
@@ -65,6 +67,7 @@ export interface DesktopHostState {
   closePending?: boolean;
   capabilities: {
     mediaImport: CapabilityState;
+    sourceRelocation?: CapabilityState;
     transcription: CapabilityState;
     manualExport?: CapabilityState;
     manualTitle?: CapabilityState;
@@ -99,6 +102,7 @@ const METHODS = new Set<HostMethod>([
   "editorial.snapshot",
   "editorial.revise",
   "media.ingestLocal",
+  "media.relocateLocal",
   "video.previewLocal",
   "video.thumbnailLocal",
   "video.prepareManualExport",
@@ -201,6 +205,13 @@ export function validateTranscriptionParams(params: Record<string, unknown>, id:
     operationId: operationId(params.operationId, id),
     locale: locale(params.locale, id)
   };
+}
+
+/** The candidate URI is supplied by the native picker, never by a WebView request. */
+export function validateSourceRelocationParams(params: Record<string, unknown>, id: string) {
+  exactKeys(params, ["version", "sourceId", "expectedSnapshotId", "uri", "operationId", "locale"], id);
+  const { operationId: operation, locale: language, ...candidate } = params;
+  return { ...validateLocalSourceRelocationRequest(candidate), operationId: operationId(operation, id), locale: locale(language, id) };
 }
 
 export function validateCancelParams(params: Record<string, unknown>, id: string): { operationId: string } {

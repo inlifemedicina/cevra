@@ -365,6 +365,8 @@ export type TimelineEditOperationV2 = TimelineEditOperation
 export type EditCommand =
   | { type: "project.rename"; name: string }
   | { type: "source.add"; source: SourceAsset }
+  | { type: "source.relocate"; version: 1; sourceId: Id; expectedSourceUri: string; uri: string;
+      expectedContent: { sha256: string; sizeBytes: number } }
   | { type: "source.remove"; sourceId: Id }
   | { type: "source.removeFromProject"; version: 1; sourceId: Id; dependentClipIds: readonly Id[] }
   | {

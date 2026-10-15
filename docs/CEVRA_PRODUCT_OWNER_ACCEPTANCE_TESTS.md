@@ -1051,3 +1051,24 @@ unchanged repeats with unproven root causes. This is not eleven demonstrated
 product bugs, and the failed aggregate is not relabelled PASS. Other catalog
 variants, G1/ADR0012/global release and platforms remain unresolved/blocked as
 applicable. Draft publication is authorized separately; merge is not.
+
+### Localizar mídia — variante aprovada em 2026-10-15
+
+Reutilizar I4-T1, X-T1/T2/T7 e I17-T9 na próxima rodada agrupada adequada.
+O Owner aprovou localizar **a mesma mídia movida**, uma fonte por vez; não
+aprovou substituição por outro conteúdo, adoção de identidade legada, busca
+automática no disco ou gerenciamento completo de projetos.
+
+| Variante dos IDs existentes | Preparação e resultado esperado |
+|---|---|
+| I4-T1, X-T1/T7 — localizar arquivo movido | Em projeto sintético com fonte que já possui SHA256/tamanho, cortes e título, mover o arquivo fora do app. Selecionar a fonte, usar Localizar mídia e escolher o mesmo arquivo. Continuam os mesmos IDs, cortes, título e numeração; o novo local torna-se canônico após verificação. |
+| X-T1/T2, I17-T9 — reversibilidade e reabertura | Um Desfazer restaura o local anterior; Refazer restaura o novo. Aguardar Salvo e reabrir normalmente o mesmo projeto; conferir estado e History. O local anterior pode continuar indisponível depois de Undo, pois os arquivos originais não são movidos pelo app. |
+| I4-T1, X-T1/T7 — recusa e cancelamento | Escolher outro arquivo com mesmo tamanho mas bytes diferentes deve recusar a alteração. Cancelar o picker ou a verificação antes do commit conserva o projeto. Se a confirmação canônica já ocorreu quando o cancelamento chegou, a UI mostra esse estado confirmado. Fonte legada sem identidade adotada mantém a ação indisponível. |
+
+**AUTO PASS limitado:** 122 testes Node focados, 45 UI e 56 Rust; os 14 novos
+testes application/Host também foram executados pelo revisor independente.
+Incluem arquivo realmente renomeado, identidade divergente, stale/cancelamento,
+checkpoint com falha e três reaberturas físicas do Host com Undo/Redo persistido.
+**APP/PICKER/OWNER: NÃO EXECUTADO** nesta entrega; nenhuma tela ou aplicativo
+existente foi usado. Essas verificações técnicas não promovem os IDs completos
+a PASS e não autorizam uma nova rodada humana por botão.

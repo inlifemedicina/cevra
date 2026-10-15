@@ -1,4 +1,13 @@
 {
+  "media.locate": "Localizar mídia",
+  "media.locating": "Verificando o arquivo escolhido…",
+  "media.locateCancel": "Cancelar verificação",
+  "media.located": "Mídia localizada. Suas edições foram preservadas.",
+  "media.locateHelp": "Escolha o mesmo arquivo na nova pasta. Os cortes e títulos são preservados.",
+  "media.locateUnavailable": "Esta mídia não tem identidade de conteúdo verificada para relocalização.",
+  "media.locateMismatch": "O arquivo escolhido é diferente. Escolha o mesmo arquivo original.",
+  "media.locateStale": "O projeto mudou durante a verificação. Selecione a mídia e tente novamente.",
+  "media.locateFailed": "Não foi possível verificar o arquivo escolhido. O projeto não foi alterado.",
   "preview.marksDraft": "Marcas do Original: definem o próximo trecho a criar. Os campos IN/OUT do selecionado são editados nos controles da montagem.",
   "editorialReview.titleForBlock": "Título do bloco {number} (até 200 caracteres)",
   "editorialReview.noteForBlock": "Sua nota no bloco {number} (até 2.000 caracteres)",
