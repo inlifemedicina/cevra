@@ -197,6 +197,22 @@ export async function verifyManualVideoSources(sources: readonly SourceAsset[], 
 }
 
 /** Candidate diagnostic endpoint; native canvas submit and RAF are not physical paint. */
+/** Candidate-only closed diagnostics; no exception messages or project content. */
+export interface LayerPreviewFallbackV1 {
+  version: 1;
+  kind: "fallback";
+  operationId: string;
+  snapshotId: string;
+  epoch: number;
+  stage: "request" | "binding" | "base" | "graphic" | "decode" | "capability" | "play";
+  reason: "unsupported" | "binding" | "base-unavailable" | "base-identity" | "oversize" | "png-invalid" | "graphic-identity" | "graphic-collision" | "decode-error" | "decode-timeout" | "base-grid" | "frame" | "resize-observer-unavailable" | "video-frame-callback-unavailable" | "play-rejected" | "unexpected";
+  nativeCode: "MANUAL_LAYER_UNAVAILABLE" | "MANUAL_VIDEO_UNAVAILABLE" | "MANUAL_VIDEO_UNSUPPORTED" | "MANUAL_VIDEO_SOURCE_CHANGED" | "MANUAL_VIDEO_STALE" | "MANUAL_VIDEO_PREVIEW_TIMEOUT" | "MANUAL_VIDEO_TITLE_COLOUR_UNSUPPORTED" | "OPERATION_CANCELLED" | "PROJECT_MUTATION_BUSY" | "HOST_INVALID_PARAMS" | "HOST_UNAVAILABLE" | "HOST_OPERATION_FAILED" | null;
+  elapsedMs: number;
+  capabilities: { resizeObserver: boolean; videoFrameCallback: boolean; imageBitmap: boolean; webCryptoDigest: boolean };
+  endpoint: "encoded-fallback";
+}
+export type LayerPreviewDiagnosticV1 = LayerPreviewPresentationV1 | LayerPreviewFallbackV1;
+
 export interface LayerPreviewPresentationV1 {
   version:1;kind:"asset-update"|"seek";operationId:string;snapshotId:string;epoch:number;frame:number;
   requestToCanvasMs:number;uiDecodeMs:number;animationOpportunityMs:number|null;supersededBeforeOpportunity:boolean;

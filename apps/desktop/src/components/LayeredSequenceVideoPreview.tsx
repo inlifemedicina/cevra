@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { validateManualTitle } from "@cevra/project-ir";
-import type { LocalVideoPreview } from "@cevra/application";
+import type { LocalVideoPreview, LayerPreviewFallbackV1 } from "@cevra/application";
 import { ManualVideoPreview } from "./ManualVideoPreview";
 import { ManualTitleOverlay } from "./ManualTitleOverlay";
 import { cfr30DecoderSeekSeconds, floorMsToFrames, framesToMilliseconds } from "../frame-timing";
@@ -19,6 +19,10 @@ type Images = {
     graphicSha: string;
 };
 export type LayerPreviewTiming=import("@cevra/application").LayerPreviewPresentationV1;
+class AdmissionError extends Error {
+    constructor(readonly reason: LayerPreviewFallbackV1["reason"]) { super(reason); }
+}
+const nativeCodes: readonly NonNullable<LayerPreviewFallbackV1["nativeCode"]>[] = ["MANUAL_LAYER_UNAVAILABLE", "MANUAL_VIDEO_UNAVAILABLE", "MANUAL_VIDEO_UNSUPPORTED", "MANUAL_VIDEO_SOURCE_CHANGED", "MANUAL_VIDEO_STALE", "MANUAL_VIDEO_PREVIEW_TIMEOUT", "MANUAL_VIDEO_TITLE_COLOUR_UNSUPPORTED", "OPERATION_CANCELLED", "PROJECT_MUTATION_BUSY", "HOST_INVALID_PARAMS", "HOST_UNAVAILABLE", "HOST_OPERATION_FAILED"];
 const timings: LayerPreviewTiming[] = [];
 /** Local bounded diagnostics; no project, path, title text or external telemetry. */
 export function layerPreviewTimings() { return timings.map(t => structuredClone(t)); }
@@ -28,17 +32,17 @@ async function digest(bytes: Blob | Uint8Array) { const data = bytes instanceof 
 const release = (images: Images | null) => { images?.canonical.close(); images?.graphic.close(); };
 function sameTitle(a: unknown, b: unknown) { const encode = (v: unknown) => { const t = validateManualTitle(v); return JSON.stringify([t.version, t.componentId, t.text, t.startFrame, t.endFrame, t.aspect, t.version === 2 ? t.layout.x : null, t.version === 2 ? t.layout.y : null, t.version === 2 ? t.layout.width : null, t.version === 2 ? t.layout.fontScale : null]); }; return encode(a) === encode(b); }
 const pixels = (base64: string, max: number) => { if (base64.length > Math.ceil(max / 3) * 4)
-    throw Error("oversize"); const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0)); if (!bytes.length || bytes.length > max)
-    throw Error("oversize"); return bytes; };
+    throw new AdmissionError("oversize"); const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0)); if (!bytes.length || bytes.length > max)
+    throw new AdmissionError("oversize"); return bytes; };
 function png(value: Packet["layered"]["graphic"] | Packet["layered"]["canonical"], width: number, height: number) {
     const bytes = pixels(value.base64, 2 * 1024 * 1024), view = new DataView(bytes.buffer);
     if (value.mimeType !== "image/png" || value.width !== width || value.height !== height || bytes.length < 24 || ![137, 80, 78, 71, 13, 10, 26, 10].every((v, i) => bytes[i] === v) || view.getUint32(8) !== 13 || view.getUint32(12) !== 0x49484452 || view.getUint32(16) !== width || view.getUint32(20) !== height || !/^[a-f0-9]{64}$/.test(value.sha256))
-        throw Error("invalid PNG");
+        throw new AdmissionError("png-invalid");
     return new Blob([bytes], { type: "image/png" });
 }
 async function waitMedia(video: HTMLVideoElement, event: string, signal: AbortSignal) {
     signal.throwIfAborted();
-    await new Promise<void>((resolve, reject) => { const done = (e?: unknown) => { clearTimeout(timer); video.removeEventListener(event, ok); video.removeEventListener("error", error); signal.removeEventListener("abort", abort); e ? reject(e) : resolve(); }; const ok = () => done(), error = () => done(Error("decode")), abort = () => done(Error("aborted")); const timer = setTimeout(() => done(Error("decode timeout")), 15000); video.addEventListener(event, ok, { once: true }); video.addEventListener("error", error, { once: true }); signal.addEventListener("abort", abort, { once: true }); });
+    await new Promise<void>((resolve, reject) => { const done = (e?: unknown) => { clearTimeout(timer); video.removeEventListener(event, ok); video.removeEventListener("error", error); signal.removeEventListener("abort", abort); e ? reject(e) : resolve(); }; const ok = () => done(), error = () => done(new AdmissionError("decode-error")), abort = () => done(Error("aborted")); const timer = setTimeout(() => done(new AdmissionError("decode-timeout")), 15000); video.addEventListener(event, ok, { once: true }); video.addEventListener("error", error, { once: true }); signal.addEventListener("abort", abort, { once: true }); });
 }
 /** Candidate-only presentation over the existing sequence/History/transport. */
 export function LayeredSequenceVideoPreview(props: Props) {
@@ -69,7 +73,23 @@ export function LayeredSequenceVideoPreview(props: Props) {
         start: number;
         decodeMs: number;kind:"asset-update"|"seek";
     } | null>(null);
-    const [fallback, setFallback] = useState(false), [ready, setReady] = useState(false), [playing, setPlaying] = useState(false), [frame, setFrame] = useState(0), [failure, setFailure] = useState(false);
+    const [fallback, setFallback] = useState(false), [ready, setReady] = useState(false), [playing, setPlaying] = useState(false), [frame, setFrame] = useState(0);
+    const fallbackRecorded = useRef(false), requestTiming = useRef({ operationId: "layer-preview", start: performance.now() });
+    function fallBack(stage: LayerPreviewFallbackV1["stage"], cause: unknown, reason?: LayerPreviewFallbackV1["reason"]) {
+        setFallback(true);
+        if (fallbackRecorded.current) return;
+        fallbackRecorded.current = true;
+        const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : null;
+        const nativeCode = nativeCodes.find(value => value === code) ?? null;
+        const now = current.current, timing = pendingTiming.current ?? requestTiming.current;
+        const receipt: LayerPreviewFallbackV1 = { version: 1, kind: "fallback", operationId: timing.operationId,
+            snapshotId: now.snapshotId, epoch: viewEpoch.current, stage,
+            reason: reason ?? (cause instanceof AdmissionError ? cause.reason : "unexpected"), nativeCode,
+            elapsedMs: performance.now() - timing.start, endpoint: "encoded-fallback",
+            capabilities: { resizeObserver: typeof ResizeObserver === "function", videoFrameCallback: typeof video.current?.requestVideoFrameCallback === "function",
+                imageBitmap: typeof createImageBitmap === "function", webCryptoDigest: typeof globalThis.crypto?.subtle?.digest === "function" } };
+        try { void now.backend.recordLayerPresentation?.(receipt).catch(() => {}); } catch { /* Diagnostics cannot prevent the existing fallback. */ }
+    }
     const run = (fn: () => void | Promise<void>) => { if (props.onAction)
         void props.onAction(fn).catch(() => { });
     else
@@ -131,7 +151,7 @@ export function LayeredSequenceVideoPreview(props: Props) {
             if (v.readyState < 2)
                 await waitMedia(v, "loadeddata", control.signal);
             if (!Number.isFinite(v.duration) || Math.abs(v.duration * 1000 - p.durationMs) > 50 || v.videoWidth !== 720 || v.videoHeight !== 404)
-                throw Error("base grid mismatch");
+                throw new AdmissionError("base-grid");
             if (Math.abs(v.currentTime - time) > 0.00001) {
                 const event = waitMedia(v, "seeked", control.signal);
                 v.currentTime = time;
@@ -141,7 +161,7 @@ export function LayeredSequenceVideoPreview(props: Props) {
             if (!isCurrent(epoch))
                 return;
             if (v.seeking || v.readyState < 2 || Math.floor(v.currentTime * 30 + 1e-5) !== decodeFrame)
-                throw Error("frame mismatch");
+                throw new AdmissionError("frame");
             pendingSeek.current = false;
             if (pendingTiming.current)
                 pendingTiming.current.decodeMs += performance.now() - start;
@@ -149,8 +169,7 @@ export function LayeredSequenceVideoPreview(props: Props) {
         }
         catch (e) {
             if (!control.signal.aborted && isCurrent(epoch)) {
-                setFailure(true);
-                setFallback(true);
+                fallBack("decode", e);
             }
         }
     }
@@ -175,29 +194,34 @@ export function LayeredSequenceVideoPreview(props: Props) {
         const control = new AbortController();
         modelAbort.current = control;
         packet.current = null;
+        pendingTiming.current = null;
         let settled = false;
         const operationId = `layer-preview-${crypto.randomUUID()}`, start = performance.now();
+        requestTiming.current = { operationId, start };
         const valid = () => !control.signal.aborted && generation === modelEpoch.current && current.current.snapshotId === snapshotId;
         void (async () => {
             let created: Images | null = null;
+            let stage: LayerPreviewFallbackV1["stage"] = "request";
             try {
                 if (!source || !sequencePreview || !titleEditing)
-                    throw Error("unsupported");
+                    throw new AdmissionError("unsupported");
                 const result = await backend.previewLocalVideo({ sourceId: source.id, expectedSnapshotId: snapshotId, operationId, sequence: true, experimentalLayer: { version: 1, ...(base.current ? { knownBaseId: base.current.id } : {}) } });
                 settled = true;
                 if (!valid())
                     return;
+                stage = "binding";
                 const p = result as Packet, l = p.layered;
                 if (result.sourceId !== source.id || result.snapshotId !== snapshotId || result.mimeType !== "video/mp4" || result.proxy?.profile !== "manual-cfr30-preview-v1" || !l || l.version !== 1 || !/^[a-f0-9]{64}$/.test(l.baseId) || !/^[a-f0-9]{64}$/.test(l.graphicId) || !sameTitle(l.title, titleEditing.title) || !result.sequence || result.sequence.timingPolicy !== "cfr30" || result.sequence.totalFrames !== props.clip?.frameTiming?.sourceEndFrame || result.durationMs !== framesToMilliseconds(result.sequence.totalFrames) || result.sequence.clipIds.length !== sequencePreview.length || result.sequence.clipIds.some((id, i) => id !== sequencePreview[i]!.id))
-                    throw Error("binding");
+                    throw new AdmissionError("binding");
+                stage = "base";
                 if (l.baseReused) {
                     if (result.base64 !== "" || base.current?.id !== l.baseId)
-                        throw Error("base unavailable");
+                        throw new AdmissionError("base-unavailable");
                 }
                 else {
                     const bytes = pixels(result.base64, 8 * 1024 * 1024);
                     if (await digest(bytes) !== l.baseId || !valid())
-                        throw Error("base identity");
+                        throw new AdmissionError("base-identity");
                     const v = video.current!;
                     v.pause();
                     v.removeAttribute("src");
@@ -210,10 +234,11 @@ export function LayeredSequenceVideoPreview(props: Props) {
                     v.load();
                 }
                 const decodeStart = performance.now();
+                stage = "graphic";
                 if (images.current?.key !== l.graphicId) {
                     const canonicalBlob = png(l.canonical, 1920, 1080), graphicBlob = png(l.graphic, 720, 404);
                     if (await digest(canonicalBlob) !== l.canonical.sha256 || await digest(graphicBlob) !== l.graphic.sha256)
-                        throw Error("graphic identity");
+                        throw new AdmissionError("graphic-identity");
                     if (!valid())
                         return;
                     const canonical = await createImageBitmap(canonicalBlob);
@@ -231,7 +256,7 @@ export function LayeredSequenceVideoPreview(props: Props) {
                     created = null;
                 }
                 else if (images.current.canonicalSha !== l.canonical.sha256 || images.current.graphicSha !== l.graphic.sha256)
-                    throw Error("graphic collision");
+                    throw new AdmissionError("graphic-collision");
                 if (!valid())
                     return;
                 packet.current = { ...p, base64: "", layered: { ...l, canonical: { ...l.canonical, base64: "" }, graphic: { ...l.graphic, base64: "" } } };
@@ -240,8 +265,7 @@ export function LayeredSequenceVideoPreview(props: Props) {
             }
             catch (e) {
                 if (valid()) {
-                    setFailure(true);
-                    setFallback(true);
+                    fallBack(stage, e);
                 }
             }
             finally {
@@ -258,7 +282,7 @@ export function LayeredSequenceVideoPreview(props: Props) {
         if (!v || fallback || !baseId)
             return;
         if (typeof v.requestVideoFrameCallback !== "function") {
-            setFallback(true);
+            fallBack("capability", null, "video-frame-callback-unavailable");
             return;
         }
         let stopped = false, id = 0;
@@ -278,7 +302,7 @@ export function LayeredSequenceVideoPreview(props: Props) {
         if (fallback || !picture)
             return;
         if (typeof ResizeObserver !== "function") {
-            setFallback(true);
+            fallBack("capability", null, "resize-observer-unavailable");
             return;
         }
         const observer = new ResizeObserver(() => { if (admitted.current?.epoch === viewEpoch.current)
@@ -291,11 +315,10 @@ export function LayeredSequenceVideoPreview(props: Props) {
         return;
     } if (ready && !pendingSeek.current && !busy && admitted.current?.epoch === epoch)
         void v?.play().catch(() => { if (active && epoch === viewEpoch.current && id === base.current?.id && current.current.program?.resume && !current.current.busy) {
-            setFailure(true);
-            setFallback(true);
+            fallBack("play", null, "play-rejected");
         } }); return () => { active = false; }; }, [program?.resume, ready, busy, seek.sequence, snapshotId]);
     if (fallback)
-        return <><p className="manual-preview-hint" role="status">{t(failure ? "preview.layerFallback" : "preview.layerFallback")}</p><ManualVideoPreview {...props}/></>;
+        return <><p className="manual-preview-hint" role="status">{t("preview.layerFallback")}</p><ManualVideoPreview {...props}/></>;
     const coherent = ready && admitted.current?.snapshot === snapshotId && admitted.current?.epoch === viewEpoch.current && !busy;
     const total = props.clip?.frameTiming?.sourceEndFrame ?? 0;
     const controlBusy=props.actionBusy??busy;
@@ -312,8 +335,7 @@ export function LayeredSequenceVideoPreview(props: Props) {
   <div className="manual-preview-heading"><strong>{props.sourceFileName ?? source?.displayName}</strong><span>{t("preview.layerExperimental")}</span></div>
   <div className="manual-video-stage layered-video-stage" aria-busy={!coherent}>
    <video ref={attachVideo} className="layered-decoder" preload="auto" playsInline muted={false} onError={() => { if (packet.current) {
-        setFailure(true);
-        setFallback(true);
+        fallBack("decode", null, "decode-error");
     } }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={event => { const now = current.current, p = packet.current;
         if (event.currentTarget !== video.current || !event.currentTarget.ended || !now.program?.resume || now.busy || ended.current
             || admitted.current?.snapshot !== now.snapshotId || admitted.current?.epoch !== viewEpoch.current || !p

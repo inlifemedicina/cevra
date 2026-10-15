@@ -69,7 +69,7 @@ export interface DesktopBackend {
   loadEditorialDraft(): Promise<EditorialDraftState>;
   reviseEditorialDraft(request: ReviseEditorialDraftRequest): Promise<EditorialDraftState>;
   thumbnailLocalVideo?(request: SourceThumbnailRequest): Promise<SourceThumbnail>;
-  recordLayerPresentation?(receipt: import("@cevra/application").LayerPreviewPresentationV1): Promise<void>;
+  recordLayerPresentation?(receipt: import("@cevra/application").LayerPreviewDiagnosticV1): Promise<void>;
   previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview>;
   prepareManualExport?(request: ManualExportPreparationRequest): Promise<
     { readonly outcome: "cancelled" } | { readonly outcome: "prepared"; readonly preparation: ManualExportPreparation }>;

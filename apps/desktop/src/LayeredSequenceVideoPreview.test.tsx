@@ -22,7 +22,7 @@ function packet(request:LocalVideoPreviewRequest,t:ManualTitle=title):LocalVideo
 }
 function fixture(){
  const preview=vi.fn(async(request:LocalVideoPreviewRequest)=>packet(request));
- const backend={previewLocalVideo:preview,cancelOperation:vi.fn().mockResolvedValue(undefined)} as unknown as DesktopBackend;
+ const backend={previewLocalVideo:preview,cancelOperation:vi.fn().mockResolvedValue(undefined),recordLayerPresentation:vi.fn().mockResolvedValue(undefined)} as unknown as DesktopBackend;
  const clip={id:"clip",trackId:"v1",sourceId:"source",sourceStartMs:0,sourceEndMs:10000,timelineStartMs:0,timelineEndMs:10000,speed:1,volume:1,opacity:1,frameTiming:{version:1 as const,sourceStartFrame:0,sourceEndFrame:300,timelineStartFrame:0,timelineEndFrame:300}};
  const props:Props={backend,source:{id:"source",kind:"video",uri:"/tmp/synthetic.mp4",displayName:"Synthetic",durationMs:10000},snapshotId:"s1",clip,sequencePreview:[clip],timelineOccupied:true,sequenceEditing:true,frameEditing:true,busy:false,seek:{sequence:1,timelineMs:5000},t:key=>key,onPlayheadChange:vi.fn(),onCreate:vi.fn(),titleEditing:{title,graphicId:"title",snapshotId:"s1",selected:true,onSelect:vi.fn(),onCommit:vi.fn().mockResolvedValue(undefined)},program:{durationMs:10000,resume:false,onPlaybackIntent:vi.fn(),onSeek:vi.fn(),onClipEnd:vi.fn()}};
  return {props,preview,backend,view:(p:Partial<Props>={})=><LayeredSequenceVideoPreview {...props} {...p}/>};
@@ -142,4 +142,41 @@ it.each([true,false])("uses encoded fallback without ResizeObserver (video frame
  expect(container.querySelector("canvas.layered-picture")).toBeNull();
  await waitFor(()=>expect(f.preview.mock.calls.some(([request])=>request.experimentalLayer===undefined)).toBe(true));
  expect(container.querySelector("video.layered-decoder")).toBeNull();
+ expect(f.backend.recordLayerPresentation).toHaveBeenCalledWith(expect.objectContaining({kind:"fallback",stage:"capability",reason:"resize-observer-unavailable",endpoint:"encoded-fallback",capabilities:expect.objectContaining({resizeObserver:false,videoFrameCallback:frameCallbackPresent})}));
+});
+
+it("records the native request code without retaining its private exception message",async()=>{
+ const f=fixture();f.preview.mockRejectedValueOnce({code:"MANUAL_LAYER_UNAVAILABLE",message:"/private/title text"});
+ render(f.view());await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());
+ expect(f.backend.recordLayerPresentation).toHaveBeenCalledWith(expect.objectContaining({kind:"fallback",stage:"request",reason:"unexpected",nativeCode:"MANUAL_LAYER_UNAVAILABLE",endpoint:"encoded-fallback"}));
+ expect(JSON.stringify(vi.mocked(f.backend.recordLayerPresentation!).mock.calls)).not.toContain("private");
+});
+it("records a binding rejection separately from a decoded-grid mismatch",async()=>{
+ const f=fixture();f.preview.mockImplementationOnce(async r=>{const p=packet(r);p.sequence!.totalFrames=299;return p});
+ const first=render(f.view());await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());
+ expect(f.backend.recordLayerPresentation).toHaveBeenCalledWith(expect.objectContaining({kind:"fallback",stage:"binding",reason:"binding"}));first.unmount();
+ Object.defineProperty(HTMLVideoElement.prototype,"videoWidth",{configurable:true,get:()=>404});
+ const second=fixture();render(second.view());await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());
+ expect(second.backend.recordLayerPresentation).toHaveBeenCalledWith(expect.objectContaining({kind:"fallback",stage:"decode",reason:"base-grid"}));
+});
+it("records missing video frame callbacks without claiming canvas submission",async()=>{
+ Object.defineProperty(HTMLVideoElement.prototype,"requestVideoFrameCallback",{configurable:true,value:undefined});
+ const f=fixture();render(f.view());await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());
+ const fallback=vi.mocked(f.backend.recordLayerPresentation!).mock.calls.map(([v])=>v).filter(v=>v.kind==="fallback");
+ expect(fallback).toHaveLength(1);expect(fallback[0]).toMatchObject({reason:"video-frame-callback-unavailable",stage:"capability",endpoint:"encoded-fallback"});
+});
+it("does not record a stale request rejection after the component has unmounted",async()=>{
+ const f=fixture(),pending=deferred<LocalVideoPreview>();f.preview.mockImplementationOnce(()=>pending.promise);
+ const view=render(f.view());view.unmount();await act(async()=>pending.reject({code:"HOST_UNAVAILABLE"}));
+ expect(f.backend.recordLayerPresentation).not.toHaveBeenCalled();
+});
+it("binds a new request failure to its operation while the prior packet awaited decode",async()=>{
+ Object.defineProperty(HTMLMediaElement.prototype,"readyState",{configurable:true,get:()=>1});
+ const f=fixture(),{rerender}=render(f.view());
+ await waitFor(()=>expect(createImageBitmap).toHaveBeenCalledTimes(2));
+ f.preview.mockRejectedValueOnce({code:"HOST_UNAVAILABLE"});
+ rerender(f.view({snapshotId:"s2",titleEditing:{...f.props.titleEditing!,snapshotId:"s2"}}));
+ await waitFor(()=>expect(screen.getByText("preview.layerFallback")).toBeTruthy());
+ const request=f.preview.mock.calls.find(([r])=>r.expectedSnapshotId==="s2")![0];
+ expect(f.backend.recordLayerPresentation).toHaveBeenCalledWith(expect.objectContaining({kind:"fallback",stage:"request",operationId:request.operationId,snapshotId:"s2",nativeCode:"HOST_UNAVAILABLE"}));
 });

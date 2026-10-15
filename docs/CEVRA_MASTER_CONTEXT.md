@@ -1,6 +1,14 @@
 # CEVRA ORBIT — MASTER CONTEXT & DECISION LEDGER
 
 **Canonical continuity document**
+
+**Active isolated continuation, 2026-10-15:** the real Tauri smoke of consolidated
+`5f82ef1` confirmed manual edits but observed experimental encoded fallback with
+no canvas receipts. Exact-checkpoint native Host preparation succeeds separately.
+The approved continuation adds closed candidate-only fallback diagnostics to the
+existing bounded native receipt path, pending a coordinated Tauri diagnosis and
+minimum fix. No cause, visual latency, new default or Owner acceptance is claimed.
+See [the experimental proof](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#real-tauri-fallback-diagnosis--2026-10-15).
 **Initial consolidation:** 2026-09-14
 **Last decision reconciliation:** 2026-10-11 UTC: approved Vids UX/direct titles IN DEVELOPMENT in Draft #96, grouped APP/OWNER pending (latest entries below). Earlier integrated context: 2026-10-03 UTC, bounded offline Editorial Draft V1 integrated by PR #75 after #74; its smallest offline host/backend/UI consumer is integrated through PR #77 at `73f8427ac18337f779ceeda9c93f60edf35df33b`, with post-merge CI 5/5 and Exact Runtime 1/1. The owner subsequently approved bounded offline admission of the designated existing F-A02 result/history into a temporary native review session; that addition is IN DEVELOPMENT / NOT MERGED (see the offline draft document). Wider strategy/takes/cuts remain outside this slice.  PR #70 diagnostic persistence and PR #72 isolated-attempt preparation are IMPLEMENTED / CLOSED, with exact-head integration and successful post-merge CI. The owner subsequently performed the one authorized F-A02 in a genuine local TTY: FIRST_FA_VALIDATED, one invocation, accepted textual analysis candidate, correlated success receipt and closed child. Direct PT-BR scenario evidence is now demonstrated; citation support is PARTIAL at one observation and the unchanged literal fixture helper passes only its complement check. The whole real-agent gate remains OPEN, complete analysis NOT DELIVERED, strategy/takes/cut planning NOT STARTED, progress 55%. F-A02 is exhausted at 1/1; earlier failed F-A and historical V1 remain preserved and closed to replay.
 **Scope:** decisions, architecture, implementation state, research references, skills/product investigations, roadmap and operational workflow for CEVRA Orbit / CEVRA Vids.

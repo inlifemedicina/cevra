@@ -1,6 +1,37 @@
 # Experimental static-title preview — 2026-10-15
 
 Status: **isolated experiment; not a default, release, merge or Owner acceptance**.
+
+## Real Tauri fallback diagnosis — 2026-10-15
+
+The consolidated candidate at `5f82ef1` opened in a real CUA-operated Tauri
+session. Import, the continuous 300-frame sequence, Unicode title bounds/layout
+and Undo/Redo were observed, but the experimental renderer selected encoded
+fallback after title creation and one deliberate remount. No canvas receipt was
+produced. This is not experimental presentation acceptance. A subsequent offline
+request using the exact saved checkpoint and packaged Host/runtime successfully
+prepared the layer in native scope; that result does not identify the browser
+failure or establish Tauri/paint latency. Restricted-shell capability failures
+remain separate from the real graphical result.
+
+An isolated continuation extends the existing diagnostic command with a closed
+fallback receipt: current operation/snapshot/epoch, preparation stage, allowlisted
+reason and native error code, elapsed time, and four browser-capability booleans.
+It never stores exception messages, title text, media paths, user-agent strings or
+project payloads. `endpoint: encoded-fallback` cannot be mistaken for a canvas
+submission. Existing successful presentation receipts remain unchanged; both
+shapes retain the compiled experiment gate, native validation, private local
+`0600` file and maximum 100 records per process. No IPC command or ACL is added.
+Starting a new model clears prior pending timing so a request failure cannot be
+paired with the previous operation's clock. Stale/unmounted failures are ignored;
+diagnostic failure cannot prevent encoded fallback.
+
+The cause and minimum product correction remain pending a coordinated real
+Tauri run of the distinct diagnostic candidate. No browser script injection,
+runtime change, new framework, policy relaxation, default promotion, AI call or
+additional editing authority is involved. Ordinary flags remain off. The current
+manual sequence supports video clips and the approved static title; arbitrary
+still-image timeline composition is not established by this proof.
 The Owner approved integrating the previously isolated base-video/PNG experiment
 into the existing sequence preview for evaluation. This extends presentation and
 the closed media contract; Project IR, ProjectHistory, typed edits, CoreText,

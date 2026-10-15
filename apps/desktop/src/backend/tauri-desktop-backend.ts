@@ -57,7 +57,7 @@ export class TauriDesktopBackend implements DesktopBackend {
     return this.call("desktop_thumbnail_local_video", { args: request });
   }
 
-  async recordLayerPresentation(receipt:import("@cevra/application").LayerPreviewPresentationV1):Promise<void>{await this.call("desktop_record_layer_presentation",{args:receipt})}
+  async recordLayerPresentation(receipt:import("@cevra/application").LayerPreviewDiagnosticV1):Promise<void>{await this.call("desktop_record_layer_presentation",{args:receipt})}
   async previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> {
     const start=performance.now();
     const value=await this.call<LocalVideoPreview>("desktop_preview_local_video", { args: request });
