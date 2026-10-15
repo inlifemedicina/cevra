@@ -68,7 +68,8 @@ export function ManualTitleControls({ project, busy, available, t, draft, onComm
     <fieldset disabled={disabled} onKeyDown={event => {
       if (event.nativeEvent.isComposing || composing.current || event.repeat) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); reset(); }
-      if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); void publish(onEdit)?.catch(() => {}); }
+      // Fields confirm their draft; buttons and the aspect chooser keep native keyboard activation.
+      if (event.key === "Enter" && event.target instanceof HTMLInputElement) { event.preventDefault(); event.stopPropagation(); void publish(onEdit)?.catch(() => {}); }
     }}>
       <label>{t("title.text")}<input type="text" maxLength={80} value={text} aria-label={t("title.text")} aria-invalid={dirty && !candidate}
         onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
