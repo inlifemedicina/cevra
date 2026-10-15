@@ -1,5 +1,5 @@
 import { MANUAL_VIDEO_MAX_BYTES, MANUAL_VIDEO_FRAME_MAX_BYTES, localSourceProbeInput, manualVideoError, resolveManualVideo, resolveManualVideoSequence, type LocalVideoPreview, type LocalVideoPreviewRequest } from "@cevra/application";
-import { FixedManualTitleCompositionAdapter, validateManualSequenceExecutionEvidence, type MediaEngineAdapter } from "@cevra/contracts";
+import { FixedManualTitleCompositionAdapter, ManualTitleColourError, validateManualSequenceExecutionEvidence, type MediaEngineAdapter } from "@cevra/contracts";
 import { resolveProjectManualTitle } from "@cevra/application";
 import { framesToMilliseconds, type ProjectHistory, type SourceAsset } from "@cevra/project-ir";
 import { constants, type BigIntStats } from "node:fs";
@@ -294,6 +294,7 @@ export class DerivedVideoPreview {
       return this.packet(pendingCache!, request, current);
     } catch (cause) {
       primary = combined.aborted ? manualVideoError(timeout.signal.aborted && !signal.aborted ? "MANUAL_VIDEO_PREVIEW_TIMEOUT" : "OPERATION_CANCELLED")
+        : range.composition && cause instanceof ManualTitleColourError ? manualVideoError("MANUAL_VIDEO_TITLE_COLOUR_UNSUPPORTED")
         : cause instanceof Error && "code" in cause && (String(cause.code).startsWith("MANUAL_VIDEO_") || String(cause.code).startsWith("MANUAL_SEQUENCE_")) ? cause : manualVideoError("MANUAL_VIDEO_UNAVAILABLE");
       if ("code" in primary && primary.code === "MANUAL_VIDEO_SOURCE_CHANGED") for (const [cachedKey, entry] of this.cache) if (entry.sourceId === source.id || range.sequenceClips) this.forget(cachedKey);
       throw primary;

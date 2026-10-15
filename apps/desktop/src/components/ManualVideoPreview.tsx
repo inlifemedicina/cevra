@@ -359,7 +359,7 @@ export function ManualVideoPreview({ onAction, actionBusy, backend, source, sour
   }
 
   const validRange = inMs !== null && outMs !== null && inMs < outMs && outMs <= (source?.durationMs ?? 0);
-  const errorKey = error === "MANUAL_VIDEO_FRAME_GRID_UNAVAILABLE" ? "preview.gridUnavailable" : error === "MANUAL_VIDEO_PREVIEW_SETTLING" ? "preview.localSettling" : error === "MANUAL_VIDEO_TOO_LARGE" ? "preview.localTooLarge" : error === "MANUAL_VIDEO_STALE" || error === "MANUAL_SEQUENCE_STALE" || error === "MANUAL_VIDEO_SOURCE_CHANGED" ? "preview.localChanged" : "preview.localUnavailable";
+  const errorKey = error === "MANUAL_VIDEO_TITLE_COLOUR_UNSUPPORTED" ? "preview.titleColourUnsupported" : error === "MANUAL_VIDEO_FRAME_GRID_UNAVAILABLE" ? "preview.gridUnavailable" : error === "MANUAL_VIDEO_PREVIEW_SETTLING" ? "preview.localSettling" : error === "MANUAL_VIDEO_TOO_LARGE" ? "preview.localTooLarge" : error === "MANUAL_VIDEO_STALE" || error === "MANUAL_SEQUENCE_STALE" || error === "MANUAL_VIDEO_SOURCE_CHANGED" ? "preview.localChanged" : "preview.localUnavailable";
   const programFrame = timing ? timing.timelineStartFrame + (Math.min(timing.sourceEndFrame, Math.max(timing.sourceStartFrame, nearestMsToFrames(Math.max(0, currentMs)))) - timing.sourceStartFrame) : undefined;
   const clockDuration = program?.durationMs ?? source?.durationMs ?? endMs;
   const programMs = timing ? framesToMilliseconds(programFrame!) : clip ? clip.timelineStartMs + (currentMs - startMs) : 0;

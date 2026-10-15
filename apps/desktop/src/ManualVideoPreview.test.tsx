@@ -1066,3 +1066,18 @@ it("decoder seeks inside each CFR frame while the visible clock, last frame and 
   expect(f.requests).toHaveBeenCalledTimes(1);
   expect(f.backend.history.toArchive()).toEqual(before);
 });
+
+it.each(["pt-BR", "en-US"] as const)("%s explains title colour refusal without raw diagnostics or automatic retry", async locale => {
+  const backend = new ManualBackend(), before = backend.history.toArchive();
+  const preview = vi.spyOn(backend, "previewLocalVideo").mockRejectedValue({ code: "MANUAL_VIDEO_TITLE_COLOUR_UNSUPPORTED", message: "/private/worker/diagnostic" });
+  const translated = (key: Parameters<typeof translate>[1]) => translate(locale, key);
+  render(<ManualVideoPreview backend={backend} source={source} snapshotId="colour" timelineOccupied busy={false}
+    seek={{ sequence: 0, timelineMs: 0 }} t={translated} onPlayheadChange={vi.fn()} onCreate={vi.fn()} />);
+  await screen.findByText(translated("preview.titleColourUnsupported"));
+  expect(document.body.textContent).not.toContain("/private/worker"); expect(preview).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: translated("preview.playLocal") }).matches(":disabled")).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: translated("preview.retryLocal") }));
+  await waitFor(() => expect(preview).toHaveBeenCalledTimes(2));
+  await screen.findByText(translated("preview.titleColourUnsupported"));
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled(); expect(backend.history.toArchive()).toEqual(before);
+});

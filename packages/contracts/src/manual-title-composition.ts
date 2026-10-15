@@ -1,5 +1,10 @@
 import { validateManualTitle, type ManualTitle } from "@cevra/project-ir";
 export const MANUAL_TITLE_FONT_SHA256 = "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031" as const;
+/** Closed admission failure; worker diagnostics never become user-facing text. */
+export class ManualTitleColourError extends Error {
+  readonly code = "MANUAL_TITLE_UNSUPPORTED_COLOUR";
+  constructor() { super("MANUAL_TITLE_UNSUPPORTED_COLOUR"); this.name = "ManualTitleColourError"; }
+}
 /** Engine-independent component plan. Paths and generated pixels never enter Project IR or UI requests. */
 export interface ManualTitleCompositionPlanV1 {
   version: 1;

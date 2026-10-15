@@ -47,6 +47,8 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
   const [importBusy, setImportBusy] = useState(false);
   const [locateOperationId, setLocateOperationId] = useState<string | null>(null);
   const [locateCancelRequested, setLocateCancelRequested] = useState(false);
+  const activeLocate = useRef<{ id: string; cancelRequested: boolean } | null>(null);
+  useEffect(() => () => { activeLocate.current = null; }, []);
   const [manualMutationBusy, setManualMutationBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [removeReview, setRemoveReview] = useState<{ sourceId: string; snapshot: string; clipIds: string[] } | null>(null);
@@ -389,20 +391,35 @@ export function App({ backend = defaultBackend }: { backend?: DesktopBackend }) 
       || !source?.technicalDescriptor || !["video", "audio"].includes(source.kind)
       || importBusy || transcriptionOperationId || editorialBusy || manualMutationInFlight.current || checkpointPending || closePending || exportBusy) return;
     const operationId = `locate-${globalThis.crypto.randomUUID()}`;
+    const operation = { id: operationId, cancelRequested: false };
+    activeLocate.current = operation;
     manualMutationInFlight.current = true; setManualMutationBusy(true); setLocateOperationId(operationId); setLocateCancelRequested(false);
     setRuntimeError(null); setRuntimeNotice(null);
     try {
       const result = await backend.locateMedia({ version: 1, sourceId, expectedSnapshotId: current!.history.headSnapshotId!, operationId, locale });
+      if (activeLocate.current !== operation) return;
       if (result.outcome === "located") { applyBackendState(result.state, undefined, true); setRuntimeNotice("media.located"); }
       else setRuntimeNotice("media.pickerCancelled");
-    } catch (cause) { handleRuntimeError(cause, true); }
-    finally { manualMutationInFlight.current = false; setManualMutationBusy(false); setLocateOperationId(null); setLocateCancelRequested(false); }
+    } catch (cause) { if (activeLocate.current === operation) handleRuntimeError(cause, true); }
+    finally {
+      if (activeLocate.current === operation) {
+        activeLocate.current = null;
+        manualMutationInFlight.current = false; setManualMutationBusy(false); setLocateOperationId(null); setLocateCancelRequested(false);
+      }
+    }
   }
 
   function cancelLocateMedia() {
-    if (!locateOperationId || locateCancelRequested) return;
+    const operation = activeLocate.current;
+    if (!operation || operation.cancelRequested) return;
+    operation.cancelRequested = true;
     setLocateCancelRequested(true);
-    void backend.cancelOperation(locateOperationId).catch(cause => handleRuntimeError(cause, true));
+    void backend.cancelOperation(operation.id).catch(cause => {
+      if (activeLocate.current !== operation) return;
+      operation.cancelRequested = false;
+      setLocateCancelRequested(false);
+      handleRuntimeError(cause, true);
+    });
   }
 
   async function changeHistory(direction: "undo" | "redo") {

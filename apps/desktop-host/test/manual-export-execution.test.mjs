@@ -4,7 +4,9 @@ import { createHash } from "node:crypto";
 import { link, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { ManualSequenceExportApplicationService, ManualVideoSequenceApplicationService, MediaApplicationService } from "@cevra/application";
+import { ManualTitleApplicationService, ManualSequenceExportApplicationService, ManualVideoSequenceApplicationService, MediaApplicationService } from "@cevra/application";
+import { ManualTitleColourError } from "@cevra/contracts";
+import { MANUAL_TITLE_COMPONENT } from "@cevra/project-ir";
 import { NodeMediaArtifactStore, OwnedRenderResourceError } from "@cevra/media-ffmpeg";
 import { DesktopSession, DesktopProjectPersistence, DesktopHostProtocolServer, NativeManualExportDestination, guardManualExportEngine } from "../dist/index.js";
 
@@ -273,4 +275,41 @@ test("issued workspace cleanup refuses directory replacement and leaves foreign 
   await rename(workspace.uri, `${workspace.uri}.original`); await mkdir(workspace.uri); await writeFile(join(workspace.uri, "foreign"), "preserve");
   await assert.rejects(workspace.remove(), { code: "MANUAL_EXPORT_DESTINATION_CHANGED" });
   assert.equal(await readFile(join(workspace.uri, "foreign"), "utf8"), "preserve");
+});
+
+async function addColourTitle(f) {
+  new ManualTitleApplicationService(f.history, () => "colour-title").edit({ version: 1, type: "set", expectedSnapshotId: f.history.current.history.headSnapshotId,
+    title: { version: 1, componentId: MANUAL_TITLE_COMPONENT, text: "Colour admission", startFrame: 0, endFrame: 30, aspect: "16:9" } });
+  await f.opened.persistence.checkpoint(f.history);
+}
+test("title colour refusal is specific, audited and restart-safe without publication, mutation or replay", async t => {
+  const f = await fixture(t); await addColourTitle(f);
+  f.history.commit({ type: "project.rename", name: "retained redo" }); f.history.undo();
+  await f.opened.persistence.checkpoint(f.history);
+  const target = join(f.root, "colour.mp4"), before = f.history.toArchive(), failure = new ManualTitleColourError();
+  f.hooks.beforeWrite = (_signal, operation) => { assert.ok(operation.composition); throw failure; };
+  await assert.rejects(f.session.exportManualSequence(f.request("colour"), target), error => {
+    assert.equal(error.code, "MANUAL_EXPORT_TITLE_COLOUR_UNSUPPORTED"); assert.equal(error.cause.code, "MEDIA_OPERATION_FAILED");
+    assert.equal(error.cause.cause, failure); return true;
+  });
+  await assert.rejects(lstat(target), { code: "ENOENT" });
+  assert.deepEqual(f.history.toArchive(), before); assert.equal(f.history.canRedo, true);
+  assert.deepEqual(await readFile(f.original), f.bytes); assert.equal(f.calls(), 1);
+  assert.deepEqual((await readdir(f.root)).filter(name => name.startsWith(".cevra-export-")), []);
+  const record = await f.executions.get("manual-export-colour");
+  assert.equal(record.status, "failed"); assert.equal(record.attempts.length, 1); assert.equal(record.attempts[0].errorCode, "MEDIA_OPERATION_FAILED");
+  await f.session.close(); const reopened = await DesktopProjectPersistence.open(join(f.root, "store"));
+  assert.deepEqual(reopened.history.toArchive(), before);
+  const executions = await reopened.persistence.openMediaExecutionRepository(reopened.history.current.project.id);
+  assert.equal((await executions.get(record.id)).status, "failed"); assert.equal(f.calls(), 1);
+  await executions.close?.(); await reopened.persistence.close();
+});
+test("unproved retirement keeps priority over title colour feedback", async t => {
+  const f = await fixture(t); await addColourTitle(f);
+  const target = join(f.root, "colour-retirement.mp4"), before = f.history.toArchive();
+  f.hooks.beforeWrite = () => { throw new ManualTitleColourError(); };
+  f.hooks.beforeSettle = () => { if (f.calls()) throw Error("synthetic retirement failure"); };
+  await assert.rejects(f.session.exportManualSequence(f.request("colour-retirement"), target), { code: "MANUAL_EXPORT_CLEANUP_FAILED" });
+  assert.deepEqual(f.history.toArchive(), before); await assert.rejects(lstat(target), { code: "ENOENT" });
+  assert.equal((await readdir(f.root)).filter(name => name.startsWith(".cevra-export-")).length, 1);
 });

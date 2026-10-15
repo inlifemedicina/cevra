@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createEmptyProject, ProjectHistory, framesToMilliseconds } from "@cevra/project-ir";
+import { ManualTitleColourError } from "@cevra/contracts";
+import { createEmptyProject, ProjectHistory, framesToMilliseconds, MANUAL_TITLE_COMPONENT } from "@cevra/project-ir";
 import {
-  ManualSequenceExportApplicationService, MediaApplicationService, MediaExecutionCommitError, InMemoryMediaExecutionRepository,
+  ManualTitleApplicationService, ManualSequenceExportApplicationService, MediaApplicationError, MediaApplicationService, MediaExecutionCommitError, InMemoryMediaExecutionRepository,
   validatePersistedMediaExecutionArchive
 } from "../dist/index.js";
 
@@ -193,4 +194,21 @@ test("archive failure after canonical commit carries trusted commit evidence and
     executions: restoredRecords, artifacts: f.artifacts });
   assert.equal((await restored.reconcilePendingWithoutReplay())[0].status, "succeeded");
   assert.equal(f.calls.length, 1); assert.equal((await restoredRecords.get("manual-export-one")).status, "succeeded");
+});
+
+test("colour feedback is scoped to titled renders and never rewrites cancellation, resource or confirmed-commit failures", async () => {
+  for (const scenario of ["untitled", "cancelled", "resource", "committed"]) {
+    const f = fixture();
+    if (scenario !== "untitled") {
+      new ManualTitleApplicationService(f.history, () => "colour-title").edit({ version: 1, type: "set", expectedSnapshotId: f.history.current.history.headSnapshotId,
+        title: { version: 1, componentId: MANUAL_TITLE_COMPONENT, text: "Colour admission", startFrame: 0, endFrame: 30, aspect: "16:9" } });
+      f.port.prepare = async () => ({ label: "final.mp4", availableBytes: 1e9 });
+    }
+    const failure = new MediaApplicationError(scenario === "cancelled" ? "MEDIA_OPERATION_CANCELLED" : scenario === "committed" ? "MEDIA_RECOVERY_FAILED" : "MEDIA_OPERATION_FAILED",
+      "en-US", "manual-export-one", {}, scenario === "resource" ? Object.assign(Error("resource"), { code: "MEDIA_RENDER_MEMORY_LIMIT" }) : new ManualTitleColourError());
+    f.media.execute = async () => { throw failure; };
+    const before = f.history.toArchive();
+    await assert.rejects(f.service.execute(f.request(), f.port, "/tmp/private-issued-job"), error => error === failure);
+    assert.deepEqual(f.history.toArchive(), before); assert.equal(f.files.size, 0);
+  }
 });
