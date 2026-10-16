@@ -2,6 +2,8 @@ import type { ProjectIR, SourceNumberingV1 } from "@cevra/project-ir";
 import type { ReviseEditorialDraftRequest } from "@cevra/application";
 import type { LocalVideoPreviewRequest, SourceThumbnailRequest, CreateManualVideoClipRequest, TrimManualVideoClipRequest } from "@cevra/application";
 import { validateManualVideoSequenceEdit, type ManualVideoSequenceEdit } from "@cevra/application";
+import { validateManualTitleEdit } from "@cevra/application";
+import { validateLocalSourceRelocationRequest } from "@cevra/application";
 import { validateManualExportPreparationRequest, type ManualExportPreparationRequest } from "@cevra/application";
 
 export const DESKTOP_HOST_PROTOCOL_VERSION = 1 as const;
@@ -22,6 +24,7 @@ export type HostMethod =
   | "editorial.snapshot"
   | "editorial.revise"
   | "media.ingestLocal"
+  | "media.relocateLocal"
   | "video.previewLocal"
   | "video.thumbnailLocal"
   | "video.prepareManualExport"
@@ -30,6 +33,7 @@ export type HostMethod =
   | "video.trimManualClip"
   | "video.createManualClip"
   | "video.editManualSequence"
+  | "video.editManualTitle"
   | "transcription.transcribeSource"
   | "history.undo"
   | "history.redo"
@@ -63,8 +67,10 @@ export interface DesktopHostState {
   closePending?: boolean;
   capabilities: {
     mediaImport: CapabilityState;
+    sourceRelocation?: CapabilityState;
     transcription: CapabilityState;
     manualExport?: CapabilityState;
+    manualTitle?: CapabilityState;
   };
 }
 
@@ -96,6 +102,7 @@ const METHODS = new Set<HostMethod>([
   "editorial.snapshot",
   "editorial.revise",
   "media.ingestLocal",
+  "media.relocateLocal",
   "video.previewLocal",
   "video.thumbnailLocal",
   "video.prepareManualExport",
@@ -104,6 +111,7 @@ const METHODS = new Set<HostMethod>([
   "video.createManualClip",
   "video.trimManualClip",
   "video.editManualSequence",
+  "video.editManualTitle",
   "transcription.transcribeSource",
   "history.undo",
   "history.redo",
@@ -199,6 +207,13 @@ export function validateTranscriptionParams(params: Record<string, unknown>, id:
   };
 }
 
+/** The candidate URI is supplied by the native picker, never by a WebView request. */
+export function validateSourceRelocationParams(params: Record<string, unknown>, id: string) {
+  exactKeys(params, ["version", "sourceId", "expectedSnapshotId", "uri", "operationId", "locale"], id);
+  const { operationId: operation, locale: language, ...candidate } = params;
+  return { ...validateLocalSourceRelocationRequest(candidate), operationId: operationId(operation, id), locale: locale(language, id) };
+}
+
 export function validateCancelParams(params: Record<string, unknown>, id: string): { operationId: string } {
   exactKeys(params, ["operationId"], id);
   return { operationId: operationId(params.operationId, id) };
@@ -224,10 +239,15 @@ export function validateVideoThumbnailParams(params: Record<string, unknown>, id
 }
 
 export function validateVideoPreviewParams(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {
-  exactKeys(params, ["sourceId", "expectedSnapshotId", "clipId", "operationId", "sequence"], id);
+  exactKeys(params, ["sourceId", "expectedSnapshotId", "clipId", "operationId", "sequence", "experimentalLayer"], id);
+  if (params.experimentalLayer !== undefined) {
+    const v = params.experimentalLayer as {version: unknown; knownBaseId?: unknown};
+    if (!v || typeof v !== "object" || Array.isArray(v) || v.version !== 1 || Object.keys(v).some(k=>!["version","knownBaseId"].includes(k))
+      || (v.knownBaseId !== undefined && (typeof v.knownBaseId !== "string" || !/^[a-f0-9]{64}$/.test(v.knownBaseId))) || params.sequence !== true || params.operationId === undefined) throw new ProtocolValidationError("HOST_INVALID_PARAMS", "Invalid experimental preview binding.", id);
+  }
   if (params.sequence !== undefined && (params.sequence !== true || params.clipId !== undefined || params.operationId === undefined)) throw new ProtocolValidationError("HOST_INVALID_PARAMS", "Sequence preview binding is invalid.", id);
   if (params.clipId === undefined && params.operationId === undefined) return videoBinding(params, id);
-  return { ...videoBinding(params, id), ...(params.sequence === true ? { sequence: true as const } : {}), ...(params.clipId === undefined ? {} : { clipId: boundedString(params.clipId, 128, "clipId", id) }), operationId: operationId(params.operationId, id) };
+  return { ...videoBinding(params, id), ...(params.experimentalLayer ? {experimentalLayer: params.experimentalLayer as {version:1;knownBaseId?:string}} : {}), ...(params.sequence === true ? { sequence: true as const } : {}), ...(params.clipId === undefined ? {} : { clipId: boundedString(params.clipId, 128, "clipId", id) }), operationId: operationId(params.operationId, id) };
 }
 
 export function validateManualClipParams(params: Record<string, unknown>, id: string): CreateManualVideoClipRequest {
@@ -258,6 +278,9 @@ export function validateManualSequenceParams(params: Record<string, unknown>, id
     if (key === "clipIds") for (const clipId of value as string[]) boundedString(clipId, 128, "clipId", id);
   }
   return stable;
+}
+export function validateManualTitleParams(params: Record<string, unknown>, _id: string) {
+  return validateManualTitleEdit(params);
 }
 
 function videoBinding(params: Record<string, unknown>, id: string): LocalVideoPreviewRequest {

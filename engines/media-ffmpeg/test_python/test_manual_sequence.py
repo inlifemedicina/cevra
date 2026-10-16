@@ -86,6 +86,34 @@ class Runtime:
 
 
 class ManualSequenceTests(unittest.TestCase):
+    def test_experimental_base_requires_square_pixels_without_relaxing_frame_clock(self):
+        stream = {"codec_type": "video", "codec_name": "h264", "width": 720, "height": 404,
+                  "pix_fmt": "yuv420p", "avg_frame_rate": "30/1", "r_frame_rate": "30/1",
+                  "time_base": "1/30000", "duration_ts": 2000, "nb_frames": "2"}
+        def frames(_command, consume, **_kwargs):
+            consume("best_effort_timestamp=0|duration=1000")
+            consume("best_effort_timestamp=1000|duration=1000")
+        for ratio in ("404:405", "0:1", "N/A", None):
+            with self.subTest(ratio=ratio), mock.patch.object(manual, "_streams", return_value=[{**stream, "sample_aspect_ratio": ratio}]), mock.patch.object(manual, "reduce_lines", side_effect=frames):
+                with self.assertRaisesRegex(RuntimeError, "square pixels"):
+                    manual._video_clock(Common(), Path("base.mp4"), 2, 720, 404, square_pixels=True)
+        with mock.patch.object(manual, "_streams", return_value=[{**stream, "sample_aspect_ratio": "1:1"}]), mock.patch.object(manual, "reduce_lines", side_effect=frames):
+            self.assertEqual(manual._video_clock(Common(), Path("base.mp4"), 2, 720, 404, square_pixels=True), Fraction(1, 15))
+            with self.assertRaisesRegex(RuntimeError, "coverage/count"):
+                manual._video_clock(Common(), Path("base.mp4"), 3, 720, 404, square_pixels=True)
+
+    def test_unaffected_title_occurrences_reuse_pixels_but_aspect_and_visible_text_invalidate(self):
+        from copy import deepcopy
+        plan = {"title": {"aspect": "9:16", "text": "Ação ❤️", "startFrame": 90, "endFrame": 120}}
+        changed = deepcopy(plan); changed["title"]["text"] = "Novo 👩🏽‍⚕️"
+        self.assertEqual(manual._occurrence_composition(plan, {"font": "a"}, None),
+                         manual._occurrence_composition(changed, {"font": "b"}, None))
+        self.assertNotEqual(manual._occurrence_composition(plan, {"font": "a"}, (0, 30)),
+                            manual._occurrence_composition(changed, {"font": "a"}, (0, 30)))
+        changed["title"]["aspect"] = "16:9"
+        self.assertNotEqual(manual._occurrence_composition(plan, {"font": "a"}, None),
+                            manual._occurrence_composition(changed, {"font": "a"}, None))
+
     def test_mux_encoder_inventory_is_a_reader_and_native_router_preserves_budget_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve(); root.chmod(0o700)
@@ -463,15 +491,30 @@ class ManualSequenceTests(unittest.TestCase):
                     tools._run_extract_frame(common, args)
                 self.assertEqual(output.read_bytes(), b"foreign png")
 
-    def _pipeline(self, directory: str, *, failure: str | None = None, preview: bool = False):
+    def _pipeline(self, directory: str, *, failure: str | None = None, preview: bool = False,
+                  composition: dict | None = None, repetitions: int | None = None,
+                  aliases: int | None = None, distinct_last: bool = False):
         from contextlib import ExitStack
         root = Path(directory).resolve(); workspace = root / "job"; workspace.mkdir(mode=0o700)
         original = root / "original.mp4"; content = b"original immutable bytes"; original.write_bytes(content)
         one = {**item(str(original)), "source_content": {"sha256": hashlib.sha256(content).hexdigest(), "size_bytes": len(content)}}
         args = {"version": 1, "items": [one] if preview else [one, one], "output": str(root / "final.mp4"), "owned_workspace": str(workspace)}
+        if repetitions is not None:
+            args["items"] = [one] * repetitions
+        if aliases is not None:
+            args["items"] = []
+            for index in range(aliases):
+                alias = root / f"alias-{index}.mp4"
+                payload = b"distinct immutable bytes" if distinct_last and index == aliases - 1 else content
+                alias.write_bytes(payload)
+                args["items"].append({**one, "input": str(alias), "source_content": {"sha256": hashlib.sha256(payload).hexdigest(), "size_bytes": len(payload)}})
+        if composition is not None:
+            args.update(version=3 if preview else 2, composition=composition)
         frames = len(args["items"]); common = PipelineCommon(workspace, frames * 1600, failure=failure, original=original, preview=preview)
         meta = {"duration": 1, "video": {"codec": "h264", "width": 1920, "height": 1080, "bit_depth": 8, "pix_fmt": "yuv420p"},
                 "audio": {"codec": "aac", "sample_rate": 48000, "channels": 2, "channel_layout": "stereo"}}
+        if composition is not None:
+            meta["video"].update(color_space="bt709", color_primaries="bt709", color_transfer="bt709", color_range="tv")
         clock = [Fraction(index, 30) for index in range(30)]
         def check_cancelled():
             if failure == "late-cancel" and Path(args["output"]).exists():
@@ -481,7 +524,7 @@ class ManualSequenceTests(unittest.TestCase):
         with ExitStack() as stack:
             stack.enter_context(mock.patch.dict(os.environ, {"CEVRA_VIDEO_ENCODER_H264": "h264_videotoolbox"}))
             stack.enter_context(mock.patch.object(manual.inspection, "_inspect_source", return_value=(meta, clock, [Fraction(1, 30)] * 30, Fraction(1, 30000), {}, (0, 48000))))
-            stack.enter_context(mock.patch.object(manual, "_streams", return_value=[{"index": 0, "codec_type": "video"}, {"index": 3, "codec_type": "audio"}]))
+            stack.enter_context(mock.patch.object(manual, "_streams", return_value=[{**meta["video"], "index": 0, "codec_type": "video"}, {"index": 3, "codec_type": "audio"}]))
             stack.enter_context(mock.patch.object(manual, "_video_clock", side_effect=lambda _common, _path, count, *_dimensions: Fraction(count, 30)))
             stack.enter_context(mock.patch.object(manual, "_audio_clock", side_effect=lambda _common, _path, count, _channels: Fraction(count, 48000)))
             stack.enter_context(mock.patch.object(tools, "_ffmpeg_encoders", return_value=["aac"]))

@@ -318,7 +318,10 @@ function validateGraphic(graphic: unknown, index: number, issues: ValidationIssu
   if (!isRecord(graphic)) return push(issues, path, "type", "Graphic must be an object.");
   requireString(graphic, "id", path, issues);
   if (!["text", "image", "video", "shape", "lottie"].includes(String(graphic.kind))) push(issues, `${path}.kind`, "enum", "Unsupported graphic kind.");
-  validateLegacyTimeRange(graphic, "startMs", "endMs", path, issues);
+  if (isRecord(graphic.extensions) && Object.hasOwn(graphic.extensions, MANUAL_TITLE_EXTENSION)) {
+    try { resolveManualTitle(graphic as unknown as import("./types.js").GraphicItem); }
+    catch { push(issues, path, "type", "Manual title must have its closed component and exact frame aliases."); }
+  } else validateLegacyTimeRange(graphic, "startMs", "endMs", path, issues);
 }
 
 function validateLayout(layout: unknown, index: number, issues: ValidationIssue[]): void {
@@ -842,3 +845,4 @@ function throwValidation(issues: ValidationIssue[]): never {
   const detail = issues.map((issue) => `${issue.path}: ${issue.message}`).join("\n");
   throw new Error(`Invalid CEVRA Project IR:\n${detail}`);
 }
+import { MANUAL_TITLE_EXTENSION, resolveManualTitle } from "./manual-title.js";

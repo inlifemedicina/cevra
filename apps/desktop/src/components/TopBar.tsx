@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { CevraLocale } from "@cevra/i18n";
 import { Icon } from "./Icon";
 import { shortcutProps } from "../keyboard-shortcuts";
@@ -25,10 +26,11 @@ interface TopBarProps {
   onUndo(): void;
   onRedo(): void;
   onRetryCheckpoint(): void;
+  exportPanel?: ReactNode;
   onExport?(): void;
 }
 
-export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOpen, exportAvailable, status, retryAvailable, retryBusy, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onSidebarToggle, onMediaToggle, onUndo, onRedo, onRetryCheckpoint, onExport }: TopBarProps) {
+export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOpen, exportAvailable, status, retryAvailable, retryBusy, canUndo, canRedo, t, onWorkspaceChange, onLocaleChange, onSidebarToggle, onMediaToggle, onUndo, onRedo, onRetryCheckpoint, onExport, exportPanel }: TopBarProps) {
   function handleWorkspaceKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || timelineShortcutBlocked(event.nativeEvent)) return;
     const currentIndex = workspaces.indexOf(workspace);
@@ -78,9 +80,10 @@ export function TopBar({ projectName, workspace, locale, sidebarCompact, mediaOp
         <button className="locale-button" type="button" onClick={() => onLocaleChange(locale === "pt-BR" ? "en-US" : "pt-BR")} aria-label={t("top.switchLanguage")} title={t("top.switchLanguage")}>
           {locale === "pt-BR" ? "EN" : "PT"}
         </button>
-        <button {...shortcutProps("export", t)} type="button" className="export-button" disabled={!exportAvailable} onClick={onExport} title={retryBusy ? t("status.busy") : exportAvailable ? shortcutProps("export", t).title : t("export.unavailable")}>{t("action.export")}</button>
+
         <KeyboardShortcutHelp t={t} />
         <button type="button" className="icon-button settings-action" disabled aria-label={t("top.settings")} title={t("status.notImplemented")}><Icon name="settings" /></button>
+        <div className="top-export"><button {...shortcutProps("export", t)} type="button" className="export-button" disabled={!exportAvailable} onClick={onExport}>{t("export.choose")}</button>{exportPanel}</div>
       </div>
     </header>
   );

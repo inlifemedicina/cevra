@@ -54,6 +54,8 @@ SENSITIVE_ENVIRONMENT = frozenset({
 })
 
 CRITICAL_WORKER_FILES = (
+    "worker/cevra_title_preview.py",
+    "worker/cevra_manual_title.py",
     "worker/cevra_audio_measurement.py",
     "worker/cevra_bounded_preview.py",
     "worker/cevra_streaming_process.py",
@@ -67,6 +69,7 @@ CRITICAL_WORKER_FILES = (
 )
 
 REQUIRED_NOTICE_PATHS = {
+    "inter-license": "components/manual-title/OFL.txt",
     "cevra-notice": "NOTICE",
     "third-party-licenses": "THIRD_PARTY_LICENSES.md",
     "ffmpeg-skill-license": "vendor/ffmpeg-skill/LICENSE",

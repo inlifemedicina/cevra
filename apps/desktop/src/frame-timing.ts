@@ -1,10 +1,11 @@
 import { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, isCfr30Frame, MAX_CFR30_FRAME } from "@cevra/project-ir";
 
-export { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, isCfr30Frame };
+export { floorMsToFrames, framesToMilliseconds, nearestMsToFrames, isCfr30Frame, MAX_CFR30_FRAME };
 
-export function formatFrames(frame: number): string {
-  const seconds = Math.floor(frame / 30);
-  return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}:${(frame % 30).toString().padStart(2, "0")}`;
+import { formatTime } from "./ui-model";
+
+export function formatFrames(frame: number, durationMs?: number): string {
+  return formatTime(framesToMilliseconds(frame), durationMs);
 }
 
 export function frameInput(value: string): number | null {
@@ -23,4 +24,10 @@ export function snapSourceMark(milliseconds: number, durationMs: number) {
   const frame = Math.min(maximumSourceFrame(durationMs), nearestMsToFrames(Math.min(milliseconds, framesToMilliseconds(MAX_CFR30_FRAME))));
   const projectedMs = framesToMilliseconds(frame);
   return { frame, projectedMs, deltaMs: projectedMs - milliseconds };
+}
+
+/** WK may display the preceding frame at its exact boundary. Seek inside the
+ * requested CFR frame; canonical clocks and terminal/initial positions stay exact. */
+export function cfr30DecoderSeekSeconds(frame: number, frameCount: number): number {
+  return framesToMilliseconds(frame) / 1000 + (frame > 0 && frame < frameCount ? 1 / 120 : 0);
 }

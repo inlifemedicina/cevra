@@ -1,5 +1,8 @@
+import { LayeredTitlePreview } from "./layered-title-preview.js";
+import { removeManualProjectSource } from "@cevra/application";
 import {
   LocalSourceIngestService,
+  LocalSourceRelocationService,
   EditorialDraftService,
   MediaApplicationService,
   ResolvedAudioPlanApplicationService,
@@ -7,6 +10,7 @@ import {
   SourceTechnicalDescriptorResolver,
   ManualVideoClipApplicationService,
   ManualVideoSequenceApplicationService,
+  ManualTitleApplicationService,
   ManualSequencePreviewApplicationService,
   ManualSequenceExportPreparationApplicationService,
   ManualSequenceExportApplicationService,
@@ -26,7 +30,7 @@ import type {
 } from "@cevra/application";
 import type { CreateEditorialDraftRequest, EditorialDraftState, EditorialDraftV1, ReviseEditorialDraftRequest, SemanticEditorialAnalysisCandidateV1 } from "@cevra/application";
 import type { TrimManualVideoClipRequest, CreateManualVideoClipRequest, LocalVideoPreviewRequest, LocalVideoPreview, SourceThumbnail, SourceThumbnailRequest } from "@cevra/application";
-import type { ManualVideoSequenceEdit } from "@cevra/application";
+import type { ManualVideoSequenceEdit, ManualTitleEdit } from "@cevra/application";
 import { validateManualExportPreparationRequest, type ManualExportPreparationRequest, type ManualExportPreparation } from "@cevra/application";
 import type { MediaEngineAdapter } from "@cevra/contracts";
 import {
@@ -76,6 +80,7 @@ function nativeDestinationPath(uri: string): string {
 export interface DesktopSessionServices {
   history: ProjectHistory;
   ingest?: Pick<LocalSourceIngestService, "ingest"> & Partial<Pick<LocalSourceIngestService, "reuseRegistered">>;
+  sourceRelocation?: Pick<LocalSourceRelocationService, "relocate">;
   sourceTechnicalDescriptor?: Pick<SourceTechnicalDescriptorApplicationService, "adopt">;
   transcription?: Pick<TranscriptionApplicationService, "transcribeSource">;
   mediaCapability: CapabilityState;
@@ -88,8 +93,10 @@ export interface DesktopSessionServices {
   manualExportPreparation?: Pick<ManualSequenceExportPreparationApplicationService, "prepare">;
   manualExport?: Pick<ManualSequenceExportApplicationService, "execute">;
   manualExportCapability?: CapabilityState;
+  manualTitleCapability?: CapabilityState;
   manualExportSettle?: () => Promise<void>;
   sourceThumbnail?: Pick<SourceThumbnailService, "prepare" | "close">;
+  layeredTitlePreview?: Pick<LayeredTitlePreview,"prepare"|"close">;
   derivedVideoPreview?: Pick<DerivedVideoPreview, "prepare"> & Partial<Pick<DerivedVideoPreview, "close">>;
   resolvedAudioPlan?: Pick<ResolvedAudioPlanApplicationService, "execute" | "markCheckpointSucceeded">;
   close?(): Promise<void>;
@@ -161,6 +168,8 @@ export class DesktopSession {
       } } : {}),
       closePending: this.closeAttempt !== null,
       capabilities: {
+        sourceRelocation: this.services.sourceRelocation && !this.services.temporaryEditorialReview ? available() : unavailable(this.services.temporaryEditorialReview ? "review-session" : "runtime-not-configured"),
+        manualTitle: this.services.temporaryEditorialReview ? unavailable("review-session") : this.services.manualTitleCapability ?? unavailable("runtime-not-configured"),
         mediaImport: { ...this.services.mediaCapability },
         transcription: { ...this.services.transcriptionCapability },
         manualExport: this.services.manualExport && this.services.manualExportSettle && !this.services.temporaryEditorialReview
@@ -240,6 +249,16 @@ export class DesktopSession {
       }, signal);
       await this.persistMutation();
       return this.state();
+    }));
+  }
+
+  async relocateLocalSource(params: { version: 1; sourceId: string; expectedSnapshotId: string; uri: string; operationId: string; locale: Locale }): Promise<{ state: DesktopHostState; sourceId: string; changed: boolean }> {
+    if (!this.services.sourceRelocation) throw safeError("SOURCE_RELOCATION_UNAVAILABLE");
+    const { operationId, locale: _locale, ...request } = params;
+    return this.runOperation(operationId, signal => this.runMutation(async () => {
+      const outcome = await this.services.sourceRelocation!.relocate(request, signal);
+      if (outcome.changed) await this.persistMutation();
+      return { state: this.state(), sourceId: outcome.sourceId, changed: outcome.changed };
     }));
   }
 
@@ -416,10 +435,13 @@ export class DesktopSession {
     if (this.services.temporaryEditorialReview) throw safeError("EDITORIAL_REVIEW_READ_ONLY");
     if (this.activeMutationTask) throw safeError("PROJECT_MUTATION_BUSY");
     const stable = structuredClone(request);
-    if (Object.keys(stable).some((key) => !["sourceId", "expectedSnapshotId", "clipId", "operationId", "sequence"].includes(key))
+    if (Object.keys(stable).some((key) => !["sourceId", "expectedSnapshotId", "clipId", "operationId", "sequence", "experimentalLayer"].includes(key))
       || (stable.sequence !== undefined && (stable.sequence !== true || stable.clipId !== undefined || !stable.operationId))
       || (stable.clipId !== undefined && (!stable.clipId || !stable.operationId))
       || (stable.operationId !== undefined && (typeof stable.operationId !== "string" || !stable.operationId))) throw safeError("MANUAL_VIDEO_INVALID_REQUEST");
+    if (stable.experimentalLayer !== undefined && (!stable.experimentalLayer || typeof stable.experimentalLayer !== "object" || Array.isArray(stable.experimentalLayer) || !stable.sequence || !stable.operationId || stable.experimentalLayer.version !== 1
+      || Object.keys(stable.experimentalLayer).some(k=>!["version","knownBaseId"].includes(k))
+      || (stable.experimentalLayer.knownBaseId !== undefined && !/^[a-f0-9]{64}$/.test(stable.experimentalLayer.knownBaseId)))) throw safeError("MANUAL_VIDEO_INVALID_REQUEST");
     if (stable.operationId !== undefined) {
       if (this.operations.has(stable.operationId!)) throw safeError("OPERATION_DUPLICATE");
       const resolve = () => (stable.clipId !== undefined || stable.sequence) ? resolvePreviewRange(this.services.history, stable)
@@ -438,7 +460,8 @@ export class DesktopSession {
         if (sequence && !this.services.manualSequencePreview) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
         const plan = sequence ? await this.services.manualSequencePreview!.prepare({ version: 1, expectedSnapshotId: stable.expectedSnapshotId }, signal) : undefined;
         const { source } = resolve();
-        const preview = this.services.derivedVideoPreview && (stable.clipId !== undefined || stable.sequence || supportsOriginalProxy(source))
+        if(stable.experimentalLayer&&!this.services.layeredTitlePreview)throw safeError("MANUAL_LAYER_UNAVAILABLE");
+        const preview = stable.experimentalLayer ? await this.services.layeredTitlePreview!.prepare(stable,signal) : this.services.derivedVideoPreview && (stable.clipId !== undefined || stable.sequence || supportsOriginalProxy(source))
           ? await this.services.derivedVideoPreview.prepare(stable, signal)
           : await readLocalVideoPreview(source, stable.expectedSnapshotId, signal);
         if (signal.aborted) throw safeError("OPERATION_CANCELLED");
@@ -502,8 +525,23 @@ export class DesktopSession {
     });
   }
 
+  async editManualTitle(request: ManualTitleEdit): Promise<{ state: DesktopHostState; graphicId?: string }> {
+    return this.runMutation(async () => {
+      if (!this.services.manualTitleCapability?.available) throw safeError("MANUAL_TITLE_UNAVAILABLE");
+      const before = this.services.history.journalIdentity;
+      const result = new ManualTitleApplicationService(this.services.history).edit(request);
+      if (before !== this.services.history.journalIdentity) await this.persistMutation();
+      return { state: this.state(), ...(result.graphicId ? { graphicId: result.graphicId } : {}) };
+    });
+  }
+
   async editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopHostState; changedClipIds: string[] }> {
     return this.runMutation(async () => {
+      if (request.type === "remove-source") {
+        const result = removeManualProjectSource(this.services.history, request);
+        await this.persistMutation();
+        return { state: this.state(), changedClipIds: result.changedClipIds };
+      }
       if (!this.services.manualVideoSequence) throw safeError("MANUAL_VIDEO_UNAVAILABLE");
       const before = this.services.history.journalIdentity;
       const result = await this.services.manualVideoSequence.edit(structuredClone(request));
@@ -550,6 +588,7 @@ export class DesktopSession {
   async close(): Promise<void> {
     this.closing = true;
     this.services.derivedVideoPreview?.close?.();
+    this.services.layeredTitlePreview?.close();
     this.services.sourceThumbnail?.close();
     for (const controller of this.operations.values()) controller.abort();
     await Promise.allSettled([
@@ -560,6 +599,7 @@ export class DesktopSession {
       await this.services.close?.();
     } finally {
       this.services.derivedVideoPreview?.close?.();
+    this.services.layeredTitlePreview?.close();
       this.services.sourceThumbnail?.close();
       await this.services.persistence?.close();
     }
@@ -645,10 +685,16 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
     const transcription = configuredMediaRuntime.invalid
       ? { capability: unavailable("runtime-invalid") }
       : await createTranscriptionServices(history, environment, configuredMediaRuntime.paths?.root, sourceIdentity);
+    const derived = media?.engine && media.settle ? new DerivedVideoPreview({history,engine:media.engine,settle:media.settle,
+      ...(process.env.CEVRA_EXPERIMENTAL_TITLE_LAYER === "1" ? {cacheLimits:{maxEntries:2,maxBytes:16*1024*1024}} : {}),runtimeIdentity:()=>createHash("sha256").update(readFileSync(resolve(configuredMediaRuntime.paths!.root,"manifest.json"))).digest("hex")}) : undefined;
+    const layered = process.env.CEVRA_EXPERIMENTAL_TITLE_LAYER === "1" && derived && media?.engine && media.settle ? new LayeredTitlePreview({history,engine:media.engine,video:derived,settle:media.settle,
+      runtimeIdentity:()=>createHash("sha256").update(readFileSync(resolve(configuredMediaRuntime.paths!.root,"manifest.json"))).digest("hex")}) : undefined;
     return new DesktopSession({
       history,
+      sourceRelocation: new LocalSourceRelocationService(history, sourceIdentity),
       manualVideoClip: new ManualVideoClipApplicationService({ history, identity: sourceIdentity }),
       manualVideoSequence: new ManualVideoSequenceApplicationService({ history, identity: sourceIdentity }),
+      ...(media?.manualTitleCapability ? { manualTitleCapability: media.manualTitleCapability } : {}),
       manualSequencePreview: new ManualSequencePreviewApplicationService({ history, identity: sourceIdentity }),
       manualExportPreparation: new ManualSequenceExportPreparationApplicationService({ history, identity: sourceIdentity }),
       ...(media?.manualExportCapability?.available && media.settle ? {
@@ -662,8 +708,7 @@ export async function createProductionDesktopSession(environment: NodeJS.Process
       transcriptionCapability: transcription.capability,
       persistence: opened.persistence,
       ...(media?.resolvedAudioPlan ? { resolvedAudioPlan: media.resolvedAudioPlan } : {}),
-      ...(media?.engine && media.settle ? { sourceThumbnail: new SourceThumbnailService({ history, engine: media.engine, settle: media.settle }), derivedVideoPreview: new DerivedVideoPreview({ history, engine: media.engine, settle: media.settle,
-        runtimeIdentity: () => createHash("sha256").update(readFileSync(resolve(configuredMediaRuntime.paths!.root, "manifest.json"))).digest("hex") }) } : {}),
+      ...(media?.engine && media.settle && derived ? { sourceThumbnail: new SourceThumbnailService({ history, engine: media.engine, settle: media.settle }), derivedVideoPreview: derived, ...(layered?{layeredTitlePreview:layered}:{}) } : {}),
       close: async () => {
         await media?.close?.();
       }
@@ -684,6 +729,7 @@ async function createMediaServices(
 ): Promise<{
   capability: CapabilityState;
   manualExportCapability?: CapabilityState;
+  manualTitleCapability?: CapabilityState;
   engine?: MediaEngineAdapter;
   settle?: () => Promise<void>;
   ingest?: LocalSourceIngestService;
@@ -719,6 +765,8 @@ async function createMediaServices(
     const services = composeMediaApplicationServices(history, executions, engine, sourceIdentity);
     return {
       capability: available(),
+      manualTitleCapability: (await engine.capabilities()).some(capability => capability.id === "media.cevra-manual-title-inter-v1" && capability.available)
+        ? available() : unavailable("runtime-invalid"),
       manualExportCapability: (await engine.capabilities()).some(capability => capability.id === "media.cevra-render-manual-video-sequence" && capability.available)
         ? available() : unavailable("runtime-invalid"),
       engine,

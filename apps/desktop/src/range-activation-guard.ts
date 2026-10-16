@@ -3,7 +3,7 @@ import type { ProjectIR } from "@cevra/project-ir";
 
 type Activation = { epoch: number; target: Element; cancelled: boolean; pointerId?: number };
 function actionTarget(target: EventTarget | null): Element | null {
-  return target instanceof Element ? target.closest("button, summary, select, input[type=checkbox], input[type=radio], a[href], [role=button], [data-clip-id]") : null;
+  return target instanceof Element ? target.closest("button, summary, select, input[type=checkbox], input[type=radio], a[href], [role=button], [role=slider], input[type=range], [data-clip-id]") : null;
 }
 
 /** A failed range settlement consumes the activation which was already in progress.
@@ -62,7 +62,10 @@ export function useRangeActivationGuard() {
   useEffect(() => {
     let keyRelease: ReturnType<typeof setTimeout> | undefined;
     const release = (event: globalThis.PointerEvent) => {
-      if (pointer.current?.pointerId === event.pointerId && pointer.current?.target !== actionTarget(event.target)) pointer.current = null;
+      if (pointer.current?.pointerId === event.pointerId) {
+        if (pointer.current.target !== actionTarget(event.target)) pointer.current = null;
+        scope(pointer.current);
+      }
     };
     const cancel = (event: globalThis.PointerEvent) => { const value = pointer.current; if (value && value.pointerId === event.pointerId) value.cancelled = true; };
     const blur = () => { if (pointer.current) pointer.current.cancelled = true; if (keyboard.current) keyboard.current.cancelled = true; if (drag.current) drag.current.cancelled = true; };

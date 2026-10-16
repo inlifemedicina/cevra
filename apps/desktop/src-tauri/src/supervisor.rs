@@ -1455,8 +1455,10 @@ mod tests {
         let lease = supervisor.begin_preparation_picker("export-mutating-picker").unwrap();
         assert_eq!(supervisor.shutdown().await.unwrap_err().code, "PROJECT_CLOSE_BUSY");
         supervisor.cancel_operation("export-mutating-picker").await.unwrap();
-        assert_eq!(supervisor.request_picked_mutation(&lease, "video.exportManualSequence", json!({})).await.unwrap_err().code, "OPERATION_CANCELLED");
-        assert!(!control.writes.lock().unwrap().iter().any(|request| request["method"] == "video.exportManualSequence"));
+        for method in ["video.exportManualSequence", "media.relocateLocal"] {
+            assert_eq!(supervisor.request_picked_mutation(&lease, method, json!({})).await.unwrap_err().code, "OPERATION_CANCELLED");
+            assert!(!control.writes.lock().unwrap().iter().any(|request| request["method"] == method));
+        }
         assert_eq!(control.kills.load(Ordering::Relaxed), 0);
     }
 

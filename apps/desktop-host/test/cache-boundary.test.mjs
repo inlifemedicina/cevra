@@ -78,11 +78,13 @@ test("trusted cache root stays host-internal and adds no protocol or WebView com
   assert.doesNotMatch(protocolSource, /transcript.cache|cacheRoot|cachePath/i);
   assert.doesNotMatch(rustMain, /desktop_.*cache/i);
   assert.deepEqual(capability.permissions.sort(), [
+    "allow-desktop-locate-media",
+    "allow-desktop-edit-manual-title",
     "allow-desktop-cancel-operation", "allow-desktop-get-state", "allow-desktop-pick-and-ingest-media",
     "allow-desktop-redo", "allow-desktop-transcribe-source", "allow-desktop-undo",
     "allow-desktop-get-editorial-draft", "allow-desktop-revise-editorial-draft",
     "allow-desktop-thumbnail-local-video",
-    "allow-desktop-preview-local-video", "allow-desktop-prepare-manual-export", "allow-desktop-export-manual-sequence", "allow-desktop-preview-manual-sequence-conform", "allow-desktop-create-manual-video-clip", "allow-desktop-trim-manual-video-clip",
+    "allow-desktop-preview-local-video", "allow-desktop-record-layer-presentation", "allow-desktop-prepare-manual-export", "allow-desktop-export-manual-sequence", "allow-desktop-preview-manual-sequence-conform", "allow-desktop-create-manual-video-clip", "allow-desktop-trim-manual-video-clip",
     "allow-desktop-retry-checkpoint", "allow-desktop-get-close-state", "allow-desktop-edit-manual-video-sequence",
     "allow-desktop-get-media-drop-state", "allow-desktop-import-dropped-media"
   ].sort());

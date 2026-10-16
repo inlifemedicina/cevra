@@ -4,6 +4,7 @@ import { type SourceContentIdentityPort } from "./source-technical-descriptor.js
 import { manualVideoError, resolveManualVideo, verifyManualVideoSource } from "./manual-video-clip.js";
 
 import { copyManualClip, supportsManualClipExtensions } from "./manual-clip-presentation.js";
+import { resolveProjectManualTitle } from "./manual-title.js";
 
 interface Binding { version: 1; expectedSnapshotId: string }
 interface SourceRange { sourceId: string; sourceStartMs: number; sourceEndMs: number }
@@ -14,6 +15,7 @@ export type ManualVideoSequenceEditV1 = Binding & (
   | { type: "duplicate-many"; clipIds: readonly string[] }
   | { type: "remove"; clipId: string }
   | { type: "remove-many"; clipIds: readonly string[] }
+  | { type: "remove-source"; sourceId: string; dependentClipIds: readonly string[] }
   | { type: "trim"; clipId: string; sourceStartMs: number; sourceEndMs: number }
   | { type: "split"; clipId: string; timelineAtMs: number }
   | { type: "reorder"; clipIds: readonly string[] }
@@ -26,6 +28,7 @@ export type ManualVideoSequenceEditV2 = { version: 2; expectedSnapshotId: string
   | { type: "duplicate-many"; clipIds: readonly string[] }
   | { type: "remove"; clipId: string }
   | { type: "remove-many"; clipIds: readonly string[] }
+  | { type: "remove-source"; sourceId: string; dependentClipIds: readonly string[] }
   | { type: "trim"; clipId: string; sourceStartFrame: number; sourceEndFrame: number }
   | { type: "split"; clipId: string; timelineAtFrame: number }
   | { type: "reorder"; clipIds: readonly string[] }
@@ -49,13 +52,13 @@ export interface ManualVideoSequenceConformPreview {
 const fields = {
   append: ["sourceId", "sourceStartMs", "sourceEndMs"],
   insert: ["beforeClipId", "sourceId", "sourceStartMs", "sourceEndMs"],
-  duplicate: ["clipId"], "duplicate-many": ["clipIds"], remove: ["clipId"], "remove-many": ["clipIds"],
+  duplicate: ["clipId"], "duplicate-many": ["clipIds"], remove: ["clipId"], "remove-many": ["clipIds"], "remove-source": ["sourceId", "dependentClipIds"],
   trim: ["clipId", "sourceStartMs", "sourceEndMs"],
   split: ["clipId", "timelineAtMs"], reorder: ["clipIds"]
 } as const;
 const frameFields = {
   append: ["sourceId", "sourceStartFrame", "sourceEndFrame"], insert: ["beforeClipId", "sourceId", "sourceStartFrame", "sourceEndFrame"],
-  duplicate: ["clipId"], "duplicate-many": ["clipIds"], remove: ["clipId"], "remove-many": ["clipIds"], trim: ["clipId", "sourceStartFrame", "sourceEndFrame"],
+  duplicate: ["clipId"], "duplicate-many": ["clipIds"], remove: ["clipId"], "remove-many": ["clipIds"], "remove-source": ["sourceId", "dependentClipIds"], trim: ["clipId", "sourceStartFrame", "sourceEndFrame"],
   split: ["clipId", "timelineAtFrame"], reorder: ["clipIds"], conform: ["clips"]
 } as const;
 const fail = (code: string): never => { throw manualVideoError(`MANUAL_SEQUENCE_${code}`); };
@@ -74,7 +77,7 @@ export function validateManualVideoSequenceEdit(request: unknown): ManualVideoSe
     const field = (value as unknown as Record<string, unknown>)[key];
     if (key.endsWith("Ms")) { if (!Number.isSafeInteger(field)) fail("INVALID_REQUEST"); }
     else if (key.endsWith("Frame")) { if (!isCfr30Frame(field)) fail("INVALID_REQUEST"); }
-    else if (key === "clipIds") { if (!Array.isArray(field) || field.some(id => typeof id !== "string" || !id)) fail("INVALID_REQUEST"); }
+    else if ((key === "clipIds" || key === "dependentClipIds")) { if (!Array.isArray(field) || field.some(id => typeof id !== "string" || !id)) fail("INVALID_REQUEST"); }
     else if (key === "clips") {
       if (!Array.isArray(field) || field.some(clip => !clip || typeof clip !== "object" || Array.isArray(clip)
         || Object.keys(clip).length !== 3 || Object.keys(clip).some(key => !["clipId", "sourceStartFrame", "sourceEndFrame"].includes(key))
@@ -88,7 +91,8 @@ export function validateManualVideoSequenceEdit(request: unknown): ManualVideoSe
 /** G1 intent scope only; general Project IR continues to permit other compositions. */
 export function resolveManualVideoSequence(project: Readonly<ProjectIR>, expectedSnapshotId: string): TimelineClip[] {
   if (project.history.headSnapshotId !== expectedSnapshotId) fail("STALE");
-  if (project.captions.length || project.graphics.length) fail("UNSUPPORTED");
+  if (project.captions.length) fail("UNSUPPORTED");
+  resolveProjectManualTitle(project);
   const ordered = [...project.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs);
   const trackId = ordered[0]?.trackId;
   const track = project.timeline.tracks.find(item => item.id === trackId);
@@ -122,6 +126,7 @@ export class ManualVideoSequenceApplicationService {
 
   async edit(request: ManualVideoSequenceEdit): Promise<{ project: ProjectIR; changedClipIds: string[] }> {
     const stable = validateManualVideoSequenceEdit(request);
+    if (stable.type === "remove-source") return removeManualProjectSource(this.options.history, stable);
     if (stable.version === 2) return this.editFrames(stable);
     if (this.options.history.current.timeline.timingPolicy !== "legacy-milliseconds") fail("UNSUPPORTED");
     return this.editLegacy(stable);
@@ -388,4 +393,18 @@ export class ManualVideoSequenceApplicationService {
     this.options.history.commit({ type: "timeline.edit", version: 1, edits }, { type: "user" });
     return { project: this.options.history.current, changedClipIds };
   }
+}
+
+/** Project membership only. Neither this service nor its command reads/removes files. */
+export function removeManualProjectSource(history: ProjectHistory, request: ManualVideoSequenceEdit) {
+  const stable = validateManualVideoSequenceEdit(request);
+  if (stable.type !== "remove-source") return fail("INVALID_REQUEST");
+  const project = history.current;
+  if (project.history.headSnapshotId !== stable.expectedSnapshotId) return fail("STALE");
+  if (!project.sources.some(source => source.id === stable.sourceId)) return fail("UNKNOWN_SOURCE");
+  const dependencies = project.timeline.clips.filter(clip => clip.sourceId === stable.sourceId).map(clip => clip.id).sort();
+  if (JSON.stringify(dependencies) !== JSON.stringify([...stable.dependentClipIds].sort())) return fail("STALE");
+  if (dependencies.length) resolveManualVideoSequence(project, stable.expectedSnapshotId);
+  history.commit({ type: "source.removeFromProject", version: 1, sourceId: stable.sourceId, dependentClipIds: dependencies }, { type: "user" });
+  return { project: history.current, changedClipIds: dependencies };
 }

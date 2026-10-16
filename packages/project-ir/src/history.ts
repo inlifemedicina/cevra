@@ -335,12 +335,14 @@ function defaultId(): string {
 function transcriptMutationSource(command: EditCommand): Id | undefined {
   switch (command.type) {
     case "source.remove":
+    case "source.removeFromProject":
     case "transcript.remove":
       return command.sourceId;
     case "transcript.set":
       return command.transcript.sourceId;
     case "project.rename":
     case "source.add":
+    case "source.relocate":
     case "source.technicalDescriptor.set":
     case "track.add":
     case "track.remove":
@@ -350,6 +352,8 @@ function transcriptMutationSource(command: EditCommand): Id | undefined {
     case "timeline.edit":
     case "caption.upsert":
     case "caption.remove":
+    case "graphic.manualTitle.set":
+    case "graphic.manualTitle.remove":
     case "style.patch":
     case "export.add":
       return undefined;

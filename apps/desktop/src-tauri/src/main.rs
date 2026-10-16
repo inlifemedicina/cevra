@@ -3,11 +3,14 @@
 mod command_manifest;
 mod media_drop;
 mod commands;
+mod layer_preview_diagnostics;
 mod fa02_review;
 mod protocol;
 mod supervisor;
 
 use commands::{
+    desktop_locate_media,
+    desktop_edit_manual_title,
     desktop_edit_manual_video_sequence,
     desktop_get_close_state,
     desktop_get_media_drop_state, desktop_import_dropped_media,
@@ -35,12 +38,15 @@ fn main() {
         .manage(supervisor)
         .manage(media_drops)
         .invoke_handler(tauri::generate_handler![
+            desktop_locate_media,
+            desktop_edit_manual_title,
             desktop_edit_manual_video_sequence,
             desktop_get_close_state,
             desktop_get_media_drop_state,
             desktop_import_dropped_media,
             desktop_retry_checkpoint,
             desktop_get_state,
+            layer_preview_diagnostics::desktop_record_layer_presentation,
             desktop_pick_and_ingest_media,
             desktop_transcribe_source,
             desktop_undo,

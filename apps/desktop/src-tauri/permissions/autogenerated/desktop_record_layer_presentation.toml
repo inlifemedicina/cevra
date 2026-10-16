@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-desktop-record-layer-presentation"
+description = "Enables the desktop_record_layer_presentation command without any pre-configured scope."
+commands.allow = ["desktop_record_layer_presentation"]
+
+[[permission]]
+identifier = "deny-desktop-record-layer-presentation"
+description = "Denies the desktop_record_layer_presentation command without any pre-configured scope."
+commands.deny = ["desktop_record_layer_presentation"]

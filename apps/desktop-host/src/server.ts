@@ -11,11 +11,13 @@ import {
   validateCloseParams,
   validateEditorialRevisionParams,
   validateIngestParams,
+  validateSourceRelocationParams,
   validateNoParams,
   validateTranscriptionParams,
   validateVideoPreviewParams, validateVideoThumbnailParams,
   validateManualClipParams, validateManualTrimParams,
   validateManualSequenceParams,
+  validateManualTitleParams,
   validateManualExportParams,
   validateConformPreviewParams,
   type HostErrorPayload,
@@ -123,6 +125,8 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       return { result: await requireSession(session).retryCheckpoint(validateCheckpointParams(request.params, request.id)) };
     case "media.ingestLocal":
       return { result: await requireSession(session).ingestLocal(validateIngestParams(request.params, request.id)) };
+    case "media.relocateLocal":
+      return { result: await requireSession(session).relocateLocalSource(validateSourceRelocationParams(request.params, request.id)) };
     case "video.thumbnailLocal":
       return { result: await requireSession(session).thumbnailLocalVideo(validateVideoThumbnailParams(request.params, request.id)) };
     case "video.previewLocal":
@@ -139,6 +143,8 @@ async function dispatch(session: DesktopSession | null, request: HostRequest, st
       return { result: requireSession(session).previewManualSequenceConform(validateConformPreviewParams(request.params, request.id)) };
     case "video.editManualSequence":
       return { result: await requireSession(session).editManualVideoSequence(validateManualSequenceParams(request.params, request.id)) };
+    case "video.editManualTitle":
+      return { result: await requireSession(session).editManualTitle(validateManualTitleParams(request.params, request.id)) };
     case "video.createManualClip":
       return { result: await requireSession(session).createManualVideoClip(validateManualClipParams(request.params, request.id)) };
     case "video.trimManualClip":

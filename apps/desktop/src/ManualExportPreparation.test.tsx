@@ -144,3 +144,16 @@ it("a late post-publication memory failure preserves the closed resource reason 
     }
   }
 });
+
+it.each(["pt-BR", "en-US"] as const)("%s explains title colour export refusal through Tauri without reporting publication or replay", async locale => {
+  const before = history.toArchive(), onExported = vi.fn(), invoke = vi.fn(async () => {
+    throw { code: "MANUAL_EXPORT_TITLE_COLOUR_UNSUPPORTED", message: "/private/worker/diagnostic", details: { rawCause: "/private/original.mp4" } };
+  });
+  render(<ManualExportPreparationPanel {...props(new TauriDesktopBackend(invoke as never), locale)} onExported={onExported} />);
+  fireEvent.click(screen.getByRole("button", { name: translate(locale, "export.choose") }));
+  await screen.findByText(translate(locale, "export.titleColourUnsupported"));
+  expect(onExported).not.toHaveBeenCalled(); expect(invoke).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText("new.mp4")).toBeNull(); expect(document.body.textContent).not.toContain("/private/");
+  expect(screen.getByRole("button", { name: translate(locale, "export.choose") }).matches(":disabled")).toBe(false);
+  expect(history.toArchive()).toEqual(before);
+});

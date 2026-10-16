@@ -208,7 +208,7 @@ describe("CEVRA Vids desktop shell", () => {
   it("binds a selected B-roll clip to its source and shows the no-transcript state", async () => {
     const user = await renderApplication();
     const timeline = screen.getByLabelText("Linha do tempo");
-    await user.click(within(timeline).getByRole("button", { name: /Trecho \d+ · Fonte · Vídeo 2 · B-roll_Detalhes.mp4/ }));
+    await user.click(within(timeline).getByRole("button", { name: /Trecho \d+ · Vídeo 2 · B-roll_Detalhes.mp4/ }));
     const shell = screen.getByTestId("app-shell");
     expect(shell.dataset.selectedProjectItemId).toBe("clip-broll-1");
     expect(shell.dataset.activeSourceId).toBe("source-broll");
@@ -276,7 +276,7 @@ describe("CEVRA Vids desktop shell", () => {
     await user.click(screen.getByRole("button", { name: "Trocar idioma" }));
     expect(screen.getByRole("tab", { name: "Edit" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Transcription" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Export MP4" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
     expect(document.documentElement.lang).toBe("en-US");
   });
 
@@ -299,7 +299,7 @@ describe("CEVRA Vids desktop shell", () => {
   it("makes every deferred production action explicit and unavailable", async () => {
     await renderApplication();
     expect((screen.getByRole("button", { name: "Importar" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Exportar MP4" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Exportar" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("A importação real de arquivos não está conectada nesta versão de apresentação.")).toBeTruthy();
   });
 
@@ -311,7 +311,7 @@ describe("CEVRA Vids desktop shell", () => {
     expect(screen.queryByText(/Clareza gera confiança/)).toBeNull();
     expect(screen.getAllByTestId(/^timeline-track-/)).toHaveLength(7);
     expect(screen.getByRole("slider", { name: "Régua e cursor da linha do tempo" }).getAttribute("aria-valuemax")).toBe("0");
-    expect(screen.getByTestId("preview-timecode").textContent).toBe("Fonte 00:00.000 / 00:00.000");
+    expect(screen.getByTestId("preview-timecode").textContent).toBe("Original 00:00,00 / 00:00,00");
     expect(screen.getByTestId("app-shell").dataset.activeSourceId).toBeUndefined();
   });
 
@@ -709,26 +709,38 @@ it("inspector reads canonical opacity and reports unknown transform/font/audio p
 });
 
 it("timeline height supports bounded keyboard edits, matching pointer retirement and cancellation, with no history mutation", async () => {
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: 900 }); fireEvent(window, new Event("resize"));
   const backend = new FunctionalDesktopBackend(), before = backend.history.toArchive();
   render(<App backend={backend} />); const shell = await screen.findByTestId("app-shell");
   const handle = screen.getByRole("separator", { name: translate("pt-BR", "timeline.resize") });
   const height = () => shell.style.getPropertyValue("--timeline-height");
-  fireEvent.keyDown(handle, { key: "End" }); expect(height()).toBe("420px");
-  fireEvent.keyDown(handle, { key: "ArrowDown", shiftKey: true }); expect(height()).toBe("372px");
-  fireEvent.keyDown(handle, { key: "Home", ctrlKey: true, altKey: true }); expect(height()).toBe("372px");
+  fireEvent.keyDown(handle, { key: "End" }); expect(height()).toBe("520px");
+  fireEvent.keyDown(handle, { key: "ArrowDown", shiftKey: true }); expect(height()).toBe("472px");
+  fireEvent.keyDown(handle, { key: "Home", ctrlKey: true, altKey: true }); expect(height()).toBe("472px");
   const pointer = (target: Element | Window, type: string, id: number, y = 100) => {
     const event = new MouseEvent(type, { bubbles: true, button: 0, clientY: y });
     Object.defineProperty(event, "pointerId", { value: id }); fireEvent(target, event);
   };
-  pointer(handle, "pointerdown", 1); pointer(window, "pointermove", 2, 0); expect(height()).toBe("372px");
-  pointer(window, "pointermove", 1, 0); expect(height()).toBe("420px");
-  fireEvent.keyDown(window, { key: "Escape", isComposing: true, keyCode: 229 }); expect(height()).toBe("420px");
-  fireEvent.keyDown(window, { key: "Escape", ctrlKey: true, altKey: true }); expect(height()).toBe("420px");
-  fireEvent.keyDown(window, { key: "Escape" }); expect(height()).toBe("372px");
-  pointer(handle, "pointerdown", 3); pointer(window, "pointermove", 3, 500); expect(height()).toBe("220px");
-  fireEvent(window, new Event("blur")); expect(height()).toBe("372px");
+  pointer(handle, "pointerdown", 1); pointer(window, "pointermove", 2, 0); expect(height()).toBe("472px");
+  pointer(window, "pointermove", 1, 0); expect(height()).toBe("520px");
+  fireEvent.keyDown(window, { key: "Escape", isComposing: true, keyCode: 229 }); expect(height()).toBe("520px");
+  fireEvent.keyDown(window, { key: "Escape", ctrlKey: true, altKey: true }); expect(height()).toBe("520px");
+  fireEvent.keyDown(window, { key: "Escape" }); expect(height()).toBe("472px");
+  pointer(handle, "pointerdown", 3); pointer(window, "pointermove", 3, 500); expect(height()).toBe("200px");
+  fireEvent(window, new Event("blur")); expect(height()).toBe("472px");
   pointer(handle, "pointerdown", 4); pointer(window, "pointermove", 4, 500); pointer(window, "pointerup", 4, 500);
-  expect(height()).toBe("220px");
-  pointer(window, "pointermove", 4, 0); expect(height()).toBe("220px");
+  expect(height()).toBe("200px");
+  pointer(window, "pointermove", 4, 0); expect(height()).toBe("200px");
   expect(backend.history.toArchive()).toEqual(before);
+});
+
+it("keeps preview space after enlarging the timeline and reducing the native window", async () => {
+  Object.defineProperty(window,"innerHeight",{configurable:true,value:900});
+  const backend = new FunctionalDesktopBackend(); const {container} = render(<App backend={backend}/>);
+  await screen.findByRole("button",{name:"Desfazer"}); const handle = screen.getByRole("separator",{name:translate("pt-BR","timeline.resize")});
+  fireEvent.keyDown(handle,{key:"End"}); expect((container.querySelector('[data-testid="app-shell"]') as HTMLElement).style.getPropertyValue("--timeline-height")).toBe("520px");
+  Object.defineProperty(window,"innerHeight",{configurable:true,value:680}); fireEvent(window,new Event("resize"));
+  expect((container.querySelector('[data-testid="app-shell"]') as HTMLElement).style.getPropertyValue("--timeline-height")).toBe("320px");
+  fireEvent.keyDown(handle,{key:"End"}); expect((container.querySelector('[data-testid="app-shell"]') as HTMLElement).style.getPropertyValue("--timeline-height")).toBe("320px");
+  Object.defineProperty(window,"innerHeight",{configurable:true,value:900}); fireEvent(window,new Event("resize"));
 });

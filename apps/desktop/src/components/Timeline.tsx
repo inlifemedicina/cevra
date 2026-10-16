@@ -1,14 +1,15 @@
-import type { CaptionCue, GraphicItem, ProjectIR, TimelineClip, TimelineTrack } from "@cevra/project-ir";
+import { MANUAL_TITLE_EXTENSION, type CaptionCue, type GraphicItem, type ProjectIR, type TimelineClip, type TimelineTrack } from "@cevra/project-ir";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type HTMLAttributes } from "react";
 import { presentClips } from "../clip-presentation";
 import { timelineGeometry, timelineRulerTicks, trailingTimelineMs } from "../timeline-geometry";
-import type { ManualVideoSequenceEdit, TrimManualVideoClipRequest } from "@cevra/application";
+import type { ManualTitleEdit, ManualVideoSequenceEdit, TrimManualVideoClipRequest } from "@cevra/application";
 import { ManualSequenceControls, type ManualRangeDraftController } from "./ManualSequenceControls";
 import type { RefObject } from "react";
 import type { RangeActionGate } from "../range-activation-guard";
 import { supportsManualClipPreview } from "./ManualVideoPreview";
 import { formatMilliseconds, formatTime, type Translate } from "../ui-model";
 import { Icon } from "./Icon";
+import { useTitleTimelineRange, type TitleTimelineModel, type TitleTimelineRangeEdit } from "./ManualTitleTimeline";
 
 import type { SourcePresentation } from "../source-presentation";
 import type { DesktopBackend } from "../backend/desktop-backend";
@@ -53,6 +54,9 @@ interface TimelineProps {
   onTrim?(request: TrimManualVideoClipRequest): Promise<void>;
   sequenceClips?: readonly TimelineClip[];
   onSequenceEdit?(request: ManualVideoSequenceEdit): Promise<void>;
+  onRemoveTitle?(request: ManualTitleEdit): Promise<void>;
+  onTitleRangeEdit?(request: TitleTimelineRangeEdit): Promise<void>;
+  titleRangeDraft?: RefObject<ManualRangeDraftController | null>;
   onCommitRange?(request: ManualVideoSequenceEdit): Promise<void>;
   rangeDraft?: RefObject<ManualRangeDraftController | null>;
   onRangeAction?: RangeActionGate;
@@ -63,6 +67,7 @@ interface TimelineProps {
   onResizeCancel?(event: ReactPointerEvent<HTMLButtonElement>): void;
   onResizeKey?(event: ReactKeyboardEvent<HTMLButtonElement>): void;
   height?: number;
+  maximumHeight?: number;
 }
 
 type TimelineVisual =
@@ -70,7 +75,7 @@ type TimelineVisual =
   | { id: string; kind: "caption"; startMs: number; endMs: number; label: string; caption: CaptionCue }
   | { id: string; kind: "graphic"; startMs: number; endMs: number; label: string; graphic: GraphicItem };
 
-export function Timeline({ project, presentations, selectedId, selectedClipIds, getSelectionEpoch, onSelectClips, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, onResizeCancel, onResizeKey, height = 292, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit, onCommitRange, rangeDraft, onRangeAction, backend }: TimelineProps) {
+export function Timeline({ project, presentations, selectedId, selectedClipIds, getSelectionEpoch, onSelectClips, playheadMs, zoom, t, onSelect, onPlayheadChange, onZoomChange, onResizeStart, onResizeCancel, onResizeKey, height = 340, maximumHeight = 520, trimAvailable, trimBusy, onTrim, sequenceClips, onSequenceEdit, onRemoveTitle, onTitleRangeEdit, titleRangeDraft, onCommitRange, rangeDraft, onRangeAction, backend }: TimelineProps) {
   const selectedIds = selectedClipIds ?? (selectedId && project.timeline.clips.some(clip => clip.id === selectedId) ? [selectedId] : []);
   const orderedIds = sequenceClips?.map(clip => clip.id) ?? [];
   const clipLabels = presentClips(project, presentations, t);
@@ -103,7 +108,12 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
   const geometry = sequenceClips ? timelineGeometry(canonicalDuration, viewport, pixelsPerSecond) : { width: viewport * zoom / 100, duration: legacyGeometry };
   const geometryDuration = geometry.duration;
   const geometryKey = `${geometry.width}:${geometry.duration}:${viewport}:${pixelsPerSecond}`;
-  const tracks = project.timeline.tracks.length > 0 ? project.timeline.tracks : EMPTY_TRACK_SCAFFOLD;
+  const titleRange = useTitleTimelineRange({ project, selectedId, busy: editingDisabled, geometryKey, geometryDuration,
+    draftRef: titleRangeDraft, onEdit: onTitleRangeEdit, onAction: onRangeAction, t });
+  const baseTracks = project.timeline.tracks.length > 0 ? project.timeline.tracks : EMPTY_TRACK_SCAFFOLD;
+  // Graphics own no video/audio track mutation; show the existing overlay lane as a presentation scaffold.
+  const tracks = project.graphics.length && !baseTracks.some(track => track.id === "track-v4")
+    ? [...baseTracks, EMPTY_TRACK_SCAFFOLD.find(track => track.id === "track-v4")!] : baseTracks;
   const playheadPercent = canonicalDuration === 0 ? 0 : (playheadMs / geometryDuration) * 100;
   const ticks = timelineRulerTicks(geometryDuration, geometry.width / geometryDuration * 1000, scroll, viewport);
   useLayoutEffect(() => {
@@ -164,6 +174,13 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
     try { await onSequenceEdit(request); return true; } catch { return false; /* App presents the canonical error/reconciliation. */ }
     finally { editPending.current = false; setPending(false); }
   }
+  async function removeTitle() {
+    if (editingDisabled || editPending.current || !onRemoveTitle) return;
+    editPending.current = true; setPending(true);
+    try { await onRemoveTitle({ version: 1, type: "remove", expectedSnapshotId: project.history.headSnapshotId! }); }
+    catch { /* App presents the canonical error/reconciliation. */ }
+    finally { editPending.current = false; setPending(false); }
+  }
   function keyboardSelection(event: ReactKeyboardEvent<HTMLElement>) {
     if (event.defaultPrevented || event.nativeEvent.defaultPrevented || event.repeat || timelineShortcutBlocked(event.nativeEvent)) return;
     if (event.target === event.currentTarget) {
@@ -178,6 +195,13 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
     if (shortcutAction(event, "preview") === "play") {
       const shell = event.currentTarget.closest<HTMLElement>(".app-shell");
       if (shell && activateShortcut(event, shell, "play")) return;
+    }
+    const selectedTitle = project.graphics.find(graphic => graphic.id === selectedId && graphic.extensions?.[MANUAL_TITLE_EXTENSION]);
+    if (selectedTitle && ["Delete", "Backspace"].includes(event.key) && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+      if (!editingDisabled && onRemoveTitle) {
+        event.preventDefault(); event.stopPropagation(); void removeTitle();
+      }
+      return;
     }
     if (!onSelectClips || sequenceClips === undefined || event.metaKey && event.ctrlKey || event.ctrlKey && event.altKey) return;
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a" && !event.altKey && !event.shiftKey) {
@@ -252,7 +276,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
     };
   }
   const selectedDuration = project.timeline.clips.filter(clip => selectedIds.includes(clip.id)).reduce((total, clip) => total + clip.timelineEndMs - clip.timelineStartMs, 0);
-  const durationLabel = (duration: number) => t(grid ? "timeline.durationFrames" : "timeline.durationSeconds", { seconds: Number((duration / 1000).toFixed(3)), frames: nearestMsToFrames(duration) });
+  const durationLabel = (ms: number) => formatTime(ms, canonicalDuration);
 
   function movePlayheadFromKeyboard(event: ReactKeyboardEvent<HTMLElement>) {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || trimBusy || timelineShortcutBlocked(event.nativeEvent)) return;
@@ -270,14 +294,14 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
 
   return (
     <section className="timeline" aria-label={t("timeline.title")} tabIndex={0} onKeyDown={keyboardSelection}>
-      <button type="button" role="separator" className="timeline-resizer" onPointerDown={onResizeStart} onPointerCancel={onResizeCancel} onLostPointerCapture={onResizeCancel} onKeyDown={onResizeKey} aria-label={t("timeline.resize")} title={t("timeline.resize")} aria-orientation="horizontal" aria-valuemin={220} aria-valuemax={420} aria-valuenow={height}><span /></button>
+      <button type="button" role="separator" className="timeline-resizer" onPointerDown={onResizeStart} onPointerCancel={onResizeCancel} onLostPointerCapture={onResizeCancel} onKeyDown={onResizeKey} aria-label={t("timeline.resize")} title={t("timeline.resize")} aria-orientation="horizontal" aria-valuemin={200} aria-valuemax={maximumHeight} aria-valuenow={height}><span /></button>
       <div className="timeline-toolbar">
         <div><h2>{t("timeline.title")}</h2><span className="selected-item" data-testid="selected-item">{t("timeline.clipSelected", { name: selectedLabel(project, presentations, selectedId, clipLabels) })}</span></div>
-        {trimClip && selectedId === trimClip.id && <span className="timeline-trim-hint">{t(grid ? "timeline.frameTrimHint" : "timeline.trimHint")}</span>}
+
         <div className="timeline-zoom"><label htmlFor="timeline-zoom">{t("timeline.zoom")}</label><span>−</span><input id="timeline-zoom" type="range" min="70" max="180" value={zoom} onChange={(event) => onZoomChange(Number(event.target.value))} /><span>＋</span><button {...shortcutProps("fit", t)} type="button" onClick={fitTimeline}><Icon name="fit" size={14} />{t("timeline.fit")}</button></div>
       </div>
       <div className="timeline-summary">
-        <output className="timeline-cursor" data-testid="timeline-cursor">{t(grid ? "timeline.cursor" : "timeline.cursorTime", { time: grid ? formatFrames(floorMsToFrames(playheadMs)) : formatMilliseconds(playheadMs), frame: floorMsToFrames(playheadMs) })}</output>
+        <output className="timeline-cursor" data-testid="timeline-cursor">{t("timeline.cursorTime", { time: formatTime(playheadMs, canonicalDuration) })}</output>
         <output data-testid="timeline-total-duration">{t("timeline.totalDuration", { duration: durationLabel(canonicalDuration) })}</output>
         {dropCue && <output role="status">{dropCue.label}</output>}
         {selectedIds.length > 0 && <output data-testid="timeline-selected-duration">{t("timeline.selectedDuration", { count: selectedIds.length, duration: durationLabel(selectedDuration) })}</output>}
@@ -286,9 +310,9 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
           <button {...shortcutProps("clear-selection", t)} type="button" disabled={!selectedIds.length} onClick={() => onSelectClips([], null)}>{t("keyboard.clearSelection")}</button>
         </>}
       </div>
-      {sequenceClips && onSequenceEdit && onCommitRange && rangeDraft && onRangeAction && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedIds.length === 1 ? selectedIds[0]! : null} selectedClipIds={selectedIds} playheadMs={playheadMs} busy={editingDisabled} t={t} onEdit={onSequenceEdit} onCommitRange={onCommitRange} rangeDraft={rangeDraft} onAction={onRangeAction} />}
+      {titleRange.title ? titleRange.controls : sequenceClips && onSequenceEdit && onCommitRange && rangeDraft && onRangeAction && <ManualSequenceControls backend={backend} project={project} clips={sequenceClips} presentations={presentations} selectedId={selectedIds.length === 1 ? selectedIds[0]! : null} selectedClipIds={selectedIds} playheadMs={playheadMs} busy={editingDisabled} t={t} onEdit={onSequenceEdit} onCommitRange={onCommitRange} rangeDraft={rangeDraft} onAction={onRangeAction} />}
       <div className="timeline-table" ref={table} onScroll={event => setScroll(event.currentTarget.scrollLeft)} style={{ "--timeline-content-width": `${geometry.width}px` } as CSSProperties}>
-        <div className="timeline-corner"><span className="timecode">{grid ? formatFrames(floorMsToFrames(playheadMs)) : trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs)}</span></div>
+        <div className="timeline-corner"><span className="timecode">{grid ? formatFrames(floorMsToFrames(playheadMs), canonicalDuration) : trimClip ? formatMilliseconds(playheadMs, canonicalDuration) : formatTime(playheadMs, canonicalDuration)}</span></div>
         <div
           className="timeline-ruler"
           role="slider"
@@ -297,7 +321,7 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
           aria-valuemin={0}
           aria-valuemax={grid ? floorMsToFrames(canonicalDuration) : canonicalDuration}
           aria-valuenow={grid ? floorMsToFrames(playheadMs) : playheadMs}
-          aria-valuetext={grid ? t("sequence.framePosition", { frame: floorMsToFrames(playheadMs), time: formatFrames(floorMsToFrames(playheadMs)) }) : t("timeline.playhead", { time: trimClip ? formatMilliseconds(playheadMs) : formatTime(playheadMs) })}
+          aria-valuetext={grid ? t("timeline.playhead", { time: formatTime(playheadMs, canonicalDuration) }) : t("timeline.playhead", { time: trimClip ? formatMilliseconds(playheadMs, canonicalDuration) : formatTime(playheadMs, canonicalDuration) })}
           onPointerDown={event => {
             if (event.button !== 0 || scrub.current || trimBusy) return;
             const value = pointerPosition(event); if (value === null) return;
@@ -312,20 +336,20 @@ export function Timeline({ project, presentations, selectedId, selectedClipIds, 
           onKeyDown={movePlayheadFromKeyboard}
         >
           <div className="timeline-width">
-            {ticks.map(frame => <span key={frame} data-ruler-frame={frame} style={{ left: `${framesToMilliseconds(frame) / geometryDuration * 100}%` }}><i />{grid ? formatFrames(frame) : formatMilliseconds(framesToMilliseconds(frame))}</span>)}
+            {ticks.map(frame => <span key={frame} data-ruler-frame={frame} style={{ left: `${framesToMilliseconds(frame) / geometryDuration * 100}%` }}><i />{grid ? formatFrames(frame, canonicalDuration) : formatMilliseconds(framesToMilliseconds(frame), canonicalDuration)}</span>)}
           </div>
         </div>
         {tracks.map((track) => {
           const labelKey = trackKeys[track.id as keyof typeof trackKeys];
           const label = labelKey ? t(labelKey) : track.name;
-          return <TimelineRow key={track.id} track={track} label={label} visuals={visualsForTrack(project, presentations, track, clipLabels)} duration={geometryDuration} geometryKey={geometryKey} dropCue={track.kind === "video" ? dropCue : null} zoom={zoom} playheadPercent={playheadPercent} selectedId={selectedId} selectedIds={selectedIds} clipInteraction={clipInteraction} durationLabel={durationLabel} t={t} onSelect={onSelect} trimClipId={selectedIds.length === 1 ? trimClip?.id : undefined} sourceDuration={sourceDuration} snapshotId={project.history.headSnapshotId!} trimBusy={editingDisabled} onTrim={onTrim} />;
+          return <TimelineRow key={track.id} track={track} label={label} visuals={visualsForTrack(project, presentations, track, clipLabels)} duration={geometryDuration} geometryKey={geometryKey} dropCue={track.kind === "video" ? dropCue : null} zoom={zoom} playheadPercent={playheadPercent} selectedId={selectedId} selectedIds={selectedIds} clipInteraction={clipInteraction} durationLabel={durationLabel} t={t} onSelect={onSelect} trimClipId={selectedIds.length === 1 ? trimClip?.id : undefined} sourceDuration={sourceDuration} snapshotId={project.history.headSnapshotId!} trimBusy={editingDisabled} onTrim={onTrim} titleRange={titleRange} />;
         })}
       </div>
     </section>
   );
 }
 
-function TimelineRow({ track, label, visuals, duration, geometryKey, dropCue, zoom, playheadPercent, selectedId, selectedIds, clipInteraction, durationLabel, t, onSelect, trimClipId, sourceDuration, snapshotId, trimBusy, onTrim }: { dropCue: { percent: number; label: string } | null; trimClipId?: string; sourceDuration: number; snapshotId: string; trimBusy?: boolean; onTrim?: TimelineProps["onTrim"]; track: TimelineTrack; label: string; visuals: TimelineVisual[]; duration: number; geometryKey: string; zoom: number; playheadPercent: number; selectedId: string | null; selectedIds: readonly string[]; clipInteraction(id: string): HTMLAttributes<HTMLElement> & { draggable: boolean }; durationLabel(value: number): string; t: Translate; onSelect(id: string): void }) {
+function TimelineRow({ track, label, visuals, duration, geometryKey, dropCue, zoom, playheadPercent, selectedId, selectedIds, clipInteraction, durationLabel, t, onSelect, trimClipId, sourceDuration, snapshotId, trimBusy, onTrim, titleRange }: { titleRange: TitleTimelineModel; dropCue: { percent: number; label: string } | null; trimClipId?: string; sourceDuration: number; snapshotId: string; trimBusy?: boolean; onTrim?: TimelineProps["onTrim"]; track: TimelineTrack; label: string; visuals: TimelineVisual[]; duration: number; geometryKey: string; zoom: number; playheadPercent: number; selectedId: string | null; selectedIds: readonly string[]; clipInteraction(id: string): HTMLAttributes<HTMLElement> & { draggable: boolean }; durationLabel(value: number): string; t: Translate; onSelect(id: string): void }) {
   const isAudio = track.kind === "audio";
   return <div className="timeline-row" data-testid={`timeline-track-${track.id}`}>
     <div className="track-head"><strong>{track.name}</strong><span>{label.replace(/^.. — /, "")}</span><div className="track-actions"><button type="button" disabled aria-label={t("timeline.lockTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="lock" size={12} /></button><button type="button" disabled aria-label={t("timeline.showTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="eye" size={12} /></button>{isAudio && <button type="button" disabled aria-label={t("timeline.muteTrack", { track: label })} title={t("inspector.demoControl")}><Icon name="mute" size={12} /></button>}</div></div>
@@ -333,7 +357,12 @@ function TimelineRow({ track, label, visuals, duration, geometryKey, dropCue, zo
       <div className="timeline-width">
         {visuals.map((visual) => visual.kind === "clip" && onTrim
           ? <TrimTimelineClip key={visual.id} clip={visual.clip} label={visual.label} fileName={visual.fileName} duration={duration} geometryKey={geometryKey} sourceDuration={sourceDuration} snapshotId={snapshotId} zoom={zoom} selected={selectedIds.includes(visual.id)} editable={visual.id === trimClipId && selectedId === visual.id} busy={Boolean(trimBusy)} t={t} onSelect={onSelect} onTrim={onTrim} interaction={clipInteraction(visual.id)} />
-          : <button key={visual.id} type="button" {...(visual.kind === "clip" ? clipInteraction(visual.id) : { onClick: () => onSelect(visual.id) })} className={`timeline-item item-${visual.kind}${(visual.kind === "clip" ? selectedIds.includes(visual.id) : selectedId === visual.id) ? " selected" : ""}`} data-clip-id={visual.kind === "clip" ? visual.id : undefined} style={{ left: `${(visual.startMs / duration) * 100}%`, width: `${Math.max(1.4, ((visual.endMs - visual.startMs) / duration) * 100)}%` }} title={visual.kind === "clip" ? `${visual.label} · ${visual.fileName ?? ""} · ${durationLabel(visual.endMs - visual.startMs)}` : visual.label} aria-label={visual.kind === "clip" && visual.fileName ? `${visual.label} · ${visual.fileName}` : visual.label} aria-pressed={visual.kind === "clip" ? selectedIds.includes(visual.id) : selectedId === visual.id}>{isAudio && <span className="item-wave" aria-hidden="true">{waveformBars.map((height, index) => <i key={index} style={{ height }} />)}</span>}<span>{visual.label}</span>{visual.kind === "clip" && <small>{durationLabel(visual.endMs - visual.startMs)}</small>}</button>)}
+          : visual.kind === "graphic" && visual.id === titleRange.graphicId && titleRange.shown
+            ? <div key={visual.id} className="timeline-title-range timeline-trim-clip selected trim-editable" style={{ left: `${framesToMilliseconds(titleRange.shown.startFrame) / duration * 100}%`, width: `${framesToMilliseconds(titleRange.shown.endFrame - titleRange.shown.startFrame) / duration * 100}%` }}>
+              <button type="button" className="timeline-item item-graphic timeline-trim-select selected" aria-pressed aria-label={visual.label} onClick={event => { event.currentTarget.focus({ preventScroll: true }); onSelect(visual.id); }}><span>{visual.label}</span></button>
+              {(["in", "out"] as const).map(edge => <button key={edge} type="button" className={`timeline-trim-handle trim-${edge}`} {...titleRange.edgeProps(edge)}><span aria-hidden="true" /></button>)}
+            </div>
+          : <button key={visual.id} type="button" {...(visual.kind === "clip" ? clipInteraction(visual.id) : { onClick: (event: MouseEvent<HTMLButtonElement>) => { event.currentTarget.focus({ preventScroll: true }); onSelect(visual.id); } })} className={`timeline-item item-${visual.kind}${(visual.kind === "clip" ? selectedIds.includes(visual.id) : selectedId === visual.id) ? " selected" : ""}`} data-clip-id={visual.kind === "clip" ? visual.id : undefined} style={{ left: `${(visual.startMs / duration) * 100}%`, width: `${Math.max(1.4, ((visual.endMs - visual.startMs) / duration) * 100)}%` }} title={visual.kind === "clip" ? `${visual.label} · ${visual.fileName ?? ""} · ${durationLabel(visual.endMs - visual.startMs)}` : visual.label} aria-label={visual.kind === "clip" && visual.fileName ? `${visual.label} · ${visual.fileName}` : visual.label} aria-pressed={visual.kind === "clip" ? selectedIds.includes(visual.id) : selectedId === visual.id}>{isAudio && <span className="item-wave" aria-hidden="true">{waveformBars.map((height, index) => <i key={index} style={{ height }} />)}</span>}<span>{visual.label}</span>{visual.kind === "clip" && <small>{durationLabel(visual.endMs - visual.startMs)}</small>}</button>)}
         {dropCue && <div className="timeline-drop-cue" style={{ left: `${dropCue.percent}%` }}><span aria-hidden="true">{dropCue.label}</span></div>}
         <i className="playhead-line" style={{ left: `${playheadPercent}%` }} aria-hidden="true"><b /></i>
       </div>
@@ -434,10 +463,10 @@ function TrimTimelineClip({ clip, label, fileName, duration, geometryKey, source
     {editable && (["in", "out"] as const).map((edge) => <button key={edge} type="button" role="slider" className={`timeline-trim-handle trim-${edge}`} aria-disabled={busy || pending} tabIndex={busy || pending ? -1 : 0}
       aria-label={t(edge === "in" ? "timeline.trimIn" : "timeline.trimOut")} aria-orientation="horizontal"
       aria-valuemin={edge === "in" ? 0 : clip.frameTiming ? nearestMsToFrames(range.sourceStartMs) + 1 : range.sourceStartMs + 1} aria-valuemax={edge === "in" ? clip.frameTiming ? nearestMsToFrames(range.sourceEndMs) - 1 : range.sourceEndMs - 1 : clip.frameTiming ? maximumSourceFrame(sourceDuration) : sourceDuration}
-      aria-valuenow={clip.frameTiming ? nearestMsToFrames(edge === "in" ? range.sourceStartMs : range.sourceEndMs) : edge === "in" ? range.sourceStartMs : range.sourceEndMs} aria-valuetext={clip.frameTiming ? t("sequence.framePosition", { frame: nearestMsToFrames(edge === "in" ? range.sourceStartMs : range.sourceEndMs), time: formatFrames(nearestMsToFrames(edge === "in" ? range.sourceStartMs : range.sourceEndMs)) }) : `${(edge === "in" ? range.sourceStartMs : range.sourceEndMs) / 1000} s`}
+      aria-valuenow={clip.frameTiming ? nearestMsToFrames(edge === "in" ? range.sourceStartMs : range.sourceEndMs) : edge === "in" ? range.sourceStartMs : range.sourceEndMs} aria-valuetext={formatTime(edge === "in" ? range.sourceStartMs : range.sourceEndMs, sourceDuration)}
       title={t(clip.frameTiming ? "timeline.frameTrimHint" : "timeline.trimHint")} onPointerDown={(event) => start(event, edge)} onPointerMove={(event) => { const next = rangeAt(event); if (next && !busy) setDraft(next); }}
       onPointerUp={finish} onPointerCancel={cancel} onLostPointerCapture={cancel} onKeyDown={(event) => key(event, edge)}><span aria-hidden="true" /></button>)}
-    {editable && <output className="timeline-trim-range" aria-label={t("timeline.trimRange")}>{clip.frameTiming ? <>IN {formatFrames(nearestMsToFrames(range.sourceStartMs))} · OUT {formatFrames(nearestMsToFrames(range.sourceEndMs))} @ 30 fps</> : <>IN {(range.sourceStartMs / 1000).toFixed(3)} · OUT {(range.sourceEndMs / 1000).toFixed(3)}</>}</output>}
+    {editable && <output className="timeline-trim-range" aria-label={t("timeline.trimRange")}>{clip.frameTiming ? <>IN {formatFrames(nearestMsToFrames(range.sourceStartMs), sourceDuration)} · OUT {formatFrames(nearestMsToFrames(range.sourceEndMs), sourceDuration)}</> : <>IN {formatTime(range.sourceStartMs, sourceDuration)} · OUT {formatTime(range.sourceEndMs, sourceDuration)}</>}</output>}
   </div>;
 }
 

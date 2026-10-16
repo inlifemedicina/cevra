@@ -7,7 +7,7 @@ import { presentClip } from "../clip-presentation";
 
 const videoFields = ["inspector.position", "inspector.scale", "inspector.rotation", "inspector.opacity"] as const;
 
-export function Inspector({ project, presentations, selectedProjectItemId, workspace, t, exportPreparation }: { project: Readonly<ProjectIR>; presentations: ReadonlyMap<string, SourcePresentation>; selectedProjectItemId: string | null; workspace: Workspace; t: Translate; exportPreparation?: ReactNode }) {
+export function Inspector({ project, presentations, selectedProjectItemId, workspace, t, exportPreparation, titleControls }: { project: Readonly<ProjectIR>; presentations: ReadonlyMap<string, SourcePresentation>; selectedProjectItemId: string | null; workspace: Workspace; t: Translate; exportPreparation?: ReactNode; titleControls?: ReactNode }) {
   const source = project.sources.find((item) => item.id === selectedProjectItemId);
   const clip = project.timeline.clips.find((item) => item.id === selectedProjectItemId);
   const clipSource = clip ? project.sources.find((item) => item.id === clip.sourceId) : undefined;
@@ -15,7 +15,7 @@ export function Inspector({ project, presentations, selectedProjectItemId, works
   const caption = project.captions.find((item) => item.id === selectedProjectItemId);
   const graphic = project.graphics.find((item) => item.id === selectedProjectItemId);
   const selectedSource = source ?? clipSource;
-  const selectedName = clip ? presentClip(project, clip, presentations, t) : (selectedSource && t("clipPresentation.source", { name: presentations.get(selectedSource.id)?.label ?? selectedSource.id })) ?? caption?.text ?? graphic?.text ?? graphic?.styleToken ?? null;
+  const selectedName = clip ? presentClip(project, clip, presentations, t) : (selectedSource ? presentations.get(selectedSource.id)?.label ?? selectedSource.id : null) ?? caption?.text ?? graphic?.text ?? graphic?.styleToken ?? null;
   const isAudioSelection = source?.kind === "audio" || clipTrack?.kind === "audio";
   return (
     <aside className="inspector" aria-label={t("inspector.title")} data-sidebar-scroll="context">
@@ -23,6 +23,7 @@ export function Inspector({ project, presentations, selectedProjectItemId, works
       {selectedName ? <p className="selection-label" data-testid="inspector-selection">{t("inspector.selected", { name: selectedName })}</p> : <div className="inspector-empty" role="status"><span aria-hidden="true">◇</span><p>{t("inspector.emptySelection")}</p></div>}
       {selectedSource && <details className="source-file-details"><summary>{t("sourcePresentation.fileDetails")}</summary><p>{selectedSource.displayName}</p></details>}
       {exportPreparation}
+      {titleControls}
       {caption ? <CaptionInspector t={t} /> : isAudioSelection ? <AudioInspector t={t} /> : (source || clip || graphic) ? <VideoInspector t={t} opacity={clip?.opacity} /> : null}
     </aside>
   );

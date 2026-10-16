@@ -46,6 +46,54 @@ pub struct LocaleArgs {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocateMediaArgs {
+    version: u8,
+    source_id: String,
+    expected_snapshot_id: String,
+    operation_id: String,
+    locale: String,
+}
+
+fn validate_locate_media(args: &LocateMediaArgs) -> Result<(), DesktopCommandError> {
+    validate_id(&args.source_id, "sourceId")?;
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    validate_id(&args.operation_id, "operationId")?;
+    validate_locale(&args.locale)?;
+    let operation = args.operation_id.as_bytes();
+    if args.version != 1 || !operation[0].is_ascii_alphanumeric()
+        || !operation.iter().all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(byte)) {
+        return Err(DesktopCommandError::new("SOURCE_RELOCATION_INVALID", "Invalid relocation request."));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn desktop_locate_media(
+    app: AppHandle,
+    supervisor: State<'_, Arc<DesktopHostSupervisor>>,
+    args: LocateMediaArgs,
+) -> Result<Value, DesktopCommandError> {
+    validate_locate_media(&args)?;
+    supervisor.ensure_started(&app).await?;
+    let lease = supervisor.begin_preparation_picker(&args.operation_id)?;
+    let title = if args.locale == "pt-BR" { "Localizar mídia" } else { "Locate media" };
+    let picked = app.dialog().file().set_title(title).blocking_pick_file();
+    let Some(picked) = picked else { return Ok(json!({ "outcome": "cancelled" })); };
+    let path = picked.into_path().map_err(|_| DesktopCommandError::new("PICKER_INVALID_SELECTION", "The selected file is invalid."))?;
+    let uri = path.to_str().filter(|_| path.is_absolute()).ok_or_else(|| DesktopCommandError::new("PICKER_INVALID_SELECTION", "The selected file is invalid."))?;
+    // The existing native lease serializes cancellation/admission and reconciles late canonical completion.
+    let result = match supervisor.request_picked_mutation(&lease, "media.relocateLocal", json!({
+        "version": args.version, "sourceId": args.source_id, "expectedSnapshotId": args.expected_snapshot_id,
+        "operationId": args.operation_id, "locale": args.locale, "uri": uri
+    })).await {
+        Ok(result) => result,
+        Err(error) => return Err(recover_mutation(&app, &supervisor, error).await),
+    };
+    Ok(json!({ "outcome": "located", "result": result }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TranscriptionArgs {
     source_id: String,
     operation_id: String,
@@ -58,9 +106,14 @@ pub struct CancelArgs {
     operation_id: String,
 }
 
+#[derive(Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExperimentalLayerArgs { version: u8, known_base_id: Option<String> }
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VideoPreviewArgs {
+    experimental_layer: Option<ExperimentalLayerArgs>,
     sequence: Option<bool>,
     source_id: String,
     expected_snapshot_id: String,
@@ -216,9 +269,18 @@ pub async fn desktop_preview_local_video(
         }
         params["sequence"] = json!(true);
     }
+    if let Some(layer) = args.experimental_layer {
+        if layer.version != 1 || args.sequence != Some(true) || args.operation_id.is_none()
+            || layer.known_base_id.as_ref().map_or(false, |id| id.len()!=64 || !id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))) {
+            return Err(DesktopCommandError::new("MANUAL_VIDEO_INVALID_REQUEST", "Invalid experimental layer binding."));
+        }
+        let mut value=json!({"version":1});if let Some(id)=layer.known_base_id{value["knownBaseId"]=json!(id);}params["experimentalLayer"]=value;
+    }
+    let started=std::time::Instant::now();
     supervisor.ensure_started(&app).await?;
     if let Some(operation) = args.operation_id {
-        supervisor.request_preparation("video.previewLocal", params, &operation).await
+        let mut result=supervisor.request_preparation("video.previewLocal", params, &operation).await?;
+        if result.get("layered").is_some(){result["layered"]["timings"]["rustHostMs"]=json!(started.elapsed().as_secs_f64()*1000.0);}Ok(result)
     } else {
         supervisor.request_control("video.previewLocal", params).await
     }
@@ -302,6 +364,8 @@ pub enum ManualVideoSequenceAction {
     Remove { clip_id: String },
     #[serde(rename = "remove-many")]
     RemoveMany { clip_ids: Vec<String> },
+    #[serde(rename = "remove-source")]
+    RemoveSource { source_id: String, dependent_clip_ids: Vec<String> },
     Trim { clip_id: String, source_start_ms: u64, source_end_ms: u64 },
     Split { clip_id: String, timeline_at_ms: u64 },
     Reorder { clip_ids: Vec<String> },
@@ -326,6 +390,8 @@ pub enum ManualVideoSequenceFrameAction {
     Remove { clip_id: String },
     #[serde(rename = "remove-many")]
     RemoveMany { clip_ids: Vec<String> },
+    #[serde(rename = "remove-source")]
+    RemoveSource { source_id: String, dependent_clip_ids: Vec<String> },
     Trim { clip_id: String, source_start_frame: u64, source_end_frame: u64 },
     Split { clip_id: String, timeline_at_frame: u64 },
     Reorder { clip_ids: Vec<String> },
@@ -345,7 +411,7 @@ fn manual_sequence_params(args: ManualVideoSequenceArgs) -> Result<Value, Deskto
         .map_err(|_| DesktopCommandError::new("MANUAL_SEQUENCE_INVALID_REQUEST", "Manual sequence action is invalid."))?;
     for (key, value) in params.as_object().expect("typed action serializes as an object") {
         if key.ends_with("Id") { validate_id(value.as_str().expect("typed ID"), key)?; }
-        if key == "clipIds" {
+        if key == "clipIds" || key == "dependentClipIds" {
             for id in value.as_array().expect("typed IDs") { validate_id(id.as_str().expect("typed ID"), "clipId")?; }
         }
         let time_limit = if key.ends_with("Frame") { 9_007_199_254_740 } else { 9_007_199_254_740_991 };
@@ -389,6 +455,71 @@ pub struct EditorialRevisionArgs {
     title: Option<String>,
     block_order: Option<Vec<String>>,
     block_edits: Option<Vec<EditorialBlockEdit>>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualTitleLayout {
+    version: u8, x: f64, y: f64, width: f64, font_scale: f64,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualTitleValue {
+    version: u8,
+    component_id: String,
+    text: String,
+    start_frame: u64,
+    end_frame: u64,
+    aspect: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    layout: Option<ManualTitleLayout>,
+}
+#[derive(Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
+pub enum ManualTitleAction { Set { title: ManualTitleValue }, Remove {} }
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ManualTitleArgs {
+    version: u8,
+    expected_snapshot_id: String,
+    action: Value,
+}
+fn manual_title_params(args: ManualTitleArgs) -> Result<Value, DesktopCommandError> {
+    validate_id(&args.expected_snapshot_id, "expectedSnapshotId")?;
+    if args.version != 1 { return Err(DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title version.")); }
+    let action = serde_json::from_value::<ManualTitleAction>(args.action).map_err(|_| DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title action."))?;
+    if let ManualTitleAction::Set { ref title } = action {
+        if ![1, 2].contains(&title.version) || title.component_id != "cevra.title.lower-third.inter.v1"
+            || !["16:9", "9:16"].contains(&title.aspect.as_str()) || title.text.trim().is_empty()
+            || title.text.encode_utf16().count() > 80 || title.text.chars().any(|c| c.is_control() || c == '\u{2028}' || c == '\u{2029}')
+            || title.start_frame >= title.end_frame || title.end_frame > 18_144_000 {
+            return Err(DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title component."));
+        }
+    }
+    if let ManualTitleAction::Set { ref title } = action {
+        let valid = match (title.version, &title.layout) {
+            (1, None) => true,
+            (2, Some(l)) => {
+                let h = (if title.aspect == "16:9" { 56.0 / 1080.0 } else { 48.0 / 1920.0 }) * 1.9 * l.font_scale;
+                l.version == 1 && [l.x, l.y, l.width, l.font_scale].iter().all(|v| v.is_finite())
+                    && l.x >= 0.0 && l.y >= 0.0 && (0.2..=1.0).contains(&l.width) && (0.5..=2.0).contains(&l.font_scale)
+                    && l.x + l.width <= 1.0 + 1e-9 && l.y + h <= 1.0 + 1e-9
+            }
+            _ => false,
+        };
+        if !valid { return Err(DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title layout.")); }
+    }
+    let mut params = serde_json::to_value(action).map_err(|_| DesktopCommandError::new("MANUAL_TITLE_INVALID", "Invalid title request."))?;
+    params["version"] = json!(args.version); params["expectedSnapshotId"] = json!(args.expected_snapshot_id);
+    Ok(params)
+}
+#[tauri::command]
+pub async fn desktop_edit_manual_title(app: AppHandle, supervisor: State<'_, Arc<DesktopHostSupervisor>>, args: ManualTitleArgs) -> Result<Value, DesktopCommandError> {
+    let params = manual_title_params(args)?;
+    supervisor.ensure_started(&app).await?;
+    match supervisor.request_immediate_mutation("video.editManualTitle", params).await {
+        Ok(result) => Ok(result), Err(error) => Err(recover_mutation(&app, &supervisor, error).await),
+    }
 }
 
 #[tauri::command]
@@ -682,6 +813,42 @@ mod video_boundary_tests {
     use super::*;
 
     #[test]
+    fn manual_title_layout_roundtrips_and_rejects_unbounded_or_open_input() {
+        let title = json!({"version":2,"componentId":"cevra.title.lower-third.inter.v1","text":"Ação","startFrame":1,"endFrame":29,"aspect":"9:16","layout":{"version":1,"x":0.1,"y":0.2,"width":0.7,"fontScale":0.8}});
+        let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":{"type":"set","title":title}});
+        assert_eq!(manual_title_params(serde_json::from_value(request.clone()).unwrap()).unwrap()["title"], title);
+        for (field, value) in [("width",json!(0.1)),("fontScale",json!(3)),("y",json!(1)),("filter",json!("caller-code"))] {
+            let mut bad = request.clone(); bad["action"]["title"]["layout"][field] = value;
+            assert!(manual_title_params(serde_json::from_value(bad).unwrap()).is_err());
+        }
+    }
+
+    #[test]
+    fn manual_title_boundary_roundtrips_closed_actions_and_rejects_injection() {
+        let title = json!({"version":1,"componentId":"cevra.title.lower-third.inter.v1",
+            "text":"Ação, café e conexão","startFrame":90,"endFrame":210,"aspect":"9:16"});
+        for action in [json!({"type":"set","title":title.clone()}), json!({"type":"remove"})] {
+            let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":action});
+            let params = manual_title_params(serde_json::from_value(request.clone()).unwrap()).unwrap();
+            assert_eq!(params["type"], action["type"]);
+            assert_eq!(params["expectedSnapshotId"], "snapshot");
+            for extra in ["fontPath","filter","outputUri","commands"] {
+                let mut injected = request.clone(); injected[extra] = json!("injected");
+                assert!(serde_json::from_value::<ManualTitleArgs>(injected).is_err());
+                let mut injected = request.clone(); injected["action"][extra] = json!("injected");
+                assert!(manual_title_params(serde_json::from_value(injected).unwrap()).is_err());
+            }
+        }
+        for (field, value) in [("startFrame",json!(0.5)),("endFrame",json!(90)),
+            ("aspect",json!("1:1")),("componentId",json!("caller-code")),("text",json!("a\nline")),
+            ("fontPath",json!("/private/font")),("version",json!(2))] {
+            let mut injected = title.clone(); injected[field] = value;
+            let request = json!({"version":1,"expectedSnapshotId":"snapshot","action":{"type":"set","title":injected}});
+            assert!(manual_title_params(serde_json::from_value(request).unwrap()).is_err());
+        }
+    }
+
+    #[test]
     fn thumbnail_boundary_requires_ids_and_rejects_paths_and_render_controls() {
         let valid = json!({ "sourceId": "source", "expectedSnapshotId": "snapshot", "operationId": "thumbnail-1" });
         let args = serde_json::from_value::<SourceThumbnailArgs>(valid.clone()).unwrap();
@@ -712,6 +879,24 @@ mod video_boundary_tests {
         for operation in ["", "../foreign", "/tmp/path", "bad\nidentifier"] {
             let mut injected = valid.clone(); injected["operationId"] = json!(operation);
             assert!(validate_export_preparation(&serde_json::from_value::<ManualExportPreparationArgs>(injected).unwrap()).is_err());
+        }
+    }
+
+    #[test]
+    fn locate_media_boundary_allows_one_source_and_never_a_webview_path_or_content_identity() {
+        let valid = json!({"version":1,"sourceId":"source","expectedSnapshotId":"snapshot","operationId":"locate-1","locale":"pt-BR"});
+        assert!(validate_locate_media(&serde_json::from_value::<LocateMediaArgs>(valid.clone()).unwrap()).is_ok());
+        for extra in ["uri", "path", "paths", "sourceIds", "sha256", "sizeBytes", "commands", "replace"] {
+            let mut injected = valid.clone(); injected[extra] = json!("injected");
+            assert!(serde_json::from_value::<LocateMediaArgs>(injected).is_err());
+        }
+        for field in ["version", "sourceId", "expectedSnapshotId", "operationId", "locale"] {
+            let mut missing = valid.clone(); missing.as_object_mut().unwrap().remove(field);
+            assert!(serde_json::from_value::<LocateMediaArgs>(missing).is_err());
+        }
+        for (field, value) in [("version",json!(2)),("locale",json!("fr")),("sourceId",json!("")),("operationId",json!("../file"))] {
+            let mut invalid = valid.clone(); invalid[field] = value;
+            assert!(validate_locate_media(&serde_json::from_value::<LocateMediaArgs>(invalid).unwrap()).is_err());
         }
     }
 

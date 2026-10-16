@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -15,7 +16,7 @@ ENGINE = HERE.parent
 WORKER_SOURCE = ENGINE / "worker"
 VERSIONS = json.loads((HERE / "versions.json").read_text(encoding="utf-8"))
 
-WORKER_FILES = ("cevra_media_worker.py", "cevra_native_tools.py", "cevra_manual_sequence.py", "cevra_preview_segments.py", "cevra_job_control.py", "cevra_audio_measurement.py", "cevra_bounded_preview.py", "cevra_streaming_process.py", "runtime_integrity.py", "runtime_profile.py")
+WORKER_FILES = ("cevra_manual_title.py", "cevra_media_worker.py", "cevra_native_tools.py", "cevra_manual_sequence.py", "cevra_preview_segments.py", "cevra_job_control.py", "cevra_audio_measurement.py", "cevra_bounded_preview.py", "cevra_streaming_process.py", "runtime_integrity.py", "runtime_profile.py", "cevra_title_preview.py")
 
 
 def run(argv: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -63,6 +64,21 @@ def build(output_dir: Path, python_executable: Path, vendor_source: Path | None 
         if not source.is_file():
             raise SystemExit(f"worker source missing: {source}")
         shutil.copy2(source, worker_dir / name)
+    title_source = ENGINE / "components" / "manual-title"
+    title_output = output_dir / "components" / "manual-title"
+    title_output.mkdir(parents=True, exist_ok=True)
+    pins = {"Inter.ttf": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
+            "OFL.txt": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57"}
+    for name in ("Inter.ttf", "OFL.txt", "rasterizer.swift", "preview-colour.swift", "empty-h.png"):
+        source = title_source / name
+        if name in pins and hashlib.sha256(source.read_bytes()).hexdigest() != pins[name]:
+            raise SystemExit("manual title asset digest mismatch")
+        shutil.copy2(source, title_output / name)
+    if sys.platform == "darwin":
+        with tempfile.TemporaryDirectory(prefix="cevra-title-swift-") as module_cache:
+            run(["/usr/bin/xcrun", "swiftc", "-O", "-module-cache-path", module_cache,
+                 str(title_output / "rasterizer.swift"), "-o", str(title_output / "rasterizer")])
+            run(["/usr/bin/xcrun", "swiftc", "-O", "-module-cache-path", module_cache, str(title_output / "preview-colour.swift"), "-o", str(title_output / "preview-colour")])
 
     if vendor_source is None:
         run([str(python_executable), "-I", "-B", str(HERE / "prepare_vendor.py"), str(vendor_dir)])

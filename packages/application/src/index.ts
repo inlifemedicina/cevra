@@ -21,3 +21,5 @@ export * from "./manual-sequence-preview.js";
 export * from "./manual-sequence-export.js";
 
 export { MANUAL_CLIP_COPY_EXTENSION, manualClipCopyOrigin, supportsManualClipExtensions } from "./manual-clip-presentation.js";
+export * from "./manual-title.js";
+export * from "./local-source-relocation.js";

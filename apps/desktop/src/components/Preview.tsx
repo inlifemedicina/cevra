@@ -21,7 +21,7 @@ export function Preview({ compact = false, empty = false, interactive, playing, 
       </div>
       <div className="preview-controls">
         <button type="button" className="play-button" disabled={!interactive} onClick={() => onPlayingChange(!playing)} aria-label={t(playing ? "preview.pause" : "preview.play")} title={interactive ? t(playing ? "preview.pause" : "preview.play") : t("preview.notConnected")}><Icon name={playing ? "pause" : "play"} size={16} /></button>
-        <output className="timecode" data-testid="preview-timecode" aria-label={t("preview.timecode", { current: formatTime(playheadMs), duration: formatTime(durationMs) })}>{formatTime(playheadMs)} <span>/ {formatTime(durationMs)}</span></output>
+        <output className="timecode" data-testid="preview-timecode" aria-label={t("preview.timecode", { current: formatTime(playheadMs, durationMs), duration: formatTime(durationMs) })}>{formatTime(playheadMs, durationMs)} <span>/ {formatTime(durationMs)}</span></output>
         <div className="control-spacer" />
         {!empty && <span className="micro-wave" aria-hidden="true">{waveformBars.slice(0, 10).map((height, index) => <i key={index} style={{ height }} />)}</span>}
         <button type="button" className="icon-button" disabled aria-label={t("preview.volume")} title={t("status.unavailableDetail")}><Icon name="volume" size={16} /></button>

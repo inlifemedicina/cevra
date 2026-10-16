@@ -365,7 +365,10 @@ export type TimelineEditOperationV2 = TimelineEditOperation
 export type EditCommand =
   | { type: "project.rename"; name: string }
   | { type: "source.add"; source: SourceAsset }
+  | { type: "source.relocate"; version: 1; sourceId: Id; expectedSourceUri: string; uri: string;
+      expectedContent: { sha256: string; sizeBytes: number } }
   | { type: "source.remove"; sourceId: Id }
+  | { type: "source.removeFromProject"; version: 1; sourceId: Id; dependentClipIds: readonly Id[] }
   | {
       type: "source.technicalDescriptor.set";
       sourceId: Id;
@@ -383,5 +386,7 @@ export type EditCommand =
   | { type: "track.remove"; trackId: Id }
   | { type: "caption.upsert"; caption: CaptionCue }
   | { type: "caption.remove"; captionId: Id }
+  | { type: "graphic.manualTitle.set"; graphic: GraphicItem }
+  | { type: "graphic.manualTitle.remove"; graphicId: Id }
   | { type: "style.patch"; patch: Partial<StyleState> }
   | { type: "export.add"; export: ExportRecord };

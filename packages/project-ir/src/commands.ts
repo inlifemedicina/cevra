@@ -1,9 +1,13 @@
 import type { CaptionCue, EditCommand, ProjectIR, SourceTechnicalDescriptorV1, SourceTranscript, StyleState, TimelineClip, TimelineEditOperationV2, TranscriptProvenanceStage } from "./types.js";
-import { frameTimingMilliseconds } from "./frame-time.js";
+import { framesToMilliseconds, frameTimingMilliseconds } from "./frame-time.js";
+import { manualTitleGraphic, resolveManualTitle } from "./manual-title.js";
 import { computeTranscriptDigest } from "./transcript-digest.js";
 import { assertValidProjectIR, validateProjectIR, validateTimelineEditOperation } from "./validation.js";
 
 export type ProjectCommandErrorCode =
+  | "PROJECT_SOURCE_RELOCATION_INVALID"
+  | "PROJECT_SOURCE_RELOCATION_STALE"
+  | "PROJECT_SOURCE_RELOCATION_NO_OP"
   | "PROJECT_TIMELINE_EDIT_INVALID"
   | "PROJECT_TIMELINE_EDIT_NO_OP"
   | "PROJECT_TRANSCRIPT_INVALID"
@@ -45,6 +49,60 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
       rejectDuplicate(next.sources, command.source.id, "source");
       next.sources.push(clone(command.source));
       break;
+    case "source.relocate": {
+      if (command.version !== 1 || Object.keys(command).some(key => !["type", "version", "sourceId", "expectedSourceUri", "uri", "expectedContent"].includes(key))
+        || !validLocalLocator(command.uri) || !validLocalLocator(command.expectedSourceUri)
+        || !isRecord(command.expectedContent) || Object.keys(command.expectedContent).sort().join() !== "sha256,sizeBytes") {
+        throw new ProjectCommandError("PROJECT_SOURCE_RELOCATION_INVALID", "Invalid local source relocation.");
+      }
+      const source = next.sources.find(item => item.id === command.sourceId);
+      if (!source || !["video", "audio"].includes(source.kind) || !source.technicalDescriptor) {
+        throw new ProjectCommandError("PROJECT_SOURCE_RELOCATION_INVALID", "A verified local media source is required.");
+      }
+      if (source.uri !== command.expectedSourceUri || !deepEqual(source.technicalDescriptor.content, command.expectedContent)) {
+        throw new ProjectCommandError("PROJECT_SOURCE_RELOCATION_STALE", "The source binding changed.");
+      }
+      if (source.uri === command.uri) throw new ProjectCommandError("PROJECT_SOURCE_RELOCATION_NO_OP", "The source location is unchanged.");
+      source.uri = command.uri;
+      break;
+    }
+    case "source.removeFromProject": {
+      const dependencies = next.timeline.clips.filter(clip => clip.sourceId === command.sourceId).map(clip => clip.id).sort();
+      if (command.version !== 1 || JSON.stringify(dependencies) !== JSON.stringify([...command.dependentClipIds].sort())) throw new Error("Source dependencies changed.");
+      if (!next.sources.some(source => source.id === command.sourceId)) throw new Error("Unknown source.");
+      if (next.graphics.some(graphic => graphic.sourceId === command.sourceId) || next.generation.some(record => record.outputSourceIds.includes(command.sourceId))) throw new Error("Unsupported source dependencies.");
+      if (dependencies.length) {
+        if (next.captions.length || next.graphics.length > 1) throw new Error("Unsupported timeline dependencies.");
+        let oldEnd = 0, cursor = 0;
+        const ordered = [...next.timeline.clips].sort((a, b) => a.timelineStartMs - b.timelineStartMs);
+        const track = next.timeline.tracks.find(track => track.id === ordered[0]?.trackId);
+        if (!track || track.kind !== "video" || track.locked || track.hidden || track.muted) throw new Error("Unsupported timeline.");
+        for (const clip of ordered) {
+          if (clip.trackId !== track.id || clip.timelineStartMs !== oldEnd || clip.speed !== 1 || clip.volume !== 1 || clip.opacity !== 1) throw new Error("Unsupported timeline.");
+          oldEnd = clip.timelineEndMs;
+          if (clip.sourceId === command.sourceId) continue;
+          if (next.timeline.timingPolicy === "cfr30") {
+            if (!clip.frameTiming) throw new Error("Missing frame timing.");
+            const count = clip.frameTiming.sourceEndFrame - clip.frameTiming.sourceStartFrame;
+            clip.frameTiming.timelineStartFrame = cursor; clip.frameTiming.timelineEndFrame = cursor + count; cursor += count;
+            Object.assign(clip, frameTimingMilliseconds(clip.frameTiming));
+          } else {
+            const count = clip.timelineEndMs - clip.timelineStartMs;
+            clip.timelineStartMs = cursor; clip.timelineEndMs = cursor + count; cursor += count;
+          }
+        }
+        next.timeline.clips = ordered.filter(clip => clip.sourceId !== command.sourceId);
+        const duration = next.timeline.timingPolicy === "cfr30" ? framesToMilliseconds(cursor) : cursor;
+        next.graphics = next.graphics.flatMap(graphic => {
+          const title = resolveManualTitle(graphic);
+          const endFrame = Math.min(title.endFrame, Math.round(duration * 30 / 1000));
+          return title.startFrame >= endFrame ? [] : [manualTitleGraphic(graphic.id, { ...title, endFrame })];
+        });
+      }
+      next.sources = next.sources.filter(source => source.id !== command.sourceId);
+      next.sourceTranscripts = next.sourceTranscripts.filter(transcript => transcript.sourceId !== command.sourceId);
+      break;
+    }
     case "source.remove": {
       if (!next.sources.some((source) => source.id === command.sourceId)) throw new Error(`Unknown source ${command.sourceId}.`);
       if (next.timeline.clips.some((clip) => clip.sourceId === command.sourceId)) throw new Error("Cannot remove a source used by timeline clips.");
@@ -92,6 +150,25 @@ export function applyCommand(project: ProjectIR, command: EditCommand, now = new
     case "caption.remove":
       next.captions = next.captions.filter((caption) => caption.id !== command.captionId);
       break;
+    case "graphic.manualTitle.set": {
+      if (Object.keys(command).some(k => !["type", "graphic"].includes(k))) throw Error("MANUAL_TITLE_INVALID");
+      const title = resolveManualTitle(command.graphic);
+      if (next.timeline.timingPolicy !== "cfr30" || title.endFrame > next.timeline.durationMs * 30 / 1000 + 1e-7
+        || next.graphics.some(g => g.id !== command.graphic.id)) throw Error("MANUAL_TITLE_UNSUPPORTED");
+      const previous = next.graphics.find(g => g.id === command.graphic.id);
+      if (previous) resolveManualTitle(previous);
+      if (JSON.stringify(previous) === JSON.stringify(command.graphic)) throw Error("MANUAL_TITLE_NO_OP");
+      next.graphics = [clone(command.graphic)];
+      break;
+    }
+    case "graphic.manualTitle.remove": {
+      if (Object.keys(command).some(k => !["type", "graphicId"].includes(k))) throw Error("MANUAL_TITLE_INVALID");
+      const graphic = next.graphics.find(g => g.id === command.graphicId);
+      if (!graphic) throw Error("MANUAL_TITLE_UNKNOWN");
+      resolveManualTitle(graphic);
+      next.graphics = next.graphics.filter(g => g.id !== command.graphicId);
+      break;
+    }
     case "style.patch":
       next.style = mergeDefined(next.style, command.patch);
       break;
@@ -164,6 +241,16 @@ function applyTimelineEdit(project: ProjectIR, command: Extract<EditCommand, { t
   if (JSON.stringify(project.timeline) === before) {
     throw new ProjectCommandError("PROJECT_TIMELINE_EDIT_NO_OP", "Atomic timeline edit has no effect.");
   }
+}
+
+function validLocalLocator(value: unknown): value is string {
+  if (typeof value !== "string" || !value || value.length > 8192 || value !== value.trim() || /[\u0000-\u001f\u007f]/u.test(value)) return false;
+  if (/^[A-Za-z]:[\\/]/u.test(value) || value.startsWith("/") && !value.startsWith("//")) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "file:" && ["", "localhost"].includes(url.hostname) && !url.username && !url.password && !url.port
+      && !url.search && !url.hash && url.pathname.startsWith("/") && !url.pathname.startsWith("//");
+  } catch { return false; }
 }
 
 function applySourceTechnicalDescriptorSet(

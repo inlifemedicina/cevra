@@ -1,5 +1,7 @@
 #[allow(dead_code)]
 pub const APPLICATION_COMMANDS: &[&str] = &[
+    "desktop_locate_media",
+    "desktop_edit_manual_title",
     "desktop_edit_manual_video_sequence",
     "desktop_get_close_state",
     "desktop_get_media_drop_state",
@@ -15,6 +17,7 @@ pub const APPLICATION_COMMANDS: &[&str] = &[
     "desktop_revise_editorial_draft",
     "desktop_thumbnail_local_video",
     "desktop_preview_local_video",
+    "desktop_record_layer_presentation",
     "desktop_prepare_manual_export",
     "desktop_export_manual_sequence",
     "desktop_preview_manual_sequence_conform",

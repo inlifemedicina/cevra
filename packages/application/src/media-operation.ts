@@ -3,6 +3,7 @@ import type { MediaOperation } from "@cevra/contracts";
 /** Canonical output paths owned by the operation contract, in contract order. */
 export function mediaOperationOutputUris(operation: MediaOperation): string[] {
   switch (operation.type) {
+    case "render-manual-title-preview": return [operation.canonicalUri, operation.previewUri];
     case "probe":
     case "measure-audio":
     case "detect-silence":

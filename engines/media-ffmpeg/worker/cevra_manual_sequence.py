@@ -19,8 +19,9 @@ from typing import Any
 
 import cevra_bounded_preview as inspection
 import cevra_job_control as jobs
+import cevra_manual_title as title_component
 from cevra_streaming_process import reduce_lines
-from cevra_preview_segments import CACHE as preview_segments, encode as encode_segment_identity
+from cevra_preview_segments import CACHE as preview_segments, MAX_SEGMENT_BYTES, encode as encode_segment_identity
 
 CFR30_SOURCE_SAMPLER = "fps=30:start_time=0:round=near:eof_action=pass"
 SAMPLING_POLICY = "source-pts-fps30-near-v1"
@@ -44,8 +45,14 @@ def _integer(value: Any, minimum: int, maximum: int, label: str) -> int:
 
 
 def validate(args: dict, preview: bool) -> tuple[list[dict], int]:
-    _closed(args, {"version", "items", "output", "owned_workspace"}, "manual operation")
-    if args["version"] not in ((1, 2) if preview else (1,)) or isinstance(args["version"], bool):
+    base_profile = preview and args.get("version") == 4
+    composed = args.get("version") == (3 if preview else 2)
+    _closed(args, {"version", "items", "output", "owned_workspace"} | ({"composition"} if composed else set()) | ({"base_profile"} if base_profile else set()), "manual operation")
+    if base_profile and args["base_profile"] != "canonical-h-bt709-v1":
+        raise ValueError("invalid experimental base profile")
+    if composed:
+        title_component.validate(args["composition"])
+    if args["version"] not in ((1, 2, 3, 4) if preview else (1, 2)) or isinstance(args["version"], bool):
         raise ValueError("manual operation version is invalid")
     items = args["items"]
     if not isinstance(items, list) or not 1 <= len(items) <= (1 if preview and args["version"] == 1 else MAX_ITEMS):
@@ -336,7 +343,7 @@ def _streams(common: Any, path: Path) -> list[dict]:
         if not values or "index" not in values or "codec_type" not in values:
             raise ValueError("manual stream descriptor is unavailable")
         streams.append({key: int(value) if key in integers and re.fullmatch(r"-?[0-9]+", value) else value for key, value in values.items()})
-    fields = "index,codec_type,codec_name,sample_rate,channels,channel_layout,time_base,duration_ts,start_pts,nb_frames,width,height,pix_fmt,avg_frame_rate,r_frame_rate,color_space,color_transfer,color_primaries,color_range"
+    fields = "index,codec_type,codec_name,sample_rate,channels,channel_layout,time_base,duration_ts,start_pts,nb_frames,width,height,pix_fmt,sample_aspect_ratio,avg_frame_rate,r_frame_rate,color_space,color_transfer,color_primaries,color_range"
     reduce_lines([common.require_tool("ffprobe"), "-v", "error", "-show_streams", "-show_entries", "stream=" + fields,
                   "-of", "compact=p=0:nk=0", str(path)], consume, timeout=30)
     if not streams:
@@ -367,11 +374,13 @@ def _fields(line: str) -> dict[str, str]:
     return values
 
 
-def _video_clock(common: Any, path: Path, expected_frames: int, width: int, height: int) -> Fraction:
+def _video_clock(common: Any, path: Path, expected_frames: int, width: int, height: int, *, square_pixels: bool = False) -> Fraction:
     streams = [s for s in _streams(common, path) if s.get("codec_type") == "video"]
     if len(streams) != 1:
         raise RuntimeError("manual video must contain exactly one video stream")
     stream = streams[0]
+    if square_pixels and stream.get("sample_aspect_ratio") != "1:1":
+        raise RuntimeError("experimental base must use square pixels")
     if stream.get("codec_name") != "h264" or stream.get("width") != width or stream.get("height") != height or stream.get("pix_fmt") != "yuv420p" \
             or Fraction(stream.get("avg_frame_rate", "0")) != 30 or Fraction(stream.get("r_frame_rate", "0")) != 30:
         raise RuntimeError("manual encoded video profile postcondition failed")
@@ -483,13 +492,26 @@ def _segment_runtime_identity(common: Any) -> dict:
             for name, path in paths.items()}
 
 
-def _segment_key(item: dict, video: dict, stream_index: int, encoder_args: list[str], runtime_identity: dict) -> bytes:
+def _segment_key(item: dict, video: dict, stream_index: int, encoder_args: list[str], runtime_identity: dict, composition_identity=None) -> bytes:
     return encode_segment_identity({"version": 1, "sourceContent": item["source_content"], "sourceVideo": video,
         "videoStreamIndex": stream_index, "audioSelection": item["audio_selection"],
         "inFrame": item["source_start_frame"], "outFrame": item["source_end_frame"],
         "sampler": CFR30_SOURCE_SAMPLER, "samplingPolicy": SAMPLING_POLICY, "grid": [30, 1],
         "profile": "manual-cfr30-preview-v1", "width": 720, "height": 404, "pixelFormat": "yuv420p",
-        "encoderArgs": encoder_args, "frameFilterVersion": 1, "runtime": runtime_identity})
+        "encoderArgs": encoder_args, "frameFilterVersion": 1, "runtime": runtime_identity,
+        "composition": composition_identity})
+
+
+def _occurrence_composition(composition, component_identity, interval):
+    if not composition:
+        return None
+    # A title outside this occurrence cannot affect its bytes. Keep the owning
+    # sequence aspect, which still controls fit/pad geometry, in that identity.
+    # Visible pixels depend on the local half-open interval, not on the title's
+    # global bounds beyond this occurrence. Do not mutate the canonical plan.
+    local_plan = {**composition, "title": {**composition["title"], "startFrame": interval[0], "endFrame": interval[1]}} if interval else None
+    return ({"component": component_identity, "plan": local_plan, "interval": interval}
+            if interval else {"aspect": composition["title"]["aspect"]})
 
 
 def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_segments: bool = False) -> dict:
@@ -499,8 +521,22 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
     if output.suffix.lower() != ".mp4":
         raise ValueError("manual delivery must be MP4")
     originals = list(dict.fromkeys(_path(item["input"]) for item in items))
+    base_identity = None
+    if args.get("base_profile"):
+        empty_asset = Path(__file__).resolve().parent.parent / "components/manual-title/empty-h.png"
+        if empty_asset.is_symlink() or hashlib.sha256(empty_asset.read_bytes()).hexdigest() != "05dfa378222e0220b74385202702bd0595950e75f3f1a00b094ca448dde8df74":
+            raise RuntimeError("experimental empty raster identity changed")
+        base_identity = {"baseProfile": args["base_profile"], "empty": "05dfa378222e0220b74385202702bd0595950e75f3f1a00b094ca448dde8df74"}
     root, root_stamp = _workspace(args["owned_workspace"], output, originals)
     width, height, bitrate = (720, 404, 700_000) if preview else (1920, 1080, 20_000_000)
+    def video_clock(path: Path, frames: int) -> Fraction:
+        if base_identity:
+            return _video_clock(common, path, frames, width, height, square_pixels=True)
+        return _video_clock(common, path, frames, width, height)
+    composition = args.get("composition")
+    if composition and composition["title"]["aspect"] == "9:16":
+        width, height = height, width
+    component_identity = title_component.identity() if composition else None
     encoder = os.environ.get("CEVRA_VIDEO_ENCODER_H264", "").strip()
     if not encoder:
         raise RuntimeError("manual render requires the existing approved H.264 encoder")
@@ -518,6 +554,22 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
         if cache_transaction:
             runtime_identity = _segment_runtime_identity(common)
         budget = _LogicalBudget(root, root_stamp, OWNED_BYTES)
+        raster = None
+        if composition:
+            canonical_width, canonical_height = (1080, 1920) if composition["title"]["aspect"] == "9:16" else (1920, 1080)
+            raster_allowance = canonical_width * canonical_height * 4 + 65536
+            mandatory = sum(next(item["source_content"]["size_bytes"] for item in items if item["input"] == str(original)) for original in originals)
+            mandatory += total * 1600 * 8 + 1024 * 1024
+            # Preserve eager admission for export, non-retained previews,
+            # out-of-program titles and tight budgets. Equal-content aliases can
+            # restore one entry into several files; bound each occurrence, not
+            # only the cache's retained memory, before deferring its raster.
+            restored_allowance = len(items) * min(MAX_SEGMENT_BYTES, preview_segments.maximum_bytes)
+            defer_raster = (cache_transaction is not None and composition["title"]["startFrame"] < total
+                            and mandatory + restored_allowance + raster_allowance <= budget.remaining)
+            if not defer_raster:
+                raster = directory / "title.png"; owned_files.append(raster)
+                title_component.rasterize(common, budget, composition, raster)
         source_targets = {}
         # Admit all mandatory copies and the conservative stereo PCM allowance
         # before copying/encoding. Encoder targets are not file-size bounds.
@@ -544,6 +596,9 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
             video, audio = meta["video"], meta["audio"]
             if video.get("hdr") or video.get("bit_depth", 8) > 8:
                 raise ValueError("manual source requires admitted 8-bit SDR")
+            if composition and (video.get("color_space") != "bt709" or video.get("color_primaries") != "bt709"
+                or video.get("color_transfer") != "bt709" or video.get("color_range") != "tv"):
+                raise ValueError("MANUAL_TITLE_UNSUPPORTED_COLOUR: title V1 requires explicit BT709 limited-range SDR")
             signature = tuple(video.get(key) for key in COLOUR_KEYS)
             if colour is not None and signature != colour:
                 raise ValueError("manual sources have mixed colour/pixel signalling; explicit admission is required")
@@ -564,13 +619,17 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
         layout = "stereo" if any(meta["audio"]["channel_layout"] == "stereo" for meta in metadata.values()) else "mono"
         channels = 2 if layout == "stereo" else 1
         pcm_items, occurrences = [], []
+        offset = 0
         for item in items:
             source_id, sealed, source_end, first, count, sr = sources[item["input"]]
             start, end = item["source_start_frame"], item["source_end_frame"]
             if Fraction(end, 30) > source_end or Fraction(start, 30) < Fraction(first, sr) or Fraction(end, 30) > Fraction(first + count, sr):
                 raise ValueError("manual requested frame range exceeds measured video/audio clock coverage")
             pcm_items.append({"source_id": source_id, "source_start_sample": start * 1600, "source_end_sample": end * 1600})
-            key = (source_id, start, end)
+            interval = title_component.local_interval(composition, offset, end - start) if composition else None
+            occurrence_composition = base_identity or _occurrence_composition(composition, component_identity, interval)
+            key = (source_id, start, end, json.dumps(occurrence_composition, sort_keys=True))
+            offset += end - start
             if key not in segments:
                 segment = directory / f"segment-{len(segments)}.mp4"; owned_files.append(segment)
                 profile = runtime.sdr_encoder_args(encoder, 18, "medium", {"video": {"width": width, "height": height, "fps": 30}}, tag_bt709=False)
@@ -579,7 +638,7 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                     profile += ["-maxrate", "700k", "-bufsize", "1400k"]
                 stream_index = receipts[int(source_id[1:])]["videoStreamIndex"]
                 encoder_args = [*profile, *_colour_args(metadata[source_id]["video"]), "-bf", "0", "-fps_mode", "passthrough", "-video_track_timescale", "30000", "-metadata:s:v:0", "rotate=0"]
-                cache_key = _segment_key(item, metadata[source_id]["video"], stream_index, encoder_args, runtime_identity) if cache_transaction else None
+                cache_key = _segment_key(item, metadata[source_id]["video"], stream_index, encoder_args, runtime_identity, occurrence_composition) if cache_transaction else None
                 grid = {"version": 1, "frames": end - start, "width": width, "height": height,
                         "codec": "h264", "pixelFormat": "yuv420p", "frameRate": [30, 1], "durationFrames": end - start}
                 payload = cache_transaction.get(cache_key, grid) if cache_transaction else None
@@ -587,10 +646,30 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                     budget.restore_segment(segment, payload)
                     del payload
                 else:
-                    budget.run_native(common, common.ffmpeg_base(overwrite=False) + ["-threads", "2", "-filter_threads", "2", "-copyts", "-i", str(sealed), "-map", f"0:{stream_index}", "-an", "-vf", _video_filter(start, end, width, height), *encoder_args, str(segment)])
+                    if composition and raster is None:
+                        # A sealed hit already contains its admitted title. Any
+                        # miss restores the original raster/producer ordering.
+                        raster = directory / "title.png"; owned_files.append(raster)
+                        title_component.rasterize(common, budget, composition, raster)
+                    command = common.ffmpeg_base(overwrite=False) + ["-threads", "2", "-filter_threads", "2", "-filter_complex_threads", "2", "-copyts", "-i", str(sealed)]
+                    if interval:
+                        canonical_width, canonical_height = (1080, 1920) if composition["title"]["aspect"] == "9:16" else (1920, 1080)
+                        # PNG is canonical final geometry; preview scales the complete picture once.
+                        graph = f"[0:{stream_index}]{_video_filter(start, end, canonical_width, canonical_height)}[base];[base][1:v]overlay=0:0:format=rgb:eof_action=repeat:enable='gte(n,{interval[0]})*lt(n,{interval[1]})',scale={width}:{height}:out_color_matrix=bt709:out_range=tv:flags=lanczos,format=yuv420p[out]"
+                        command += ["-i", str(raster), "-filter_complex", graph, "-map", "[out]", "-an"]
+                    elif preview and args.get("base_profile") == "canonical-h-bt709-v1":
+                        info = metadata[source_id]["video"]
+                        if any(info.get(k) != "bt709" for k in ("color_primaries", "color_transfer", "color_space")) or info.get("color_range") != "tv" or info.get("pix_fmt") != "yuv420p":
+                            raise ValueError("experimental base requires admitted SDR BT709 limited-range yuv420p")
+                        empty = Path(__file__).resolve().parent.parent / "components/manual-title/empty-h.png"
+                        graph = f"[0:{stream_index}]{_video_filter(start, end, 1920, 1080)}[base];[base][1:v]overlay=0:0:format=rgb:eof_action=repeat,scale={width}:{height}:out_color_matrix=bt709:out_range=tv:flags=lanczos,setsar=1,format=yuv420p[out]"
+                        command += ["-i", str(empty), "-filter_complex", graph, "-map", "[out]", "-an"]
+                    else:
+                        command += ["-map", f"0:{stream_index}", "-an", "-vf", _video_filter(start, end, width, height)]
+                    budget.run_native(common, command + [*encoder_args, str(segment)])
                     segment_stamp = segment.lstat()
                     segment_digest = inspection._hash_stable(segment, segment_stamp, inspection.MAX_BYTES) if cache_transaction and segment_stamp.st_size <= inspection.MAX_BYTES else None
-                    _video_clock(common, segment, end - start, width, height)
+                    video_clock(segment, end - start)
                     if segment_digest is not None:
                         if inspection._hash_stable(segment, segment_stamp, inspection.MAX_BYTES) != segment_digest:
                             raise RuntimeError("preview segment changed during grid validation")
@@ -612,14 +691,14 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
         # Generated relative names contain no caller text or quoting surface.
         budget.write_text(listing, "ffconcat version 1.0\n" + "".join(f"file {segment.name}\n" for segment in occurrences))
         budget.run_native(common, common.ffmpeg_base(overwrite=False) + ["-f", "concat", "-safe", "1", "-auto_convert", "0", "-i", str(listing), "-map", "0:v:0", "-c:v", "copy", "-an", "-video_track_timescale", "30000", str(video)])
-        _video_clock(common, video, total, width, height)
+        video_clock(video, total)
         measured = {}
         def admit(candidate: Path, probe: dict) -> None:
             nonlocal publication
             _root_current(root, root_stamp)
             if preview and not 0 < candidate.stat().st_size <= inspection.MAX_BYTES:
                 raise ValueError("manual disposable preview exceeds the inherited 8 MiB admission bound")
-            measured["video"] = _video_clock(common, candidate, total, width, height)
+            measured["video"] = video_clock(candidate, total)
             measured["audio"] = _audio_clock(common, candidate, samples, channels)
             for original, stamp in original_stamps.items():
                 expected = next(item["source_content"]["sha256"] for item in items if item["input"] == str(original))
@@ -631,6 +710,10 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
                     raise RuntimeError("manual sealed original changed during render")
             if cache_transaction and _segment_runtime_identity(common) != runtime_identity:
                 raise RuntimeError("preview segment runtime changed during render")
+            if base_identity and hashlib.sha256(empty_asset.read_bytes()).hexdigest() != base_identity["empty"]:
+                raise RuntimeError("experimental empty raster changed during render")
+            if composition and title_component.identity() != component_identity:
+                raise RuntimeError("title component changed during render")
             candidate_stream = next(s for s in _streams(common, candidate) if s.get("codec_type") == "video")
             for key in COLOUR_KEYS[:-1]:
                 expected = metadata["s0"]["video"].get(key)
@@ -657,7 +740,7 @@ def run(common: Any, runtime: Any, args: dict, *, preview: bool = False, retain_
         if inspection._hash_stable(output, output.lstat(), OWNED_BYTES) != measured["sha256"]:
             raise RuntimeError("manual final publication bytes changed")
         jobs.check_cancelled()
-        evidence = {"version": 1, "outputSha256": measured["sha256"], "profile": "manual-cfr30-preview-v1" if preview else "manual-cfr30-export-v1", "samplingPolicy": SAMPLING_POLICY,
+        evidence = {"version": 2 if composition else 3 if args.get("base_profile") else 1, **({"baseProfile": args["base_profile"]} if args.get("base_profile") else {}), **({"composition": composition} if composition else {}), "outputSha256": measured["sha256"], "profile": "manual-cfr30-preview-v1" if preview else "manual-cfr30-export-v1", "samplingPolicy": SAMPLING_POLICY,
             "frameRate": {"numerator": 30, "denominator": 1}, "container": "mp4", "videoCodec": "h264", "audioCodec": "aac", "dynamicRange": "sdr",
             "width": width, "height": height, "targetVideoBitsPerSecond": bitrate, "totalFrames": total, "outputFrameCount": total,
             "totalPcmSamples": samples, "outputAudioSampleCount": int(measured["audio"] * 48000), "audioSampleRate": 48000, "audioChannelLayout": layout,

@@ -78,6 +78,11 @@ jobs:
           --python-root "${RUNNER_TEMP}/cevra-python"
           --ffmpeg-prefix "${RUNNER_TEMP}/cevra-ffmpeg"
           --vendor-source "${RUNNER_TEMP}/ffmpeg-skill"
+      - name: Verify private Inter Unicode graphemes and closed raster guards
+        env:
+          CEVRA_TEST_ARTIFACTS: ${{ runner.temp }}
+          CEVRA_TITLE_RASTERIZER_ROOT: ${{ runner.temp }}/cevra-media-runtime/components/manual-title
+        run: python3 -I -B -m unittest discover -s engines/media-ffmpeg/test_python -p test_manual_title_rasterizer.py -v
       - name: Execute bounded multi-source audio acceptance catalog
         env:
           CEVRA_AUDIO_SEQUENCE_RELEASE: "1"

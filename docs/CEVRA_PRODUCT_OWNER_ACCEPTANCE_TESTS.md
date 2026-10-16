@@ -817,3 +817,350 @@ Exact final CI and package identity belong in the technical receipt and Draft #8
 failed harness attempts remain failed evidence. No automatic Play or product
 brightness gate, no original change, private human-store read/copy, media
 publication or actual AI. [Current bounds and evidence](CEVRA_MANUAL_TIMELINE_TRIM_V1.md#approved-preview-fluency-and-admitted-png--2026-10-05).
+
+
+## Offline manual-title visual round — 2026-10-10
+
+The Owner confirmed both exact synthetic title videos and replied **“Sim”** that
+the title appeared correctly at the expected times and margins. **OWNER VISUAL
+PASS applies only to this offline 16:9/9:16 fixture round**, now closed.
+
+Four preview/final outputs, 13 contract tests and independent review PASS cover
+the fixed title, 300 frames/10 seconds, frame90–209 timing across the frame150
+cut, source/audio identity, seeks, cancellation and bounded observed resources.
+[Exact artifact hashes, retained failures and method](CEVRA_MANUAL_TITLE_PROOF_V1.md)
+keep this evidence attached to its actual scope.
+
+Reuse D14-T2/D23-T1/T2 for the proposed integrated title behavior and
+X-T1/T2/T7/I17-T9 for History/persistence. Their complete app scenarios remain
+**BLOCKED where unimplemented**; editing/persistence, live preview K4-T1,
+original-source integrated export K4-T2 and the complete composition benchmark
+are not inferred from these MP4s. No new scenario ID or blanket D23/K4/G1 PASS
+is introduced. Next app acceptance follows automated integration checks and one
+grouped subjective round; do not repeat this approved offline visual test.
+
+## Integrated manual-title app round — 2026-10-11
+
+**SECOND OWNER REPORT RECORDED; NEW PACKAGE VERIFIED / FINAL CI PENDING.** This single grouped app round includes
+both Owner-approved UX scopes: organization/time/removal, then direct title
+manipulation. It supersedes the earlier pending app instructions at this same
+anchor; the accepted offline fixed-title visual proof remains closed. Reuse the
+stable IDs below without a blanket catalog PASS or new scenario ID.
+[Implemented contracts and gate bounds](CEVRA_MANUAL_TITLE_PROOF_V1.md#ux-e-manipulação-direta-aprovadas--2026-10-11).
+
+The previous UX/Unicode candidates and their reported Owner results remain
+historical evidence. Do not repeat that full initial round. After the current
+source/CI/package gates finish, use the new shortcut
+`~/Documents/CEVRA/Vids/human-review-regressions-2026-10-11/round-2/CEVRA Vids Revisao 2.app`
+(runtime0.3.9). The signed package stays in Applications. The existing app and
+project remain preserved; close the old variant normally after Saved before
+manually opening the new one with the same isolated project identity.
+Synthetic fixtures are `review-assets/source-horizontal.mp4` and
+`review-assets/source-vertical.mp4`; prepared real preview/export/mixed outputs
+are in `round-2/real-verified`. Keep any human export in `round-2/rodada-humana`.
+
+| Existing IDs / one minimal grouped follow-up | Expected result |
+|---|---|
+| D14-T2, X-T1/T2: inspect IN/OUT and preview counter, navigate one frame, focus/blur unchanged fields. | Always two centisecond digits (`MM:SS,cc`, owning duration adds hours); ruler stays whole seconds. Existing cuts remain exact. One Export remains at top right; accepted warnings/layout stay. |
+| D14-T2, D23-T1/T2, X-T1/T2: select title on timeline, drag both edges or edit contextual IN/OUT; type `Ação ↑ ❤️ 👩🏽‍⚕️ 🇧🇷 1️⃣`, move/resize in preview and Undo/Redo. | Duration respects sequence bounds, one History step per settled edit, text/layout/range restore together. Emoji presentation agrees between editor and current video; report perceived wait and gesture fluency together. Automation already checks stale/pending/cancel/focus guards. |
+| D23-T1/T2, bounded K3-T2/K4-T2, I17-T9: compare prepared H/V Unicode and V-H-V/H-V-H outputs; if needed export current title, then Saved/normal reopen. | Current preview/export title agrees in both aspects; mixed source is completely fitted with bars in a stable owning canvas. No automatic fill/crop or aspect switch. Canonical title/layout/range persists. Fit-versus-fill product changes need a separate decision. |
+
+Exact precision/fine navigation/conversion, stale snapshots, native closed
+payloads, physical History persistence, glyph/profile/overflow negatives,
+cancel/deadline, sampled budgets and original hashes are automated. Do not
+repeat their technical negative cases with the Owner. DOM/Blob receipts do not
+prove native decode/paint or perceived fluency. No new real media, AI, login,
+Xcode/iPhone operation or human project-store inspection is necessary. Full
+G1/ADR0012, Windows/notarization/release and unimplemented catalog variants stay
+**BLOCKED/PENDING**. Progress55%, F-A02 exhausted1/1 and the historical offline
+OWNER VISUAL PASS remain.
+
+### Reported Owner results and bounded follow-up — 2026-10-11
+
+The Owner completed the PR96 grouped round and reported general layout,
+direct title manipulation, horizontal export and vertical composition usable.
+Title selection/Delete/Undo and project-media removal warning/Cancel/Undo
+were reported working. These observations close the first requested round;
+they do not establish every variant of D14/D23/X/K or physical reopen, which
+was not explicitly reported. No blanket G1 or ADR0012 acceptance is inferred.
+
+Regressions remain under those same IDs: Original scrub before first Play
+left its counter at zero (D14-T2); the covered up-arrow plus U+FE0E text selector
+produced a generic preview failure (D23-T1/T2); vertical media filenames were
+covered by thumbnail overflow (D14-T2); the removal review needs better visual
+spacing (X-T7). Permanent IN/OUT/title instructions and duplicate sidebar
+layout controls also require the approved contextual-help cleanup. The Owner
+approved compact time by owning duration, millisecond draft precision on focus,
+clickable/focusable Help and short hover/focus hints. The main action is
+`Exportar` / `Export`; the existing MP4 profile remains explicit inside the
+export flow. Other formats and project management were not approved here.
+
+The follow-up uses a separate checkout and eventual distinct app; PR96/97,
+the running app and active project stay preserved. Before a new grouped visual
+follow-up, pass exact-time/navigation, typed History/Undo, Unicode negatives,
+real H/V render/export, package/signature and independent review gates.
+Automated technical cases are not delegated to the Owner again. Its subjective
+follow-up is limited to requested-clock response, title glyph/gesture fluency,
+filename readability, dialog spacing and help/compact-time comprehension.
+The technical render gate is currently **BLOCKED** by working-file identity
+changes in Documents; an explicitly approved stable scratch exception is
+pending. No new human review request or blanket acceptance is issued now.
+
+
+The clarified approximately two-second reload report is included in the same
+D23-T1/T2 and X-T1/T2 follow-up; no duplicate ID or new broad round is created.
+Judge image continuity and measured time to the current title separately.
+The bounded implementation labels a retained inert picture while updating;
+this does not itself remove render latency or establish subjective fluency.
+Objective gates currently cover 331 UI tests, History/latest-target/error
+contracts and actual WK frame-zero PNG continuity in both aspects with a
+controlled packet delay. Native frame 151 retention is unproven in the
+transparent offscreen context; actual render/latency remains BLOCKED under
+Documents pending the explicit scratch exception. Keep the app follow-up
+pending until technical gates close; no frozen app is replaced here.
+
+
+#### General-symbol clarification and objective progress — 2026-10-11
+
+This checkpoint supersedes the pending-scratch/FE0E-only statements above under
+the same D23-T1/T2 and X-T1/T2 IDs. The Owner approved stable temporary folders
+and clarified the report applies to arbitrary symbols. Runtime0.3.8 renders
+covered private-Inter graphemes, displays `□` for uncovered clusters, and keeps
+original Unicode text in IR/History. PT/EN Help explains monochrome/font and
+fitting limits; no universal glyph or color-emoji promise.
+
+Objective real H/V matrix33 renders/51 jobs/12 ROI and recovery4 renders/6 jobs
+pass, including selectors, combining accents, literal escapes, compound emoji,
+three source-removal/UndoRedo cycles and two physical reopens per aspect.
+Negative overflow/color, cancellation, deadline, immutable sources and frame/
+AAC/PCM clocks are verified automatically. The cold Host1742.393/1859.718ms
+measurements exclude decoder/UI. Do not ask the Owner to repeat these cases.
+
+Intermediate-frame native pixel continuity remains **BLOCKED/PENDING** while
+own WK probes are diagnosed; metadata/currentTime/seeked is not paint evidence.
+One accessory probe changed focus and was stopped by its guard. The0.3.8 signed
+package, fresh exact-head CI and final independent documentation/package review
+remain pending; retain the single grouped subjective follow-up until those
+gates close. No previous app/project is replaced and no broad acceptance or
+latency reduction is inferred. Detailed proof/hashes stay in the
+[Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--general-unicode-and-approved-stable-scratch).
+
+
+#### Native intermediate-frame gates — 2026-10-11
+
+The earlier native-paint BLOCKED state is superseded for this same D23/X
+follow-up. Real H/V previews pass text/position/size at91/151/208 and native
+navigation0/1/29/30/91/151/208/299/OUT. The fixture marker exposed and verified
+a decoder-boundary correction; clocks, cuts, History and Original remain
+canonical. Held/current pixels are opaque, snapshot matched and controls
+blocked until current packet/seek admission; aligned native title ROI passes.
+UI332/one local real-packet skip and build pass. Current admission1719–1865ms
+is measured in an owned warmed probe with programmatic typed commits and
+forced snapshot paint, not physical gesture fluency or first natural paint.
+Do not ask the Owner to repeat these objective frame/resource/font negatives.
+
+The single grouped subjective follow-up remains pending final signed-package,
+independent package review, archive verification and fresh exact-head CI. Its
+scope stays requested-clock response, image/gesture fluency, compact time/help,
+filename readability and removal-dialog spacing. No previous acceptance is
+reopened and no latency elimination or full G1/ADR0012 claim is made. Detailed
+receipts and limits stay in the
+[Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--native-intermediate-frames-and-decoder-boundary-correction).
+
+
+#### Technical closeout and single subjective follow-up — 2026-10-11
+
+The signed7a59baf candidate, CI756/Runtime111, independent source/package review
+and fully verified recoverable archive close the prior technical pendings for
+this same D14-T2, D23-T1/T2 and X follow-up. The clean038 package preserves
+executed code and passes fresh H/V/raster/recovery/immutability gates after
+removing only13 generated test caches. Objective fixtures/results are already
+prepared; the existing IDs are reused without a second acceptance catalog.
+
+The candidate is available through its CEVRA shortcut. After documentation-head
+checks finish, use one grouped subjective APP/OWNER follow-up for requested-
+clock response, title image/gesture fluency, compact time/help, media filenames
+and removal-dialog spacing. The measured1719–1865ms title-update admission
+remains and does not establish natural first paint or latency elimination.
+APP/OWNER verdicts remain pending; no blanket G1/K4/ADR0012/release acceptance.
+See [Manual Title Proof](CEVRA_MANUAL_TITLE_PROOF_V1.md#2026-10-11--signed-candidate-clean-runtime-and-recoverable-closeout)
+for exact package, archive and evidence locations; no previous app is replaced.
+
+
+#### Second human correction gate record — 2026-10-11
+
+The second report asks for persistent centiseconds, general Unicode color/cluster
+presentation, direct timeline duration and measured refresh; previous Export
+and warning acceptance remains. All three reported PNGs were read as pixels.
+The screenshot and actual mixed renders establish existing fit/pad in the
+checked cases; no crop policy is silently substituted. Current automated
+evidence: UI341/one skip, retained drafts46, Host preview47, Python162, build
+and independent source review PASS, plus14 actual H/V/mixed renders. Complete offline test:ci and Tauri release build pass. Fresh
+final-documentation-head CI is still required before the
+same single subjective follow-up above. Host admission2202–2363ms for new
+titles remains; cached Undo/Redo12–13ms causes no render. These measurements
+do not establish natural WK paint or subjective fluency. No new catalog ID,
+blanket acceptance, engine or Director permission is introduced.
+
+The new039 candidate uses executable21c3b67. Full offline test:ci, local
+real renders, ad-hoc deep/strict signing, independent1024file rehash, cold
+release metadata, three-RPC Host smoke and independent source/package/archive
+review pass. CI760 passes5/5 and Runtime113 passes1/1.
+Only final-documentation-head checks precede the shortcut and grouped follow-up.
+The complete2692entry scratch archive is recoverable and independently verified
+before exclusive cleanup. This is the current candidate; the prior038 closeout
+is retained as history. No app is opened by the agent or prior acceptance
+repeated. [Current package/evidence](CEVRA_MANUAL_TITLE_PROOF_V1.md#signed039-package-and-recoverable-closeout).
+
+## Exact preview-duration candidate: bounded grouped Owner acceptance — 2026-10-14
+
+**APP/OWNER FUNCTIONAL PASS, LIMITED VARIANTS.** The Owner confirmed all
+requested steps on the isolated CEVRA Vids Patch Exato candidate with sealed
+media runtime 0.3.10 (bundle/interface 0.1.0), rather than import alone. Exact
+source commit `185bb3d3c3683dbf6f2c95a8a78119887e1b42d7` is based on PR98
+`cdc8f8099387d4fce36aca791731665ef15986bd`; seven-path diff SHA256
+`33e545af2f12dac2dbb03e4512b1227a256fee527443899175392831b1c6f456`.
+Candidate inventory: 1,024 files, SHA256
+`d7a472b23beb860ea929536289209a1ca322a325700330b08607f65fe19eb767`.
+Reuse these stable IDs without expanding the result to every variant.
+
+| Existing IDs / this tested variant | Owner result |
+|---|---|
+| D1-T1; I4-T1 — import synthetic MP4 and add a range | APP/OWNER FUNCTIONAL PASS in the isolated project. |
+| D14-T2; bounded preview-title variant of D23-T2 — add title and change timeline duration/OUT | APP/OWNER FUNCTIONAL PASS for this sequence. |
+| X-T1 — Desfazer/Refazer in the tested title/duration flow | APP/OWNER FUNCTIONAL PASS. |
+| Bounded preview variant X-T6 — reproduce and pause | APP/OWNER FUNCTIONAL PASS; no new sync or natural-paint benchmark. |
+
+The functional Owner report is distinct from the earlier incomplete automated
+GUI attempt. That attempt observed the loaded normal editor, then was blocked
+at modal selection/coordinate routing. File type, permissions, configured
+native filter and packaged Host import subsequently passed in isolated
+background probes; the Owner completed the real grouped sequence. No product
+change was made by speculation. X-T2 save/reopen and X-T9 complete cost measurements have only technical
+evidence in this round, not a new Owner verdict. Schema/security guards under
+D23-T1 remain automated evidence. No additional move/resize/HV/Unicode matrix,
+human export or new physical reopen is accepted here. Earlier visual/export
+acceptance remains historical and is not repeated or enlarged by this record.
+
+Technical native export and Host/WK results stay separate. Latency remains
+(WK 2.452–2.614 s; isolated Host duration 1.708–1.828 s); functional acceptance
+is not latency elimination or a global fluency score. The broad cloud run
+still has 11 failed assertions: seven exited worker PIDs left in Z under
+container PID1 were confirmed; three UI and one RPC transient failures passed
+unchanged repeats with unproven root causes. This is not eleven demonstrated
+product bugs, and the failed aggregate is not relabelled PASS. Other catalog
+variants, G1/ADR0012/global release and platforms remain unresolved/blocked as
+applicable. Draft publication is authorized separately; merge is not.
+
+### Localizar mídia — variante aprovada em 2026-10-15
+
+Reutilizar I4-T1, X-T1/T2/T7 e I17-T9 na próxima rodada agrupada adequada.
+O Owner aprovou localizar **a mesma mídia movida**, uma fonte por vez; não
+aprovou substituição por outro conteúdo, adoção de identidade legada, busca
+automática no disco ou gerenciamento completo de projetos.
+
+| Variante dos IDs existentes | Preparação e resultado esperado |
+|---|---|
+| I4-T1, X-T1/T7 — localizar arquivo movido | Em projeto sintético com fonte que já possui SHA256/tamanho, cortes e título, mover o arquivo fora do app. Selecionar a fonte, usar Localizar mídia e escolher o mesmo arquivo. Continuam os mesmos IDs, cortes, título e numeração; o novo local torna-se canônico após verificação. |
+| X-T1/T2, I17-T9 — reversibilidade e reabertura | Um Desfazer restaura o local anterior; Refazer restaura o novo. Aguardar Salvo e reabrir normalmente o mesmo projeto; conferir estado e History. O local anterior pode continuar indisponível depois de Undo, pois os arquivos originais não são movidos pelo app. |
+| I4-T1, X-T1/T7 — recusa e cancelamento | Escolher outro arquivo com mesmo tamanho mas bytes diferentes deve recusar a alteração. Cancelar o picker ou a verificação antes do commit conserva o projeto. Se a confirmação canônica já ocorreu quando o cancelamento chegou, a UI mostra esse estado confirmado. Fonte legada sem identidade adotada mantém a ação indisponível. |
+
+**AUTO PASS limitado:** 122 testes Node focados, 45 UI e 56 Rust; os 14 novos
+testes application/Host também foram executados pelo revisor independente.
+Incluem arquivo realmente renomeado, identidade divergente, stale/cancelamento,
+checkpoint com falha e três reaberturas físicas do Host com Undo/Redo persistido.
+**APP/PICKER/OWNER: NÃO EXECUTADO** nesta entrega; nenhuma tela ou aplicativo
+existente foi usado. Essas verificações técnicas não promovem os IDs completos
+a PASS e não autorizam uma nova rodada humana por botão.
+
+## Experimental title-layer integration — 2026-10-15
+
+Reuse D14-T2, D23-T1/T2, X-T1/T2/T6 and the bounded K3/K4 preview/export
+variants; no new global Owner acceptance is implied. The Owner approved an
+isolated experimental implementation, with ordinary builds disabled.
+
+AUTO backend: fixed H/SDR CJS base/graphic reuse, duration/Undo/Redo,
+text/position, encoded fallback, source invalidation, trim and native PNG
+cancellation/settlement/cleanup passed. Full final export decoded equivalence
+passed for the recorded fixture. UI regression and Rust diagnostic tests pass.
+The broad aggregate remains FAIL with separately recorded follow-ups.
+
+APP and OWNER visual/fluency, real Tauri timing, native continuous playback and
+current integration seek/image comparison are **BLOCKED**: the Mac was locked
+when UI inventory was attempted. Manual unlock and actual candidate execution
+remain necessary. Prior standalone WebKit proof does not close these gates.
+[Experimental scope, limits and gate evidence](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md).
+
+### Offline capability correction follow-up — 2026-10-15
+
+The later directed review found and corrected a new missing-ResizeObserver
+fallback defect in a separate continuation/candidate. Two regression cases fail
+before/pass after; affected UI files pass 44 cases with the experimental flag and
+29 workflows without it. These are JSDOM/unit outcomes, not native presentation
+or Owner acceptance. Historical aggregate FAIL and the original candidate are
+preserved. The existing D14/D23/X/K3/K4 variants above remain APP/OWNER BLOCKED;
+GUI is reserved explicitly by the parent until release, even if unlocked.
+
+
+### Local reconciliation of Localizar/PR104 and experimental title layers — 2026-10-15
+
+Reuse the existing I4/X relocation and D14/D23/K3/K4 experimental variants above.
+AUTO only: 106 affected Node, 153 UI per flag mode and 58 Rust pass in the
+combined tree. Four regression cases first reproduce a stale `ended` callback;
+the correction preserves two legitimate loops and rejects obsolete/busy/paused
+events. Native production CJS confirms source relocation, missing-source/cache
+admission, Undo/Redo, Host reopen and the exact BT709 refusal codes, with unchanged
+runtime 0.3.12 and compile-time experiment disabled in the ordinary bundle.
+
+These checks do not establish Tauri/IPC/physical presentation or Owner fluency.
+Those same APP/OWNER variants remain pending; no new manual checklist is added.
+A Documents-TMPDIR native FAIL is preserved and reproduced with the earlier CJS;
+its precise metadata cause remains unresolved, despite a passing system-TMPDIR
+proof. No historical failure or PR104-specific CI is promoted to integration CI.
+The parent reserves GUI until explicit release; no capture is allowed meanwhile.
+
+### Native playback and recovery continuation — 2026-10-16
+
+Reuse the existing D14/D23, I4, X-T1/T2/T6/T7 and bounded K3/K4 variants; this
+entry records technical evidence, without creating a new human checklist.
+
+| Existing variant | New evidence and limit |
+|---|---|
+| X-T6 / experimental continuous sequence | Official CUA on frozen55d/runtime0.3.13: one continuous attempt, two native returns,23 correlated observations under one snapshot, no fallback/draw failure; Repeat off reaches300/300 and Play. Prior218 retention is not reproduced; cause/fix remain unknown. |
+| X-T2 / physical app reopen | Official normal Quit/inventory absence and physical Tauri reopen; project/media/two clips/Unicode title/10s/Saved return. Before/after checkpoint SHA256 is identical. |
+| D14/D23 / title and cut limits | New React regression drives900 callbacks through89/90,149/150,239/240, two returns, old-callback rejection and final stop. Mocks verify control flow/draw gates, not native pixels/paint;277 directed UI tests per flag mode pass. Real square1 boundary images remain separate prior evidence. |
+| I4, X-T1/T7 / source location and refusal | New isolated packaged-Host chain verifies warm-cache/missing-source refusal, same-size wrong-byte rejection, correct Locate and exact Undo/Redo. Only URI plus audited History/update metadata changes. Native picker evidence remains the earlier square1 run, not repeated55d evidence. |
+| K3/K4 / export, X-T2 / recovery | New baseline and post-Locate/reopen exports have equal300 decoded frame hashes/PTS and480000 PCM samples/channel. Existing-destination refusal preserves bytes. Another copied store with corrupt current recovers exact previous revision7/one export, quarantines bad bytes and does not replay the lost revision8/two-export state. |
+
+The initial55d canvas-submit receipt is3308ms, with physicalPaintMs=null; no
+2.2-second elimination or fluency score is established. Export/Locate were not
+repeated in that short CUA script. Ordinary experimental flags remain off and
+the physically tested55d package is preserved because the continuation modifies
+only tests/docs. Human visual/editorial acceptance, broader variants and global
+release remain unresolved. Historical broad/cloud FAILs are not relabelled PASS.
+[Detailed scope and bindings](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#continuous-native-playback-and-recovery-continuation--2026-10-16).
+
+### Remaining human judgment for the experimental candidate — 2026-10-16
+
+**APPROVED, bounded Owner judgments.** The parent supplied the direct exchange
+on 2026-10-16: the Owner was asked to select the saved diagnostic candidate,
+use Sequence with Experimental preview checked, play from the beginning and
+judge image/audio, stalls and synchrony; then change title OUT from00:08,00 to
+00:08,50, apply it and judge responsiveness and playback continuity. The direct
+reply was **“TUDO OK”**. The parent explicitly confirmed that this approves
+both requested judgments. The transcript supplies no independent visual capture,
+frame observation, timing measurement or separate exported-file inspection.
+
+- [x] Perceived image/audio fidelity and synchrony in the requested saved
+  horizontal SDR sequence workflow — APPROVED by that direct reply.
+- [x] Perceived response and playback continuity after the requested title OUT
+  adjustment — APPROVED by the same reply.
+
+The earlier checklist also mentioned the existing export. No separate human
+inspection of that file is inferred from this narrower script; original-derived
+export correctness retains its independently decoded technical evidence. This
+does not broaden D14/D23, X-T6 or K3/K4 to full catalog acceptance, other aspects,
+colour profiles, sources or production/release. Import, technical loop counts,
+pickers, export generation and reopen are not requested again. Historical FAILs
+remain FAIL; frame218 cause/fix remain unestablished. Merge and default adoption
+are separate from these two completed subjective judgments.

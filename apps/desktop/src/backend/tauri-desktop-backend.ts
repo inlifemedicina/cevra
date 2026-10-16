@@ -11,7 +11,8 @@ import type {
   DesktopCapabilityReason,
   DesktopOperationError,
   ManualSequenceExportResult,
-  ImportMediaResult, NativeMediaDropState, DroppedMediaResult, DroppedMediaItem
+  ImportMediaResult, NativeMediaDropState, DroppedMediaResult, DroppedMediaItem,
+  LocateMediaRequest, LocateMediaResult
 } from "./desktop-backend";
 
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -28,6 +29,8 @@ interface HostState {
     mediaImport: { available: boolean; reason: DesktopCapabilityReason };
     transcription: { available: boolean; reason: DesktopCapabilityReason };
     manualExport?: { available: boolean; reason: DesktopCapabilityReason };
+    manualTitle?: { available: boolean; reason: DesktopCapabilityReason };
+    sourceRelocation?: { available: boolean; reason: DesktopCapabilityReason };
   };
 }
 
@@ -44,13 +47,22 @@ export class TauriDesktopBackend implements DesktopBackend {
   async loadEditorialDraft(): Promise<EditorialDraftState> {
     return this.call("desktop_get_editorial_draft");
   }
+  async editManualTitle(request: ManualTitleEdit): Promise<{ state: DesktopBackendState; graphicId?: string }> {
+    const { version, expectedSnapshotId, ...action } = request;
+    const result = await this.call<{ state: HostState; graphicId?: string }>("desktop_edit_manual_title", { args: { version, expectedSnapshotId, action } });
+    return { ...result, state: fromHostState(result.state) };
+  }
 
   async thumbnailLocalVideo(request: SourceThumbnailRequest): Promise<SourceThumbnail> {
     return this.call("desktop_thumbnail_local_video", { args: request });
   }
 
+  async recordLayerPresentation(receipt:import("@cevra/application").LayerPreviewDiagnosticV1):Promise<void>{await this.call("desktop_record_layer_presentation",{args:receipt})}
   async previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview> {
-    return this.call("desktop_preview_local_video", { args: request });
+    const start=performance.now();
+    const value=await this.call<LocalVideoPreview>("desktop_preview_local_video", { args: request });
+    if(value.layered)value.layered.timings.tauriRoundTripMs=performance.now()-start;
+    return value;
   }
 
   async prepareManualExport(request: ManualExportPreparationRequest): Promise<
@@ -101,6 +113,12 @@ export class TauriDesktopBackend implements DesktopBackend {
       importedSourceId: response.result.importedSourceId,
       reused: response.result.reused
     };
+  }
+
+  async locateMedia(request: LocateMediaRequest): Promise<LocateMediaResult> {
+    const { version, sourceId, expectedSnapshotId, operationId, locale } = request;
+    const response = await this.call<{ outcome: "cancelled" } | { outcome: "located"; result: { state: HostState; sourceId: string; changed: boolean } }>("desktop_locate_media", { args: { version, sourceId, expectedSnapshotId, operationId, locale } });
+    return response.outcome === "cancelled" ? response : { outcome: "located", ...response.result, state: fromHostState(response.result.state) };
   }
 
   async getNativeMediaDropState(): Promise<NativeMediaDropState> {
@@ -181,6 +199,8 @@ function fromHostState(state: HostState): DesktopBackendState {
     ...(state.checkpoint ? { checkpoint: { ...state.checkpoint } } : {}),
     ...(state.closePending !== undefined ? { closePending: state.closePending } : {}),
     capabilities: {
+      ...(state.capabilities.sourceRelocation ? { "media.locate": { ...state.capabilities.sourceRelocation } } : {}),
+      ...(state.capabilities.manualTitle ? { "title.edit": { ...state.capabilities.manualTitle } } : {}),
       "media.import": { ...state.capabilities.mediaImport },
       "transcription.transcribe": { ...state.capabilities.transcription },
       "director.execute": { available: false, reason: "desktop-runtime-deferred" },
@@ -189,3 +209,4 @@ function fromHostState(state: HostState): DesktopBackendState {
     }
   };
 }
+import type { ManualTitleEdit } from "@cevra/application";

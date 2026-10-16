@@ -15,6 +15,8 @@ export interface LocalVideoPreviewRequest {
   /** Whole admitted CFR30 montage; mutually exclusive with clipId. */
   sequence?: true;
   operationId?: string;
+  /** Explicit candidate-only request; the default preview remains encoded. */
+  experimentalLayer?: { version: 1; knownBaseId?: string };
 }
 
 export interface SourceThumbnailRequest {
@@ -35,6 +37,13 @@ export interface LocalVideoPreview {
   /** Ephemeral first admitted frame; never a source, poster asset or project edit. */
   initialFrame?: { mimeType: "image/png"; base64: string; width: number; height: number; sourceTimeMs: number };
   sequence?: { timingPolicy: "cfr30"; totalFrames: number; clipIds: string[] };
+  layered?: {
+    version: 1; baseId: string; baseReused: boolean; graphicId: string;
+    title: import("@cevra/project-ir").ManualTitle;
+    canonical: { mimeType: "image/png"; width: 1920; height: 1080; base64: string; sha256: string };
+    graphic: { mimeType: "image/png"; width: 720; height: 404; base64: string; sha256: string };
+    timings: { hostTotalMs: number; basePrepareMs: number; graphicPrepareMs: number; graphicCacheHit: boolean; rustHostMs?: number; tauriRoundTripMs?: number };
+  };
   clip?: { id: string; sourceStartMs: number; sourceEndMs: number; firstFrameMs: number; lastFrameMs: number; frameCount: number; frameTiming?: ClipFrameTimingV1 };
 }
 
@@ -185,4 +194,39 @@ export async function verifyManualVideoSources(sources: readonly SourceAsset[], 
     signal?.throwIfAborted();
     if (status !== "match") throw manualVideoError("MANUAL_VIDEO_SOURCE_CHANGED");
   }
+}
+
+/** Candidate diagnostic endpoint; native canvas submit and RAF are not physical paint. */
+/** Candidate-only closed diagnostics; no exception messages or project content. */
+export interface LayerPreviewFallbackV1 {
+  version: 1;
+  kind: "fallback";
+  operationId: string;
+  snapshotId: string;
+  epoch: number;
+  stage: "request" | "binding" | "base" | "graphic" | "decode" | "capability" | "play";
+  reason: "unsupported" | "binding" | "base-unavailable" | "base-identity" | "oversize" | "png-invalid" | "graphic-identity" | "graphic-collision" | "decode-error" | "decode-timeout" | "base-grid" | "frame" | "resize-observer-unavailable" | "video-frame-callback-unavailable" | "play-rejected" | "unexpected";
+  nativeCode: "MANUAL_LAYER_UNAVAILABLE" | "MANUAL_VIDEO_UNAVAILABLE" | "MANUAL_VIDEO_UNSUPPORTED" | "MANUAL_VIDEO_SOURCE_CHANGED" | "MANUAL_VIDEO_STALE" | "MANUAL_VIDEO_PREVIEW_TIMEOUT" | "MANUAL_VIDEO_TITLE_COLOUR_UNSUPPORTED" | "OPERATION_CANCELLED" | "PROJECT_MUTATION_BUSY" | "HOST_INVALID_PARAMS" | "HOST_UNAVAILABLE" | "HOST_OPERATION_FAILED" | null;
+  elapsedMs: number;
+  capabilities: { resizeObserver: boolean; videoFrameCallback: boolean; imageBitmap: boolean; webCryptoDigest: boolean };
+  endpoint: "encoded-fallback";
+}
+/** Bounded candidate observation, not a physical-paint or playback-success receipt. */
+export interface LayerPreviewPlaybackV1 {
+  version: 1; kind: "playback"; reason: "sample" | "draw-failure";
+  operationId: string; snapshotId: string; epoch: number; elapsedMs: number;
+  intentToPlay: boolean; frame: number | null; pendingSeek: boolean;
+  decoder: { timeMs: number | null; paused: boolean; ended: boolean; seeking: boolean;
+    readyState: number; networkState: number; errorCode: 1 | 2 | 3 | 4 | null };
+  callback: { received: number; scheduled: boolean; lastMediaTimeMs: number | null; lastAgeMs: number | null };
+  draw: { submitted: number; failed: number; lastAgeMs: number | null };
+  visibility: "visible" | "hidden" | "unknown";
+  endpoint: "playback-observation";
+}
+export type LayerPreviewDiagnosticV1 = LayerPreviewPresentationV1 | LayerPreviewFallbackV1 | LayerPreviewPlaybackV1;
+
+export interface LayerPreviewPresentationV1 {
+  version:1;kind:"asset-update"|"seek";operationId:string;snapshotId:string;epoch:number;frame:number;
+  requestToCanvasMs:number;uiDecodeMs:number;animationOpportunityMs:number|null;supersededBeforeOpportunity:boolean;
+  host:NonNullable<LocalVideoPreview["layered"]>["timings"]|null;physicalPaintMs:null;endpoint:"canvas-submit";
 }

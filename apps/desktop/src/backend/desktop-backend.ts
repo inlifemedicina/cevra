@@ -21,8 +21,11 @@ export interface DesktopBackendState {
   readonly status: "demo-not-persisted" | "local-unsaved" | "local-saved" | "local-recovered" | "persistence-error" | "checkpoint-pending" | "host-unavailable" | "temporary-review";
   readonly checkpoint?: { readonly token: string; readonly pending: boolean };
   readonly closePending?: boolean;
-  readonly capabilities: Readonly<Record<DesktopRuntimeCapability, DesktopCapabilityState>>;
+  readonly capabilities: Readonly<Record<DesktopRuntimeCapability, DesktopCapabilityState> & { "title.edit"?: DesktopCapabilityState; "media.locate"?: DesktopCapabilityState }>;
 }
+
+export interface LocateMediaRequest { version: 1; sourceId: string; expectedSnapshotId: string; operationId: string; locale: "pt-BR" | "en-US" }
+export type LocateMediaResult = { readonly outcome: "cancelled" } | { readonly outcome: "located"; readonly state: DesktopBackendState; readonly sourceId: string; readonly changed: boolean };
 
 export type ImportMediaResult =
   | { readonly outcome: "cancelled" }
@@ -66,6 +69,7 @@ export interface DesktopBackend {
   loadEditorialDraft(): Promise<EditorialDraftState>;
   reviseEditorialDraft(request: ReviseEditorialDraftRequest): Promise<EditorialDraftState>;
   thumbnailLocalVideo?(request: SourceThumbnailRequest): Promise<SourceThumbnail>;
+  recordLayerPresentation?(receipt: import("@cevra/application").LayerPreviewDiagnosticV1): Promise<void>;
   previewLocalVideo(request: LocalVideoPreviewRequest): Promise<LocalVideoPreview>;
   prepareManualExport?(request: ManualExportPreparationRequest): Promise<
     { readonly outcome: "cancelled" } | { readonly outcome: "prepared"; readonly preparation: ManualExportPreparation }>;
@@ -74,7 +78,9 @@ export interface DesktopBackend {
   createManualVideoClip(request: CreateManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }>;
   trimManualVideoClip(request: TrimManualVideoClipRequest): Promise<{ state: DesktopBackendState; clipId: string }>;
   editManualVideoSequence(request: ManualVideoSequenceEdit): Promise<{ state: DesktopBackendState; changedClipIds: string[] }>;
+  editManualTitle?(request: ManualTitleEdit): Promise<{ state: DesktopBackendState; graphicId?: string }>;
   pickAndImportMedia(locale: "pt-BR" | "en-US"): Promise<ImportMediaResult>;
+  locateMedia?(request: LocateMediaRequest): Promise<LocateMediaResult>;
   getNativeMediaDropState?(): Promise<NativeMediaDropState>;
   importDroppedMedia?(receiptId: string, locale: "pt-BR" | "en-US"): Promise<DroppedMediaResult>;
   transcribeSource(sourceId: string, operationId: string, locale: "pt-BR" | "en-US"): Promise<DesktopBackendState>;
@@ -84,3 +90,4 @@ export interface DesktopBackend {
   getNativeCloseState?(): Promise<{ sequence: number; pending: boolean; errorCode?: string }>;
   cancelOperation(operationId: string): Promise<{ operationId: string; cancelled: boolean }>;
 }
+import type { ManualTitleEdit } from "@cevra/application";
