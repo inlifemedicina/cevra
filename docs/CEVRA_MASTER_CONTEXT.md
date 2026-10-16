@@ -2,6 +2,17 @@
 
 **Canonical continuity document**
 
+**Integrated in main — PR105, 2026-10-16:** the approved manual-title/editing,
+verified media-location and bounded experimental-preview set was integrated by
+normal merge `7392ad30a4c6ca6ffd8d131ba115a40bf7c29c1c`, from reviewed head
+`c3fc0ace84523cd379c1d92ae1706bc9d317c905` over main48353df. Both ordinary
+experimental flags remain off; no installed app or personal project was replaced.
+Independent120-path review, native harness closure and11 pre-merge jobs passed.
+Post-merge [CI](https://github.com/inlifemedicina/cevra/actions/runs/38953272779)
+and [Exact Runtime](https://github.com/inlifemedicina/cevra/actions/runs/38953272879)
+passed all6 jobs at attempt1 without reruns. Earlier authorized/pending route
+entries below are historical; broader release/default gates remain separate.
+
 **Repository integration authorized, 2026-10-16:** the parent supplied the
 Owner's direct **“SIM”** to integrating the existing approved set into main
 after full-combination review, with experimental features disabled by default
@@ -4549,3 +4560,38 @@ and all1028 files/modes of the own runtime/app copy remain identical with strict
 signature verification passing. The failing run is retained; this is a test
 oracle correction, not a product or frame218 fix. Final CI must run on the
 subsequent test/documentation head before merge.
+
+### 2026-10-16 — PR105 main integration closeout
+
+**IMPLEMENTED / CLOSED — BOUNDED MAIN INTEGRATION.** Explicit Owner “SIM” authorized the
+existing set's consolidation through PR105→main with flags off by default,
+independent full-combination review and exact-head checks. All120 paths were
+reviewed (66 domain/Host/media/license,50 UI/native/workflow/i18n,4 docs), and
+the only P2 was closed by correcting a stale native harness expectation with
+actual failing-before/passing-after evidence. No product/runtime changed in
+that correction; no P1/P2 remained within the reviewed scope. Source headc3fc0ac
+had36 commits over main48353df after the authorization/test closeout commits.
+
+[PR105](https://github.com/inlifemedicina/cevra/pull/105) merged normally at
+`7392ad30a4c6ca6ffd8d131ba115a40bf7c29c1c` after all11 final-head jobs passed,
+attempt1 without reruns. The actual merge has parents48353df/c3fc0ac and tree
+`04a7c69e0549ec3fb4ac349501353c7e7323d977`, exactly equal to the reviewed head.
+The merge API used expected head SHA and no bypass. Main pushCI38953272779 and
+ExactRuntime38953272879 completed SUCCESS on that actual merge:5+1 jobs,
+attempt1 without reruns. These are post-merge results, independently bound to
+7392ad3 rather than inherited from pre-merge checks.
+
+GitHub's post-merge snapshot reports PR105 and PR96 closed/merged; PR97/98 and
+PR101–104 still open/draft. Their already incorporated implementation commits
+do not imply that their metadata has been reconciled. PR99/100 remain the
+separate documentary chain. Existing stacked branches are retained for that
+explicit reconciliation purpose; no unrelated close/delete operation occurs.
+
+The two reported subjective judgments remain bounded to the requested saved
+Sequence image/audio/synchrony and title adjustment workflow. Ordinary builds
+keep the evaluated layer off by default; no global engine/default adoption,
+app installation, project migration, provider/cost/security change or new
+feature/direction is included. Historical cloud FAIL11/raw-evidence absence,
+intermediate failures and unknown frame218 cause/fix remain preserved. Director:
+the approved compatible typed-operation/presentation extensions are integrated;
+Project IR and History remain execution/state authorities with no new bypass.
