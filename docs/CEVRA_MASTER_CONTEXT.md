@@ -2,6 +2,15 @@
 
 **Canonical continuity document**
 
+**Repository integration authorized, 2026-10-16:** the parent supplied the
+Owner's direct **“SIM”** to integrating the existing approved set into main
+after full-combination review, with experimental features disabled by default
+and without replacing the installed app or personal projects. PR105 is now
+retargeted to main. Independent reviews and exact head/base checks must pass
+before the authorized merge with expected head SHA; post-merge main CI must
+reach a terminal result. Earlier route-undecided entries below are historical.
+This does not approve default adoption, a new feature/engine or installation.
+
 **Bounded Owner acceptance, 2026-10-16:** the parent supplied the direct
 **“TUDO OK”** reply to the requested experimental Sequence image/audio/synchrony
 check and title OUT00:08,00→00:08,50 response/continuity check, explicitly
@@ -4497,3 +4506,34 @@ this record. The original cloud raws remain unavailable for individual audit,
 all historical FAILs remain FAIL, and frame218 cause/fix remain unknown.
 Director: no new impact within this verification/documentation scope; the
 existing typed-operation, IR and History authorities remain unchanged.
+
+### 2026-10-16 — Authorized consolidation of the existing implementation chain
+
+**INTEGRATION AUTHORIZED / REVIEW AND MERGE GATES IN PROGRESS.** The Owner
+directly replied “SIM” to the proposal to integrate the existing approved set
+into main after reviewing the complete combination, keeping experimental
+features off by default and preserving installed apps/personal projects. The
+parent explicitly authorized retargeting PR105 to main, independent reviews,
+applicable checks, merge with expected head SHA only after passing gates and
+terminal post-merge CI. This supersedes the previous route-undecided state;
+it does not supersede any historical failure or acceptance limitation.
+
+PR105 was retargeted from PR104 to main48353df. The pre-authorization-record
+head618b51b contains34 commits/120 paths above that main, including the existing
+PR96–98/101–105 implementation chain. Full domain/Host/media and UI/native
+reviews assess that combination rather than only the46-path PR104 delta.
+PR99/100 remain a separate documentary chain; their decisions are not absorbed
+or approved by this integration. The new authorization record changes only
+documentation, leaving the physically tested55d/runtime0.3.13 product unchanged.
+
+Both ordinary experimental compile flags remain off. The existing encoded
+sequence path, original-derived final export, typed operations, Project IR,
+History, colour/integrity guards and existing permissions remain authoritative.
+No main app installation, user-store migration/replacement, new provider,
+real AI call, cost/security change or architecture/default decision is included.
+Independent full-combination reviews and exact final-head/main checks must
+finish before merge; prior checks do not silently transfer to a different pair.
+The main branch result and post-merge CI will be recorded at actual completion.
+Historical cloud FAIL11/raw-evidence absence and unknown frame218 cause/fix
+remain as recorded. Director impact is the already approved compatible
+typed-operation/presentation integration, with no new execution/state authority.

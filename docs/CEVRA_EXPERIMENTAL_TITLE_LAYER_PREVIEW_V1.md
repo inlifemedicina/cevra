@@ -1,8 +1,9 @@
 # Experimental static-title preview — 2026-10-15
 
-Status: **isolated experiment; two bounded Owner judgments APPROVED on
-2026-10-16; no default adoption, release or repository merge**. Earlier pending
-acceptance entries below are historical checkpoints.
+Status: **experimental flags remain off by default; two bounded Owner judgments
+APPROVED and repository integration explicitly AUTHORIZED on2026-10-16, pending
+full-combination review and merge gates; no default adoption, release or app
+installation**. Earlier pending-acceptance/route entries below are historical.
 
 ## Real Tauri fallback diagnosis — 2026-10-15
 
@@ -533,3 +534,26 @@ identified by this final proof. Historical FAILs, missing original cloud raws
 and the unknown frame218 cause/fix remain unchanged. Director impact: no new
 impact in this verification/acceptance record; typed operations, IR and History
 remain the same execution/state authorities.
+
+## Explicit repository integration authorization — 2026-10-16
+
+The parent supplied the Owner's direct **“SIM”** to integrating the approved
+set into main after full review, keeping experimental features disabled by
+default and preserving installed apps and projects. The authorized route is
+now PR105→main. This supersedes only the earlier undecided merge route; the
+two bounded human judgments and all their limits retain their recorded scope.
+
+Main48353df is an ancestor of pre-record head618b51b. The complete combination
+has34 commits/120 changed paths, including PR96–98/101–105. Independent reviews
+cover domain/Host/media and UI/native/workflow boundaries; a46-path review over
+PR104 alone would not satisfy this scope. This new authorization record changes
+only documentation. Both ordinary experimental flags remain off, and no new
+product/default/engine/provider/security behavior is introduced in this step.
+
+Retargeting is complete. Merge remains conditional on full-combination reviews,
+actual applicable requirements and exact final-head/main checks, using expected
+head SHA through the normal merge API without bypass. Then main CI must reach
+a terminal result and the canonical ledger must record the actual merge state.
+No installed app or personal project is replaced. PR99/100's separate documentary
+chain is not incorporated or silently decided. Historical FAILs stay FAIL, the
+original cloud raws remain absent and frame218 cause/fix remain unknown.
