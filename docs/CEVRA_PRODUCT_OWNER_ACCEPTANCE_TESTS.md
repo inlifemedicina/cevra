@@ -1142,18 +1142,25 @@ release remain unresolved. Historical broad/cloud FAILs are not relabelled PASS.
 
 ### Remaining human judgment for the experimental candidate — 2026-10-16
 
-Use the saved55d/runtime0.3.13 horizontal SDR project and existing exports in one
-coordinated Owner round. Reuse bounded D14/D23, X-T6 and K3/K4; this checklist
-does not repeat import, two-loop counting, pickers, export generation or reopen.
+**APPROVED, bounded Owner judgments.** The parent supplied the direct exchange
+on 2026-10-16: the Owner was asked to select the saved diagnostic candidate,
+use Sequence with Experimental preview checked, play from the beginning and
+judge image/audio, stalls and synchrony; then change title OUT from00:08,00 to
+00:08,50, apply it and judge responsiveness and playback continuity. The direct
+reply was **“TUDO OK”**. The parent explicitly confirmed that this approves
+both requested judgments. The transcript supplies no independent visual capture,
+frame observation, timing measurement or separate exported-file inspection.
 
-- [ ] Judge the existing sequence and export: Unicode/title legibility and
-  placement, perceived colour, audio quality and audiovisual synchrony.
-- [ ] Judge responsiveness and picture continuity while making one title OUT
-  or position adjustment in Sequence. Record whether the wait/loading behaviour
-  and resulting preview feel acceptable for this bounded workflow.
+- [x] Perceived image/audio fidelity and synchrony in the requested saved
+  horizontal SDR sequence workflow — APPROVED by that direct reply.
+- [x] Perceived response and playback continuity after the requested title OUT
+  adjustment — APPROVED by the same reply.
 
-Record APPROVED or NEEDS ADJUSTMENT with the action/frame and concrete concern.
-These are subjective judgments;397 ordinary UI tests, decoded equality and a
-3308ms canvas-submit receipt do not answer them. Broader aspect/colour/source
-variants retain their existing catalog status. Frame218 cause/fix remains
-unestablished; there is no instruction to reproduce it repeatedly.
+The earlier checklist also mentioned the existing export. No separate human
+inspection of that file is inferred from this narrower script; original-derived
+export correctness retains its independently decoded technical evidence. This
+does not broaden D14/D23, X-T6 or K3/K4 to full catalog acceptance, other aspects,
+colour profiles, sources or production/release. Import, technical loop counts,
+pickers, export generation and reopen are not requested again. Historical FAILs
+remain FAIL; frame218 cause/fix remain unestablished. Merge and default adoption
+are separate from these two completed subjective judgments.

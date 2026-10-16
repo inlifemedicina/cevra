@@ -1,6 +1,8 @@
 # Experimental static-title preview — 2026-10-15
 
-Status: **isolated experiment; not a default, release, merge or Owner acceptance**.
+Status: **isolated experiment; two bounded Owner judgments APPROVED on
+2026-10-16; no default adoption, release or repository merge**. Earlier pending
+acceptance entries below are historical checkpoints.
 
 ## Real Tauri fallback diagnosis — 2026-10-15
 
@@ -488,3 +490,46 @@ contains only perceived fidelity/fluency judgments on the saved fixture and
 existing exports. Import, boundary checks, two technical returns, native picker
 actions, export decode and physical reopen are already evidenced and are not
 requested again. This does not promote the experiment or broaden acceptance.
+
+## Bounded Owner approval and final integration review — 2026-10-16
+
+The parent supplied the Owner's direct **“TUDO OK”** reply to the two requested
+checks: image/audio/synchrony in Sequence with Experimental preview checked,
+then responsiveness and playback continuity after title OUT00:08,00→00:08,50.
+The parent explicitly confirms both judgments are approved. The
+[existing checklist](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#remaining-human-judgment-for-the-experimental-candidate--2026-10-16)
+records that exact scope. This is a human report, without an independent capture,
+measured wait, separate export inspection or broader H/V/colour matrix.
+
+One additional isolated packaged-Host proof closes the previously explicit
+post-checkpoint-export gap. A copied store with invalid current opens
+`local-recovered` at exact previous revision7/one export, while the two-record
+execution ledger is preserved. The first canonical editing/render request is
+one explicit export. It adds a new revision8/export and one succeeded attempt;
+the lost old revision8 export is neither restored nor replayed. Undo restores
+the exact recovered project; Redo and normal fresh-Host reopen restore the new
+project. Checkpoint/ledger bytes remain equal across close/reopen; both Host
+processes exit normally. Independent read-only review and decode confirm all300
+frames/PTS and480000 PCM samples/channel match the prior reference. Container
+bytes differ. This is not crash/power-loss or interrupted-job recovery evidence.
+
+The old temporary candidate and old temporary export locators were absent
+before this proof. The pinned archive and durable outputs remain intact. Both
+new extractions match1028 frozen files/modes; the Documents copy fails strict
+codesign with resource/Finder metadata, and the own system-temporary copy passes.
+The failed copy/receipts remain preserved. No attributes are removed, no signing
+or security policy changes, and no GUI/app installation occurs. Only the own
+synthetic source locator is restored with its exact adopted bytes before testing.
+
+PR105 atfdf2689 passes all11 remote jobs at attempt1. It still targets PR104's
+branch; PR96–98 and101–105 form an unmerged implementation chain above main,
+while PR99/100 are a separate documentary chain. The approved recorded plan is
+an isolated integration for evaluation, with ordinary experimental flags off;
+it does not specify a repository merge route for that chain. Closing the two
+human judgments does not silently choose a main consolidation, merge other
+drafts, enable defaults or replace an installed application. A concrete merge
+route must be authorized before those mutations. No new product defect is
+identified by this final proof. Historical FAILs, missing original cloud raws
+and the unknown frame218 cause/fix remain unchanged. Director impact: no new
+impact in this verification/acceptance record; typed operations, IR and History
+remain the same execution/state authorities.

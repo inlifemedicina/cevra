@@ -2,6 +2,14 @@
 
 **Canonical continuity document**
 
+**Bounded Owner acceptance, 2026-10-16:** the parent supplied the direct
+**“TUDO OK”** reply to the requested experimental Sequence image/audio/synchrony
+check and title OUT00:08,00→00:08,50 response/continuity check, explicitly
+confirming both judgments. This closes only those subjective checks; no measured
+latency, separate export inspection, broad catalog, default adoption or release
+is inferred. Earlier pending-Owner entries below remain historical. See the
+[recorded scope](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#remaining-human-judgment-for-the-experimental-candidate--2026-10-16).
+
 **Bounded playback diagnosis, 2026-10-15:** a distinct offline successor over
 `e5b06c8` adds local playback observations to the existing candidate-only receipt
 command. It samples admitted playback at1Hz, at most23 sample attempts plus one
@@ -4456,3 +4464,36 @@ The frozen55d package and ordinary default-off policy remain unchanged. No new
 architecture, feature, provider, cost, permission or Director authority. Local
 technical review/publication may proceed as draft; merge/default promotion and
 subjective acceptance require their existing gates.
+
+### 2026-10-16 — Bounded human approval and repository integration boundary
+
+**TWO OWNER JUDGMENTS APPROVED / REPOSITORY MERGE ROUTE UNDECIDED.** The parent
+supplied the Owner's direct “TUDO OK” after the existing saved diagnostic
+Sequence image/audio/synchrony check and title OUT00:08,00→00:08,50
+response/continuity check. This is reported subjective acceptance of that
+workflow; no independent capture, measured timing, separate export inspection,
+broader aspect/colour/source acceptance or production adoption follows.
+
+A single additional packaged-Host proof exports as the first canonical request
+after exact previous-checkpoint recovery. It preserves the two old execution
+records, adds only one new succeeded attempt and new export branch, and passes
+exact Undo/Redo and normal fresh-Host reopen. Independent review confirms300
+decoded frames/PTS and480000 PCM samples/channel equal the prior reference;
+MP4 container bytes differ. Frozen archive/durable prior evidence are preserved.
+The old temporary app/outputs were absent; exact own rematerialization retains
+the first Documents signature failure and a passing1028-file system-temp copy,
+without xattr removal, resigning, installation or GUI. The failure is not a
+newly fixed File Provider compatibility claim.
+
+Live PR105fdf2689 has11/11 remote jobs PASS, attempt1, and targets the unmerged
+PR104 branch. PR96–98/101–105 are the implementation dependency chain above
+main48353df; documentary PR99/100 are separate. Existing approval covers isolated
+evaluation and draft publication with ordinary flags off. No canonical plan
+selects merging105 into104, retargeting105 to main, or merging the dependency
+chain. The new instruction permits only already planned merges after gates, so
+those repository mutations await an explicit route. Main integration, default
+promotion and replacing the installed app are distinct actions; none occurs in
+this record. The original cloud raws remain unavailable for individual audit,
+all historical FAILs remain FAIL, and frame218 cause/fix remain unknown.
+Director: no new impact within this verification/documentation scope; the
+existing typed-operation, IR and History authorities remain unchanged.
