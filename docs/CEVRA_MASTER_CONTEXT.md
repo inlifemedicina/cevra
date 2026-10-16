@@ -4426,3 +4426,33 @@ Historical broad/cloud failures remain failures. Reuse existing acceptance IDs;
 human visual/editorial judgment is still separate. Director has no new impact
 within this checked test/documentation scope; typed operations/IR/History remain
 the execution and state authorities.
+
+### 2026-10-16 — Integration reconciliation and aggregate CI closeout
+
+**LOCAL TECHNICAL CLOSEOUT, experimental acceptance still bounded.** Four
+test/documentation paths at7f1ec2f reconcile the verified55d candidate with its
+native playback and recovery receipts. PR1045261b42 and current main48353df are
+ancestors; existing drafts remain unmerged. One fresh local `npm run ci` passes
+the build,1305 Node and397 UI tests, with one opt-in UI consumer skipped in the
+ordinary aggregate. Directed277-per-flag checks already pass that consumer with
+legitimate input. Node22.23.2/explicit Python3.12.14 and unrestricted Mac scope
+are recorded; this is not a transfer of other commits' remote CI or an all-jobs
+claim. No new current product failure requires a candidate change.
+
+[CI classification and evidence limits](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#technical-closeout-and-aggregate-ci-classification--2026-10-16)
+distinguish the original cloud11FAIL report from the intermediate Mac6FAIL raw
+log. Independent hash/source review supports two inherited Python-selection
+cases, three scope-sensitive native observation cases and one corrected stale
+RPC expectation; all six named cases pass in the current aggregate. The actual
+ResizeObserver defect had failing-before/passing-after evidence and was fixed
+in821. Original cloud logs/PID observations are absent from this Mac transfer:
+the recorded seven-Z/three-UI/one-RPC diagnosis is not independently revalidated
+here. Historical FAILs remain FAIL, and218 is not reproduced or attributed.
+
+The acceptance catalog now contains one short remaining human checklist for
+perceived title/colour/audio fidelity and responsiveness. It reuses the saved
+fixture/exports and does not request already verified functional gates again.
+The frozen55d package and ordinary default-off policy remain unchanged. No new
+architecture, feature, provider, cost, permission or Director authority. Local
+technical review/publication may proceed as draft; merge/default promotion and
+subjective acceptance require their existing gates.

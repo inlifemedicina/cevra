@@ -451,3 +451,40 @@ provider, permission, cost, merge, push or publication. Historical broad/cloud
 FAILs remain unchanged. Director: no new impact within this test/documentation
 scope; typed execution, Project IR and History remain authoritative. Owner
 visual/editorial judgment and broader variants remain open.
+
+## Technical closeout and aggregate CI classification — 2026-10-16
+
+The four-path test/documentation closeout is committed at `7f1ec2f` on top of
+frozen candidate source55d36db. PR104 `5261b42` and current main `48353df` are
+ancestors; no remote main commit is missing from this integration. PR101–104
+remain draft/unmerged. The local experimental chain has not inherited their
+remote CI results. Ordinary compilation still disables both experimental flags.
+
+One fresh local `npm run ci` at7f1ec2f passes the build,1305 Node tests and397 UI
+tests. One opt-in actual-Host UI consumer is skipped in the ordinary aggregate;
+the earlier directed277-per-flag runs supply its legitimate input and pass it.
+The new aggregate uses Node22.23.2 and an explicit CPython3.12.14 test executable
+in the unrestricted Mac executor. It is a new local result, not all GitHub jobs
+or a rewrite of a failed historical invocation. Runtime assembly, Rust and
+Python unit results remain separately bound to their prior checks.
+
+| Recorded run or group | Evidence and disposition |
+|---|---|
+| Original cloud aggregate:11 failures | Historical reports record seven exited workers left as Z under container PID1; three UI and one RPC case passed unchanged repeats with causes unproven. The original aggregate log and PID observations are absent from this Mac transfer. This closeout verifies those recorded claims as records, without independently revalidating individual PIDs or classifying every cloud failure as environmental. The historical run remains FAIL. |
+| Intermediate Mac aggregate:2 Host model-gate failures | Raw TAP and preserved directed base/head logs identify inherited Python selection. Correct3.12 passes both on base1e0 and head9ac. Current7f aggregate passes both named cases. The seven inherited source/test files retain identical bytes through1e0/9ac/821/55d/7f. |
+| Intermediate Mac aggregate:3 native process-observer failures | Raw TAP records `MEDIA_RENDER_RESOURCE_OBSERVATION_FAILED`. Preserved base/head native runs pass3/3; the restricted base run fails3/3 with unchanged sources. Current unrestricted aggregate passes all three named cases. This supports a scope-sensitive observation limitation; it does not establish a memory/disk overshoot or explain the cloud PID evidence. Directed TAP lacks argv/env and raw denied-ps stderr, so environment attribution also relies on the recorded execution receipt. |
+| Intermediate Mac aggregate:1 RPC expected-list failure | The raw expected list omits the closed media tool `cevra-render-manual-title-preview`.9ac corrects that intermediate test expectation; base/head directed checks and the current aggregate pass. The native diagnostic-command ACL is a separate check. No production permission broadening is introduced by this closeout. |
+| Initial forced-experiment UI failures | Raw `ResizeObserver is not defined`, two failing-before regressions, the821 guard and passing-after runs establish an actual experimental product defect that was corrected. Other incomplete Canvas fixtures/current-decoder admission were reconciled separately. Current ordinary aggregate and directed experimental tests pass; these earlier FAILs remain retained. |
+
+The historical Mac aggregate has exactly six TAP failures, not eleven. Hashes
+of its raw log, fourteen directed logs and seven inherited source files were
+checked independently. No new current product defect is demonstrated by this
+triage, so no speculative product or candidate change is made. Frame218 remains
+unreproduced with cause/fix unknown. A future original-cloud audit requires the
+original log and process observations; a successful Mac run cannot supply them.
+
+The [single remaining human checklist](CEVRA_PRODUCT_OWNER_ACCEPTANCE_TESTS.md#remaining-human-judgment-for-the-experimental-candidate--2026-10-16)
+contains only perceived fidelity/fluency judgments on the saved fixture and
+existing exports. Import, boundary checks, two technical returns, native picker
+actions, export decode and physical reopen are already evidenced and are not
+requested again. This does not promote the experiment or broaden acceptance.

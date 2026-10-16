@@ -1139,3 +1139,21 @@ the physically tested55d package is preserved because the continuation modifies
 only tests/docs. Human visual/editorial acceptance, broader variants and global
 release remain unresolved. Historical broad/cloud FAILs are not relabelled PASS.
 [Detailed scope and bindings](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#continuous-native-playback-and-recovery-continuation--2026-10-16).
+
+### Remaining human judgment for the experimental candidate — 2026-10-16
+
+Use the saved55d/runtime0.3.13 horizontal SDR project and existing exports in one
+coordinated Owner round. Reuse bounded D14/D23, X-T6 and K3/K4; this checklist
+does not repeat import, two-loop counting, pickers, export generation or reopen.
+
+- [ ] Judge the existing sequence and export: Unicode/title legibility and
+  placement, perceived colour, audio quality and audiovisual synchrony.
+- [ ] Judge responsiveness and picture continuity while making one title OUT
+  or position adjustment in Sequence. Record whether the wait/loading behaviour
+  and resulting preview feel acceptable for this bounded workflow.
+
+Record APPROVED or NEEDS ADJUSTMENT with the action/frame and concrete concern.
+These are subjective judgments;397 ordinary UI tests, decoded equality and a
+3308ms canvas-submit receipt do not answer them. Broader aspect/colour/source
+variants retain their existing catalog status. Frame218 cause/fix remains
+unestablished; there is no instruction to reproduce it repeatedly.
