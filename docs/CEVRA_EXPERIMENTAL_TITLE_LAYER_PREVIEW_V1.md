@@ -1,9 +1,9 @@
 # Experimental static-title preview — 2026-10-15
 
-Status: **experimental flags remain off by default; two bounded Owner judgments
-APPROVED and repository integration explicitly AUTHORIZED on2026-10-16, pending
-full-combination review and merge gates; no default adoption, release or app
-installation**. Earlier pending-acceptance/route entries below are historical.
+Status: **code integrated into main by PR105 at7392ad3 on2026-10-16; experimental
+flags remain off by default, two bounded Owner judgments approved; post-merge CI
+passed6/6 at attempt1. No default adoption, release or installed
+app replacement**. Earlier pending-acceptance/route entries below are historical.
 
 ## Real Tauri fallback diagnosis — 2026-10-15
 
@@ -568,3 +568,26 @@ colour/overflow/cancellation/deadline cases. Fixture pins and all1028 own-copy
 app/runtime files/modes remain unchanged; deep/strict signature verification
 passes. The failing invocation is preserved. No product/default/runtime or
 historical-frame218 correction is attributed to this test-only adjustment.
+
+## Main integration completion — 2026-10-16
+
+The explicitly authorized PR105→main integration merged normally at
+`7392ad30a4c6ca6ffd8d131ba115a40bf7c29c1c`, with expected source head
+`c3fc0ace84523cd379c1d92ae1706bc9d317c905` over main48353df. Independent review
+covers all120 paths; the harness P2 is closed with native RED/GREEN evidence,
+and all11 exact final-head jobs passed at attempt1 without reruns. The actual
+merge's tree04a7c69e equals the reviewed head and has the expected two parents.
+No bypass was requested. Source headc3fc0ac has36 commits above the old main;
+the two additions after the proposed34 are authorization documentation and the
+bounded test-oracle/documentation correction, with product bytes unchanged.
+
+Post-merge [CI](https://github.com/inlifemedicina/cevra/actions/runs/38953272779)
+and [Exact Runtime](https://github.com/inlifemedicina/cevra/actions/runs/38953272879)
+completed SUCCESS on the actual merge7392ad3:5+1 jobs, attempt1 without reruns.
+These terminal post-merge results are independently bound to that merge. This entry
+updates repository integration state only. The isolated55d/runtime0.3.13
+candidate, installed applications and personal projects are preserved. Both
+ordinary experimental flags remain off; there is no default/engine adoption,
+production release, new provider or new security authority. Historical FAILs,
+missing original cloud raws and the unknown frame218 cause/fix retain their
+recorded status; Owner approval does not resolve them retroactively.
