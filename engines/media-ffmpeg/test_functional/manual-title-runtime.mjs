@@ -138,7 +138,7 @@ async function previewProject(fixture,name) {
   const file=path.join(outputRoot,`${name}.mp4`);writeFileSync(file,Buffer.from(packet.base64,"base64"));
   assert.deepEqual(fixture.history.toArchive(),before);assert.deepEqual(fixture.executions.toArchive(),ledger);
   assert.deepEqual(readdirSync(temporaryRoot),[]);
-  return {file,derived,request};
+  return {file,derived,request,packet};
 }
 try {
   assert.ok(["ready","degraded"].includes((await engine.healthcheck()).status));
@@ -159,8 +159,19 @@ try {
     const count=renders;
     service.edit({version:1,type:"set",expectedSnapshotId:fixture.history.current.history.headSnapshotId,title:title(aspect,{text:"Coffee and connection",startFrame:91,endFrame:209})});
     await assert.rejects(preview.derived.prepare({...preview.request(),expectedSnapshotId:"stale"},new AbortController().signal));
-    await preview.derived.prepare(preview.request(),new AbortController().signal);assert.equal(renders,count+1,"Changed title invalidates preview cache.");
-    fixture.history.undo();await preview.derived.prepare(preview.request(),new AbortController().signal);assert.equal(renders,count+2,"Snapshot-bound cache invalidates after returning to a distinct export snapshot.");
+    const changedPacket=await preview.derived.prepare(preview.request(),new AbortController().signal);
+    assert.equal(renders,count+1,"Changed title invalidates preview cache.");
+    fixture.history.undo();
+    const undoPacket=await preview.derived.prepare(preview.request(),new AbortController().signal);
+    assert.equal(renders,count+1,"Undo reuses the admitted title bytes across the export metadata snapshot.");
+    assert.equal(undoPacket.base64,preview.packet.base64);
+    assert.equal(undoPacket.snapshotId,fixture.history.current.history.headSnapshotId);
+    assert.notEqual(undoPacket.snapshotId,preview.packet.snapshotId);
+    fixture.history.redo();
+    const redoPacket=await preview.derived.prepare(preview.request(),new AbortController().signal);
+    assert.equal(renders,count+1,"Redo reuses the admitted changed-title bytes.");
+    assert.equal(redoPacket.base64,changedPacket.base64);
+    assert.equal(redoPacket.snapshotId,fixture.history.current.history.headSnapshotId);
     preview.derived.close();
     const moved=title(aspect,{version:2,text:"Título direto",startFrame:91,endFrame:209,layout:{version:1,x:.12,y:.25,width:.72,fontScale:.8}});
     service.edit({version:1,type:"set",expectedSnapshotId:fixture.history.current.history.headSnapshotId,title:moved});

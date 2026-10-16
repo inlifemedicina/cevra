@@ -4537,3 +4537,15 @@ The main branch result and post-merge CI will be recorded at actual completion.
 Historical cloud FAIL11/raw-evidence absence and unknown frame218 cause/fix
 remain as recorded. Director impact is the already approved compatible
 typed-operation/presentation integration, with no new execution/state authority.
+
+The full-combination review also found a stale opt-in native harness assertion:
+it still expected an extra render after Undo to already admitted title content
+across export metadata. The unchanged product correctly reused the cached bytes.
+An actual native before-run fails exactly5!=6; the bounded harness correction
+checks reusability, T1/T2 bytes and the current packet snapshot in Undo/Redo.
+The complete corrected H/V harness passes, including12 title-quality cases,
+colour/overflow refusal and cancellation/deadline cases. Original fixture pins
+and all1028 files/modes of the own runtime/app copy remain identical with strict
+signature verification passing. The failing run is retained; this is a test
+oracle correction, not a product or frame218 fix. Final CI must run on the
+subsequent test/documentation head before merge.

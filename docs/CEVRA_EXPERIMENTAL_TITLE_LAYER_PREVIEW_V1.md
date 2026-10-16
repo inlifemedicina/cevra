@@ -557,3 +557,14 @@ a terminal result and the canonical ledger must record the actual merge state.
 No installed app or personal project is replaced. PR99/100's separate documentary
 chain is not incorporated or silently decided. Historical FAILs stay FAIL, the
 original cloud raws remain absent and frame218 cause/fix remain unknown.
+
+Full-combination review reproduced a separate P2 in the opt-in native title
+harness: it demanded another render on Undo even though the admitted title bytes
+remain reusable across metadata snapshots. The unmodified harness fails exactly
+5!=6. Only its oracle is corrected: Undo/Redo must reuse the respective T1/T2
+bytes without an extra render, while each packet carries the current snapshot.
+The complete native H/V harness then passes, including12 quality cases and the
+colour/overflow/cancellation/deadline cases. Fixture pins and all1028 own-copy
+app/runtime files/modes remain unchanged; deep/strict signature verification
+passes. The failing invocation is preserved. No product/default/runtime or
+historical-frame218 correction is attributed to this test-only adjustment.
