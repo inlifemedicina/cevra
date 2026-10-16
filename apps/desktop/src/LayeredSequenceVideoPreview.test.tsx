@@ -263,3 +263,36 @@ it("isolates observation write failures from draw fallback and cleanup",async()=
  expect(calls.filter(r=>r.kind==="fallback")).toHaveLength(1);expect(calls.filter(r=>r.kind==="playback")).toHaveLength(1);
  expect(JSON.stringify(calls)).not.toContain("private canvas");
 });
+
+it("keeps two continuous callback-driven loops across a two-clip cut, exact title boundaries and a final natural stop",async()=>{
+ vi.stubEnv("VITE_CEVRA_TITLE_LAYER_EXPERIMENT","1");
+ const f=fixture(),range={...title,endFrame:240},history=new ProjectHistory(createEmptyProject({id:"continuous-loops"}));
+ const a={...f.props.clip!,id:"first",sourceEndMs:5000,timelineEndMs:5000,frameTiming:{version:1 as const,sourceStartFrame:0,sourceEndFrame:150,timelineStartFrame:0,timelineEndFrame:150}};
+ const b={...f.props.clip!,id:"second",sourceStartMs:5000,timelineStartMs:5000,frameTiming:{version:1 as const,sourceStartFrame:150,sourceEndFrame:300,timelineStartFrame:150,timelineEndFrame:300}};
+ history.commit({type:"source.add",source:f.props.source!});history.commit({type:"timeline.edit",version:2,edits:[{type:"timeline.timingPolicy.set",timingPolicy:"cfr30"},{type:"track.add",track:{id:"v1",kind:"video",name:"V1",locked:false,hidden:false,muted:false}},{type:"clip.add",clip:a},{type:"clip.add",clip:b}]});history.commit({type:"graphic.manualTitle.set",graphic:manualTitleGraphic("title",range)});
+ const original=JSON.stringify(history.current),snapshotId=history.current.history.headSnapshotId!;
+ f.preview.mockImplementation(async request=>{const p=packet(request,range);p.sequence!.clipIds=[a.id,b.id];return p});
+ const {container}=render(<ManualSequenceVideoPreview backend={f.backend} project={history.current} clips={history.current.timeline.clips} presentations={new Map()} originalSourceId="source" busy={false} requestedMode="sequence" requestedLoop seek={{sequence:1,timelineMs:0}} t={f.props.t} onPlayheadChange={vi.fn()} onCreate={vi.fn()} titleEditing={{...f.props.titleEditing!,snapshotId,title:range}}/>);
+ const video=await ready(container),url=video.getAttribute("src"),loads=load.mock.calls.length;
+ Object.defineProperty(video,"paused",{configurable:true,value:false});fireEvent.click(screen.getByRole("button",{name:"preview.playLocal"}));fireEvent.play(video);
+ async function continuousCycle(){
+  for(let frame=0;frame<300;frame++)await act(async()=>{
+   video.currentTime=frame/30;const [id,tick]=[...callbacks.entries()].at(-1)!;callbacks.delete(id);
+   const before=draw.mock.calls.length;tick(frame*1000/30,{mediaTime:frame/30} as VideoFrameCallbackMetadata);
+   if([89,90,149,150,239,240].includes(frame))expect(draw.mock.calls.length-before).toBe(frame>=90&&frame<240?2:1);
+  });
+  expect(container.querySelector("canvas")!.getAttribute("data-frame")).toBe("299");
+ }
+ for(let cycle=0;cycle<2;cycle++){
+  await continuousCycle();const staleTick=[...callbacks.values()].at(-1)!;
+  await act(async()=>{video.currentTime=10;fireEvent.ended(video)});await ready(container);
+  expect(container.querySelector("canvas")!.getAttribute("data-frame")).toBe("0");
+  const count=draw.mock.calls.length;await act(async()=>staleTick(0,{mediaTime:9.9} as VideoFrameCallbackMetadata));expect(draw).toHaveBeenCalledTimes(count);
+  expect(video.getAttribute("src")).toBe(url);expect(load).toHaveBeenCalledTimes(loads);expect(f.preview).toHaveBeenCalledTimes(1);
+ }
+ fireEvent.click(screen.getByRole("checkbox",{name:"sequence.repeat"}));await continuousCycle();
+ await act(async()=>{video.currentTime=10;fireEvent.ended(video)});
+ expect(container.querySelector("canvas")!.getAttribute("data-frame")).toBe("300");expect(screen.getByRole("button",{name:"preview.playLocal"})).toBeTruthy();
+ expect(JSON.stringify(history.current)).toBe(original);expect(history.current.history.headSnapshotId).toBe(snapshotId);
+ expect(screen.queryByText("preview.layerFallback")).toBeNull();expect(video.getAttribute("src")).toBe(url);expect(f.preview).toHaveBeenCalledTimes(1);
+});

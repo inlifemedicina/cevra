@@ -1118,3 +1118,24 @@ A Documents-TMPDIR native FAIL is preserved and reproduced with the earlier CJS;
 its precise metadata cause remains unresolved, despite a passing system-TMPDIR
 proof. No historical failure or PR104-specific CI is promoted to integration CI.
 The parent reserves GUI until explicit release; no capture is allowed meanwhile.
+
+### Native playback and recovery continuation — 2026-10-16
+
+Reuse the existing D14/D23, I4, X-T1/T2/T6/T7 and bounded K3/K4 variants; this
+entry records technical evidence, without creating a new human checklist.
+
+| Existing variant | New evidence and limit |
+|---|---|
+| X-T6 / experimental continuous sequence | Official CUA on frozen55d/runtime0.3.13: one continuous attempt, two native returns,23 correlated observations under one snapshot, no fallback/draw failure; Repeat off reaches300/300 and Play. Prior218 retention is not reproduced; cause/fix remain unknown. |
+| X-T2 / physical app reopen | Official normal Quit/inventory absence and physical Tauri reopen; project/media/two clips/Unicode title/10s/Saved return. Before/after checkpoint SHA256 is identical. |
+| D14/D23 / title and cut limits | New React regression drives900 callbacks through89/90,149/150,239/240, two returns, old-callback rejection and final stop. Mocks verify control flow/draw gates, not native pixels/paint;277 directed UI tests per flag mode pass. Real square1 boundary images remain separate prior evidence. |
+| I4, X-T1/T7 / source location and refusal | New isolated packaged-Host chain verifies warm-cache/missing-source refusal, same-size wrong-byte rejection, correct Locate and exact Undo/Redo. Only URI plus audited History/update metadata changes. Native picker evidence remains the earlier square1 run, not repeated55d evidence. |
+| K3/K4 / export, X-T2 / recovery | New baseline and post-Locate/reopen exports have equal300 decoded frame hashes/PTS and480000 PCM samples/channel. Existing-destination refusal preserves bytes. Another copied store with corrupt current recovers exact previous revision7/one export, quarantines bad bytes and does not replay the lost revision8/two-export state. |
+
+The initial55d canvas-submit receipt is3308ms, with physicalPaintMs=null; no
+2.2-second elimination or fluency score is established. Export/Locate were not
+repeated in that short CUA script. Ordinary experimental flags remain off and
+the physically tested55d package is preserved because the continuation modifies
+only tests/docs. Human visual/editorial acceptance, broader variants and global
+release remain unresolved. Historical broad/cloud FAILs are not relabelled PASS.
+[Detailed scope and bindings](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#continuous-native-playback-and-recovery-continuation--2026-10-16).

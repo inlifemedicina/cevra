@@ -363,3 +363,91 @@ No current GUI, Take, security/energy/network setting, default adoption, real AI
 merge, push, publication or Owner acceptance occurs. Historical broad FAILs remain
 unchanged. Director impact remains a compatible observation/diagnostic extension;
 typed execution, Project IR and History retain their existing authority.
+
+## Continuous native playback and recovery continuation — 2026-10-16
+
+The coordinated official CUA operator completed the short script on frozen
+`55d36db` / runtime0.3.13, archive SHA256
+`00361b2d679092a2b8d60a665801b1afe901bc9fbf8bbc8381df284dd5a9a6d9`.
+The exclusive playback1 store was absent before launch. The operator created
+two clips0..150 and150..300 and the Unicode title90..240 on the own tagged
+BT709 fixture. One continuous attempt had no user seeks or remounts:23 native
+playback observations span epochs2/3/4 under one snapshot, with two clock/frame
+returns. Decoder time, callback counts and successful draws advance; all rows
+report readyState4, paused=false, errorCode=null and draw.failed=0. There is no
+fallback. Turning Repeat off then reaches the natural300/300 end and Play.
+The23-sample ceiling explains collection ending during epoch4; it does not
+establish that playback stopped. Independent receipt review confirms the
+correlation and its limits.
+
+Normal Quit is confirmed by absence from the app inventory, followed by a
+physical CUA reopen of the same app. Project, media, two clips, Unicode title,
+10-second sequence and Saved state return. The checkpoint before close and
+after reopen is byte-identical, SHA256
+`9dfa718649e9105f9bfd6053db84fefe60cd293cd71e002a5836ba38ac2e7f21`.
+The preserved square1 checkpoint is also byte-identical. This attempt does not
+reproduce the historical frame218 retention. Its cause and a fix remain
+unestablished: the draw guard never triggers in these observations. The square1
+failure remains historical evidence, not a newly passing run. Export and Locate
+were not repeated in this short CUA script.
+
+The initial native canvas receipt records3308ms request-to-canvas,58ms UI decode,
+3225.01ms Host and3242ms Tauri. Physical paint is null. This is one technical
+sample, not a latency distribution, human fluency verdict or elimination of2.2s.
+Receipt SHA256 is
+`e99f7e7baee48d0d56c914de5815f6cc36541cb646733fef66398c39fa0189e3`;
+the original file remains0600. No Owner acceptance follows automatically.
+
+New offline work on a separate test/documentation branch adds one continuous
+React regression. It drives900 frame callbacks in separate `act` commits,
+crosses title89/90/239/240 and cut149/150, checks two natural-event returns,
+rejects callbacks retained from each old epoch, and ends at300 after Repeat off.
+The decoder URL, load count, one preparation and unchanged History are checked.
+The decoder and Canvas are mocked: draw-call counts do not prove cut pixels,
+native decoding, actual decoder pause or physical paint. This complements the
+real CUA receipts. Seven directed UI suites pass277 tests in each flag mode,
+including the opt-in consumer of the two previously prepared real Host packets;
+those packet-delivery tests are not new native rendering runs. Independent
+review prompted the per-frame React commits and approves the bounded claims.
+
+A new packaged-Host proof copies the playback checkpoint into an owned system
+temporary root and copies the immutable fixture. It never edits a GUI store.
+Four normal Host sessions exit0. Fourteen checks cover this combined sequence:
+baseline export, warm layer, disappearance of only the own source, missing-source
+preview/export refusal, same-size wrong-byte Locate refusal, correct Locate,
+Undo/refusal, Redo, fresh Host reopen, second export, existing-destination refusal,
+and recovery from an invalid current checkpoint in another copied store.
+Missing source returns `MANUAL_VIDEO_SOURCE_CHANGED` even with a retained base;
+the wrong file returns `SOURCE_RELOCATION_CONTENT_MISMATCH`. Refusals preserve
+Project IR/History and create no missing-source output. Correct Locate changes
+only URI plus audited History/update metadata, preserving IDs, numbering, cuts,
+title and prior export. Undo/Redo restores the exact respective projects.
+Normal reopen retains both successful exports and leaves the execution ledger
+byte-identical; no automatic rendering/replay is observed.
+
+Baseline and post-Locate/normal-reopen exports both decode300
+H2641080p/BT709tv/SAR1 frames at
+exact CFR30 PTS0..9.966667 and480000 AAC48k stereo samples per channel. Every
+decoded frame hash, every PTS and the entire decoded PCM match. MP4 container
+bytes differ; no container identity or subjective glyph/audio verdict is claimed.
+An existing output returns `MANUAL_EXPORT_DESTINATION_EXISTS` and its bytes
+remain unchanged. The separately corrupted copy opens as `local-recovered`,
+restoring exactly previous revision7 with one export, versus latest revision8
+with two. The invalid bytes are quarantined exactly. Recovery intentionally
+does not synthesize the lost current revision or replay its successful export.
+Both exports precede deliberate checkpoint corruption; the second follows
+media-location recovery and normal reopen. No export in the `local-recovered`
+session is measured here.
+
+Evidence is external at `overnight-five-blocks-evidence` in the Mac task2
+workspace, with scripts, raw reports, read-only CUA copies, stream/frame/PCM
+comparisons, checkpoints, independent reviews and SHA256 bindings. The eight
+preserved app inventories still match every byte and file mode; playback55d's
+1028-file archive and deep/strict signature are reverified. This continuation
+changes only a test and canonical documentation, so the physically tested55d
+app remains the designated experimental candidate; no replacement app is built
+or installed. Ordinary flags remain off. No new architecture, engine, runtime,
+provider, permission, cost, merge, push or publication. Historical broad/cloud
+FAILs remain unchanged. Director: no new impact within this test/documentation
+scope; typed execution, Project IR and History remain authoritative. Owner
+visual/editorial judgment and broader variants remain open.

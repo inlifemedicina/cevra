@@ -4393,3 +4393,36 @@ The parent must release GUI explicitly before a distinct consolidated candidate
 can run the remaining technical Tauri/IPC/visual group. Owner judgment remains
 separate. Director: compatible presentation/closed-error/source-location
 reconciliation, with unchanged typed execution, Project IR and History authority.
+
+### 2026-10-16 — Native continuous playback and five-block validation
+
+**EXPERIMENTAL / TECHNICAL GATES ADVANCED, no global Owner acceptance.** The
+coordinated official CUA operator completed one continuous two-return attempt
+on frozen55d36db/runtime0.3.13, followed by Repeat-off natural300/300 completion,
+normal Quit and physical Tauri reopen. Native decoder/callback/draw observations
+advance under one snapshot across epochs2/3/4, without fallback or draw failure.
+Before-close and after-reopen checkpoints are byte-identical; square1 is preserved.
+Historical218 retention was not reproduced, and no cause or fix is established.
+The initial3308ms request-to-canvas sample has physicalPaintMs=null and is not
+a latency promise. [Scope and evidence](CEVRA_EXPERIMENTAL_TITLE_LAYER_PREVIEW_V1.md#continuous-native-playback-and-recovery-continuation--2026-10-16)
+separates these real CUA results from mocks, Host proofs and subjective acceptance.
+
+A separate test/documentation continuation adds900 callback steps through two
+loops, exact title/cut boundaries, obsolete callbacks and final natural stop;
+277 directed UI tests pass per flag mode with legitimate optional Host input.
+A new isolated packaged-Host sequence confirms source disappearance/warm-cache
+refusal, wrong-byte/correct Locate, Undo/Redo, reopen, export and no overwrite.
+Baseline and post-Locate/normal-reopen exports have identical300 frame hashes/PTS
+and480000 decoded PCM samples per channel. A deliberately invalid current in
+another copied store recovers exactly the prior checkpoint and quarantines
+invalid bytes, without execution replay; revision7/one export is retained,
+not the lost revision8/two exports. Four normal Host sessions exit0.
+
+No product executable changes in this continuation: the verified1028-file55d
+archive remains the experimental candidate, with eight previous app inventories
+preserved. No new package/install, default promotion, GUI action by engineering,
+Take operation, provider/cost/security change, merge, push or publication.
+Historical broad/cloud failures remain failures. Reuse existing acceptance IDs;
+human visual/editorial judgment is still separate. Director has no new impact
+within this checked test/documentation scope; typed operations/IR/History remain
+the execution and state authorities.
